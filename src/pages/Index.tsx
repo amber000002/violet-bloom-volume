@@ -1,7 +1,7 @@
-import { EmailBenchmark } from "@/components/EmailBenchmark";
+import { InboxAlchemy } from "@/components/InboxAlchemy";
 
 const Index = () => {
-  return <EmailBenchmark />;
+  return <InboxAlchemy />;
 };
 
 export default Index;

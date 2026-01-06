@@ -1,3 +1,23 @@
+export interface LifecycleUseCase {
+  name: string;
+  trigger: string;
+  whyItWorks: string;
+  frequencyGuardrail: string;
+}
+
+export interface LifecycleStageUseCases {
+  newUser: LifecycleUseCase[];
+  browsing: LifecycleUseCase[];
+  firstPurchase: LifecycleUseCase[];
+  repeatCustomer: LifecycleUseCase[];
+  lapsed: LifecycleUseCase[];
+}
+
+export interface AMPUseCase {
+  id: string;
+  name: string;
+}
+
 export interface IndustryConfig {
   name: string;
   activeUserPercent: number;
@@ -9,7 +29,54 @@ export interface IndustryConfig {
   purchaseCycle: string;
   frequencyReason: string;
   fatigueRisk: string;
+  lifecycleUseCases: LifecycleStageUseCases;
+  ampUseCases: AMPUseCase[];
 }
+
+export const lifecycleStages = [
+  { id: "newUser", label: "New user" },
+  { id: "browsing", label: "Browsing / considering" },
+  { id: "firstPurchase", label: "First purchase" },
+  { id: "repeatCustomer", label: "Repeat customer" },
+  { id: "lapsed", label: "Lapsed / inactive" },
+] as const;
+
+export type LifecycleStageId = typeof lifecycleStages[number]["id"];
+
+const defaultLifecycleUseCases: LifecycleStageUseCases = {
+  newUser: [
+    { name: "Welcome series", trigger: "Immediately after signup", whyItWorks: "Sets expectations and builds initial trust", frequencyGuardrail: "3-5 emails over 7-14 days" },
+    { name: "Onboarding guide", trigger: "24-48 hours after signup", whyItWorks: "Helps users discover key features", frequencyGuardrail: "1 email per milestone" },
+    { name: "Value proposition reminder", trigger: "3 days post-signup with no action", whyItWorks: "Re-engages before interest fades", frequencyGuardrail: "Max 2 reminder emails" },
+  ],
+  browsing: [
+    { name: "Browse abandonment", trigger: "1-4 hours after browsing without action", whyItWorks: "Captures high-intent moments", frequencyGuardrail: "Max 1 per browse session" },
+    { name: "Wishlist reminder", trigger: "24-48 hours after adding to wishlist", whyItWorks: "Converts saved intent to action", frequencyGuardrail: "Weekly max" },
+    { name: "Price drop alert", trigger: "When viewed item price decreases", whyItWorks: "Creates urgency with real value", frequencyGuardrail: "Only for significant drops (10%+)" },
+  ],
+  firstPurchase: [
+    { name: "Order confirmation", trigger: "Immediately after purchase", whyItWorks: "Builds confidence and reduces anxiety", frequencyGuardrail: "1 email per order" },
+    { name: "Getting started guide", trigger: "Upon delivery/activation", whyItWorks: "Maximizes product value realization", frequencyGuardrail: "1-2 emails post-delivery" },
+    { name: "Feedback request", trigger: "7-14 days post-delivery", whyItWorks: "Shows you care about their experience", frequencyGuardrail: "1 request per purchase" },
+  ],
+  repeatCustomer: [
+    { name: "Loyalty program update", trigger: "Monthly or on tier changes", whyItWorks: "Rewards engagement and builds stickiness", frequencyGuardrail: "Monthly max" },
+    { name: "Personalized recommendations", trigger: "Based on purchase history patterns", whyItWorks: "Demonstrates understanding of preferences", frequencyGuardrail: "Weekly max" },
+    { name: "Early access offers", trigger: "Before public sales/launches", whyItWorks: "Makes customers feel valued", frequencyGuardrail: "Only for genuine exclusives" },
+  ],
+  lapsed: [
+    { name: "We miss you", trigger: "30-60 days of inactivity", whyItWorks: "Personal touch can reignite interest", frequencyGuardrail: "Max 2-3 in win-back series" },
+    { name: "What's new digest", trigger: "45-90 days of inactivity", whyItWorks: "Shows evolution since they left", frequencyGuardrail: "1 comprehensive update" },
+    { name: "Exclusive return offer", trigger: "60-90 days of inactivity", whyItWorks: "Incentivizes re-engagement", frequencyGuardrail: "Final attempt before suppression" },
+  ],
+};
+
+const defaultAmpUseCases: AMPUseCase[] = [
+  { id: "cart-abandonment", name: "Cart abandonment" },
+  { id: "reorder-reminder", name: "Reorder reminder" },
+  { id: "feedback-survey", name: "Feedback survey" },
+  { id: "appointment-booking", name: "Appointment booking" },
+];
 
 export const industryConfigs: Record<string, IndustryConfig> = {
   banking: {
@@ -23,6 +90,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Banking relationships span years with monthly touchpoints around statements, offers, and financial insights.",
     frequencyReason: "Lower frequency builds trust without overwhelming users with financial messaging.",
     fatigueRisk: "Over-communication can feel intrusive given the sensitive nature of financial data.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Account activation welcome", trigger: "Immediately after account opening", whyItWorks: "Builds trust from day one", frequencyGuardrail: "3 emails over 14 days" },
+        { name: "Digital banking onboarding", trigger: "24 hours post-activation", whyItWorks: "Drives app adoption and self-service", frequencyGuardrail: "1 email per feature set" },
+        { name: "Security setup reminder", trigger: "48 hours if security not configured", whyItWorks: "Protects customer and builds confidence", frequencyGuardrail: "Max 2 reminders" },
+      ],
+      browsing: [
+        { name: "Product comparison helper", trigger: "After viewing multiple products", whyItWorks: "Simplifies complex financial decisions", frequencyGuardrail: "Weekly max" },
+        { name: "Rate change notification", trigger: "When rates change on viewed products", whyItWorks: "Creates timely decision moments", frequencyGuardrail: "Only for significant changes" },
+        { name: "Pre-qualification offer", trigger: "After eligibility check", whyItWorks: "Reduces application friction", frequencyGuardrail: "Once per product category" },
+      ],
+      firstPurchase: [
+        { name: "Product welcome kit", trigger: "Upon product activation", whyItWorks: "Maximizes product utilization", frequencyGuardrail: "2-3 emails over first month" },
+        { name: "First statement walkthrough", trigger: "With first statement", whyItWorks: "Reduces confusion and support calls", frequencyGuardrail: "One-time" },
+        { name: "Relationship manager intro", trigger: "For premium products", whyItWorks: "Personalizes the banking experience", frequencyGuardrail: "One-time" },
+      ],
+      repeatCustomer: [
+        { name: "Cross-sell recommendations", trigger: "Based on life events and usage", whyItWorks: "Anticipates genuine needs", frequencyGuardrail: "Monthly max" },
+        { name: "Loyalty tier updates", trigger: "On tier changes or annually", whyItWorks: "Rewards relationship depth", frequencyGuardrail: "Quarterly max" },
+        { name: "Financial wellness tips", trigger: "Monthly", whyItWorks: "Positions bank as trusted advisor", frequencyGuardrail: "Monthly newsletter" },
+      ],
+      lapsed: [
+        { name: "Account dormancy alert", trigger: "90 days of inactivity", whyItWorks: "Regulatory compliance and re-engagement", frequencyGuardrail: "Max 2 before escalation" },
+        { name: "New features announcement", trigger: "60 days of minimal activity", whyItWorks: "Shows continued innovation", frequencyGuardrail: "One-time" },
+        { name: "Relationship review offer", trigger: "Before account review period", whyItWorks: "Proactive service touch", frequencyGuardrail: "Annual" },
+      ],
+    },
+    ampUseCases: [
+      { id: "appointment-booking", name: "Branch appointment booking" },
+      { id: "card-controls", name: "Card controls toggle" },
+      { id: "spend-categorization", name: "Transaction categorization" },
+      { id: "limit-adjustment", name: "Limit adjustment" },
+    ],
   },
   nbfcs: {
     name: "NBFCs",
@@ -35,6 +135,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Loan cycles vary from months to years, with repayment reminders and new offer windows.",
     frequencyReason: "Regular but measured communication supports repayment discipline and cross-sell timing.",
     fatigueRisk: "Aggressive lending offers may feel predatory if not timed with user intent signals.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Loan disbursement confirmation", trigger: "Upon disbursement", whyItWorks: "Confirms transaction and builds trust", frequencyGuardrail: "1 confirmation email" },
+        { name: "Repayment schedule overview", trigger: "24 hours post-disbursement", whyItWorks: "Sets clear expectations", frequencyGuardrail: "One-time" },
+        { name: "App/portal onboarding", trigger: "48 hours post-disbursement", whyItWorks: "Enables self-service", frequencyGuardrail: "1-2 onboarding emails" },
+      ],
+      browsing: [
+        { name: "Pre-approved offer", trigger: "After eligibility check", whyItWorks: "Reduces friction for interested users", frequencyGuardrail: "Monthly max" },
+        { name: "Rate comparison helper", trigger: "After viewing multiple products", whyItWorks: "Simplifies decision-making", frequencyGuardrail: "Once per browse session" },
+        { name: "Document checklist", trigger: "After starting application", whyItWorks: "Reduces drop-off", frequencyGuardrail: "One-time per application" },
+      ],
+      firstPurchase: [
+        { name: "EMI reminder setup", trigger: "Before first EMI due date", whyItWorks: "Prevents missed payments", frequencyGuardrail: "One-time setup" },
+        { name: "Auto-debit confirmation", trigger: "After mandate setup", whyItWorks: "Builds payment confidence", frequencyGuardrail: "One-time" },
+        { name: "First EMI success celebration", trigger: "After first successful payment", whyItWorks: "Positive reinforcement", frequencyGuardrail: "One-time" },
+      ],
+      repeatCustomer: [
+        { name: "Top-up loan offer", trigger: "After 6+ months of on-time payments", whyItWorks: "Rewards good behavior", frequencyGuardrail: "Quarterly max" },
+        { name: "Foreclosure benefits", trigger: "At eligible milestone", whyItWorks: "Provides flexibility", frequencyGuardrail: "One-time per eligibility" },
+        { name: "Credit score update", trigger: "Monthly or on significant change", whyItWorks: "Adds value beyond lending", frequencyGuardrail: "Monthly max" },
+      ],
+      lapsed: [
+        { name: "Payment reminder", trigger: "3 days before due date", whyItWorks: "Prevents defaults", frequencyGuardrail: "One per payment cycle" },
+        { name: "Overdue notice", trigger: "On missed payment", whyItWorks: "Essential for collections", frequencyGuardrail: "Escalating series" },
+        { name: "Fresh start offer", trigger: "After loan closure", whyItWorks: "Re-engages for future needs", frequencyGuardrail: "One-time post-closure" },
+      ],
+    },
+    ampUseCases: [
+      { id: "emi-calculator", name: "In-email EMI calculator" },
+      { id: "payment-options", name: "Payment method selector" },
+      { id: "document-upload", name: "Document upload" },
+      { id: "appointment-booking", name: "Call-back scheduling" },
+    ],
   },
   amcs: {
     name: "AMCs",
@@ -47,6 +180,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Investment decisions are quarterly to annual, with market-driven engagement spikes.",
     frequencyReason: "Investors prefer thoughtful, insight-led communication over frequent selling.",
     fatigueRisk: "Too many market alerts can create anxiety rather than confidence.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "sip-modification", name: "SIP amount modification" },
+      { id: "fund-comparison", name: "Fund comparison tool" },
+      { id: "goal-tracker", name: "Goal progress tracker" },
+      { id: "redemption-request", name: "Quick redemption" },
+    ],
   },
   insurance: {
     name: "Insurance",
@@ -59,6 +199,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Policy renewals are annual, with claim-related touchpoints as needed.",
     frequencyReason: "Insurance is a low-frequency, high-trust category requiring gentle nurturing.",
     fatigueRisk: "Frequent reminders can feel pushy for a product people hope never to use.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Policy welcome kit", trigger: "Upon policy issuance", whyItWorks: "Demystifies coverage details", frequencyGuardrail: "2-3 emails over 7 days" },
+        { name: "Claim process guide", trigger: "7 days post-purchase", whyItWorks: "Prepares for when it matters most", frequencyGuardrail: "One-time" },
+        { name: "App/portal onboarding", trigger: "48 hours post-purchase", whyItWorks: "Enables self-service", frequencyGuardrail: "One-time" },
+      ],
+      browsing: [
+        { name: "Quote comparison helper", trigger: "After viewing multiple plans", whyItWorks: "Simplifies complex decisions", frequencyGuardrail: "Once per session" },
+        { name: "Coverage calculator", trigger: "After using calculator tools", whyItWorks: "Builds confidence in coverage amount", frequencyGuardrail: "One-time" },
+        { name: "Expert consultation offer", trigger: "After extended browsing", whyItWorks: "Addresses complex questions", frequencyGuardrail: "One-time" },
+      ],
+      firstPurchase: [
+        { name: "Nominee confirmation", trigger: "If nominee details incomplete", whyItWorks: "Ensures policy completeness", frequencyGuardrail: "Max 2 reminders" },
+        { name: "Premium payment confirmation", trigger: "After each payment", whyItWorks: "Builds payment confidence", frequencyGuardrail: "Per payment" },
+        { name: "Coverage review reminder", trigger: "6 months post-purchase", whyItWorks: "Encourages adequate coverage", frequencyGuardrail: "Bi-annual" },
+      ],
+      repeatCustomer: [
+        { name: "Policy renewal reminder", trigger: "30-60 days before expiry", whyItWorks: "Prevents coverage gaps", frequencyGuardrail: "3 emails max per renewal" },
+        { name: "Loyalty discount offer", trigger: "At renewal time", whyItWorks: "Rewards continued trust", frequencyGuardrail: "Annual" },
+        { name: "Life stage check-in", trigger: "On major life events", whyItWorks: "Shows genuine care", frequencyGuardrail: "Quarterly max" },
+      ],
+      lapsed: [
+        { name: "Grace period reminder", trigger: "On premium due date", whyItWorks: "Prevents policy lapse", frequencyGuardrail: "2-3 during grace period" },
+        { name: "Reinstatement guide", trigger: "After policy lapse", whyItWorks: "Provides path back", frequencyGuardrail: "One-time" },
+        { name: "New product introduction", trigger: "60 days post-lapse", whyItWorks: "Re-engages with fresh options", frequencyGuardrail: "One-time" },
+      ],
+    },
+    ampUseCases: [
+      { id: "renewal-payment", name: "One-click renewal payment" },
+      { id: "claim-status", name: "Claim status tracker" },
+      { id: "hospital-finder", name: "Network hospital finder" },
+      { id: "policy-download", name: "Policy document access" },
+    ],
   },
   "travel-hospitality": {
     name: "Travel and Hospitality (OTA)",
@@ -71,6 +244,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Travel planning happens seasonally with dream, plan, book, and post-trip phases.",
     frequencyReason: "Higher frequency works during planning windows; inspiration-led content performs well.",
     fatigueRisk: "Constant deal emails lose impact when users aren't in planning mode.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Inspiration series", trigger: "After signup", whyItWorks: "Sparks travel dreaming", frequencyGuardrail: "3-4 emails over 14 days" },
+        { name: "First booking incentive", trigger: "7 days post-signup with no booking", whyItWorks: "Drives first conversion", frequencyGuardrail: "One-time" },
+        { name: "App feature tour", trigger: "48 hours post-signup", whyItWorks: "Increases app engagement", frequencyGuardrail: "One-time" },
+      ],
+      browsing: [
+        { name: "Search abandonment", trigger: "1-4 hours after search", whyItWorks: "Captures planning intent", frequencyGuardrail: "Max 1 per search session" },
+        { name: "Price drop alert", trigger: "On price decrease for viewed routes", whyItWorks: "Creates urgency with value", frequencyGuardrail: "Only significant drops" },
+        { name: "Alternative destinations", trigger: "After repeated searches", whyItWorks: "Expands options", frequencyGuardrail: "Weekly max" },
+      ],
+      firstPurchase: [
+        { name: "Booking confirmation", trigger: "Immediately after booking", whyItWorks: "Confirms and excites", frequencyGuardrail: "One per booking" },
+        { name: "Pre-trip countdown", trigger: "7, 3, 1 day before travel", whyItWorks: "Builds anticipation", frequencyGuardrail: "3 emails per trip" },
+        { name: "Add-on suggestions", trigger: "Post-booking", whyItWorks: "Enhances trip value", frequencyGuardrail: "2-3 relevant suggestions" },
+      ],
+      repeatCustomer: [
+        { name: "Loyalty points update", trigger: "Monthly or post-booking", whyItWorks: "Rewards continued booking", frequencyGuardrail: "Monthly" },
+        { name: "Personalized deals", trigger: "Based on travel history", whyItWorks: "Shows you know their preferences", frequencyGuardrail: "Weekly max" },
+        { name: "Anniversary trip suggestion", trigger: "Near past travel dates", whyItWorks: "Triggers nostalgia and re-booking", frequencyGuardrail: "Annual per destination" },
+      ],
+      lapsed: [
+        { name: "We miss you", trigger: "60 days of no activity", whyItWorks: "Personal touch", frequencyGuardrail: "One-time" },
+        { name: "Exclusive comeback offer", trigger: "90 days of no booking", whyItWorks: "Incentivizes return", frequencyGuardrail: "One-time" },
+        { name: "Travel trend digest", trigger: "45 days of inactivity", whyItWorks: "Re-sparks wanderlust", frequencyGuardrail: "One-time" },
+      ],
+    },
+    ampUseCases: [
+      { id: "seat-selection", name: "In-email seat selection" },
+      { id: "hotel-gallery", name: "Hotel room carousel" },
+      { id: "date-picker", name: "Travel date picker" },
+      { id: "price-alert-setup", name: "Price alert configuration" },
+    ],
   },
   aviation: {
     name: "Aviation",
@@ -83,6 +289,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Booking cycles span weeks to months, with loyalty program engagement ongoing.",
     frequencyReason: "Pre-flight and loyalty communications have high engagement; post-flight is key for retention.",
     fatigueRisk: "Generic fare alerts without personalization quickly become noise.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "check-in", name: "In-email check-in" },
+      { id: "seat-upgrade", name: "Seat upgrade selector" },
+      { id: "meal-preference", name: "Meal preference picker" },
+      { id: "boarding-pass", name: "Dynamic boarding pass" },
+    ],
   },
   "cab-aggregators": {
     name: "Cab Aggregators",
@@ -95,6 +308,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Daily to weekly usage with high-frequency micro-transactions.",
     frequencyReason: "Transactional and promotional emails can be frequent given habitual usage patterns.",
     fatigueRisk: "Ride receipts are expected; excessive promotional emails erode value perception.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "ride-rating", name: "In-email ride rating" },
+      { id: "tip-driver", name: "Driver tipping" },
+      { id: "ride-booking", name: "Quick ride booking" },
+      { id: "subscription-manage", name: "Pass management" },
+    ],
   },
   "food-tech": {
     name: "Food Tech",
@@ -107,6 +327,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Daily to weekly ordering habits with meal-time driven engagement windows.",
     frequencyReason: "High frequency is acceptable around meal times with relevant, timely offers.",
     fatigueRisk: "Blanket discounts train users to wait for deals rather than order naturally.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Welcome with first order discount", trigger: "Immediately after signup", whyItWorks: "Drives first conversion quickly", frequencyGuardrail: "One-time" },
+        { name: "Cuisine preference discovery", trigger: "24 hours post-signup", whyItWorks: "Enables personalization", frequencyGuardrail: "One-time" },
+        { name: "App feature highlights", trigger: "48 hours post-signup", whyItWorks: "Increases app stickiness", frequencyGuardrail: "One-time" },
+      ],
+      browsing: [
+        { name: "Cart abandonment", trigger: "30 min - 1 hour after cart abandonment", whyItWorks: "Captures meal-time intent", frequencyGuardrail: "Max 1 per cart" },
+        { name: "Restaurant recommendation", trigger: "Based on browsing patterns", whyItWorks: "Simplifies choice paralysis", frequencyGuardrail: "Daily max during meal times" },
+        { name: "Flash deal alert", trigger: "On nearby restaurant deals", whyItWorks: "Creates timely urgency", frequencyGuardrail: "Max 2 per day" },
+      ],
+      firstPurchase: [
+        { name: "Order confirmation + tracking", trigger: "Immediately after order", whyItWorks: "Reduces delivery anxiety", frequencyGuardrail: "Per order" },
+        { name: "Post-delivery feedback", trigger: "30 min after delivery", whyItWorks: "Captures fresh experience", frequencyGuardrail: "Per order" },
+        { name: "Reorder suggestion", trigger: "Same day next week", whyItWorks: "Builds habit", frequencyGuardrail: "Weekly per cuisine" },
+      ],
+      repeatCustomer: [
+        { name: "Personalized meal suggestions", trigger: "Based on order history + time", whyItWorks: "Predicts cravings", frequencyGuardrail: "Daily max" },
+        { name: "Loyalty rewards update", trigger: "On points milestone", whyItWorks: "Gamifies ordering", frequencyGuardrail: "Per milestone" },
+        { name: "New restaurant alert", trigger: "When favorite cuisine restaurant opens", whyItWorks: "Expands options", frequencyGuardrail: "Weekly max" },
+      ],
+      lapsed: [
+        { name: "We miss you + offer", trigger: "14 days of no order", whyItWorks: "Short cycle, quick re-engagement", frequencyGuardrail: "One-time" },
+        { name: "New on the menu", trigger: "21 days of inactivity", whyItWorks: "Shows freshness", frequencyGuardrail: "One-time" },
+        { name: "Win-back discount", trigger: "30 days of inactivity", whyItWorks: "Last incentive push", frequencyGuardrail: "Final attempt" },
+      ],
+    },
+    ampUseCases: [
+      { id: "reorder", name: "One-tap reorder" },
+      { id: "menu-carousel", name: "Menu item carousel" },
+      { id: "feedback-rating", name: "In-email rating" },
+      { id: "coupon-reveal", name: "Scratch card coupon" },
+    ],
   },
   "apparel-fashion": {
     name: "Apparel & Fashion",
@@ -119,6 +372,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Seasonal shopping with trend-driven impulse purchases throughout the year.",
     frequencyReason: "Style inspiration and new arrivals drive engagement; sale events spike activity.",
     fatigueRisk: "Over-promoting sales can commoditize the brand and train discount dependency.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Style profile builder", trigger: "After signup", whyItWorks: "Enables personalization from start", frequencyGuardrail: "One-time" },
+        { name: "Welcome discount", trigger: "Immediately after signup", whyItWorks: "Drives first purchase", frequencyGuardrail: "One-time with 7-day expiry" },
+        { name: "Bestsellers showcase", trigger: "48 hours post-signup", whyItWorks: "Social proof + discovery", frequencyGuardrail: "One-time" },
+      ],
+      browsing: [
+        { name: "Browse abandonment", trigger: "2-4 hours after browsing", whyItWorks: "Captures style interest", frequencyGuardrail: "Max 1 per session" },
+        { name: "Back in stock alert", trigger: "When wishlist item restocks", whyItWorks: "High conversion intent", frequencyGuardrail: "Per item, not overwhelming" },
+        { name: "Complete the look", trigger: "After viewing specific items", whyItWorks: "Increases basket size", frequencyGuardrail: "Max 2 per week" },
+      ],
+      firstPurchase: [
+        { name: "Order + styling tips", trigger: "Upon order confirmation", whyItWorks: "Adds value beyond transaction", frequencyGuardrail: "One per order" },
+        { name: "Review request", trigger: "7 days post-delivery", whyItWorks: "Builds community proof", frequencyGuardrail: "One per item category" },
+        { name: "Size fit feedback", trigger: "14 days post-delivery", whyItWorks: "Improves recommendations", frequencyGuardrail: "One-time" },
+      ],
+      repeatCustomer: [
+        { name: "New arrivals based on style", trigger: "Weekly or on drops", whyItWorks: "Relevant discovery", frequencyGuardrail: "Weekly max" },
+        { name: "Early sale access", trigger: "Before public sales", whyItWorks: "Rewards loyalty", frequencyGuardrail: "Per sale event" },
+        { name: "Seasonal wardrobe refresh", trigger: "Season transition", whyItWorks: "Timely relevance", frequencyGuardrail: "Quarterly" },
+      ],
+      lapsed: [
+        { name: "Trend update", trigger: "30 days of inactivity", whyItWorks: "Reignites style interest", frequencyGuardrail: "One-time" },
+        { name: "Personal shopper offer", trigger: "60 days of inactivity", whyItWorks: "Human touch", frequencyGuardrail: "One-time" },
+        { name: "Exclusive return discount", trigger: "45 days of inactivity", whyItWorks: "Incentivizes return", frequencyGuardrail: "One-time" },
+      ],
+    },
+    ampUseCases: [
+      { id: "product-carousel", name: "Shoppable product carousel" },
+      { id: "size-selector", name: "Size selection" },
+      { id: "color-picker", name: "Color variation picker" },
+      { id: "wishlist-add", name: "Quick wishlist add" },
+    ],
   },
   retail: {
     name: "Retail",
@@ -131,6 +417,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Weekly to monthly shopping habits with seasonal and festival-driven peaks.",
     frequencyReason: "Consistent touchpoints work when value-driven; category relevance is key.",
     fatigueRisk: "Catalog-style emails without personalization get ignored quickly.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "product-carousel", name: "Product carousel" },
+      { id: "store-locator", name: "Nearest store finder" },
+      { id: "quantity-selector", name: "Quantity picker" },
+      { id: "cart-preview", name: "Cart preview & edit" },
+    ],
   },
   "quick-commerce": {
     name: "Quick Commerce",
@@ -143,6 +436,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Multiple times per week for essentials with high retention among core users.",
     frequencyReason: "High frequency is natural given the convenience-first, repeat-purchase model.",
     fatigueRisk: "Users expect receipts but promotional fatigue sets in fast without relevance.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "reorder", name: "One-tap essentials reorder" },
+      { id: "quantity-selector", name: "Quantity adjuster" },
+      { id: "delivery-slot", name: "Delivery slot picker" },
+      { id: "subscription-setup", name: "Auto-replenish setup" },
+    ],
   },
   beauty: {
     name: "Beauty",
@@ -155,6 +455,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Monthly replenishment with discovery-driven exploration purchases.",
     frequencyReason: "Tutorials, reviews, and new launches drive engagement beyond transactions.",
     fatigueRisk: "Aggressive selling undermines the aspirational, editorial tone that works.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Skin/hair profile quiz", trigger: "After signup", whyItWorks: "Enables personalized recommendations", frequencyGuardrail: "One-time" },
+        { name: "Welcome kit with samples info", trigger: "Immediately after signup", whyItWorks: "Drives first trial", frequencyGuardrail: "One-time" },
+        { name: "Routine builder guide", trigger: "48 hours post-signup", whyItWorks: "Educates and builds trust", frequencyGuardrail: "One-time" },
+      ],
+      browsing: [
+        { name: "Product comparison helper", trigger: "After viewing similar products", whyItWorks: "Reduces decision fatigue", frequencyGuardrail: "Weekly max" },
+        { name: "Ingredient spotlight", trigger: "After viewing products with key ingredients", whyItWorks: "Educates and builds confidence", frequencyGuardrail: "Weekly" },
+        { name: "Real reviews roundup", trigger: "After extended browsing", whyItWorks: "Social proof for considered purchases", frequencyGuardrail: "Once per product category" },
+      ],
+      firstPurchase: [
+        { name: "How to use guide", trigger: "Upon delivery", whyItWorks: "Maximizes product value", frequencyGuardrail: "One per product type" },
+        { name: "Results timeline", trigger: "7 days post-delivery", whyItWorks: "Sets realistic expectations", frequencyGuardrail: "One-time" },
+        { name: "Review request with tips", trigger: "21 days post-delivery", whyItWorks: "Captures informed feedback", frequencyGuardrail: "One per product" },
+      ],
+      repeatCustomer: [
+        { name: "Replenishment reminder", trigger: "Based on product lifecycle", whyItWorks: "Prevents running out", frequencyGuardrail: "Per product, not overwhelming" },
+        { name: "Routine upgrade suggestion", trigger: "Quarterly", whyItWorks: "Drives basket expansion", frequencyGuardrail: "Quarterly" },
+        { name: "New launch early access", trigger: "For engaged customers", whyItWorks: "Rewards loyalty", frequencyGuardrail: "Per major launch" },
+      ],
+      lapsed: [
+        { name: "Routine check-in", trigger: "45 days of inactivity", whyItWorks: "Caring touch", frequencyGuardrail: "One-time" },
+        { name: "What's trending now", trigger: "60 days of inactivity", whyItWorks: "FOMO on new trends", frequencyGuardrail: "One-time" },
+        { name: "Personalized return offer", trigger: "90 days of inactivity", whyItWorks: "Incentivizes return", frequencyGuardrail: "Final attempt" },
+      ],
+    },
+    ampUseCases: [
+      { id: "shade-finder", name: "Shade finder carousel" },
+      { id: "routine-builder", name: "Routine builder" },
+      { id: "sample-selector", name: "Free sample picker" },
+      { id: "subscription-manage", name: "Subscription management" },
+    ],
   },
   edtech: {
     name: "Ed-tech",
@@ -167,6 +500,39 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Enrollment cycles are seasonal; ongoing engagement supports course completion.",
     frequencyReason: "Progress nudges and learning streaks maintain momentum; enrollment windows need intensity.",
     fatigueRisk: "Over-selling courses to existing learners feels tone-deaf to their current journey.",
+    lifecycleUseCases: {
+      newUser: [
+        { name: "Learning path recommendation", trigger: "After signup/enrollment", whyItWorks: "Guides first steps", frequencyGuardrail: "One-time" },
+        { name: "Platform tour", trigger: "24 hours post-signup", whyItWorks: "Reduces friction", frequencyGuardrail: "One-time" },
+        { name: "First lesson nudge", trigger: "If no activity in 48 hours", whyItWorks: "Prevents early drop-off", frequencyGuardrail: "Max 2 nudges" },
+      ],
+      browsing: [
+        { name: "Course comparison helper", trigger: "After viewing multiple courses", whyItWorks: "Simplifies choice", frequencyGuardrail: "Once per browse session" },
+        { name: "Free trial/preview invite", trigger: "After extended browsing", whyItWorks: "Reduces purchase risk", frequencyGuardrail: "One-time per course" },
+        { name: "Career outcome stories", trigger: "For career-focused browsers", whyItWorks: "Addresses ROI concerns", frequencyGuardrail: "Weekly max" },
+      ],
+      firstPurchase: [
+        { name: "Course kickoff guide", trigger: "Upon enrollment", whyItWorks: "Sets up for success", frequencyGuardrail: "One-time" },
+        { name: "Study schedule helper", trigger: "48 hours post-enrollment", whyItWorks: "Builds habit", frequencyGuardrail: "One-time" },
+        { name: "Peer community invite", trigger: "Week 1", whyItWorks: "Builds accountability", frequencyGuardrail: "One-time" },
+      ],
+      repeatCustomer: [
+        { name: "Progress celebration", trigger: "On milestone completion", whyItWorks: "Positive reinforcement", frequencyGuardrail: "Per milestone" },
+        { name: "Next course recommendation", trigger: "Near course completion", whyItWorks: "Continues learning journey", frequencyGuardrail: "One per course completion" },
+        { name: "Certification reminder", trigger: "If eligible but not claimed", whyItWorks: "Ensures completion", frequencyGuardrail: "Max 2 reminders" },
+      ],
+      lapsed: [
+        { name: "Learning streak recovery", trigger: "After 7 days of no activity", whyItWorks: "Maintains momentum", frequencyGuardrail: "One-time" },
+        { name: "Where you left off", trigger: "14 days of inactivity", whyItWorks: "Easy restart", frequencyGuardrail: "One-time" },
+        { name: "Course update notification", trigger: "When enrolled course updates", whyItWorks: "Fresh reason to return", frequencyGuardrail: "Per major update" },
+      ],
+    },
+    ampUseCases: [
+      { id: "course-progress", name: "Progress tracker" },
+      { id: "quiz-preview", name: "In-email quiz" },
+      { id: "schedule-picker", name: "Session scheduler" },
+      { id: "course-carousel", name: "Recommended courses" },
+    ],
   },
   fintech: {
     name: "FinTech",
@@ -179,6 +545,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Continuous usage for payments with periodic engagement for new features.",
     frequencyReason: "Transactional emails are expected; feature announcements need strategic timing.",
     fatigueRisk: "Too many security or promotional emails can create alarm or apathy.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "bill-payment", name: "Quick bill payment" },
+      { id: "transaction-categorize", name: "Transaction categorization" },
+      { id: "budget-tracker", name: "Budget progress" },
+      { id: "split-request", name: "Split payment request" },
+    ],
   },
   ott: {
     name: "OTT",
@@ -191,6 +564,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Content consumption is ongoing; renewal cycles are monthly to annual.",
     frequencyReason: "New release announcements and personalized recommendations maintain engagement.",
     fatigueRisk: "Generic content emails without viewing-history personalization feel irrelevant.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "content-carousel", name: "Watchlist carousel" },
+      { id: "continue-watching", name: "Continue watching" },
+      { id: "rating-picker", name: "Content rating" },
+      { id: "profile-switch", name: "Profile selector" },
+    ],
   },
   healthcare: {
     name: "Healthcare",
@@ -203,6 +583,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Appointment-driven with preventive care reminders and prescription refills.",
     frequencyReason: "Health communication requires sensitivity; timing around care moments matters most.",
     fatigueRisk: "Promotional health emails can feel exploitative of personal health data.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "appointment-booking", name: "Appointment scheduler" },
+      { id: "prescription-refill", name: "Prescription refill" },
+      { id: "symptom-checker", name: "Symptom assessment" },
+      { id: "doctor-rating", name: "Doctor feedback" },
+    ],
   },
   gaming: {
     name: "Gaming",
@@ -215,6 +602,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Event-driven engagement with ongoing player lifecycle management.",
     frequencyReason: "In-game events and achievements create natural engagement moments.",
     fatigueRisk: "Pay-to-win pressure in emails can alienate players and feel manipulative.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "reward-claim", name: "In-email reward claim" },
+      { id: "event-rsvp", name: "Event registration" },
+      { id: "leaderboard", name: "Leaderboard preview" },
+      { id: "gift-send", name: "Send gift to friend" },
+    ],
   },
   "news-media": {
     name: "News and Media",
@@ -227,6 +621,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Daily consumption habits with breaking news spikes.",
     frequencyReason: "Newsletters are the product; high frequency is expected and valued.",
     fatigueRisk: "Too many newsletters from the same outlet can cannibalize engagement.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "poll", name: "Interactive poll" },
+      { id: "topic-subscribe", name: "Topic subscription" },
+      { id: "breaking-expand", name: "Story expansion" },
+      { id: "newsletter-manage", name: "Preference center" },
+    ],
   },
   telecom: {
     name: "Telecom",
@@ -239,6 +640,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Monthly billing cycles with upgrade opportunities and usage alerts.",
     frequencyReason: "Bill reminders are essential; plan upgrades need careful timing.",
     fatigueRisk: "Constant upselling feels aggressive in a high-retention, low-switching category.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "plan-comparison", name: "Plan comparison" },
+      { id: "data-usage", name: "Usage tracker" },
+      { id: "recharge", name: "Quick recharge" },
+      { id: "complaint-status", name: "Complaint tracker" },
+    ],
   },
   "home-services": {
     name: "Home Services",
@@ -251,6 +659,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Episodic needs with seasonal peaks for cleaning, repairs, and maintenance.",
     frequencyReason: "Reminder-based communication works; over-promotion feels pushy for infrequent needs.",
     fatigueRisk: "Generic service emails feel irrelevant without context of home or past bookings.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "slot-booking", name: "Time slot picker" },
+      { id: "service-rating", name: "Service feedback" },
+      { id: "tip-provider", name: "Provider tipping" },
+      { id: "rebooking", name: "Quick rebooking" },
+    ],
   },
   "ticket-booking": {
     name: "Ticket Booking",
@@ -263,6 +678,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Event-driven with weekend and season-based peaks.",
     frequencyReason: "New releases and trending events drive engagement; personalization is key.",
     fatigueRisk: "Mass event blasts without interest targeting waste inbox attention.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "seat-selector", name: "Seat selection map" },
+      { id: "showtime-picker", name: "Showtime picker" },
+      { id: "event-carousel", name: "Event recommendations" },
+      { id: "ticket-transfer", name: "Ticket transfer" },
+    ],
   },
   "real-estate": {
     name: "Real Estate Platforms",
@@ -275,6 +697,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Long consideration cycles spanning months to years for major decisions.",
     frequencyReason: "Alert-style emails for new listings perform well during active search phases.",
     fatigueRisk: "Continued emails after a decision feels intrusive and out of touch.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "property-carousel", name: "Property gallery" },
+      { id: "visit-scheduler", name: "Site visit booking" },
+      { id: "emi-calculator", name: "EMI calculator" },
+      { id: "shortlist-manage", name: "Shortlist management" },
+    ],
   },
   "job-portals": {
     name: "Job Portals / Recruitment",
@@ -287,6 +716,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Intense activity during job search phases with dormant periods between.",
     frequencyReason: "High frequency is expected during active search; job alerts are the core value.",
     fatigueRisk: "Irrelevant job matches erode trust and cause unsubscribes.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "job-carousel", name: "Job match carousel" },
+      { id: "quick-apply", name: "One-click apply" },
+      { id: "salary-compare", name: "Salary comparison" },
+      { id: "interview-scheduler", name: "Interview scheduler" },
+    ],
   },
   "d2c-subscriptions": {
     name: "D2C Subscriptions",
@@ -299,6 +735,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Recurring delivery cycles with upsell and skip/pause management.",
     frequencyReason: "Shipment notifications are essential; value-add content builds loyalty.",
     fatigueRisk: "Upselling too aggressively can feel at odds with the convenience promise.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "skip-pause", name: "Skip/pause delivery" },
+      { id: "frequency-adjust", name: "Delivery frequency" },
+      { id: "add-ons", name: "Add-on selector" },
+      { id: "refer-friend", name: "Referral invite" },
+    ],
   },
   "fitness-wellness": {
     name: "Fitness & Wellness Apps",
@@ -311,6 +754,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Habit-building cycles with high early engagement and drop-off risks.",
     frequencyReason: "Progress updates and streak reminders support behavior change.",
     fatigueRisk: "Guilt-tripping inactive users can backfire emotionally.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "workout-log", name: "Quick workout log" },
+      { id: "class-booking", name: "Class scheduler" },
+      { id: "progress-tracker", name: "Progress milestone" },
+      { id: "goal-setter", name: "Goal adjustment" },
+    ],
   },
   "education-marketplaces": {
     name: "Education Marketplaces",
@@ -323,6 +773,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Skill acquisition cycles with project-based and career-driven timing.",
     frequencyReason: "Course recommendations and learning milestones drive engagement.",
     fatigueRisk: "Overwhelming learners with too many options creates decision paralysis.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "course-carousel", name: "Course recommendations" },
+      { id: "progress-tracker", name: "Learning progress" },
+      { id: "instructor-rating", name: "Course feedback" },
+      { id: "wishlist-manage", name: "Wishlist management" },
+    ],
   },
   "auto-mobility": {
     name: "Auto & Mobility (EV, Servicing)",
@@ -335,6 +792,13 @@ export const industryConfigs: Record<string, IndustryConfig> = {
     purchaseCycle: "Service reminders, charging updates, and ownership lifecycle touchpoints.",
     frequencyReason: "Utility-focused emails around service and maintenance build trust.",
     fatigueRisk: "Over-communicating in a high-consideration category feels misaligned.",
+    lifecycleUseCases: defaultLifecycleUseCases,
+    ampUseCases: [
+      { id: "service-booking", name: "Service appointment" },
+      { id: "charging-locator", name: "Charging station finder" },
+      { id: "vehicle-status", name: "Vehicle health check" },
+      { id: "test-drive", name: "Test drive scheduler" },
+    ],
   },
 };
 

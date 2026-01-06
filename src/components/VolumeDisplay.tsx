@@ -38,7 +38,7 @@ export const VolumeDisplay: React.FC<VolumeDisplayProps> = ({
           transition={{ duration: 0.6 }}
         >
           <p className="text-sm text-muted-foreground mb-2 tracking-wide uppercase">
-            Estimated Responsible Monthly Volume
+            Responsible Monthly Inbox Potential
           </p>
           <div className="relative">
             <motion.div
@@ -86,7 +86,7 @@ export const VolumeDisplay: React.FC<VolumeDisplayProps> = ({
           </div>
         </div>
         <p className="text-xs text-muted-foreground italic">
-          Most volume should come from active, high-intent users.
+          High-quality volume comes from active, intent-driven users.
         </p>
       </motion.div>
     </div>
