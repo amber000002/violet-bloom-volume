@@ -4,25 +4,31 @@ import { Mail, Sparkles as SparklesIcon, Zap } from "lucide-react";
 import { MagicSelect } from "./ui/MagicSelect";
 import { Sparkles } from "./Sparkles";
 import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
-import { LifecycleUseCasesTab } from "./tabs/LifecycleUseCasesTab";
-import { AMPInspirationTab } from "./tabs/AMPInspirationTab";
-import { industryConfigs } from "@/data/industryConfig";
+import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
+import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
+import { industryConfigs, businessModels, BusinessModelId } from "@/data/industryConfig";
 
 const industryOptions = Object.entries(industryConfigs).map(([key, config]) => ({
   value: key,
   label: config.name,
 }));
 
+const businessModelOptions = businessModels.map((model) => ({
+  value: model.id,
+  label: model.label,
+}));
+
 const tabs = [
   { id: "inbox-potential", label: "Inbox Potential", icon: Mail },
-  { id: "lifecycle-use-cases", label: "Lifecycle Use Cases", icon: SparklesIcon },
-  { id: "amp-inspiration", label: "AMP Email Inspiration", icon: Zap },
+  { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
+  { id: "amp-email-studio", label: "AMP Email Studio", icon: Zap },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
 
 export const InboxAlchemy: React.FC = () => {
   const [industry, setIndustry] = useState("");
+  const [businessModel, setBusinessModel] = useState<BusinessModelId | "">("");
   const [activeTab, setActiveTab] = useState<TabId>("inbox-potential");
 
   return (
@@ -50,26 +56,47 @@ export const InboxAlchemy: React.FC = () => {
             Inbox Alchemy
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Turn lifecycle signals into emails people love opening.
+            Design lifecycle-led emails your customers actually want to receive.
           </p>
         </motion.div>
 
-        {/* Global Industry Selector */}
+        {/* Global Controls - Sticky Header */}
         <motion.div
-          className="max-w-md mx-auto mb-8"
+          className="sticky top-4 z-20 bg-background/80 backdrop-blur-xl rounded-2xl border border-border p-4 md:p-6 mb-8 shadow-lg"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <label className="block text-sm font-medium text-foreground mb-2 text-center">
-            Industry Vertical <span className="text-secondary">*</span>
-          </label>
-          <MagicSelect
-            value={industry}
-            onValueChange={setIndustry}
-            placeholder="Choose the industry closest to your core customer behavior"
-            options={industryOptions}
-          />
+          <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Industry Vertical <span className="text-secondary">*</span>
+              </label>
+              <MagicSelect
+                value={industry}
+                onValueChange={setIndustry}
+                placeholder="Choose your industry"
+                options={industryOptions}
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Choose the industry closest to your core customer behavior.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Business Model <span className="text-secondary">*</span>
+              </label>
+              <MagicSelect
+                value={businessModel}
+                onValueChange={(value) => setBusinessModel(value as BusinessModelId)}
+                placeholder="Select your model"
+                options={businessModelOptions}
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                This helps tailor journeys and frequency realistically.
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Tab Navigation */}
@@ -110,11 +137,11 @@ export const InboxAlchemy: React.FC = () => {
             {activeTab === "inbox-potential" && (
               <InboxPotentialTab industry={industry} />
             )}
-            {activeTab === "lifecycle-use-cases" && (
-              <LifecycleUseCasesTab industry={industry} />
+            {activeTab === "use-case-studio" && (
+              <UseCaseStudioTab industry={industry} businessModel={businessModel} />
             )}
-            {activeTab === "amp-inspiration" && (
-              <AMPInspirationTab industry={industry} />
+            {activeTab === "amp-email-studio" && (
+              <AMPEmailStudioTab industry={industry} businessModel={businessModel} />
             )}
           </motion.div>
         </AnimatePresence>
@@ -126,7 +153,7 @@ export const InboxAlchemy: React.FC = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
         >
-          "Great inbox experiences feel personal before they feel scalable."
+          "Inbox excellence is built on relevance, not volume."
         </motion.p>
       </div>
     </div>
