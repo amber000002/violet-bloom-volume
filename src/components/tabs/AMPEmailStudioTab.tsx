@@ -8,9 +8,13 @@ import { MagicSelect } from "../ui/MagicSelect";
 import { MagicInput } from "../ui/MagicInput";
 import { industryConfigs, BusinessModelId, AMPUseCase } from "@/data/industryConfig";
 
+import { ViewMode } from "@/hooks/usePresentationMode";
+import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
+
 interface AMPEmailStudioTabProps {
   industry: string;
   businessModel: BusinessModelId | "";
+  viewMode?: ViewMode;
 }
 
 type TemplateStyle = "brand-carousel" | "gamified";
@@ -26,6 +30,7 @@ const noGamificationIndustries = ["banking", "insurance", "healthcare", "nbfcs",
 export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   industry,
   businessModel,
+  viewMode = "app",
 }) => {
   const [selectedUseCase, setSelectedUseCase] = useState("");
   const [templateStyle, setTemplateStyle] = useState<TemplateStyle>("brand-carousel");
