@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Clock, Zap, Shield, Lightbulb, Target, Calendar, 
@@ -84,6 +84,39 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     return getStageInsight(industry, selectedStage, framework);
   }, [industry, selectedStage, framework]);
 
+  // Get all journeys and campaigns across all stages for export
+  const allJourneys = useMemo(() => {
+    if (!config) return [];
+    return Object.values(config.journeys).flat();
+  }, [config]);
+
+  const allCampaigns = useMemo(() => {
+    if (!config) return [];
+    return Object.values(config.campaigns).flat();
+  }, [config]);
+
+  // Get framework reason
+  const frameworkReason = useMemo(() => {
+    if (!businessModel) return "Select a business model to see framework recommendations.";
+    if (framework === "lifecycle") {
+      return `Lifecycle-based framework aligns with ${businessModel} models where customer stages are clearly defined and progression is measurable.`;
+    }
+    return `AARRR framework works well for growth-focused ${businessModel} models, emphasizing acquisition through referral loops.`;
+  }, [businessModel, framework]);
+
+  // Report data changes for export
+  useEffect(() => {
+    if (onDataChange && config) {
+      onDataChange({
+        framework,
+        frameworkReason,
+        journeys: allJourneys,
+        campaigns: allCampaigns,
+        businessModel: businessModel || "",
+      });
+    }
+  }, [framework, frameworkReason, allJourneys, allCampaigns, businessModel, config, onDataChange]);
+
   if (!industry) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -94,6 +127,19 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           Select an industry and business model above to discover use cases.
         </p>
       </div>
+    );
+  }
+
+  // Presentation view
+  if (viewMode === "presentation") {
+    return (
+      <UseCaseStudioSlides
+        framework={framework}
+        frameworkReason={frameworkReason}
+        journeys={allJourneys}
+        campaigns={allCampaigns}
+        businessModel={businessModel || ""}
+      />
     );
   }
 

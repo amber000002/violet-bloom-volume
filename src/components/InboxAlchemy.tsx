@@ -320,6 +320,7 @@ const InboxAlchemyContent: React.FC = () => {
                 industry={industry} 
                 businessModel={businessModel}
                 viewMode={viewMode}
+                onDataChange={(data) => updateExportData("ampData", data)}
               />
             )}
           </motion.div>
