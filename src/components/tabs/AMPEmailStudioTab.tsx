@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, RefreshCw, User, ArrowRight, Star, Gift,
@@ -15,6 +15,7 @@ interface AMPEmailStudioTabProps {
   industry: string;
   businessModel: BusinessModelId | "";
   viewMode?: ViewMode;
+  onDataChange?: (data: any) => void;
 }
 
 type TemplateStyle = "brand-carousel" | "gamified";
@@ -31,6 +32,7 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   industry,
   businessModel,
   viewMode = "app",
+  onDataChange,
 }) => {
   const [selectedUseCase, setSelectedUseCase] = useState("");
   const [templateStyle, setTemplateStyle] = useState<TemplateStyle>("brand-carousel");
@@ -57,6 +59,39 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   }, [config, templateStyle]);
 
   const selectedUseCaseData = config?.ampUseCases.find((uc) => uc.id === selectedUseCase);
+
+  // AMP benefits based on industry
+  const ampBenefits = useMemo(() => {
+    if (!config) return [];
+    return [
+      `Reduce app dependency for quick actions in ${config.name}`,
+      "Increase engagement with in-email interactivity",
+      "Provide real-time content updates",
+      "Shorten user journeys from email to conversion",
+    ];
+  }, [config]);
+
+  // Guardrails
+  const guardrails = [
+    "Ensure graceful fallback for non-AMP clients",
+    "Keep interactions simple and purposeful",
+    "Test across email clients thoroughly",
+  ];
+
+  // Report data changes for export
+  useEffect(() => {
+    if (onDataChange && config) {
+      onDataChange({
+        industry: config.name,
+        ampBenefits,
+        useCases: config.ampUseCases.map(uc => uc.name),
+        guardrails,
+        supportsGamification: config.supportsGamification,
+        selectedUseCase: selectedUseCaseData?.name || "",
+        templateStyle,
+      });
+    }
+  }, [config, ampBenefits, selectedUseCaseData, templateStyle, onDataChange]);
 
   // Reset use case when template style changes
   React.useEffect(() => {
@@ -109,6 +144,17 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
           Select an industry above to explore AMP email templates.
         </p>
       </div>
+    );
+  }
+
+  // Presentation view
+  if (viewMode === "presentation") {
+    return (
+      <AMPStudioSlides
+        industry={config?.name || ""}
+        ampUseCases={config?.ampUseCases || []}
+        supportsGamification={supportsGamification}
+      />
     );
   }
 
