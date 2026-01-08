@@ -39,11 +39,20 @@ const activeUserOptions = Object.entries(activeUserDefinitions).map(
   })
 );
 
+import { ViewMode } from "@/hooks/usePresentationMode";
+import { InboxPotentialSlides } from "../presentation/InboxPotentialSlides";
+
 interface InboxPotentialTabProps {
   industry: string;
+  viewMode?: ViewMode;
+  onDataChange?: (data: any) => void;
 }
 
-export const InboxPotentialTab: React.FC<InboxPotentialTabProps> = ({ industry }) => {
+export const InboxPotentialTab: React.FC<InboxPotentialTabProps> = ({ 
+  industry, 
+  viewMode = "app",
+  onDataChange 
+}) => {
   const [databaseSize, setDatabaseSize] = useState("1,000,000");
   const [maturity, setMaturity] = useState("growing");
   const [activeUserDef, setActiveUserDef] = useState("30-days");
@@ -92,6 +101,35 @@ export const InboxPotentialTab: React.FC<InboxPotentialTabProps> = ({ industry }
       config,
     };
   }, [industry, databaseSize, maturity, activeUserDef]);
+
+  // Report data changes for export
+  React.useEffect(() => {
+    if (calculation && onDataChange) {
+      onDataChange({
+        minVolume: calculation.minVolume,
+        maxVolume: calculation.maxVolume,
+        activeVolume: calculation.activeVolume,
+        inactiveVolume: calculation.inactiveVolume,
+      });
+    }
+  }, [calculation, onDataChange]);
+
+  // Presentation mode view
+  if (viewMode === "presentation" && calculation) {
+    return (
+      <div className="flex flex-col items-center gap-8">
+        <InboxPotentialSlides
+          industry={industry}
+          businessModel=""
+          minVolume={calculation.minVolume}
+          maxVolume={calculation.maxVolume}
+          activeVolume={calculation.activeVolume}
+          inactiveVolume={calculation.inactiveVolume}
+          config={calculation.config}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="grid lg:grid-cols-2 gap-8">

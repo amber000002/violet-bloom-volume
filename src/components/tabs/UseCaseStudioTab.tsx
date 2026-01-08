@@ -15,9 +15,14 @@ import {
   BusinessModelId,
 } from "@/data/industryConfig";
 
+import { ViewMode } from "@/hooks/usePresentationMode";
+import { UseCaseStudioSlides } from "../presentation/UseCaseStudioSlides";
+
 interface UseCaseStudioTabProps {
   industry: string;
   businessModel: BusinessModelId | "";
+  viewMode?: ViewMode;
+  onDataChange?: (data: any) => void;
 }
 
 const frameworkOptions = [
@@ -35,6 +40,8 @@ const triggerTypeIcons: Record<JourneyUseCase['triggerType'], typeof Clock> = {
 export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   industry,
   businessModel,
+  viewMode = "app",
+  onDataChange,
 }) => {
   const [framework, setFramework] = useState<FrameworkType>("lifecycle");
   const [selectedStage, setSelectedStage] = useState<string>("");
