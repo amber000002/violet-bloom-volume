@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Clock, Zap, Shield, Lightbulb, Target, Calendar, 
-  UserMinus, Activity, TrendingUp, Workflow 
+  UserMinus, Activity, TrendingUp, Workflow, Info
 } from "lucide-react";
 import {
   industryConfigs,
@@ -12,7 +12,11 @@ import {
   getTriggerTypeLabel,
   getStageInsight,
   FrameworkType,
-  BusinessModelId,
+  frameworkOptions,
+  getFrameworkStages,
+  getFrameworkReason,
+  getInferredBusinessModel,
+  getBusinessModelLabel,
 } from "@/data/industryConfig";
 
 import { ViewMode } from "@/hooks/usePresentationMode";
@@ -20,15 +24,9 @@ import { UseCaseStudioSlides } from "../presentation/UseCaseStudioSlides";
 
 interface UseCaseStudioTabProps {
   industry: string;
-  businessModel: BusinessModelId | "";
   viewMode?: ViewMode;
   onDataChange?: (data: any) => void;
 }
-
-const frameworkOptions = [
-  { id: "lifecycle" as const, label: "Lifecycle-based" },
-  { id: "aarrr" as const, label: "AARRR-based" },
-];
 
 const triggerTypeIcons: Record<JourneyUseCase['triggerType'], typeof Clock> = {
   "past-behavior": Activity,
@@ -39,7 +37,6 @@ const triggerTypeIcons: Record<JourneyUseCase['triggerType'], typeof Clock> = {
 
 export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   industry,
-  businessModel,
   viewMode = "app",
   onDataChange,
 }) => {
@@ -47,17 +44,20 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const [selectedStage, setSelectedStage] = useState<string>("");
 
   const config = industry ? industryConfigs[industry] : null;
+  
+  // Infer business model from industry
+  const inferredBusinessModel = useMemo(() => {
+    if (!industry) return null;
+    return getInferredBusinessModel(industry);
+  }, [industry]);
+  
+  const businessModelLabel = inferredBusinessModel ? getBusinessModelLabel(inferredBusinessModel) : "";
 
   // Get dynamic stages based on framework and industry
   const availableStages = useMemo(() => {
-    if (!config) return [];
-    
-    if (framework === "lifecycle") {
-      return config.lifecycleStages;
-    } else {
-      return config.aarrrStages;
-    }
-  }, [config, framework]);
+    if (!industry) return [];
+    return getFrameworkStages(framework, industry);
+  }, [industry, framework]);
 
   // Reset selected stage when framework or industry changes
   React.useEffect(() => {
@@ -97,12 +97,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   // Get framework reason
   const frameworkReason = useMemo(() => {
-    if (!businessModel) return "Select a business model to see framework recommendations.";
-    if (framework === "lifecycle") {
-      return `Lifecycle-based framework aligns with ${businessModel} models where customer stages are clearly defined and progression is measurable.`;
-    }
-    return `AARRR framework works well for growth-focused ${businessModel} models, emphasizing acquisition through referral loops.`;
-  }, [businessModel, framework]);
+    if (!industry) return "Select an industry to see framework recommendations.";
+    return getFrameworkReason(framework, industry);
+  }, [industry, framework]);
 
   // Report data changes for export
   useEffect(() => {
@@ -112,10 +109,10 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         frameworkReason,
         journeys: allJourneys,
         campaigns: allCampaigns,
-        businessModel: businessModel || "",
+        businessModel: businessModelLabel,
       });
     }
-  }, [framework, frameworkReason, allJourneys, allCampaigns, businessModel, config, onDataChange]);
+  }, [framework, frameworkReason, allJourneys, allCampaigns, businessModelLabel, config, onDataChange]);
 
   if (!industry) {
     return (
@@ -138,7 +135,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         frameworkReason={frameworkReason}
         journeys={allJourneys}
         campaigns={allCampaigns}
-        businessModel={businessModel || ""}
+        businessModel={businessModelLabel}
       />
     );
   }
@@ -146,22 +143,36 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   return (
     <div className="space-y-8">
       {/* Framework Selector */}
-      <div className="flex justify-center gap-4">
-        {frameworkOptions.map((option) => (
-          <motion.button
-            key={option.id}
-            onClick={() => setFramework(option.id)}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className={`px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
-              framework === option.id
-                ? "bg-gradient-magic text-primary-foreground shadow-magic"
-                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
-            }`}
-          >
-            {option.label}
-          </motion.button>
-        ))}
+      <div className="space-y-3">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <span className="text-sm font-medium text-foreground">Insight Framework</span>
+          <div className="group relative">
+            <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64 text-xs text-muted-foreground z-10">
+              Frameworks help structure insights — they don't change the underlying data.
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2">
+          {frameworkOptions.map((option) => (
+            <motion.button
+              key={option.id}
+              onClick={() => setFramework(option.id)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                framework === option.id
+                  ? "bg-gradient-magic text-primary-foreground shadow-magic"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
+              }`}
+            >
+              {option.label}
+            </motion.button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground text-center max-w-xl mx-auto">
+          {frameworkReason}
+        </p>
       </div>
 
       {/* Stage Selector */}

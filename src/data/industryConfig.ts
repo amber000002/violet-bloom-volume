@@ -1,4 +1,4 @@
-// Business Models
+// Business Models (inferred from industry, not user-selected)
 export const businessModels = [
   { id: "transactional", label: "Transactional / Commerce" },
   { id: "subscription", label: "Subscription" },
@@ -10,6 +10,128 @@ export const businessModels = [
 ] as const;
 
 export type BusinessModelId = typeof businessModels[number]["id"];
+
+// Industry to Business Model mapping (auto-inferred)
+export const industryBusinessModelMap: Record<string, BusinessModelId> = {
+  banking: "financial",
+  nbfcs: "financial",
+  amcs: "financial",
+  insurance: "financial",
+  fintech: "financial",
+  "travel-hospitality": "transactional",
+  aviation: "transactional",
+  "cab-aggregators": "transactional",
+  "food-tech": "transactional",
+  "quick-commerce": "transactional",
+  retail: "transactional",
+  "apparel-fashion": "transactional",
+  beauty: "high-consideration",
+  healthcare: "utility",
+  "fitness-wellness": "subscription",
+  edtech: "subscription",
+  ott: "subscription",
+  gaming: "subscription",
+  "job-portals": "marketplace",
+  "real-estate": "high-consideration",
+  "ticket-booking": "transactional",
+  crypto: "financial",
+  broking: "financial",
+  "d2c-brands": "transactional",
+  saas: "subscription",
+  logistics: "utility",
+  "super-apps": "marketplace",
+};
+
+// Get inferred business model for an industry
+export const getInferredBusinessModel = (industry: string): BusinessModelId => {
+  return industryBusinessModelMap[industry] || "transactional";
+};
+
+// Get business model label
+export const getBusinessModelLabel = (modelId: BusinessModelId): string => {
+  return businessModels.find(m => m.id === modelId)?.label || modelId;
+};
+
+// Framework types - expanded
+export type FrameworkType = "lifecycle" | "aarrr" | "aida" | "4p" | "7p";
+
+// Framework options for UI
+export const frameworkOptions = [
+  { id: "lifecycle" as const, label: "Lifecycle-based", description: "Adaptive stages by industry" },
+  { id: "aarrr" as const, label: "AARRR", description: "Acquisition to Referral" },
+  { id: "aida" as const, label: "AIDA", description: "Attention to Action" },
+  { id: "4p" as const, label: "4P", description: "Product, Price, Place, Promotion" },
+  { id: "7p" as const, label: "7P", description: "Extended marketing mix" },
+] as const;
+
+// AIDA stages
+export const aidaStages: DynamicStage[] = [
+  { id: "attention", label: "Attention" },
+  { id: "interest", label: "Interest" },
+  { id: "desire", label: "Desire" },
+  { id: "action", label: "Action" },
+];
+
+// 4P stages (campaign-focused)
+export const fourPStages: DynamicStage[] = [
+  { id: "product", label: "Product" },
+  { id: "price", label: "Price" },
+  { id: "place", label: "Place" },
+  { id: "promotion", label: "Promotion" },
+];
+
+// 7P stages (extended)
+export const sevenPStages: DynamicStage[] = [
+  { id: "product", label: "Product" },
+  { id: "price", label: "Price" },
+  { id: "place", label: "Place" },
+  { id: "promotion", label: "Promotion" },
+  { id: "people", label: "People" },
+  { id: "process", label: "Process" },
+  { id: "physical-evidence", label: "Physical Evidence" },
+];
+
+// Get framework stages based on framework type and industry
+export const getFrameworkStages = (framework: FrameworkType, industry: string): DynamicStage[] => {
+  const config = industryConfigs[industry];
+  if (!config) return [];
+  
+  switch (framework) {
+    case "lifecycle":
+      return config.lifecycleStages;
+    case "aarrr":
+      return config.aarrrStages;
+    case "aida":
+      return aidaStages;
+    case "4p":
+      return fourPStages;
+    case "7p":
+      return sevenPStages;
+    default:
+      return config.lifecycleStages;
+  }
+};
+
+// Get framework reason based on inferred business model
+export const getFrameworkReason = (framework: FrameworkType, industry: string): string => {
+  const businessModel = getInferredBusinessModel(industry);
+  const modelLabel = getBusinessModelLabel(businessModel);
+  
+  switch (framework) {
+    case "lifecycle":
+      return `Lifecycle-based framework adapts naturally to ${modelLabel} patterns, where customer stages are clearly defined and progression is measurable.`;
+    case "aarrr":
+      return `AARRR framework excels for growth-focused ${modelLabel} models, emphasizing acquisition loops and referral optimization.`;
+    case "aida":
+      return `AIDA framework structures messaging around the customer decision journey—particularly effective for ${modelLabel} with considered purchase decisions.`;
+    case "4p":
+      return `4P framework organizes campaigns around core marketing levers, ideal for ${modelLabel} with strong product-market messaging needs.`;
+    case "7p":
+      return `7P framework extends marketing mix thinking to service elements—valuable for ${modelLabel} where people, process, and experience matter.`;
+    default:
+      return "Select a framework to see how it applies to your industry.";
+  }
+};
 
 // Journey Use Case (Automated, behavior-led)
 export interface JourneyUseCase {
@@ -34,10 +156,7 @@ export interface DynamicStage {
   label: string;
 }
 
-// Framework types
-export type FrameworkType = "lifecycle" | "aarrr";
-
-// AARRR stages
+// AARRR stages (default)
 export const aarrrStages: DynamicStage[] = [
   { id: "acquisition", label: "Acquisition" },
   { id: "activation", label: "Activation" },

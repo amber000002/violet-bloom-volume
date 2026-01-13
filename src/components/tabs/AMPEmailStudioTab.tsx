@@ -6,14 +6,13 @@ import {
 } from "lucide-react";
 import { MagicSelect } from "../ui/MagicSelect";
 import { MagicInput } from "../ui/MagicInput";
-import { industryConfigs, BusinessModelId, AMPUseCase } from "@/data/industryConfig";
+import { industryConfigs, AMPUseCase, getInferredBusinessModel, FrameworkType } from "@/data/industryConfig";
 
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
 
 interface AMPEmailStudioTabProps {
   industry: string;
-  businessModel: BusinessModelId | "";
   viewMode?: ViewMode;
   onDataChange?: (data: any) => void;
 }
@@ -30,7 +29,6 @@ const noGamificationIndustries = ["banking", "insurance", "healthcare", "nbfcs",
 
 export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   industry,
-  businessModel,
   viewMode = "app",
   onDataChange,
 }) => {
@@ -39,7 +37,13 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   const [websiteUrl, setWebsiteUrl] = useState("");
 
   const config = industry ? industryConfigs[industry] : null;
-
+  
+  // Get inferred business model for template adaptation
+  const inferredBusinessModel = useMemo(() => {
+    if (!industry) return null;
+    return getInferredBusinessModel(industry);
+  }, [industry]);
+  
   // Check if gamification is appropriate for this industry
   const supportsGamification = config?.supportsGamification ?? false;
   const showGamificationWarning = templateStyle === "gamified" && !supportsGamification;
