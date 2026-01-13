@@ -7,18 +7,13 @@ import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
 import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
 import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
 import { InboxDiagnosticsTab } from "./tabs/InboxDiagnosticsTab";
-import { industryConfigs, businessModels, BusinessModelId } from "@/data/industryConfig";
+import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
 
 const industryOptions = Object.entries(industryConfigs).map(([key, config]) => ({
   value: key,
   label: config.name,
-}));
-
-const businessModelOptions = businessModels.map((model) => ({
-  value: model.id,
-  label: model.label,
 }));
 
 const tabs = [
@@ -33,7 +28,6 @@ type TabId = typeof tabs[number]["id"];
 // Separate component to use the context
 const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
-  const [businessModel, setBusinessModel] = useState<BusinessModelId | "">("");
   const [activeTab, setActiveTab] = useState<TabId>("inbox-potential");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   
@@ -48,7 +42,14 @@ const InboxAlchemyContent: React.FC = () => {
   }>({ inboxData: null, useCaseData: null, ampData: null, diagnosticsData: null });
 
   const config = industry ? industryConfigs[industry] : null;
-  const businessModelLabel = businessModels.find(b => b.id === businessModel)?.label || "";
+  
+  // Infer business model from industry
+  const inferredBusinessModel = useMemo(() => {
+    if (!industry) return null;
+    return getInferredBusinessModel(industry);
+  }, [industry]);
+  
+  const businessModelLabel = inferredBusinessModel ? getBusinessModelLabel(inferredBusinessModel) : "";
 
   // Callback to collect export data from tabs
   const updateExportData = useCallback((tab: string, data: any) => {
@@ -152,36 +153,24 @@ const InboxAlchemyContent: React.FC = () => {
           transition={{ delay: 0.2 }}
         >
           <div className="flex flex-col lg:flex-row gap-4">
-            {/* Industry and Business Model selectors */}
-            <div className="grid md:grid-cols-2 gap-4 flex-1">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Industry Vertical <span className="text-secondary">*</span>
-                </label>
-                <MagicSelect
-                  value={industry}
-                  onValueChange={setIndustry}
-                  placeholder="Choose your industry"
-                  options={industryOptions}
-                />
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Choose the industry closest to your core customer behavior.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Business Model <span className="text-secondary">*</span>
-                </label>
-                <MagicSelect
-                  value={businessModel}
-                  onValueChange={(value) => setBusinessModel(value as BusinessModelId)}
-                  placeholder="Select your model"
-                  options={businessModelOptions}
-                />
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  This helps tailor journeys and frequency realistically.
-                </p>
-              </div>
+            {/* Industry selector - now single column, full width */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Industry Vertical <span className="text-secondary">*</span>
+              </label>
+              <MagicSelect
+                value={industry}
+                onValueChange={setIndustry}
+                placeholder="Choose your industry"
+                options={industryOptions}
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {inferredBusinessModel ? (
+                  <>Your industry suggests a <span className="text-primary font-medium">{businessModelLabel}</span> model.</>
+                ) : (
+                  "Choose the industry closest to your core customer behavior."
+                )}
+              </p>
             </div>
 
             {/* Presentation Controls */}
@@ -326,7 +315,6 @@ const InboxAlchemyContent: React.FC = () => {
             {activeTab === "use-case-studio" && (
               <UseCaseStudioTab 
                 industry={industry} 
-                businessModel={businessModel}
                 viewMode={viewMode}
                 onDataChange={(data) => updateExportData("useCaseData", data)}
               />
@@ -334,7 +322,6 @@ const InboxAlchemyContent: React.FC = () => {
             {activeTab === "amp-email-studio" && (
               <AMPEmailStudioTab 
                 industry={industry} 
-                businessModel={businessModel}
                 viewMode={viewMode}
                 onDataChange={(data) => updateExportData("ampData", data)}
               />

@@ -1,6 +1,6 @@
 import React from "react";
 import { PresentationSlide } from "./PresentationSlide";
-import { JourneyUseCase, CampaignUseCase, FrameworkType, getTriggerTypeLabel } from "@/data/industryConfig";
+import { JourneyUseCase, CampaignUseCase, FrameworkType, getTriggerTypeLabel, frameworkOptions } from "@/data/industryConfig";
 import { Clock, Zap, Activity, TrendingUp } from "lucide-react";
 
 interface UseCaseStudioSlidesProps {
@@ -16,6 +16,12 @@ const triggerTypeIcons: Record<JourneyUseCase["triggerType"], typeof Clock> = {
   "live-event": Zap,
   "segment-change": TrendingUp,
   "time-based": Clock,
+};
+
+// Get label for framework
+const getFrameworkLabel = (framework: FrameworkType): string => {
+  const option = frameworkOptions.find(f => f.id === framework);
+  return option?.label || framework;
 };
 
 export const UseCaseStudioSlides: React.FC<UseCaseStudioSlidesProps> = ({
@@ -35,7 +41,7 @@ export const UseCaseStudioSlides: React.FC<UseCaseStudioSlidesProps> = ({
         <div className="space-y-6">
           <div className="text-center py-4">
             <span className="inline-flex px-4 py-2 rounded-full bg-gradient-magic text-primary-foreground font-medium">
-              {framework === "lifecycle" ? "Lifecycle-based" : "AARRR-based"}
+              {getFrameworkLabel(framework)}
             </span>
           </div>
 
@@ -44,9 +50,11 @@ export const UseCaseStudioSlides: React.FC<UseCaseStudioSlidesProps> = ({
             <p className="text-sm text-muted-foreground">{frameworkReason}</p>
           </div>
 
-          <p className="text-sm text-muted-foreground text-center italic">
-            Selected based on {businessModel} business model characteristics
-          </p>
+          {businessModel && (
+            <p className="text-sm text-muted-foreground text-center italic">
+              Inferred model: {businessModel}
+            </p>
+          )}
         </div>
       </PresentationSlide>
 
