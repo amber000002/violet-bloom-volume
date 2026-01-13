@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText } from "lucide-react";
+import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity } from "lucide-react";
 import { MagicSelect } from "./ui/MagicSelect";
 import { Sparkles } from "./Sparkles";
 import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
 import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
 import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
+import { InboxDiagnosticsTab } from "./tabs/InboxDiagnosticsTab";
 import { industryConfigs, businessModels, BusinessModelId } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
@@ -24,6 +25,7 @@ const tabs = [
   { id: "inbox-potential", label: "Inbox Potential", icon: Mail },
   { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
   { id: "amp-email-studio", label: "AMP Email Studio", icon: Zap },
+  { id: "inbox-diagnostics", label: "Inbox Diagnostics", icon: Activity },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
@@ -42,7 +44,8 @@ const InboxAlchemyContent: React.FC = () => {
     inboxData: any;
     useCaseData: any;
     ampData: any;
-  }>({ inboxData: null, useCaseData: null, ampData: null });
+    diagnosticsData: any;
+  }>({ inboxData: null, useCaseData: null, ampData: null, diagnosticsData: null });
 
   const config = industry ? industryConfigs[industry] : null;
   const businessModelLabel = businessModels.find(b => b.id === businessModel)?.label || "";
@@ -91,7 +94,20 @@ const InboxAlchemyContent: React.FC = () => {
         supportsGamification: config.supportsGamification,
       } : null;
 
-      await exportToPPT(inboxData, useCaseData, ampData, type);
+      const diagnosticsExport = exportData.diagnosticsData ? {
+        totalCampaigns: exportData.diagnosticsData.performance?.totalCampaigns || 0,
+        totalEmailsSent: exportData.diagnosticsData.performance?.totalEmailsSent || 0,
+        medianOpenRate: exportData.diagnosticsData.performance?.medianOpenRate || 0,
+        medianClickRate: exportData.diagnosticsData.performance?.medianClickRate || 0,
+        bestCampaign: exportData.diagnosticsData.performance?.bestCampaign?.campaign_name || "",
+        worstCampaign: exportData.diagnosticsData.performance?.worstCampaign?.campaign_name || "",
+        openRateTrend: exportData.diagnosticsData.trends?.openRateTrend || "stable",
+        clickRateTrend: exportData.diagnosticsData.trends?.clickRateTrend || "stable",
+        overallRisk: exportData.diagnosticsData.fatigue?.overallRisk || "low",
+        recommendations: exportData.diagnosticsData.recommendations || [],
+      } : null;
+
+      await exportToPPT(inboxData, useCaseData, ampData, type, diagnosticsExport);
     } catch (error) {
       console.error("Export failed:", error);
     } finally {
@@ -321,6 +337,13 @@ const InboxAlchemyContent: React.FC = () => {
                 businessModel={businessModel}
                 viewMode={viewMode}
                 onDataChange={(data) => updateExportData("ampData", data)}
+              />
+            )}
+            {activeTab === "inbox-diagnostics" && (
+              <InboxDiagnosticsTab 
+                industry={industry}
+                viewMode={viewMode}
+                onDataChange={(data) => updateExportData("diagnosticsData", data)}
               />
             )}
           </motion.div>
