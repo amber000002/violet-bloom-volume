@@ -51,6 +51,19 @@ interface AMPStudioData {
   supportsGamification: boolean;
 }
 
+interface DiagnosticsExportData {
+  totalCampaigns: number;
+  totalEmailsSent: number;
+  medianOpenRate: number;
+  medianClickRate: number;
+  bestCampaign: string;
+  worstCampaign: string;
+  openRateTrend: string;
+  clickRateTrend: string;
+  overallRisk: string;
+  recommendations: { title: string; description: string }[];
+}
+
 const formatNumber = (num: number): string => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
@@ -70,7 +83,8 @@ export const exportToPPT = async (
   inboxData: InboxPotentialData | null,
   useCaseData: UseCaseStudioData | null,
   ampData: AMPStudioData | null,
-  deckType: "executive" | "detailed" = "executive"
+  deckType: "executive" | "detailed" = "executive",
+  diagnosticsData: DiagnosticsExportData | null = null
 ) => {
   const pptx = new pptxgen();
 
@@ -544,6 +558,56 @@ export const exportToPPT = async (
         color: slideStyles.subtitleColor,
       });
     }
+  }
+
+  // Section 4: Inbox Diagnostics
+  if (diagnosticsData) {
+    const section4Header = pptx.addSlide();
+    section4Header.addText("Section 4", {
+      x: 0.5, y: 2, w: 9, h: 0.5,
+      fontSize: 14, color: slideStyles.accentColor, align: "center",
+    });
+    section4Header.addText("Inbox Diagnostics", {
+      x: 0.5, y: 2.5, w: 9, h: 1,
+      fontSize: 36, bold: true, color: slideStyles.titleColor, align: "center",
+    });
+
+    // Performance slide
+    const perfSlide = pptx.addSlide();
+    perfSlide.addText("Campaign Performance", {
+      x: 0.5, y: 0.5, w: 9, h: 0.7,
+      fontSize: 28, bold: true, color: slideStyles.titleColor,
+    });
+    perfSlide.addText(`${formatNumber(diagnosticsData.totalEmailsSent)} emails across ${diagnosticsData.totalCampaigns} campaigns`, {
+      x: 0.5, y: 1.5, w: 9, h: 0.5,
+      fontSize: 18, color: slideStyles.accentColor, align: "center",
+    });
+    perfSlide.addText(`Median Open Rate: ${diagnosticsData.medianOpenRate.toFixed(1)}%`, {
+      x: 0.5, y: 2.5, w: 9, h: 0.4, fontSize: 14, color: slideStyles.textColor,
+    });
+    perfSlide.addText(`Median Click Rate: ${diagnosticsData.medianClickRate.toFixed(1)}%`, {
+      x: 0.5, y: 3, w: 9, h: 0.4, fontSize: 14, color: slideStyles.textColor,
+    });
+    perfSlide.addText(`Open Rate Trend: ${diagnosticsData.openRateTrend} • Click Rate Trend: ${diagnosticsData.clickRateTrend}`, {
+      x: 0.5, y: 3.8, w: 9, h: 0.4, fontSize: 12, color: slideStyles.subtitleColor,
+    });
+
+    // Recommendations slide
+    const recSlide = pptx.addSlide();
+    recSlide.addText("Key Recommendations", {
+      x: 0.5, y: 0.5, w: 9, h: 0.7,
+      fontSize: 28, bold: true, color: slideStyles.titleColor,
+    });
+    diagnosticsData.recommendations.slice(0, 4).forEach((rec, i) => {
+      recSlide.addText(rec.title, {
+        x: 0.5, y: 1.4 + i * 1.1, w: 9, h: 0.35,
+        fontSize: 14, bold: true, color: slideStyles.titleColor,
+      });
+      recSlide.addText(rec.description, {
+        x: 0.5, y: 1.7 + i * 1.1, w: 9, h: 0.6,
+        fontSize: 11, color: slideStyles.subtitleColor,
+      });
+    });
   }
 
   // Closing Slide
