@@ -1,18 +1,45 @@
-// CSV Parser and Analyzer for Inbox Diagnostics
+// CSV Parser and Analyzer for Inbox Diagnostics - Enhanced Version
+
+// ============= INTERFACES =============
 
 export interface CampaignRow {
-  campaign_name: string;
-  subject_line: string;
-  sent_date: string;
-  emails_sent: number;
-  open_rate: number;
-  click_rate: number;
-  // Optional fields
-  campaign_type?: string;
-  audience_segment?: string;
-  unsubscribe_rate?: number;
-  bounce_rate?: number;
-  send_time?: string;
+  campaignName: string;
+  campaignId: string;
+  channel: string;
+  title: string;
+  subjectLine: string;
+  startDate: string;
+  startTime: string;
+  serviceProvider: string;
+  providerName: string;
+  status: string;
+  totalSentUsers: number;
+  totalDeliveredUsers: number;
+  totalSentEvents: number;
+  uniqueSentUsers: number;
+  uniqueViewedWithinConversion: number;
+  uniqueClickedWithinConversion: number;
+  clickThroughConversions: number;
+  totalUnsubscribes: number;
+  hardBounces: number;
+  softBounces: number;
+  // Calculated rates
+  openRate: number;
+  clickRate: number;
+  unsubscribeRate: number;
+  hardBounceRate: number;
+  softBounceRate: number;
+}
+
+export interface PostmasterRow {
+  date: string;
+  domain: string;
+  ipReputation: string;
+  ipCount: number;
+  sampleIps: string;
+  domainReputation: string;
+  spamRatio: number;
+  errorRatio: number;
 }
 
 export interface ValidationResult {
@@ -22,159 +49,144 @@ export interface ValidationResult {
   data: CampaignRow[];
 }
 
-export interface PerformanceSnapshot {
-  bestCampaign: CampaignRow | null;
-  worstCampaign: CampaignRow | null;
-  medianOpenRate: number;
-  medianClickRate: number;
-  totalCampaigns: number;
-  totalEmailsSent: number;
+export interface PostmasterValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  data: PostmasterRow[];
 }
 
-export interface SubjectLineSignal {
-  pattern: string;
-  avgOpenRate: number;
-  count: number;
-  isTopPerformer: boolean;
+// Report Types
+export interface ProviderAggregate {
+  serviceProvider: string;
+  providerName: string;
+  totalSentUsers: number;
+  totalDeliveredUsers: number;
+  uniqueViewed: number;
+  uniqueClicked: number;
+  conversions: number;
+  unsubscribes: number;
+  hardBounces: number;
+  softBounces: number;
+  campaignCount: number;
 }
 
-export interface SubjectLineAnalysis {
-  lengthInsight: string;
-  topPatterns: SubjectLineSignal[];
-  lowPatterns: SubjectLineSignal[];
-  avgLengthTop: number;
-  avgLengthBottom: number;
+export interface MonthlyOverview {
+  month: string;
+  totalSentUsers: number;
+  totalDeliveredUsers: number;
+  uniqueViewed: number;
+  uniqueClicked: number;
+  conversions: number;
+  unsubscribes: number;
+  hardBounces: number;
+  softBounces: number;
+  campaignCount: number;
+  openRate: number;
+  clickRate: number;
+}
+
+export interface TopCampaign {
+  campaignId: string;
+  subjectLine: string;
+  totalSentUsers: number;
+  totalDeliveredUsers: number;
+  uniqueViewed: number;
+  uniqueClicked: number;
+  conversions: number;
+  unsubscribes: number;
+  hardBounces: number;
+  softBounces: number;
+  openRate: number;
+  clickRate: number;
+  startDate: string;
 }
 
 export interface TrendPoint {
-  date: string;
+  month: string;
   openRate: number;
   clickRate: number;
   volume: number;
 }
 
-export interface TrendAnalysis {
-  dataPoints: TrendPoint[];
-  openRateTrend: "improving" | "declining" | "stable";
-  clickRateTrend: "improving" | "declining" | "stable";
-  volumeVsEngagement: string;
-}
-
-export interface FatigueSignal {
-  type: "declining_engagement" | "overused_pattern" | "high_send_low_click";
-  severity: "low" | "medium" | "high";
-  description: string;
-  campaigns: string[];
-}
-
-export interface FatigueAnalysis {
-  signals: FatigueSignal[];
-  overallRisk: "low" | "medium" | "high";
-}
-
-export interface Recommendation {
+export interface KeyLearning {
   title: string;
   description: string;
-  category: "lifecycle" | "journey" | "amp" | "frequency" | "content";
-  priority: "high" | "medium" | "low";
+}
+
+export interface AnalysisReport {
+  providerAggregates: ProviderAggregate[];
+  monthlyOverview: MonthlyOverview[];
+  bestCampaigns: TopCampaign[];
+  worstCampaigns: TopCampaign[];
+  bestSummary: string;
+  worstSummary: string;
+  engagementTrends: TrendPoint[];
+  keyLearnings: KeyLearning[];
+}
+
+// Reputation Repair Types
+export interface ReputationIssue {
+  campaignId: string;
+  sendDate: string;
+  observation: string;
+  impact: string;
+  rootCause: string;
+  recommendation: string;
+  metricValues: Record<string, number | string>;
+}
+
+export interface ReputationRepairReport {
+  issues: ReputationIssue[];
+  hasPostmasterData: boolean;
+  contextNotes: string | null;
 }
 
 export interface DiagnosticsData {
   rawData: CampaignRow[];
-  performance: PerformanceSnapshot;
-  subjectLines: SubjectLineAnalysis;
-  trends: TrendAnalysis;
-  fatigue: FatigueAnalysis;
-  recommendations: Recommendation[];
+  postmasterData: PostmasterRow[] | null;
+  contextText: string | null;
+  analysisReport: AnalysisReport | null;
+  reputationReport: ReputationRepairReport | null;
 }
 
-const REQUIRED_HEADERS = [
-  "campaign_name",
-  "subject_line",
-  "sent_date",
-  "emails_sent",
-  "open_rate",
-  "click_rate",
-];
+// ============= CONSTANTS =============
 
-const OPTIONAL_HEADERS = [
-  "campaign_type",
-  "audience_segment",
-  "unsubscribe_rate",
-  "bounce_rate",
-  "send_time",
-];
-
-export const parseCSV = (csvText: string): ValidationResult => {
-  const lines = csvText.trim().split("\n");
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const data: CampaignRow[] = [];
-
-  if (lines.length < 2) {
-    return { isValid: false, errors: ["CSV file must have a header row and at least one data row"], warnings: [], data: [] };
-  }
-
-  // Parse headers (handle both comma and semicolon delimiters)
-  const delimiter = lines[0].includes(";") ? ";" : ",";
-  const headers = lines[0].toLowerCase().split(delimiter).map((h) => h.trim().replace(/"/g, ""));
-
-  // Validate required headers
-  const missingHeaders = REQUIRED_HEADERS.filter((h) => !headers.includes(h));
-  if (missingHeaders.length > 0) {
-    errors.push(`Missing required columns: ${missingHeaders.join(", ")}`);
-    return { isValid: false, errors, warnings, data: [] };
-  }
-
-  // Check for optional headers
-  const presentOptional = OPTIONAL_HEADERS.filter((h) => headers.includes(h));
-  const missingOptional = OPTIONAL_HEADERS.filter((h) => !headers.includes(h));
-  if (missingOptional.length > 0) {
-    warnings.push(`Optional columns not found: ${missingOptional.join(", ")}`);
-  }
-
-  // Parse data rows
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const values = parseCSVLine(line, delimiter);
-    
-    if (values.length !== headers.length) {
-      warnings.push(`Row ${i + 1}: Column count mismatch, skipping`);
-      continue;
-    }
-
-    const row: any = {};
-    headers.forEach((header, idx) => {
-      let value = values[idx]?.trim().replace(/"/g, "") || "";
-      
-      // Parse numeric fields
-      if (["emails_sent", "open_rate", "click_rate", "unsubscribe_rate", "bounce_rate"].includes(header)) {
-        row[header] = parseFloat(value.replace("%", "")) || 0;
-      } else {
-        row[header] = value;
-      }
-    });
-
-    // Validate required fields have values
-    if (!row.campaign_name || !row.subject_line || !row.sent_date) {
-      warnings.push(`Row ${i + 1}: Missing required field values, skipping`);
-      continue;
-    }
-
-    data.push(row as CampaignRow);
-  }
-
-  if (data.length === 0) {
-    errors.push("No valid data rows found after parsing");
-    return { isValid: false, errors, warnings, data: [] };
-  }
-
-  return { isValid: true, errors, warnings, data };
+const REQUIRED_HEADERS_MAP: Record<string, string> = {
+  "campaign name": "campaignName",
+  "campaign id": "campaignId",
+  "channel": "channel",
+  "title": "title",
+  "start date": "startDate",
+  "start time": "startTime",
+  "service provider": "serviceProvider",
+  "provider name": "providerName",
+  "status": "status",
+  "total sent (users)": "totalSentUsers",
+  "total delivered (users)": "totalDeliveredUsers",
+  "total sent (events)": "totalSentEvents",
+  "unique sent (users)": "uniqueSentUsers",
+  "unique viewed within conversion time": "uniqueViewedWithinConversion",
+  "unique clicked within conversion time": "uniqueClickedWithinConversion",
+  "click through conversions": "clickThroughConversions",
+  "total unsubscribes": "totalUnsubscribes",
+  "error: email hard bounced": "hardBounces",
+  "error: email soft bounced": "softBounces",
 };
 
-// Helper to parse CSV line respecting quoted values
+const POSTMASTER_HEADERS_MAP: Record<string, string> = {
+  "date": "date",
+  "domain": "domain",
+  "ip reputation": "ipReputation",
+  "ip count": "ipCount",
+  "sample ips": "sampleIps",
+  "domain reputation": "domainReputation",
+  "spam ratio": "spamRatio",
+  "error ratio": "errorRatio",
+};
+
+// ============= PARSING FUNCTIONS =============
+
 const parseCSVLine = (line: string, delimiter: string): string[] => {
   const result: string[] = [];
   let current = "";
@@ -195,413 +207,642 @@ const parseCSVLine = (line: string, delimiter: string): string[] => {
   return result;
 };
 
-const median = (arr: number[]): number => {
-  const sorted = [...arr].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-};
+export const parseCSV = (csvText: string): ValidationResult => {
+  const lines = csvText.trim().split("\n");
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const data: CampaignRow[] = [];
 
-export const analyzePerformance = (data: CampaignRow[]): PerformanceSnapshot => {
-  if (data.length === 0) {
-    return {
-      bestCampaign: null,
-      worstCampaign: null,
-      medianOpenRate: 0,
-      medianClickRate: 0,
-      totalCampaigns: 0,
-      totalEmailsSent: 0,
-    };
+  if (lines.length < 2) {
+    return { isValid: false, errors: ["CSV file must have a header row and at least one data row"], warnings: [], data: [] };
   }
 
-  // Score campaigns by combined engagement (open + click weighted)
-  const scored = data.map((c) => ({
-    ...c,
-    score: c.open_rate * 0.6 + c.click_rate * 0.4,
-  }));
+  const delimiter = lines[0].includes(";") ? ";" : ",";
+  const rawHeaders = parseCSVLine(lines[0], delimiter).map(h => h.trim().replace(/"/g, "").toLowerCase());
 
-  const sorted = [...scored].sort((a, b) => b.score - a.score);
+  // Create header index map
+  const headerIndexMap: Record<string, number> = {};
+  rawHeaders.forEach((header, idx) => {
+    headerIndexMap[header] = idx;
+  });
 
-  return {
-    bestCampaign: sorted[0],
-    worstCampaign: sorted[sorted.length - 1],
-    medianOpenRate: median(data.map((c) => c.open_rate)),
-    medianClickRate: median(data.map((c) => c.click_rate)),
-    totalCampaigns: data.length,
-    totalEmailsSent: data.reduce((sum, c) => sum + c.emails_sent, 0),
-  };
-};
-
-const extractPatterns = (subjectLine: string): string[] => {
-  const patterns: string[] = [];
+  // Check required headers
+  const requiredKeys = Object.keys(REQUIRED_HEADERS_MAP);
+  const missingHeaders = requiredKeys.filter(h => headerIndexMap[h] === undefined);
   
-  // Check for common patterns
-  if (/\d+%/.test(subjectLine)) patterns.push("Discount percentage");
-  if (/free/i.test(subjectLine)) patterns.push("Free offer");
-  if (/limited|expires|ending/i.test(subjectLine)) patterns.push("Urgency");
-  if (/\?$/.test(subjectLine.trim())) patterns.push("Question");
-  if (/!$/.test(subjectLine.trim())) patterns.push("Exclamation");
-  if (/^re:|^fw:/i.test(subjectLine)) patterns.push("Reply/Forward");
-  if (/you|your/i.test(subjectLine)) patterns.push("Personalization");
-  if (/new|latest|just/i.test(subjectLine)) patterns.push("Newness");
-  if (/exclusive|vip|special/i.test(subjectLine)) patterns.push("Exclusivity");
-  if (/emoji|[^\x00-\x7F]/.test(subjectLine)) patterns.push("Emoji usage");
-  
-  return patterns.length > 0 ? patterns : ["Standard"];
-};
-
-export const analyzeSubjectLines = (data: CampaignRow[]): SubjectLineAnalysis => {
-  if (data.length === 0) {
-    return {
-      lengthInsight: "No data available",
-      topPatterns: [],
-      lowPatterns: [],
-      avgLengthTop: 0,
-      avgLengthBottom: 0,
-    };
+  if (missingHeaders.length > 0) {
+    // Allow some flexibility - only critical ones are truly required
+    const criticalMissing = missingHeaders.filter(h => 
+      ["campaign id", "title", "start date", "total sent (users)", "unique viewed within conversion time"].includes(h)
+    );
+    if (criticalMissing.length > 0) {
+      errors.push(`Missing required columns: ${criticalMissing.join(", ")}`);
+      return { isValid: false, errors, warnings, data: [] };
+    }
+    warnings.push(`Optional columns not found: ${missingHeaders.join(", ")}`);
   }
 
-  const sorted = [...data].sort((a, b) => b.open_rate - a.open_rate);
-  const topQuartile = sorted.slice(0, Math.max(1, Math.ceil(data.length * 0.25)));
-  const bottomQuartile = sorted.slice(-Math.max(1, Math.ceil(data.length * 0.25)));
+  // Parse data rows
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
 
-  const avgLengthTop = topQuartile.reduce((sum, c) => sum + c.subject_line.length, 0) / topQuartile.length;
-  const avgLengthBottom = bottomQuartile.reduce((sum, c) => sum + c.subject_line.length, 0) / bottomQuartile.length;
+    const values = parseCSVLine(line, delimiter);
+    
+    const getValue = (headerKey: string): string => {
+      const idx = headerIndexMap[headerKey];
+      return idx !== undefined ? (values[idx]?.trim().replace(/"/g, "") || "") : "";
+    };
 
-  // Analyze patterns
-  const patternStats: Record<string, { total: number; openSum: number; campaigns: CampaignRow[] }> = {};
+    const getNumericValue = (headerKey: string): number => {
+      const val = getValue(headerKey);
+      return parseFloat(val.replace(/,/g, "").replace("%", "")) || 0;
+    };
 
-  data.forEach((campaign) => {
-    const patterns = extractPatterns(campaign.subject_line);
-    patterns.forEach((pattern) => {
-      if (!patternStats[pattern]) {
-        patternStats[pattern] = { total: 0, openSum: 0, campaigns: [] };
-      }
-      patternStats[pattern].total++;
-      patternStats[pattern].openSum += campaign.open_rate;
-      patternStats[pattern].campaigns.push(campaign);
+    // Only process Email channel and Completed status
+    const channel = getValue("channel");
+    const status = getValue("status");
+    
+    if (channel.toLowerCase() !== "email" || status.toLowerCase() !== "completed") {
+      continue;
+    }
+
+    // Extract subject line from title (before preheader)
+    const fullTitle = getValue("title");
+    const subjectLine = fullTitle.split("|")[0].trim() || fullTitle;
+
+    const totalSent = getNumericValue("total sent (users)");
+    const totalDelivered = getNumericValue("total delivered (users)");
+    const uniqueViewed = getNumericValue("unique viewed within conversion time");
+    const uniqueClicked = getNumericValue("unique clicked within conversion time");
+    const hardBounces = getNumericValue("error: email hard bounced");
+    const softBounces = getNumericValue("error: email soft bounced");
+    const unsubscribes = getNumericValue("total unsubscribes");
+
+    const baseForRates = totalDelivered > 0 ? totalDelivered : totalSent;
+
+    const row: CampaignRow = {
+      campaignName: getValue("campaign name"),
+      campaignId: getValue("campaign id"),
+      channel,
+      title: fullTitle,
+      subjectLine,
+      startDate: getValue("start date"),
+      startTime: getValue("start time"),
+      serviceProvider: getValue("service provider"),
+      providerName: getValue("provider name"),
+      status,
+      totalSentUsers: totalSent,
+      totalDeliveredUsers: totalDelivered,
+      totalSentEvents: getNumericValue("total sent (events)"),
+      uniqueSentUsers: getNumericValue("unique sent (users)"),
+      uniqueViewedWithinConversion: uniqueViewed,
+      uniqueClickedWithinConversion: uniqueClicked,
+      clickThroughConversions: getNumericValue("click through conversions"),
+      totalUnsubscribes: unsubscribes,
+      hardBounces,
+      softBounces,
+      openRate: baseForRates > 0 ? (uniqueViewed / baseForRates) * 100 : 0,
+      clickRate: baseForRates > 0 ? (uniqueClicked / baseForRates) * 100 : 0,
+      unsubscribeRate: baseForRates > 0 ? (unsubscribes / baseForRates) * 100 : 0,
+      hardBounceRate: totalSent > 0 ? (hardBounces / totalSent) * 100 : 0,
+      softBounceRate: totalSent > 0 ? (softBounces / totalSent) * 100 : 0,
+    };
+
+    data.push(row);
+  }
+
+  if (data.length === 0) {
+    errors.push("No valid Email campaigns with Completed status found");
+    return { isValid: false, errors, warnings, data: [] };
+  }
+
+  return { isValid: true, errors, warnings, data };
+};
+
+export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult => {
+  const lines = csvText.trim().split("\n");
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const data: PostmasterRow[] = [];
+
+  if (lines.length < 2) {
+    return { isValid: false, errors: ["Postmaster CSV must have header and data rows"], warnings: [], data: [] };
+  }
+
+  const delimiter = lines[0].includes(";") ? ";" : ",";
+  const rawHeaders = parseCSVLine(lines[0], delimiter).map(h => h.trim().replace(/"/g, "").toLowerCase());
+
+  const headerIndexMap: Record<string, number> = {};
+  rawHeaders.forEach((header, idx) => {
+    headerIndexMap[header] = idx;
+  });
+
+  // Check for date and domain at minimum
+  if (headerIndexMap["date"] === undefined || headerIndexMap["domain"] === undefined) {
+    errors.push("Postmaster CSV must have Date and Domain columns");
+    return { isValid: false, errors, warnings, data: [] };
+  }
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const values = parseCSVLine(line, delimiter);
+
+    const getValue = (key: string): string => {
+      const idx = headerIndexMap[key];
+      return idx !== undefined ? (values[idx]?.trim().replace(/"/g, "") || "") : "";
+    };
+
+    const getNumericValue = (key: string): number => {
+      const val = getValue(key);
+      return parseFloat(val.replace(/,/g, "").replace("%", "")) || 0;
+    };
+
+    data.push({
+      date: getValue("date"),
+      domain: getValue("domain"),
+      ipReputation: getValue("ip reputation"),
+      ipCount: getNumericValue("ip count"),
+      sampleIps: getValue("sample ips"),
+      domainReputation: getValue("domain reputation"),
+      spamRatio: getNumericValue("spam ratio"),
+      errorRatio: getNumericValue("error ratio"),
     });
-  });
-
-  const patternSignals: SubjectLineSignal[] = Object.entries(patternStats)
-    .filter(([, stats]) => stats.total >= 2)
-    .map(([pattern, stats]) => ({
-      pattern,
-      avgOpenRate: stats.openSum / stats.total,
-      count: stats.total,
-      isTopPerformer: false,
-    }))
-    .sort((a, b) => b.avgOpenRate - a.avgOpenRate);
-
-  const medianRate = median(data.map((c) => c.open_rate));
-  patternSignals.forEach((p) => {
-    p.isTopPerformer = p.avgOpenRate > medianRate;
-  });
-
-  const topPatterns = patternSignals.filter((p) => p.isTopPerformer).slice(0, 3);
-  const lowPatterns = patternSignals.filter((p) => !p.isTopPerformer).slice(-3);
-
-  let lengthInsight: string;
-  if (avgLengthTop < avgLengthBottom - 10) {
-    lengthInsight = `Shorter subject lines perform better (avg ${Math.round(avgLengthTop)} vs ${Math.round(avgLengthBottom)} chars)`;
-  } else if (avgLengthTop > avgLengthBottom + 10) {
-    lengthInsight = `Longer subject lines perform better (avg ${Math.round(avgLengthTop)} vs ${Math.round(avgLengthBottom)} chars)`;
-  } else {
-    lengthInsight = `Subject line length has minimal impact (both avg ~${Math.round((avgLengthTop + avgLengthBottom) / 2)} chars)`;
   }
 
-  return {
-    lengthInsight,
-    topPatterns,
-    lowPatterns,
-    avgLengthTop,
-    avgLengthBottom,
-  };
+  return { isValid: data.length > 0, errors, warnings, data };
 };
+
+// ============= ANALYSIS FUNCTIONS =============
 
 const parseDateSafely = (dateStr: string): Date | null => {
-  // Try various date formats
-  const formats = [
-    /^(\d{4})-(\d{2})-(\d{2})/, // YYYY-MM-DD
-    /^(\d{2})\/(\d{2})\/(\d{4})/, // MM/DD/YYYY
-    /^(\d{2})-(\d{2})-(\d{4})/, // DD-MM-YYYY
-  ];
-
-  for (const format of formats) {
-    const match = dateStr.match(format);
-    if (match) {
-      const date = new Date(dateStr);
-      if (!isNaN(date.getTime())) return date;
-    }
+  if (!dateStr) return null;
+  
+  // Try various formats
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) return date;
+  
+  // Try DD/MM/YYYY or DD-MM-YYYY
+  const parts = dateStr.split(/[\/\-]/);
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    const parsedDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+    if (!isNaN(parsedDate.getTime())) return parsedDate;
   }
   
-  // Fallback to Date.parse
-  const date = new Date(dateStr);
-  return isNaN(date.getTime()) ? null : date;
+  return null;
 };
 
-export const analyzeTrends = (data: CampaignRow[]): TrendAnalysis => {
-  if (data.length < 3) {
-    return {
-      dataPoints: [],
-      openRateTrend: "stable",
-      clickRateTrend: "stable",
-      volumeVsEngagement: "Insufficient data for trend analysis",
-    };
-  }
+const getMonthKey = (dateStr: string): string => {
+  const date = parseDateSafely(dateStr);
+  if (!date) return "Unknown";
+  return date.toLocaleString('default', { month: 'short', year: 'numeric' });
+};
 
-  // Group by date and aggregate
-  const dateGroups: Record<string, { openSum: number; clickSum: number; volume: number; count: number }> = {};
-
-  data.forEach((campaign) => {
-    const date = parseDateSafely(campaign.sent_date);
-    if (!date) return;
-    
-    const dateKey = date.toISOString().split("T")[0];
-    if (!dateGroups[dateKey]) {
-      dateGroups[dateKey] = { openSum: 0, clickSum: 0, volume: 0, count: 0 };
+export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
+  // Report 1a: Provider Aggregates
+  const providerMap: Record<string, ProviderAggregate> = {};
+  
+  data.forEach(row => {
+    const key = `${row.serviceProvider}|${row.providerName}`;
+    if (!providerMap[key]) {
+      providerMap[key] = {
+        serviceProvider: row.serviceProvider || "Unknown",
+        providerName: row.providerName || "Unknown",
+        totalSentUsers: 0,
+        totalDeliveredUsers: 0,
+        uniqueViewed: 0,
+        uniqueClicked: 0,
+        conversions: 0,
+        unsubscribes: 0,
+        hardBounces: 0,
+        softBounces: 0,
+        campaignCount: 0,
+      };
     }
-    dateGroups[dateKey].openSum += campaign.open_rate;
-    dateGroups[dateKey].clickSum += campaign.click_rate;
-    dateGroups[dateKey].volume += campaign.emails_sent;
-    dateGroups[dateKey].count++;
+    const agg = providerMap[key];
+    agg.totalSentUsers += row.totalSentUsers;
+    agg.totalDeliveredUsers += row.totalDeliveredUsers;
+    agg.uniqueViewed += row.uniqueViewedWithinConversion;
+    agg.uniqueClicked += row.uniqueClickedWithinConversion;
+    agg.conversions += row.clickThroughConversions;
+    agg.unsubscribes += row.totalUnsubscribes;
+    agg.hardBounces += row.hardBounces;
+    agg.softBounces += row.softBounces;
+    agg.campaignCount++;
   });
 
-  const dataPoints: TrendPoint[] = Object.entries(dateGroups)
-    .map(([date, stats]) => ({
-      date,
-      openRate: stats.openSum / stats.count,
-      clickRate: stats.clickSum / stats.count,
-      volume: stats.volume,
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const providerAggregates = Object.values(providerMap);
 
-  // Calculate trends (comparing first half to second half)
-  const mid = Math.floor(dataPoints.length / 2);
-  const firstHalf = dataPoints.slice(0, mid);
-  const secondHalf = dataPoints.slice(mid);
+  // Report 1b: Monthly Overview
+  const monthMap: Record<string, MonthlyOverview> = {};
+  
+  data.forEach(row => {
+    const month = getMonthKey(row.startDate);
+    if (!monthMap[month]) {
+      monthMap[month] = {
+        month,
+        totalSentUsers: 0,
+        totalDeliveredUsers: 0,
+        uniqueViewed: 0,
+        uniqueClicked: 0,
+        conversions: 0,
+        unsubscribes: 0,
+        hardBounces: 0,
+        softBounces: 0,
+        campaignCount: 0,
+        openRate: 0,
+        clickRate: 0,
+      };
+    }
+    const m = monthMap[month];
+    m.totalSentUsers += row.totalSentUsers;
+    m.totalDeliveredUsers += row.totalDeliveredUsers;
+    m.uniqueViewed += row.uniqueViewedWithinConversion;
+    m.uniqueClicked += row.uniqueClickedWithinConversion;
+    m.conversions += row.clickThroughConversions;
+    m.unsubscribes += row.totalUnsubscribes;
+    m.hardBounces += row.hardBounces;
+    m.softBounces += row.softBounces;
+    m.campaignCount++;
+  });
 
-  const avgOpenFirst = firstHalf.reduce((s, p) => s + p.openRate, 0) / (firstHalf.length || 1);
-  const avgOpenSecond = secondHalf.reduce((s, p) => s + p.openRate, 0) / (secondHalf.length || 1);
-  const avgClickFirst = firstHalf.reduce((s, p) => s + p.clickRate, 0) / (firstHalf.length || 1);
-  const avgClickSecond = secondHalf.reduce((s, p) => s + p.clickRate, 0) / (secondHalf.length || 1);
+  const monthlyOverview = Object.values(monthMap)
+    .map(m => {
+      const base = m.totalDeliveredUsers > 0 ? m.totalDeliveredUsers : m.totalSentUsers;
+      m.openRate = base > 0 ? (m.uniqueViewed / base) * 100 : 0;
+      m.clickRate = base > 0 ? (m.uniqueClicked / base) * 100 : 0;
+      return m;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.month);
+      const dateB = new Date(b.month);
+      return dateA.getTime() - dateB.getTime();
+    });
 
-  const openRateTrend: "improving" | "declining" | "stable" =
-    avgOpenSecond > avgOpenFirst * 1.1 ? "improving" :
-    avgOpenSecond < avgOpenFirst * 0.9 ? "declining" : "stable";
+  // Filter campaigns with >= 1000 users for best/worst
+  const eligibleCampaigns = data.filter(c => c.totalSentUsers >= 1000);
 
-  const clickRateTrend: "improving" | "declining" | "stable" =
-    avgClickSecond > avgClickFirst * 1.1 ? "improving" :
-    avgClickSecond < avgClickFirst * 0.9 ? "declining" : "stable";
+  // Report 2: Best Performing (by unique viewed)
+  const sortedByViewed = [...eligibleCampaigns].sort(
+    (a, b) => b.uniqueViewedWithinConversion - a.uniqueViewedWithinConversion
+  );
 
-  // Analyze volume vs engagement correlation
-  const highVolumeDays = dataPoints.filter((p) => p.volume > median(dataPoints.map((d) => d.volume)));
-  const avgEngagementHigh = highVolumeDays.reduce((s, p) => s + p.openRate + p.clickRate, 0) / (highVolumeDays.length * 2 || 1);
-  const avgEngagementAll = dataPoints.reduce((s, p) => s + p.openRate + p.clickRate, 0) / (dataPoints.length * 2 || 1);
+  const bestCampaigns: TopCampaign[] = sortedByViewed.slice(0, 10).map(c => ({
+    campaignId: c.campaignId,
+    subjectLine: c.subjectLine,
+    totalSentUsers: c.totalSentUsers,
+    totalDeliveredUsers: c.totalDeliveredUsers,
+    uniqueViewed: c.uniqueViewedWithinConversion,
+    uniqueClicked: c.uniqueClickedWithinConversion,
+    conversions: c.clickThroughConversions,
+    unsubscribes: c.totalUnsubscribes,
+    hardBounces: c.hardBounces,
+    softBounces: c.softBounces,
+    openRate: c.openRate,
+    clickRate: c.clickRate,
+    startDate: c.startDate,
+  }));
 
-  let volumeVsEngagement: string;
-  if (avgEngagementHigh < avgEngagementAll * 0.85) {
-    volumeVsEngagement = "Higher send volume correlates with lower engagement - consider pacing";
-  } else if (avgEngagementHigh > avgEngagementAll * 1.15) {
-    volumeVsEngagement = "Higher volume days show better engagement - timing may be optimal";
-  } else {
-    volumeVsEngagement = "Volume does not significantly impact engagement rates";
-  }
+  // Report 3: Worst Performing
+  const worstCampaigns: TopCampaign[] = sortedByViewed.slice(-10).reverse().map(c => ({
+    campaignId: c.campaignId,
+    subjectLine: c.subjectLine,
+    totalSentUsers: c.totalSentUsers,
+    totalDeliveredUsers: c.totalDeliveredUsers,
+    uniqueViewed: c.uniqueViewedWithinConversion,
+    uniqueClicked: c.uniqueClickedWithinConversion,
+    conversions: c.clickThroughConversions,
+    unsubscribes: c.totalUnsubscribes,
+    hardBounces: c.hardBounces,
+    softBounces: c.softBounces,
+    openRate: c.openRate,
+    clickRate: c.clickRate,
+    startDate: c.startDate,
+  }));
+
+  // Generate summaries
+  const bestSummary = generateBestSummary(bestCampaigns);
+  const worstSummary = generateWorstSummary(worstCampaigns);
+
+  // Report 4: Engagement Trends
+  const engagementTrends: TrendPoint[] = monthlyOverview.map(m => ({
+    month: m.month,
+    openRate: m.openRate,
+    clickRate: m.clickRate,
+    volume: m.totalSentUsers,
+  }));
+
+  // Report 5: Key Learnings
+  const keyLearnings = generateKeyLearnings(data, monthlyOverview, bestCampaigns, worstCampaigns);
 
   return {
-    dataPoints,
-    openRateTrend,
-    clickRateTrend,
-    volumeVsEngagement,
+    providerAggregates,
+    monthlyOverview,
+    bestCampaigns,
+    worstCampaigns,
+    bestSummary,
+    worstSummary,
+    engagementTrends,
+    keyLearnings,
   };
 };
 
-export const analyzeFatigue = (data: CampaignRow[]): FatigueAnalysis => {
-  const signals: FatigueSignal[] = [];
+const generateBestSummary = (campaigns: TopCampaign[]): string => {
+  if (campaigns.length === 0) return "No campaigns with sufficient volume to analyze.";
 
-  if (data.length < 5) {
-    return { signals: [], overallRisk: "low" };
+  const avgOpenRate = campaigns.reduce((s, c) => s + c.openRate, 0) / campaigns.length;
+  const avgClickRate = campaigns.reduce((s, c) => s + c.clickRate, 0) / campaigns.length;
+  
+  const patterns: string[] = [];
+  
+  // Analyze subject line patterns
+  const hasUrgency = campaigns.some(c => /limited|last|ending|hurry|now/i.test(c.subjectLine));
+  const hasPersonalization = campaigns.some(c => /you|your/i.test(c.subjectLine));
+  const hasNumbers = campaigns.some(c => /\d+%|\d+ off/i.test(c.subjectLine));
+  const shortSubjects = campaigns.filter(c => c.subjectLine.length < 50).length > campaigns.length / 2;
+  
+  if (hasUrgency) patterns.push("urgency-driven messaging");
+  if (hasPersonalization) patterns.push("personalized language");
+  if (hasNumbers) patterns.push("specific offers with numbers");
+  if (shortSubjects) patterns.push("concise subject lines");
+  
+  const patternText = patterns.length > 0 
+    ? `Common success factors include ${patterns.join(", ")}.`
+    : "High engagement indicates strong audience-message fit.";
+
+  return `Top performers achieved ${avgOpenRate.toFixed(1)}% avg open rate and ${avgClickRate.toFixed(1)}% click rate. ${patternText} Low bounce and unsubscribe rates suggest healthy list quality and relevant content timing.`;
+};
+
+const generateWorstSummary = (campaigns: TopCampaign[]): string => {
+  if (campaigns.length === 0) return "No campaigns with sufficient volume to analyze.";
+
+  const avgOpenRate = campaigns.reduce((s, c) => s + c.openRate, 0) / campaigns.length;
+  const avgClickRate = campaigns.reduce((s, c) => s + c.clickRate, 0) / campaigns.length;
+  const avgBounce = campaigns.reduce((s, c) => s + (c.hardBounces + c.softBounces), 0) / campaigns.length;
+  
+  const issues: string[] = [];
+  
+  if (avgOpenRate < 10) issues.push("low open rates suggest deliverability or subject line issues");
+  if (avgClickRate < 1) issues.push("poor click-through indicates weak CTAs or irrelevant content");
+  if (avgBounce > 100) issues.push("elevated bounce rates point to list hygiene problems");
+  
+  // Check for patterns
+  const longSubjects = campaigns.filter(c => c.subjectLine.length > 60).length > campaigns.length / 2;
+  if (longSubjects) issues.push("overly long subject lines getting truncated");
+
+  const issueText = issues.length > 0 
+    ? issues.join("; ")
+    : "underperformance may be due to timing, segmentation, or content relevance";
+
+  return `Low performers averaged ${avgOpenRate.toFixed(1)}% open rate and ${avgClickRate.toFixed(1)}% click rate. Issues identified: ${issueText}. Consider A/B testing and audience segmentation improvements.`;
+};
+
+const generateKeyLearnings = (
+  data: CampaignRow[],
+  monthlyData: MonthlyOverview[],
+  best: TopCampaign[],
+  worst: TopCampaign[]
+): KeyLearning[] => {
+  const learnings: KeyLearning[] = [];
+
+  // Trend analysis
+  if (monthlyData.length >= 2) {
+    const firstMonth = monthlyData[0];
+    const lastMonth = monthlyData[monthlyData.length - 1];
+    const openDelta = lastMonth.openRate - firstMonth.openRate;
+    
+    if (Math.abs(openDelta) > 2) {
+      learnings.push({
+        title: openDelta > 0 ? "Improving Open Rates" : "Declining Open Rates",
+        description: `Open rates ${openDelta > 0 ? "increased" : "decreased"} by ${Math.abs(openDelta).toFixed(1)}% from ${firstMonth.month} to ${lastMonth.month}. ${openDelta > 0 ? "Continue current strategies." : "Review subject lines and send times."}`,
+      });
+    }
   }
 
-  // Sort by date
-  const sorted = [...data].sort((a, b) => {
-    const dateA = parseDateSafely(a.sent_date);
-    const dateB = parseDateSafely(b.sent_date);
+  // Volume vs engagement
+  const totalSent = data.reduce((s, c) => s + c.totalSentUsers, 0);
+  const avgOpen = data.reduce((s, c) => s + c.openRate, 0) / data.length;
+  
+  if (avgOpen < 15 && totalSent > 100000) {
+    learnings.push({
+      title: "High Volume, Low Engagement",
+      description: "Large send volumes with below-average open rates suggest potential list fatigue. Consider frequency capping and re-engagement campaigns.",
+    });
+  }
+
+  // Bounce rate concerns
+  const avgHardBounce = data.reduce((s, c) => s + c.hardBounceRate, 0) / data.length;
+  if (avgHardBounce > 0.5) {
+    learnings.push({
+      title: "Hard Bounce Rate Above Threshold",
+      description: `Average hard bounce rate of ${avgHardBounce.toFixed(2)}% exceeds the 0.5% best practice threshold. Implement email verification and list cleaning.`,
+    });
+  }
+
+  // Unsubscribe concerns
+  const avgUnsub = data.reduce((s, c) => s + c.unsubscribeRate, 0) / data.length;
+  if (avgUnsub > 0.2) {
+    learnings.push({
+      title: "Elevated Unsubscribe Rate",
+      description: `Average unsubscribe rate of ${avgUnsub.toFixed(2)}% is above the 0.2% threshold. Review content relevance and send frequency.`,
+    });
+  }
+
+  // Best performer insights
+  if (best.length > 0) {
+    const topAvgOpen = best.slice(0, 3).reduce((s, c) => s + c.openRate, 0) / Math.min(3, best.length);
+    learnings.push({
+      title: "Top Campaign Performance",
+      description: `Best campaigns achieved ${topAvgOpen.toFixed(1)}% open rates. Analyze these subject lines and content for replicable patterns.`,
+    });
+  }
+
+  return learnings.slice(0, 5);
+};
+
+// ============= REPUTATION REPAIR ANALYSIS =============
+
+export const generateReputationRepairReport = (
+  data: CampaignRow[],
+  postmasterData: PostmasterRow[] | null,
+  contextText: string | null
+): ReputationRepairReport => {
+  const issues: ReputationIssue[] = [];
+
+  // Sort campaigns chronologically (oldest to newest)
+  const sortedData = [...data].sort((a, b) => {
+    const dateA = parseDateSafely(a.startDate);
+    const dateB = parseDateSafely(b.startDate);
     return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
   });
 
-  // Check for declining engagement
-  const recentQuarter = sorted.slice(-Math.ceil(sorted.length * 0.25));
-  const earlierData = sorted.slice(0, -Math.ceil(sorted.length * 0.25));
+  // Calculate rolling average for detecting dips
+  const windowSize = 5;
   
-  const recentAvgOpen = recentQuarter.reduce((s, c) => s + c.open_rate, 0) / recentQuarter.length;
-  const earlierAvgOpen = earlierData.reduce((s, c) => s + c.open_rate, 0) / (earlierData.length || 1);
+  for (let i = windowSize; i < sortedData.length; i++) {
+    const current = sortedData[i];
+    const previousWindow = sortedData.slice(i - windowSize, i);
+    const prevAvgOpen = previousWindow.reduce((s, c) => s + c.openRate, 0) / windowSize;
+    
+    // Detect sudden open rate drops (>20% decline from rolling avg)
+    if (current.openRate < prevAvgOpen * 0.8 && prevAvgOpen > 5) {
+      // Check for correlated issues
+      const issue: ReputationIssue = {
+        campaignId: current.campaignId,
+        sendDate: current.startDate,
+        observation: `Open rate dropped from ${prevAvgOpen.toFixed(1)}% (rolling avg) to ${current.openRate.toFixed(1)}%`,
+        impact: "Potential deliverability issue affecting inbox placement",
+        rootCause: "",
+        recommendation: "",
+        metricValues: {
+          openRate: current.openRate,
+          previousAvg: prevAvgOpen,
+          hardBounceRate: current.hardBounceRate,
+          softBounceRate: current.softBounceRate,
+        },
+      };
 
-  if (recentAvgOpen < earlierAvgOpen * 0.8) {
-    signals.push({
-      type: "declining_engagement",
-      severity: recentAvgOpen < earlierAvgOpen * 0.6 ? "high" : "medium",
-      description: `Open rates dropped ${Math.round((1 - recentAvgOpen / earlierAvgOpen) * 100)}% in recent campaigns`,
-      campaigns: recentQuarter.map((c) => c.campaign_name),
-    });
-  }
+      // Determine root cause
+      if (current.hardBounceRate > 0.5) {
+        issue.rootCause = `Hard bounce rate of ${current.hardBounceRate.toFixed(2)}% exceeds 0.5% threshold`;
+        issue.recommendation = "Clean email list immediately. Remove invalid addresses and implement double opt-in.";
+      } else if (current.softBounceRate > 1) {
+        issue.rootCause = `Soft bounce rate of ${current.softBounceRate.toFixed(2)}% exceeds 1% threshold`;
+        issue.recommendation = "Check sending infrastructure. Review content for spam triggers and reduce email size.";
+      } else if (current.unsubscribeRate > 0.2) {
+        issue.rootCause = `Unsubscribe rate of ${current.unsubscribeRate.toFixed(2)}% indicates content dissatisfaction`;
+        issue.recommendation = "Review content relevance and reduce send frequency. Consider preference center.";
+      } else {
+        issue.rootCause = "Possible spam folder placement or recipient fatigue";
+        issue.recommendation = "Review subject lines for spam triggers. Check authentication (SPF/DKIM/DMARC).";
+      }
 
-  // Check for overused patterns
-  const patternCounts: Record<string, string[]> = {};
-  data.forEach((c) => {
-    const patterns = extractPatterns(c.subject_line);
-    patterns.forEach((p) => {
-      if (!patternCounts[p]) patternCounts[p] = [];
-      patternCounts[p].push(c.campaign_name);
-    });
-  });
+      // Check postmaster data for correlated issues
+      if (postmasterData && postmasterData.length > 0) {
+        const campaignDate = parseDateSafely(current.startDate);
+        if (campaignDate) {
+          const nearbyPostmaster = postmasterData.find(p => {
+            const pmDate = parseDateSafely(p.date);
+            if (!pmDate) return false;
+            const dayDiff = Math.abs((pmDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
+            return dayDiff <= 2;
+          });
 
-  Object.entries(patternCounts).forEach(([pattern, campaigns]) => {
-    if (campaigns.length > data.length * 0.5 && pattern !== "Standard") {
-      signals.push({
-        type: "overused_pattern",
-        severity: campaigns.length > data.length * 0.7 ? "high" : "medium",
-        description: `"${pattern}" used in ${campaigns.length} of ${data.length} campaigns`,
-        campaigns: campaigns.slice(0, 5),
+          if (nearbyPostmaster) {
+            if (nearbyPostmaster.spamRatio > 0.01) {
+              issue.rootCause += `. Postmaster shows ${(nearbyPostmaster.spamRatio * 100).toFixed(2)}% spam ratio on ${nearbyPostmaster.date}`;
+              issue.recommendation += " Postmaster data confirms spam issues - prioritize content and list hygiene.";
+            }
+            if (nearbyPostmaster.domainReputation === "Low" || nearbyPostmaster.domainReputation === "Bad") {
+              issue.rootCause += `. Domain reputation: ${nearbyPostmaster.domainReputation}`;
+              issue.recommendation += " Domain reputation is degraded - implement gradual warm-up.";
+            }
+          }
+        }
+      }
+
+      issues.push(issue);
+    }
+
+    // Check threshold violations regardless of dips
+    if (current.hardBounceRate > 0.5 && !issues.some(i => i.campaignId === current.campaignId)) {
+      issues.push({
+        campaignId: current.campaignId,
+        sendDate: current.startDate,
+        observation: `Hard bounce rate of ${current.hardBounceRate.toFixed(2)}% exceeds 0.5% threshold`,
+        impact: "Sender reputation damage and potential blocklisting",
+        rootCause: "Invalid email addresses in list - possible purchased list or outdated data",
+        recommendation: "Immediately pause sends to unverified segments. Implement real-time email verification.",
+        metricValues: {
+          hardBounceRate: current.hardBounceRate,
+          hardBounces: current.hardBounces,
+          totalSent: current.totalSentUsers,
+        },
       });
     }
-  });
 
-  // Check for high send, low click
-  const medianClick = median(data.map((c) => c.click_rate));
-  const medianVolume = median(data.map((c) => c.emails_sent));
-  
-  const highSendLowClick = data.filter(
-    (c) => c.emails_sent > medianVolume * 1.5 && c.click_rate < medianClick * 0.5
-  );
-
-  if (highSendLowClick.length >= 3) {
-    signals.push({
-      type: "high_send_low_click",
-      severity: highSendLowClick.length > 5 ? "high" : "medium",
-      description: `${highSendLowClick.length} campaigns with high volume but low clicks`,
-      campaigns: highSendLowClick.map((c) => c.campaign_name),
-    });
-  }
-
-  // Calculate overall risk
-  const highSeverityCount = signals.filter((s) => s.severity === "high").length;
-  const mediumSeverityCount = signals.filter((s) => s.severity === "medium").length;
-
-  let overallRisk: "low" | "medium" | "high" = "low";
-  if (highSeverityCount >= 2 || (highSeverityCount >= 1 && mediumSeverityCount >= 2)) {
-    overallRisk = "high";
-  } else if (highSeverityCount >= 1 || mediumSeverityCount >= 2) {
-    overallRisk = "medium";
-  }
-
-  return { signals, overallRisk };
-};
-
-export const generateRecommendations = (
-  performance: PerformanceSnapshot,
-  subjectLines: SubjectLineAnalysis,
-  trends: TrendAnalysis,
-  fatigue: FatigueAnalysis
-): Recommendation[] => {
-  const recommendations: Recommendation[] = [];
-
-  // Based on performance
-  if (performance.medianClickRate < 2) {
-    recommendations.push({
-      title: "Strengthen Call-to-Actions",
-      description: "Low click rates suggest CTAs may not be compelling. Test value-driven language and create urgency without being pushy.",
-      category: "content",
-      priority: "high",
-    });
-  }
-
-  // Based on subject lines
-  if (subjectLines.topPatterns.some((p) => p.pattern === "Personalization")) {
-    recommendations.push({
-      title: "Scale Personalization",
-      description: "Personalized subject lines are performing well. Extend this to body content and consider behavioral triggers for journey automation.",
-      category: "journey",
-      priority: "high",
-    });
-  }
-
-  if (subjectLines.lowPatterns.some((p) => p.pattern === "Urgency")) {
-    recommendations.push({
-      title: "Reconsider Urgency Tactics",
-      description: "Urgency-based subject lines are underperforming. Your audience may prefer value-focused messaging over pressure.",
-      category: "content",
-      priority: "medium",
-    });
-  }
-
-  // Based on trends
-  if (trends.openRateTrend === "declining") {
-    recommendations.push({
-      title: "Implement Re-engagement Journeys",
-      description: "Declining open rates indicate list fatigue. Set up automated re-engagement sequences and consider sunsetting unengaged subscribers.",
-      category: "lifecycle",
-      priority: "high",
-    });
-  }
-
-  if (trends.volumeVsEngagement.includes("pacing")) {
-    recommendations.push({
-      title: "Optimize Send Frequency",
-      description: "High volume is hurting engagement. Implement frequency capping and let user behavior determine send cadence.",
-      category: "frequency",
-      priority: "high",
-    });
-  }
-
-  // Based on fatigue
-  if (fatigue.overallRisk === "high") {
-    recommendations.push({
-      title: "Address List Fatigue Urgently",
-      description: "Multiple fatigue signals detected. Pause promotional campaigns temporarily, focus on value-driven content, and clean your list.",
-      category: "frequency",
-      priority: "high",
-    });
-  }
-
-  fatigue.signals.forEach((signal) => {
-    if (signal.type === "overused_pattern" && !recommendations.some((r) => r.title.includes("Subject Line"))) {
-      recommendations.push({
-        title: "Diversify Subject Line Strategy",
-        description: `Overuse of "${signal.description.split('"')[1]}" pattern. Test new approaches like curiosity, exclusivity, or question-based subjects.`,
-        category: "content",
-        priority: "medium",
+    if (current.unsubscribeRate > 0.2 && !issues.some(i => i.campaignId === current.campaignId)) {
+      issues.push({
+        campaignId: current.campaignId,
+        sendDate: current.startDate,
+        observation: `Unsubscribe rate of ${current.unsubscribeRate.toFixed(2)}% exceeds 0.2% threshold`,
+        impact: "List degradation and potential spam complaints",
+        rootCause: "Content-audience mismatch or excessive send frequency",
+        recommendation: "Review segmentation strategy. Implement preference center for frequency control.",
+        metricValues: {
+          unsubscribeRate: current.unsubscribeRate,
+          unsubscribes: current.totalUnsubscribes,
+          totalSent: current.totalSentUsers,
+        },
       });
     }
-  });
-
-  // Always include AMP opportunity
-  if (performance.medianOpenRate > 15 && performance.medianClickRate < 3) {
-    recommendations.push({
-      title: "Explore AMP for Interactivity",
-      description: "Good opens but low clicks suggest interest without action. AMP emails can enable in-email actions, reducing friction to conversion.",
-      category: "amp",
-      priority: "medium",
-    });
   }
 
-  // Sort by priority
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  return recommendations.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]).slice(0, 5);
-};
+  // Incorporate context text insights
+  if (contextText) {
+    const lowerContext = contextText.toLowerCase();
+    
+    if (lowerContext.includes("spam") && !issues.some(i => i.observation.includes("spam"))) {
+      issues.push({
+        campaignId: "Context Note",
+        sendDate: "User Reported",
+        observation: "User reported emails landing in spam",
+        impact: "Reduced visibility and engagement, potential reputation damage",
+        rootCause: "Could be content triggers, authentication issues, or reputation decline",
+        recommendation: "1) Verify SPF/DKIM/DMARC setup. 2) Check content for spam triggers. 3) Review postmaster tools. 4) Warm up IP/domain if new.",
+        metricValues: {},
+      });
+    }
+    
+    if (lowerContext.includes("clipped") || lowerContext.includes("scroll")) {
+      issues.push({
+        campaignId: "Context Note",
+        sendDate: "User Reported",
+        observation: "User reported emails getting clipped or long scroll issues",
+        impact: "Content below fold not visible, reduced engagement",
+        rootCause: "Email size exceeds Gmail's 102KB limit or design is too long",
+        recommendation: "Keep HTML under 100KB. Move key CTA above fold. Use web-hosted version link.",
+        metricValues: {},
+      });
+    }
+  }
 
-export const runFullAnalysis = (data: CampaignRow[]): DiagnosticsData => {
-  const performance = analyzePerformance(data);
-  const subjectLines = analyzeSubjectLines(data);
-  const trends = analyzeTrends(data);
-  const fatigue = analyzeFatigue(data);
-  const recommendations = generateRecommendations(performance, subjectLines, trends, fatigue);
+  // Sort issues by date
+  issues.sort((a, b) => {
+    const dateA = parseDateSafely(a.sendDate);
+    const dateB = parseDateSafely(b.sendDate);
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateA.getTime() - dateB.getTime();
+  });
 
   return {
-    rawData: data,
-    performance,
-    subjectLines,
-    trends,
-    fatigue,
-    recommendations,
+    issues,
+    hasPostmasterData: postmasterData !== null && postmasterData.length > 0,
+    contextNotes: contextText,
   };
 };
+
+// ============= LEGACY COMPATIBILITY =============
+
+// Keep old interfaces for backward compatibility during transition
+export interface LegacyCampaignRow {
+  campaign_name: string;
+  subject_line: string;
+  sent_date: string;
+  emails_sent: number;
+  open_rate: number;
+  click_rate: number;
+}
+
+export interface LegacyDiagnosticsData {
+  rawData: LegacyCampaignRow[];
+  performance: any;
+  subjectLines: any;
+  trends: any;
+  fatigue: any;
+  recommendations: any;
+}
