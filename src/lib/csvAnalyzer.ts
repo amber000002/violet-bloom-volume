@@ -425,45 +425,99 @@ export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult 
 
 // ============= ANALYSIS FUNCTIONS =============
 
-// CRITICAL: Parse DD/MM/YYYY format correctly (day first, not month first)
-const parseDateSafely = (dateStr: string): Date | null => {
-  if (!dateStr) return null;
+// CRITICAL: Parse DD/MM/YYYY format ONLY (day first, month second, year third)
+// MANDATORY: Do NOT assume MM/DD/YYYY - all dates are DD/MM/YYYY
+const parseDateDDMMYYYY = (dateStr: string): { date: Date | null; error: string | null } => {
+  if (!dateStr) return { date: null, error: "Empty date string" };
   
-  // First, try DD/MM/YYYY or DD-MM-YYYY format (most common in the data)
+  // Split by / or - delimiter
   const parts = dateStr.split(/[\/\-]/);
-  if (parts.length === 3) {
-    const [part1, part2, part3] = parts;
-    
-    // If first part is <= 31 and second part is <= 12, treat as DD/MM/YYYY
-    const day = parseInt(part1, 10);
-    const month = parseInt(part2, 10);
-    const year = parseInt(part3, 10);
-    
-    if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
-      const parsedDate = new Date(year, month - 1, day);
-      if (!isNaN(parsedDate.getTime())) return parsedDate;
-    }
+  if (parts.length !== 3) {
+    return { date: null, error: `Invalid date format: ${dateStr}` };
   }
   
-  // Fallback: try native Date parsing
-  const date = new Date(dateStr);
-  if (!isNaN(date.getTime())) return date;
+  // MANDATORY: Day = first value, Month = second value, Year = third value
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
   
-  return null;
+  // Validate ranges
+  if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    return { date: null, error: `Non-numeric date parts: ${dateStr}` };
+  }
+  
+  if (day < 1 || day > 31) {
+    return { date: null, error: `Invalid day value: ${day} in ${dateStr}` };
+  }
+  
+  if (month < 1 || month > 12) {
+    return { date: null, error: `Invalid month value: ${month} in ${dateStr}` };
+  }
+  
+  if (year < 1900 || year > 2100) {
+    return { date: null, error: `Invalid year value: ${year} in ${dateStr}` };
+  }
+  
+  const parsedDate = new Date(year, month - 1, day);
+  if (isNaN(parsedDate.getTime())) {
+    return { date: null, error: `Failed to create date from: ${dateStr}` };
+  }
+  
+  return { date: parsedDate, error: null };
 };
 
-const getMonthKey = (dateStr: string): string => {
-  const date = parseDateSafely(dateStr);
-  if (!date) return "Unknown";
-  return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+// Valid months for this dataset: October (10), November (11), December (12)
+const VALID_MONTHS = [10, 11, 12]; // Oct, Nov, Dec
+const MONTH_NAMES: Record<number, string> = {
+  10: "October",
+  11: "November", 
+  12: "December"
 };
 
-const getMonthSortKey = (dateStr: string): string => {
-  const date = parseDateSafely(dateStr);
-  if (!date) return "0000-00";
+interface MonthParseResult {
+  monthName: string;
+  monthSortKey: string;
+  isValid: boolean;
+  error: string | null;
+}
+
+const getMonthFromDate = (dateStr: string): MonthParseResult => {
+  const { date, error } = parseDateDDMMYYYY(dateStr);
+  
+  if (!date || error) {
+    return { 
+      monthName: "Unknown", 
+      monthSortKey: "0000-00", 
+      isValid: false, 
+      error: error || "Unknown parsing error" 
+    };
+  }
+  
+  const month = date.getMonth() + 1; // 1-indexed
   const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  return `${year}-${month}`;
+  
+  // VALIDATION RULE: Only Oct, Nov, Dec are valid
+  if (!VALID_MONTHS.includes(month)) {
+    return { 
+      monthName: "PARSING_ERROR", 
+      monthSortKey: "0000-00", 
+      isValid: false, 
+      error: `Month ${month} extracted from ${dateStr} is outside valid range (Oct-Dec). This indicates incorrect parsing.` 
+    };
+  }
+  
+  return {
+    monthName: `${MONTH_NAMES[month]} ${year}`,
+    monthSortKey: `${year}-${month.toString().padStart(2, '0')}`,
+    isValid: true,
+    error: null
+  };
+};
+
+// BACKWARD COMPATIBILITY: Wrapper for legacy code that uses parseDateSafely
+const parseDateSafely = (dateStr: string): Date | null => {
+  const { date } = parseDateDDMMYYYY(dateStr);
+  return date;
 };
 
 export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
@@ -521,17 +575,25 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     return agg;
   });
 
-  // Report 1b: Monthly Overview (with correct DD/MM/YYYY parsing)
+  // Report 1b: Monthly Overview (with STRICT DD/MM/YYYY parsing → Oct/Nov/Dec only)
   const monthMap: Record<string, MonthlyOverview> = {};
+  const monthParsingErrors: string[] = [];
   
   data.forEach(row => {
-    const month = getMonthKey(row.startDate);
-    const sortKey = getMonthSortKey(row.startDate);
+    const monthResult = getMonthFromDate(row.startDate);
     
-    if (!monthMap[month]) {
-      monthMap[month] = {
-        month,
-        monthSortKey: sortKey,
+    // Flag parsing errors but don't auto-correct
+    if (!monthResult.isValid) {
+      monthParsingErrors.push(monthResult.error || `Invalid date: ${row.startDate}`);
+      return; // Skip this row for monthly aggregation
+    }
+    
+    const { monthName, monthSortKey } = monthResult;
+    
+    if (!monthMap[monthName]) {
+      monthMap[monthName] = {
+        month: monthName,
+        monthSortKey,
         totalSentUsers: 0,
         totalDeliveredUsers: 0,
         uniqueSentUsers: 0,
@@ -552,7 +614,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
         softBouncePercent: 0,
       };
     }
-    const m = monthMap[month];
+    const m = monthMap[monthName];
     m.totalSentUsers += row.totalSentUsers;
     m.totalDeliveredUsers += row.totalDeliveredUsers;
     m.uniqueSentUsers += row.uniqueSentUsers;
@@ -564,6 +626,11 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     m.softBounces += row.softBounces;
     m.campaignCount++;
   });
+
+  // Log parsing errors if any occurred (for debugging)
+  if (monthParsingErrors.length > 0) {
+    console.warn(`[Monthly Overview] Date parsing errors (${monthParsingErrors.length} rows skipped):`, monthParsingErrors.slice(0, 5));
+  }
 
   const monthlyOverview = Object.values(monthMap)
     .map(m => {
@@ -582,18 +649,21 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     })
     .sort((a, b) => a.monthSortKey.localeCompare(b.monthSortKey));
 
-  // Filter campaigns with >= 1000 users for best/worst
+  // ============= DETERMINISTIC CAMPAIGN RANKING =============
+  // Step 1: Filter eligible campaigns
+  // - Total Sent (users) >= 1,000
+  // - Status = Completed (already filtered during parsing)
+  // - Channel = Email (already filtered during parsing)
   const eligibleCampaigns = data.filter(c => c.totalSentUsers >= 1000);
 
-  // Report 2 & 3: Best and Worst Performing (MUTUALLY EXCLUSIVE)
-  // Sort by unique viewed descending
+  // Step 2: Single sort by Unique Viewed Within Conversion Time (DESC)
   const sortedByViewed = [...eligibleCampaigns].sort(
     (a, b) => b.uniqueViewedWithinConversion - a.uniqueViewedWithinConversion
   );
 
-  // Take top 10 for best
+  // Step 3: Best Performing = Top 5 campaigns, lock these IDs
   const bestCampaignIds = new Set<string>();
-  const bestCampaigns: TopCampaign[] = sortedByViewed.slice(0, 10).map(c => {
+  const bestCampaigns: TopCampaign[] = sortedByViewed.slice(0, 5).map(c => {
     bestCampaignIds.add(c.campaignId);
     return {
       campaignId: c.campaignId,
@@ -612,12 +682,13 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     };
   });
 
-  // Worst: Sort ascending, exclude any campaign already in best list
-  const sortedAscending = [...eligibleCampaigns]
-    .filter(c => !bestCampaignIds.has(c.campaignId))
-    .sort((a, b) => a.uniqueViewedWithinConversion - b.uniqueViewedWithinConversion);
+  // Step 4: Worst Performing = From REMAINING campaigns only, sort ASC, take bottom 5
+  const remainingCampaigns = eligibleCampaigns.filter(c => !bestCampaignIds.has(c.campaignId));
+  const sortedAscending = [...remainingCampaigns].sort(
+    (a, b) => a.uniqueViewedWithinConversion - b.uniqueViewedWithinConversion
+  );
 
-  const worstCampaigns: TopCampaign[] = sortedAscending.slice(0, 10).map(c => ({
+  const worstCampaigns: TopCampaign[] = sortedAscending.slice(0, 5).map(c => ({
     campaignId: c.campaignId,
     subjectLine: c.subjectLine,
     totalSentUsers: c.totalSentUsers,
@@ -632,6 +703,14 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     clickRate: c.clickRate,
     startDate: c.startDate,
   }));
+
+  // SANITY CHECK: Verify no overlap (MANDATORY)
+  const worstCampaignIds = new Set(worstCampaigns.map(c => c.campaignId));
+  const overlap = [...bestCampaignIds].filter(id => worstCampaignIds.has(id));
+  if (overlap.length > 0) {
+    console.error(`[RANKING ERROR] Overlap detected between best and worst campaigns: ${overlap.join(", ")}`);
+    // This should never happen with the logic above, but log for debugging
+  }
 
   // Generate summaries
   const bestSummary = generateBestSummary(bestCampaigns);
