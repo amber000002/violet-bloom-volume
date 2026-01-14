@@ -28,6 +28,7 @@ import {
   PostmasterValidationResult,
   CampaignRow,
   PostmasterRow,
+  DeliverabilityDiagnosticSummary,
 } from "@/lib/csvAnalyzer";
 import { InboxDiagnosticsSlides } from "../presentation/InboxDiagnosticsSlides";
 import { Button } from "../ui/button";
@@ -53,12 +54,14 @@ const POSTMASTER_HEADERS = [
 ];
 
 const formatNumber = (num: number): string => {
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
-  return num.toFixed(0);
+  return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
 };
 
 const formatPercent = (num: number): string => {
+  return `${num.toFixed(1)}%`;
+};
+
+const formatPercentDetail = (num: number): string => {
   return `${num.toFixed(2)}%`;
 };
 
@@ -386,7 +389,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </div>
 
-          {/* Report 1a: Campaign Overview by Provider */}
+          {/* Report 1a: Campaign Overview by Provider with Percentages */}
           <CollapsibleSection
             title="Campaign Overview (by Provider)"
             icon={<BarChart3 className="w-5 h-5 text-primary" />}
@@ -399,13 +402,19 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   <tr className="border-b border-border">
                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Provider</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Delivered</th>
+                    {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator && (
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Delivered</th>
+                    )}
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Conversions</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -416,21 +425,34 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         <span className="text-muted-foreground ml-1">/ {p.providerName}</span>
                       </td>
                       <td className="text-right py-2 px-3">{formatNumber(p.totalSentUsers)}</td>
-                      <td className="text-right py-2 px-3">{formatNumber(p.totalDeliveredUsers)}</td>
+                      {p.useDeliveredAsDenominator && (
+                        <td className="text-right py-2 px-3">{formatNumber(p.totalDeliveredUsers)}</td>
+                      )}
                       <td className="text-right py-2 px-3">{formatNumber(p.uniqueViewed)}</td>
+                      <td className="text-right py-2 px-3 text-primary font-medium">{formatPercent(p.viewPercent)}</td>
                       <td className="text-right py-2 px-3">{formatNumber(p.uniqueClicked)}</td>
-                      <td className="text-right py-2 px-3">{formatNumber(p.conversions)}</td>
+                      <td className="text-right py-2 px-3 text-secondary font-medium">{formatPercent(p.clickPercent)}</td>
                       <td className="text-right py-2 px-3">{formatNumber(p.unsubscribes)}</td>
+                      <td className="text-right py-2 px-3 text-muted-foreground">{formatPercent(p.unsubscribePercent)}</td>
                       <td className="text-right py-2 px-3">{formatNumber(p.hardBounces)}</td>
+                      <td className={`text-right py-2 px-3 ${p.hardBouncePercent > 0.5 ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+                        {formatPercent(p.hardBouncePercent)}
+                      </td>
                       <td className="text-right py-2 px-3">{formatNumber(p.softBounces)}</td>
+                      <td className={`text-right py-2 px-3 ${p.softBouncePercent > 1 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}>
+                        {formatPercent(p.softBouncePercent)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              * Percentages calculated using {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator
+            </p>
           </CollapsibleSection>
 
-          {/* Report 1b: Monthly Overview */}
+          {/* Report 1b: Monthly Overview with correct date parsing */}
           <CollapsibleSection
             title="Monthly Overview"
             icon={<BarChart3 className="w-5 h-5 text-primary" />}
@@ -444,10 +466,20 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Month</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Campaigns</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open Rate</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click Rate</th>
+                    {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator && (
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Delivered</th>
+                    )}
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Sent</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -456,15 +488,34 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       <td className="py-2 px-3 font-medium">{m.month}</td>
                       <td className="text-right py-2 px-3">{m.campaignCount}</td>
                       <td className="text-right py-2 px-3">{formatNumber(m.totalSentUsers)}</td>
-                      <td className="text-right py-2 px-3 text-primary font-medium">{formatPercent(m.openRate)}</td>
-                      <td className="text-right py-2 px-3 text-secondary font-medium">{formatPercent(m.clickRate)}</td>
+                      {m.useDeliveredAsDenominator && (
+                        <td className="text-right py-2 px-3">{formatNumber(m.totalDeliveredUsers)}</td>
+                      )}
+                      <td className="text-right py-2 px-3">{formatNumber(m.uniqueSentUsers)}</td>
+                      <td className="text-right py-2 px-3">{formatNumber(m.uniqueViewed)}</td>
+                      <td className="text-right py-2 px-3 text-primary font-medium">{formatPercent(m.viewPercent)}</td>
+                      <td className="text-right py-2 px-3">{formatNumber(m.uniqueClicked)}</td>
+                      <td className="text-right py-2 px-3 text-secondary font-medium">{formatPercent(m.clickPercent)}</td>
                       <td className="text-right py-2 px-3">{formatNumber(m.unsubscribes)}</td>
+                      <td className={`text-right py-2 px-3 ${m.unsubscribePercent > 0.2 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}>
+                        {formatPercent(m.unsubscribePercent)}
+                      </td>
                       <td className="text-right py-2 px-3">{formatNumber(m.hardBounces)}</td>
+                      <td className={`text-right py-2 px-3 ${m.hardBouncePercent > 0.5 ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+                        {formatPercent(m.hardBouncePercent)}
+                      </td>
+                      <td className="text-right py-2 px-3">{formatNumber(m.softBounces)}</td>
+                      <td className={`text-right py-2 px-3 ${m.softBouncePercent > 1 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}>
+                        {formatPercent(m.softBouncePercent)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              * Dates parsed as DD/MM/YYYY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
+            </p>
           </CollapsibleSection>
 
           {/* Report 2: Best Performing */}
@@ -605,6 +656,56 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </div>
 
+          {/* Diagnostic Summary - NEW TOP SECTION */}
+          {diagnostics.reputationReport.diagnosticSummary && (
+            <div className="magic-card rounded-2xl p-6 border-2 border-primary/20 bg-primary/5">
+              <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                Deliverability & Performance Diagnostic Summary
+              </h3>
+              
+              {/* Trend Analysis */}
+              {diagnostics.reputationReport.diagnosticSummary.trendAnalysis.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Trend Analysis (Oldest → Newest)</h4>
+                  <div className="grid gap-2">
+                    {diagnostics.reputationReport.diagnosticSummary.trendAnalysis.map((t, i) => (
+                      <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg ${
+                        t.trend === 'improving' ? 'bg-green-500/10' : t.trend === 'declining' ? 'bg-red-500/10' : 'bg-muted/30'
+                      }`}>
+                        {t.trend === 'improving' ? <TrendingUp className="w-4 h-4 text-green-500" /> : 
+                         t.trend === 'declining' ? <TrendingDown className="w-4 h-4 text-red-500" /> : 
+                         <BarChart3 className="w-4 h-4 text-muted-foreground" />}
+                        <span className="text-sm">{t.observation}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Prioritized Recommendations */}
+              {diagnostics.reputationReport.diagnosticSummary.prioritizedRecommendations.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Prioritized Recommendations</h4>
+                  <div className="space-y-2">
+                    {diagnostics.reputationReport.diagnosticSummary.prioritizedRecommendations.map((r, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                          r.priority === 'immediate' ? 'bg-red-500/20 text-red-600' :
+                          r.priority === 'short-term' ? 'bg-amber-500/20 text-amber-600' :
+                          'bg-blue-500/20 text-blue-600'
+                        }`}>
+                          {r.priority === 'immediate' ? '0-7 days' : r.priority === 'short-term' ? '7-21 days' : 'Ongoing'}
+                        </span>
+                        <p className="text-sm">{r.recommendation}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Status indicators */}
           <div className="flex flex-wrap gap-3">
             <div className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
@@ -625,7 +726,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
 
           {/* Issues */}
           <CollapsibleSection
-            title={`Issues Detected (${diagnostics.reputationReport.issues.length})`}
+            title={`Campaign-Level Issues (${diagnostics.reputationReport.issues.length})`}
             icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
             isOpen={expandedSections.issues}
             onToggle={() => toggleSection("issues")}
@@ -635,52 +736,34 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 {diagnostics.reputationReport.issues.map((issue, i) => (
                   <div key={i} className="bg-muted/20 border border-border rounded-xl p-5">
                     <div className="flex items-start justify-between gap-4 mb-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">
-                            {issue.campaignId}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{issue.sendDate}</span>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{issue.campaignId}</span>
+                        <span className="text-xs text-muted-foreground">{issue.sendDate}</span>
+                        {issue.priority && (
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            issue.priority === 'immediate' ? 'bg-red-500/20 text-red-600' :
+                            issue.priority === 'short-term' ? 'bg-amber-500/20 text-amber-600' :
+                            'bg-blue-500/20 text-blue-600'
+                          }`}>{issue.priority}</span>
+                        )}
                       </div>
                     </div>
-                    
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Observation</p>
-                        <p className="text-sm text-foreground">{issue.observation}</p>
+                    <div className="space-y-2 text-sm">
+                      <p><span className="font-medium">Observation:</span> {issue.observation}</p>
+                      <p><span className="font-medium text-amber-600">Impact:</span> {issue.impact}</p>
+                      <p><span className="font-medium">Root Cause:</span> {issue.rootCause}</p>
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2">
+                        <p className="text-primary font-medium">Recommendation:</p>
+                        <p>{issue.recommendation}</p>
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Impact</p>
-                        <p className="text-sm text-amber-600">{issue.impact}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Root Cause</p>
-                        <p className="text-sm text-foreground">{issue.rootCause}</p>
-                      </div>
-                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                        <p className="text-xs font-medium text-primary uppercase tracking-wide mb-1">Recommendation</p>
-                        <p className="text-sm text-foreground">{issue.recommendation}</p>
-                      </div>
-                      
-                      {Object.keys(issue.metricValues).length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-2">
-                          {Object.entries(issue.metricValues).map(([key, value]) => (
-                            <span key={key} className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                              {key}: {typeof value === "number" ? value.toFixed(2) : value}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-green-500" />
-                <p className="font-medium text-foreground">No reputation issues detected</p>
-                <p className="text-sm mt-1">Your campaigns appear healthy based on the data provided.</p>
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-green-500" />
+                <p className="font-medium">No threshold violations detected</p>
               </div>
             )}
           </CollapsibleSection>

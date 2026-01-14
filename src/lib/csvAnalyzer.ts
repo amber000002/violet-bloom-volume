@@ -69,12 +69,21 @@ export interface ProviderAggregate {
   hardBounces: number;
   softBounces: number;
   campaignCount: number;
+  // Percentage columns
+  useDeliveredAsDenominator: boolean;
+  viewPercent: number;
+  clickPercent: number;
+  unsubscribePercent: number;
+  hardBouncePercent: number;
+  softBouncePercent: number;
 }
 
 export interface MonthlyOverview {
   month: string;
+  monthSortKey: string;
   totalSentUsers: number;
   totalDeliveredUsers: number;
+  uniqueSentUsers: number;
   uniqueViewed: number;
   uniqueClicked: number;
   conversions: number;
@@ -84,6 +93,13 @@ export interface MonthlyOverview {
   campaignCount: number;
   openRate: number;
   clickRate: number;
+  // Percentage columns
+  useDeliveredAsDenominator: boolean;
+  viewPercent: number;
+  clickPercent: number;
+  unsubscribePercent: number;
+  hardBouncePercent: number;
+  softBouncePercent: number;
 }
 
 export interface TopCampaign {
@@ -134,9 +150,41 @@ export interface ReputationIssue {
   rootCause: string;
   recommendation: string;
   metricValues: Record<string, number | string>;
+  priority?: "immediate" | "short-term" | "ongoing";
+}
+
+export interface TrendAnalysis {
+  metric: string;
+  trend: "improving" | "declining" | "stable";
+  startValue: number;
+  endValue: number;
+  changePercent: number;
+  observation: string;
+}
+
+export interface CorrelationInsight {
+  primaryMetric: string;
+  secondaryMetric: string;
+  relationship: string;
+  affectedCampaigns: { campaignId: string; sendDate: string }[];
+}
+
+export interface DeliverabilityDiagnosticSummary {
+  trendAnalysis: TrendAnalysis[];
+  correlations: CorrelationInsight[];
+  impactSummary: {
+    observation: string;
+    impact: string;
+    affectedCampaignIds: string[];
+  }[];
+  prioritizedRecommendations: {
+    priority: "immediate" | "short-term" | "ongoing";
+    recommendation: string;
+  }[];
 }
 
 export interface ReputationRepairReport {
+  diagnosticSummary: DeliverabilityDiagnosticSummary;
   issues: ReputationIssue[];
   hasPostmasterData: boolean;
   contextNotes: string | null;
@@ -377,20 +425,29 @@ export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult 
 
 // ============= ANALYSIS FUNCTIONS =============
 
+// CRITICAL: Parse DD/MM/YYYY format correctly (day first, not month first)
 const parseDateSafely = (dateStr: string): Date | null => {
   if (!dateStr) return null;
   
-  // Try various formats
-  const date = new Date(dateStr);
-  if (!isNaN(date.getTime())) return date;
-  
-  // Try DD/MM/YYYY or DD-MM-YYYY
+  // First, try DD/MM/YYYY or DD-MM-YYYY format (most common in the data)
   const parts = dateStr.split(/[\/\-]/);
   if (parts.length === 3) {
-    const [day, month, year] = parts;
-    const parsedDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
-    if (!isNaN(parsedDate.getTime())) return parsedDate;
+    const [part1, part2, part3] = parts;
+    
+    // If first part is <= 31 and second part is <= 12, treat as DD/MM/YYYY
+    const day = parseInt(part1, 10);
+    const month = parseInt(part2, 10);
+    const year = parseInt(part3, 10);
+    
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+      const parsedDate = new Date(year, month - 1, day);
+      if (!isNaN(parsedDate.getTime())) return parsedDate;
+    }
   }
+  
+  // Fallback: try native Date parsing
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) return date;
   
   return null;
 };
@@ -398,7 +455,15 @@ const parseDateSafely = (dateStr: string): Date | null => {
 const getMonthKey = (dateStr: string): string => {
   const date = parseDateSafely(dateStr);
   if (!date) return "Unknown";
-  return date.toLocaleString('default', { month: 'short', year: 'numeric' });
+  return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+};
+
+const getMonthSortKey = (dateStr: string): string => {
+  const date = parseDateSafely(dateStr);
+  if (!date) return "0000-00";
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  return `${year}-${month}`;
 };
 
 export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
@@ -420,6 +485,12 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
         hardBounces: 0,
         softBounces: 0,
         campaignCount: 0,
+        useDeliveredAsDenominator: true,
+        viewPercent: 0,
+        clickPercent: 0,
+        unsubscribePercent: 0,
+        hardBouncePercent: 0,
+        softBouncePercent: 0,
       };
     }
     const agg = providerMap[key];
@@ -434,18 +505,36 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     agg.campaignCount++;
   });
 
-  const providerAggregates = Object.values(providerMap);
+  // Calculate percentages with proper denominator logic
+  const providerAggregates = Object.values(providerMap).map(agg => {
+    // Check if ALL delivered values are > 0, else use Sent as denominator
+    const useDelivered = agg.totalDeliveredUsers > 0;
+    const denominator = useDelivered ? agg.totalDeliveredUsers : agg.totalSentUsers;
+    
+    agg.useDeliveredAsDenominator = useDelivered;
+    agg.viewPercent = denominator > 0 ? (agg.uniqueViewed / denominator) * 100 : 0;
+    agg.clickPercent = denominator > 0 ? (agg.uniqueClicked / denominator) * 100 : 0;
+    agg.unsubscribePercent = denominator > 0 ? (agg.unsubscribes / denominator) * 100 : 0;
+    agg.hardBouncePercent = denominator > 0 ? (agg.hardBounces / denominator) * 100 : 0;
+    agg.softBouncePercent = denominator > 0 ? (agg.softBounces / denominator) * 100 : 0;
+    
+    return agg;
+  });
 
-  // Report 1b: Monthly Overview
+  // Report 1b: Monthly Overview (with correct DD/MM/YYYY parsing)
   const monthMap: Record<string, MonthlyOverview> = {};
   
   data.forEach(row => {
     const month = getMonthKey(row.startDate);
+    const sortKey = getMonthSortKey(row.startDate);
+    
     if (!monthMap[month]) {
       monthMap[month] = {
         month,
+        monthSortKey: sortKey,
         totalSentUsers: 0,
         totalDeliveredUsers: 0,
+        uniqueSentUsers: 0,
         uniqueViewed: 0,
         uniqueClicked: 0,
         conversions: 0,
@@ -455,11 +544,18 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
         campaignCount: 0,
         openRate: 0,
         clickRate: 0,
+        useDeliveredAsDenominator: true,
+        viewPercent: 0,
+        clickPercent: 0,
+        unsubscribePercent: 0,
+        hardBouncePercent: 0,
+        softBouncePercent: 0,
       };
     }
     const m = monthMap[month];
     m.totalSentUsers += row.totalSentUsers;
     m.totalDeliveredUsers += row.totalDeliveredUsers;
+    m.uniqueSentUsers += row.uniqueSentUsers;
     m.uniqueViewed += row.uniqueViewedWithinConversion;
     m.uniqueClicked += row.uniqueClickedWithinConversion;
     m.conversions += row.clickThroughConversions;
@@ -471,43 +567,57 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
 
   const monthlyOverview = Object.values(monthMap)
     .map(m => {
-      const base = m.totalDeliveredUsers > 0 ? m.totalDeliveredUsers : m.totalSentUsers;
-      m.openRate = base > 0 ? (m.uniqueViewed / base) * 100 : 0;
-      m.clickRate = base > 0 ? (m.uniqueClicked / base) * 100 : 0;
+      const useDelivered = m.totalDeliveredUsers > 0;
+      const denominator = useDelivered ? m.totalDeliveredUsers : m.totalSentUsers;
+      
+      m.useDeliveredAsDenominator = useDelivered;
+      m.openRate = denominator > 0 ? (m.uniqueViewed / denominator) * 100 : 0;
+      m.clickRate = denominator > 0 ? (m.uniqueClicked / denominator) * 100 : 0;
+      m.viewPercent = m.openRate;
+      m.clickPercent = m.clickRate;
+      m.unsubscribePercent = denominator > 0 ? (m.unsubscribes / denominator) * 100 : 0;
+      m.hardBouncePercent = denominator > 0 ? (m.hardBounces / denominator) * 100 : 0;
+      m.softBouncePercent = denominator > 0 ? (m.softBounces / denominator) * 100 : 0;
       return m;
     })
-    .sort((a, b) => {
-      const dateA = new Date(a.month);
-      const dateB = new Date(b.month);
-      return dateA.getTime() - dateB.getTime();
-    });
+    .sort((a, b) => a.monthSortKey.localeCompare(b.monthSortKey));
 
   // Filter campaigns with >= 1000 users for best/worst
   const eligibleCampaigns = data.filter(c => c.totalSentUsers >= 1000);
 
-  // Report 2: Best Performing (by unique viewed)
+  // Report 2 & 3: Best and Worst Performing (MUTUALLY EXCLUSIVE)
+  // Sort by unique viewed descending
   const sortedByViewed = [...eligibleCampaigns].sort(
     (a, b) => b.uniqueViewedWithinConversion - a.uniqueViewedWithinConversion
   );
 
-  const bestCampaigns: TopCampaign[] = sortedByViewed.slice(0, 10).map(c => ({
-    campaignId: c.campaignId,
-    subjectLine: c.subjectLine,
-    totalSentUsers: c.totalSentUsers,
-    totalDeliveredUsers: c.totalDeliveredUsers,
-    uniqueViewed: c.uniqueViewedWithinConversion,
-    uniqueClicked: c.uniqueClickedWithinConversion,
-    conversions: c.clickThroughConversions,
-    unsubscribes: c.totalUnsubscribes,
-    hardBounces: c.hardBounces,
-    softBounces: c.softBounces,
-    openRate: c.openRate,
-    clickRate: c.clickRate,
-    startDate: c.startDate,
-  }));
+  // Take top 10 for best
+  const bestCampaignIds = new Set<string>();
+  const bestCampaigns: TopCampaign[] = sortedByViewed.slice(0, 10).map(c => {
+    bestCampaignIds.add(c.campaignId);
+    return {
+      campaignId: c.campaignId,
+      subjectLine: c.subjectLine,
+      totalSentUsers: c.totalSentUsers,
+      totalDeliveredUsers: c.totalDeliveredUsers,
+      uniqueViewed: c.uniqueViewedWithinConversion,
+      uniqueClicked: c.uniqueClickedWithinConversion,
+      conversions: c.clickThroughConversions,
+      unsubscribes: c.totalUnsubscribes,
+      hardBounces: c.hardBounces,
+      softBounces: c.softBounces,
+      openRate: c.openRate,
+      clickRate: c.clickRate,
+      startDate: c.startDate,
+    };
+  });
 
-  // Report 3: Worst Performing
-  const worstCampaigns: TopCampaign[] = sortedByViewed.slice(-10).reverse().map(c => ({
+  // Worst: Sort ascending, exclude any campaign already in best list
+  const sortedAscending = [...eligibleCampaigns]
+    .filter(c => !bestCampaignIds.has(c.campaignId))
+    .sort((a, b) => a.uniqueViewedWithinConversion - b.uniqueViewedWithinConversion);
+
+  const worstCampaigns: TopCampaign[] = sortedAscending.slice(0, 10).map(c => ({
     campaignId: c.campaignId,
     subjectLine: c.subjectLine,
     totalSentUsers: c.totalSentUsers,
@@ -665,6 +775,261 @@ const generateKeyLearnings = (
 
 // ============= REPUTATION REPAIR ANALYSIS =============
 
+const generateDiagnosticSummary = (
+  sortedData: CampaignRow[],
+  postmasterData: PostmasterRow[] | null,
+  contextText: string | null
+): DeliverabilityDiagnosticSummary => {
+  const trendAnalysis: TrendAnalysis[] = [];
+  const correlations: CorrelationInsight[] = [];
+  const impactSummary: { observation: string; impact: string; affectedCampaignIds: string[] }[] = [];
+  const prioritizedRecommendations: { priority: "immediate" | "short-term" | "ongoing"; recommendation: string }[] = [];
+
+  if (sortedData.length < 2) {
+    return { trendAnalysis, correlations, impactSummary, prioritizedRecommendations };
+  }
+
+  // A. TREND ANALYSIS (Oldest → Newest)
+  const windowSize = Math.min(5, Math.floor(sortedData.length / 2));
+  const firstWindow = sortedData.slice(0, windowSize);
+  const lastWindow = sortedData.slice(-windowSize);
+
+  const calcAvg = (arr: CampaignRow[], getter: (c: CampaignRow) => number) => 
+    arr.reduce((s, c) => s + getter(c), 0) / arr.length;
+
+  // Open/View rate trend
+  const openStart = calcAvg(firstWindow, c => c.openRate);
+  const openEnd = calcAvg(lastWindow, c => c.openRate);
+  const openChange = openStart > 0 ? ((openEnd - openStart) / openStart) * 100 : 0;
+  trendAnalysis.push({
+    metric: "Open/View Rate",
+    trend: openChange > 5 ? "improving" : openChange < -5 ? "declining" : "stable",
+    startValue: openStart,
+    endValue: openEnd,
+    changePercent: openChange,
+    observation: `Open rate ${openChange > 5 ? "improved" : openChange < -5 ? "declined" : "remained stable"} from ${openStart.toFixed(1)}% to ${openEnd.toFixed(1)}% (${openChange > 0 ? "+" : ""}${openChange.toFixed(1)}%)`,
+  });
+
+  // Click rate trend
+  const clickStart = calcAvg(firstWindow, c => c.clickRate);
+  const clickEnd = calcAvg(lastWindow, c => c.clickRate);
+  const clickChange = clickStart > 0 ? ((clickEnd - clickStart) / clickStart) * 100 : 0;
+  trendAnalysis.push({
+    metric: "Click Rate",
+    trend: clickChange > 5 ? "improving" : clickChange < -5 ? "declining" : "stable",
+    startValue: clickStart,
+    endValue: clickEnd,
+    changePercent: clickChange,
+    observation: `Click rate ${clickChange > 5 ? "improved" : clickChange < -5 ? "declined" : "remained stable"} from ${clickStart.toFixed(2)}% to ${clickEnd.toFixed(2)}%`,
+  });
+
+  // Unsubscribe rate trend
+  const unsubStart = calcAvg(firstWindow, c => c.unsubscribeRate);
+  const unsubEnd = calcAvg(lastWindow, c => c.unsubscribeRate);
+  const unsubChange = unsubStart > 0 ? ((unsubEnd - unsubStart) / unsubStart) * 100 : 0;
+  trendAnalysis.push({
+    metric: "Unsubscribe Rate",
+    trend: unsubChange > 10 ? "declining" : unsubChange < -10 ? "improving" : "stable",
+    startValue: unsubStart,
+    endValue: unsubEnd,
+    changePercent: unsubChange,
+    observation: `Unsubscribe rate ${unsubChange > 10 ? "increased (concerning)" : unsubChange < -10 ? "decreased (positive)" : "remained stable"} at ${unsubEnd.toFixed(3)}%`,
+  });
+
+  // Bounce rate trend (hard + soft combined)
+  const bounceStart = calcAvg(firstWindow, c => c.hardBounceRate + c.softBounceRate);
+  const bounceEnd = calcAvg(lastWindow, c => c.hardBounceRate + c.softBounceRate);
+  const bounceChange = bounceStart > 0 ? ((bounceEnd - bounceStart) / bounceStart) * 100 : 0;
+  trendAnalysis.push({
+    metric: "Combined Bounce Rate",
+    trend: bounceChange > 10 ? "declining" : bounceChange < -10 ? "improving" : "stable",
+    startValue: bounceStart,
+    endValue: bounceEnd,
+    changePercent: bounceChange,
+    observation: `Bounce rate ${bounceChange > 10 ? "increased" : bounceChange < -10 ? "decreased" : "stable"} from ${bounceStart.toFixed(2)}% to ${bounceEnd.toFixed(2)}%`,
+  });
+
+  // Postmaster trends if available
+  if (postmasterData && postmasterData.length >= 2) {
+    const sortedPM = [...postmasterData].sort((a, b) => {
+      const dateA = parseDateSafely(a.date);
+      const dateB = parseDateSafely(b.date);
+      return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
+    });
+    
+    const pmFirst = sortedPM.slice(0, Math.min(3, sortedPM.length));
+    const pmLast = sortedPM.slice(-Math.min(3, sortedPM.length));
+    
+    // Spam ratio trend
+    const spamStart = pmFirst.reduce((s, p) => s + p.spamRatio, 0) / pmFirst.length;
+    const spamEnd = pmLast.reduce((s, p) => s + p.spamRatio, 0) / pmLast.length;
+    if (spamStart > 0 || spamEnd > 0) {
+      trendAnalysis.push({
+        metric: "Spam Ratio (Postmaster)",
+        trend: spamEnd > spamStart ? "declining" : "improving",
+        startValue: spamStart * 100,
+        endValue: spamEnd * 100,
+        changePercent: spamStart > 0 ? ((spamEnd - spamStart) / spamStart) * 100 : 0,
+        observation: `Spam ratio moved from ${(spamStart * 100).toFixed(2)}% to ${(spamEnd * 100).toFixed(2)}%`,
+      });
+    }
+
+    // Domain reputation trend
+    const repLevels: Record<string, number> = { "High": 4, "Medium": 3, "Low": 2, "Bad": 1 };
+    const pmWithRep = sortedPM.filter(p => p.domainReputation && repLevels[p.domainReputation]);
+    if (pmWithRep.length >= 2) {
+      const repStart = repLevels[pmWithRep[0].domainReputation] || 0;
+      const repEnd = repLevels[pmWithRep[pmWithRep.length - 1].domainReputation] || 0;
+      trendAnalysis.push({
+        metric: "Domain Reputation (Postmaster)",
+        trend: repEnd > repStart ? "improving" : repEnd < repStart ? "declining" : "stable",
+        startValue: repStart,
+        endValue: repEnd,
+        changePercent: 0,
+        observation: `Domain reputation moved from "${pmWithRep[0].domainReputation}" to "${pmWithRep[pmWithRep.length - 1].domainReputation}"`,
+      });
+    }
+  }
+
+  // B. CORRELATION ANALYSIS
+  // Find campaigns where open rate dropped AND bounce/reputation issues occurred
+  const windowForCorr = 5;
+  const openDropCampaigns: { campaignId: string; sendDate: string; openDrop: number }[] = [];
+  const bounceSpikeCampaigns: { campaignId: string; sendDate: string; bounceRate: number }[] = [];
+
+  for (let i = windowForCorr; i < sortedData.length; i++) {
+    const current = sortedData[i];
+    const prevAvg = sortedData.slice(i - windowForCorr, i).reduce((s, c) => s + c.openRate, 0) / windowForCorr;
+    
+    if (current.openRate < prevAvg * 0.8 && prevAvg > 5) {
+      openDropCampaigns.push({ campaignId: current.campaignId, sendDate: current.startDate, openDrop: prevAvg - current.openRate });
+    }
+    
+    if (current.hardBounceRate > 0.5 || current.softBounceRate > 1) {
+      bounceSpikeCampaigns.push({ campaignId: current.campaignId, sendDate: current.startDate, bounceRate: current.hardBounceRate + current.softBounceRate });
+    }
+  }
+
+  // Correlate engagement declines with bounce spikes
+  if (openDropCampaigns.length > 0 && bounceSpikeCampaigns.length > 0) {
+    const overlapping = openDropCampaigns.filter(od => 
+      bounceSpikeCampaigns.some(bs => bs.campaignId === od.campaignId)
+    );
+    
+    if (overlapping.length > 0) {
+      correlations.push({
+        primaryMetric: "Open Rate Decline",
+        secondaryMetric: "Bounce Rate Spike",
+        relationship: `Engagement decline coincides with elevated bounce rates in ${overlapping.length} campaigns. This is a likely contributor to deliverability issues.`,
+        affectedCampaigns: overlapping.map(o => ({ campaignId: o.campaignId, sendDate: o.sendDate })),
+      });
+    }
+  }
+
+  // Correlate with postmaster data
+  if (postmasterData && postmasterData.length > 0 && openDropCampaigns.length > 0) {
+    const lowRepDates = postmasterData.filter(p => p.domainReputation === "Low" || p.domainReputation === "Bad");
+    if (lowRepDates.length > 0) {
+      correlations.push({
+        primaryMetric: "Open Rate Decline",
+        secondaryMetric: "Domain Reputation Drop",
+        relationship: `Open rate declines preceded by domain reputation drops to "${lowRepDates[0].domainReputation}" on ${lowRepDates[0].date}. Reputation degradation is a likely contributor.`,
+        affectedCampaigns: openDropCampaigns.slice(0, 5).map(o => ({ campaignId: o.campaignId, sendDate: o.sendDate })),
+      });
+    }
+  }
+
+  // C. IMPACT SUMMARY
+  // High hard bounce campaigns
+  const highBounce = sortedData.filter(c => c.hardBounceRate > 0.5);
+  if (highBounce.length > 0) {
+    impactSummary.push({
+      observation: `${highBounce.length} campaigns exceeded 0.5% hard bounce threshold`,
+      impact: "Sender reputation damage and potential blocklisting by major ISPs",
+      affectedCampaignIds: highBounce.map(c => `${c.campaignId} (${c.startDate})`),
+    });
+  }
+
+  // High unsubscribe campaigns
+  const highUnsub = sortedData.filter(c => c.unsubscribeRate > 0.2);
+  if (highUnsub.length > 0) {
+    impactSummary.push({
+      observation: `${highUnsub.length} campaigns exceeded 0.2% unsubscribe threshold`,
+      impact: "List degradation and increased spam complaint risk",
+      affectedCampaignIds: highUnsub.map(c => `${c.campaignId} (${c.startDate})`),
+    });
+  }
+
+  // Open rate decline
+  if (openChange < -15) {
+    impactSummary.push({
+      observation: `Overall open rate declined by ${Math.abs(openChange).toFixed(1)}%`,
+      impact: "Reduced campaign visibility and potential inbox placement issues",
+      affectedCampaignIds: openDropCampaigns.slice(0, 5).map(c => `${c.campaignId} (${c.sendDate})`),
+    });
+  }
+
+  // D. PRIORITIZED RECOMMENDATIONS
+  // Immediate (0-7 days)
+  if (highBounce.length > 0) {
+    prioritizedRecommendations.push({
+      priority: "immediate",
+      recommendation: "Clean email list immediately. Remove invalid addresses identified in recent sends. Implement real-time email verification for new signups.",
+    });
+  }
+
+  if (postmasterData?.some(p => p.domainReputation === "Low" || p.domainReputation === "Bad")) {
+    prioritizedRecommendations.push({
+      priority: "immediate",
+      recommendation: "Domain reputation is degraded. Pause large sends to cold segments. Focus on engaged subscribers only for the next 7 days.",
+    });
+  }
+
+  if (contextText?.toLowerCase().includes("spam")) {
+    prioritizedRecommendations.push({
+      priority: "immediate",
+      recommendation: "User reports emails landing in spam. Verify SPF/DKIM/DMARC authentication immediately. Check content for spam triggers (excessive caps, misleading subjects).",
+    });
+  }
+
+  // Short-term (7-21 days)
+  if (highUnsub.length > 0) {
+    prioritizedRecommendations.push({
+      priority: "short-term",
+      recommendation: "Review content relevance and send frequency. Implement preference center to give subscribers control over email types and cadence.",
+    });
+  }
+
+  if (openChange < -10) {
+    prioritizedRecommendations.push({
+      priority: "short-term",
+      recommendation: "Conduct subject line A/B testing. Review send times and segment engagement patterns. Consider re-engagement campaign for inactive subscribers.",
+    });
+  }
+
+  if (contextText?.toLowerCase().includes("clipped") || contextText?.toLowerCase().includes("scroll")) {
+    prioritizedRecommendations.push({
+      priority: "short-term",
+      recommendation: "Emails getting clipped in Gmail (102KB limit). Reduce HTML size, optimize images, move key CTA above the fold.",
+    });
+  }
+
+  // Ongoing monitoring
+  prioritizedRecommendations.push({
+    priority: "ongoing",
+    recommendation: "Monitor hard bounce rate (keep < 0.5%), soft bounce (< 1%), and unsubscribe rate (< 0.2%) for every campaign. Set up alerts for threshold violations.",
+  });
+
+  if (postmasterData && postmasterData.length > 0) {
+    prioritizedRecommendations.push({
+      priority: "ongoing",
+      recommendation: "Continue monitoring Google Postmaster Tools daily. Track domain reputation, spam ratio, and error ratio trends for early warning signs.",
+    });
+  }
+
+  return { trendAnalysis, correlations, impactSummary, prioritizedRecommendations };
+};
+
 export const generateReputationRepairReport = (
   data: CampaignRow[],
   postmasterData: PostmasterRow[] | null,
@@ -678,6 +1043,9 @@ export const generateReputationRepairReport = (
     const dateB = parseDateSafely(b.startDate);
     return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
   });
+
+  // Generate diagnostic summary FIRST
+  const diagnosticSummary = generateDiagnosticSummary(sortedData, postmasterData, contextText);
 
   // Calculate rolling average for detecting dips
   const windowSize = 5;
@@ -703,21 +1071,26 @@ export const generateReputationRepairReport = (
           hardBounceRate: current.hardBounceRate,
           softBounceRate: current.softBounceRate,
         },
+        priority: "short-term",
       };
 
-      // Determine root cause
+      // Determine root cause and priority
       if (current.hardBounceRate > 0.5) {
         issue.rootCause = `Hard bounce rate of ${current.hardBounceRate.toFixed(2)}% exceeds 0.5% threshold`;
         issue.recommendation = "Clean email list immediately. Remove invalid addresses and implement double opt-in.";
+        issue.priority = "immediate";
       } else if (current.softBounceRate > 1) {
         issue.rootCause = `Soft bounce rate of ${current.softBounceRate.toFixed(2)}% exceeds 1% threshold`;
         issue.recommendation = "Check sending infrastructure. Review content for spam triggers and reduce email size.";
+        issue.priority = "immediate";
       } else if (current.unsubscribeRate > 0.2) {
         issue.rootCause = `Unsubscribe rate of ${current.unsubscribeRate.toFixed(2)}% indicates content dissatisfaction`;
         issue.recommendation = "Review content relevance and reduce send frequency. Consider preference center.";
+        issue.priority = "short-term";
       } else {
         issue.rootCause = "Possible spam folder placement or recipient fatigue";
         issue.recommendation = "Review subject lines for spam triggers. Check authentication (SPF/DKIM/DMARC).";
+        issue.priority = "short-term";
       }
 
       // Check postmaster data for correlated issues
@@ -735,10 +1108,12 @@ export const generateReputationRepairReport = (
             if (nearbyPostmaster.spamRatio > 0.01) {
               issue.rootCause += `. Postmaster shows ${(nearbyPostmaster.spamRatio * 100).toFixed(2)}% spam ratio on ${nearbyPostmaster.date}`;
               issue.recommendation += " Postmaster data confirms spam issues - prioritize content and list hygiene.";
+              issue.priority = "immediate";
             }
             if (nearbyPostmaster.domainReputation === "Low" || nearbyPostmaster.domainReputation === "Bad") {
               issue.rootCause += `. Domain reputation: ${nearbyPostmaster.domainReputation}`;
               issue.recommendation += " Domain reputation is degraded - implement gradual warm-up.";
+              issue.priority = "immediate";
             }
           }
         }
@@ -761,6 +1136,7 @@ export const generateReputationRepairReport = (
           hardBounces: current.hardBounces,
           totalSent: current.totalSentUsers,
         },
+        priority: "immediate",
       });
     }
 
@@ -777,6 +1153,24 @@ export const generateReputationRepairReport = (
           unsubscribes: current.totalUnsubscribes,
           totalSent: current.totalSentUsers,
         },
+        priority: "short-term",
+      });
+    }
+
+    if (current.softBounceRate > 1 && !issues.some(i => i.campaignId === current.campaignId)) {
+      issues.push({
+        campaignId: current.campaignId,
+        sendDate: current.startDate,
+        observation: `Soft bounce rate of ${current.softBounceRate.toFixed(2)}% exceeds 1% threshold`,
+        impact: "Temporary delivery failures affecting engagement metrics",
+        rootCause: "Recipient mailbox full, server issues, or email size too large",
+        recommendation: "Retry soft bounces after 24-48 hours. Check email size and image optimization.",
+        metricValues: {
+          softBounceRate: current.softBounceRate,
+          softBounces: current.softBounces,
+          totalSent: current.totalSentUsers,
+        },
+        priority: "short-term",
       });
     }
   }
@@ -789,11 +1183,12 @@ export const generateReputationRepairReport = (
       issues.push({
         campaignId: "Context Note",
         sendDate: "User Reported",
-        observation: "User reported emails landing in spam",
+        observation: `User reported: "${contextText.slice(0, 100)}${contextText.length > 100 ? '...' : ''}"`,
         impact: "Reduced visibility and engagement, potential reputation damage",
         rootCause: "Could be content triggers, authentication issues, or reputation decline",
         recommendation: "1) Verify SPF/DKIM/DMARC setup. 2) Check content for spam triggers. 3) Review postmaster tools. 4) Warm up IP/domain if new.",
         metricValues: {},
+        priority: "immediate",
       });
     }
     
@@ -801,16 +1196,17 @@ export const generateReputationRepairReport = (
       issues.push({
         campaignId: "Context Note",
         sendDate: "User Reported",
-        observation: "User reported emails getting clipped or long scroll issues",
+        observation: `User reported: "${contextText.slice(0, 100)}${contextText.length > 100 ? '...' : ''}"`,
         impact: "Content below fold not visible, reduced engagement",
         rootCause: "Email size exceeds Gmail's 102KB limit or design is too long",
         recommendation: "Keep HTML under 100KB. Move key CTA above fold. Use web-hosted version link.",
         metricValues: {},
+        priority: "short-term",
       });
     }
   }
 
-  // Sort issues by date
+  // Sort issues by date (oldest first)
   issues.sort((a, b) => {
     const dateA = parseDateSafely(a.sendDate);
     const dateB = parseDateSafely(b.sendDate);
@@ -820,6 +1216,7 @@ export const generateReputationRepairReport = (
   });
 
   return {
+    diagnosticSummary,
     issues,
     hasPostmasterData: postmasterData !== null && postmasterData.length > 0,
     contextNotes: contextText,
