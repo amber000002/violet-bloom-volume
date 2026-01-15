@@ -58,11 +58,64 @@ const formatNumber = (num: number): string => {
 };
 
 const formatPercent = (num: number): string => {
-  return `${num.toFixed(1)}%`;
+  return `${num.toFixed(2)}%`;
 };
 
-const formatPercentDetail = (num: number): string => {
-  return `${num.toFixed(2)}%`;
+// Clean subject line by removing "{Subject:" prefix
+const cleanSubjectLine = (subject: string): string => {
+  if (!subject) return '';
+  return subject.replace(/^\{Subject:\s*/i, '').replace(/\}$/, '').trim();
+};
+
+// Color coding logic for percentage metrics (WCAG AA compliant)
+type MetricType = 'openRate' | 'clickRate' | 'bounceRate' | 'unsubscribeRate';
+
+interface ColorResult {
+  colorClass: string;
+  tooltip: string;
+}
+
+const getPercentageColor = (value: number, metricType: MetricType): ColorResult => {
+  const roundedValue = Math.round(value * 100) / 100; // Round to 2 decimals before evaluation
+  
+  switch (metricType) {
+    case 'openRate':
+      // Open Rate: >25% green, 10-25% amber, ≤10% red
+      if (roundedValue > 25.0) return { colorClass: 'text-green-600 font-medium', tooltip: 'Healthy' };
+      if (roundedValue > 10.0) return { colorClass: 'text-amber-600 font-medium', tooltip: 'Needs Attention' };
+      return { colorClass: 'text-red-600 font-medium', tooltip: 'Deliverability Risk' };
+    
+    case 'clickRate':
+      // Click Rate: >3% green, 1.5-3% amber, ≤1.5% red
+      if (roundedValue > 3.0) return { colorClass: 'text-green-600 font-medium', tooltip: 'Healthy' };
+      if (roundedValue > 1.5) return { colorClass: 'text-amber-600 font-medium', tooltip: 'Needs Attention' };
+      return { colorClass: 'text-red-600 font-medium', tooltip: 'Deliverability Risk' };
+    
+    case 'bounceRate':
+      // Bounce Rate: <1% green, 1-3% amber, >3% red
+      if (roundedValue < 1.0) return { colorClass: 'text-green-600 font-medium', tooltip: 'Healthy' };
+      if (roundedValue <= 3.0) return { colorClass: 'text-amber-600 font-medium', tooltip: 'Needs Attention' };
+      return { colorClass: 'text-red-600 font-medium', tooltip: 'Deliverability Risk' };
+    
+    case 'unsubscribeRate':
+      // Unsubscribe Rate: <0.3% green, 0.3-0.7% amber, >0.7% red
+      if (roundedValue < 0.3) return { colorClass: 'text-green-600 font-medium', tooltip: 'Healthy' };
+      if (roundedValue <= 0.7) return { colorClass: 'text-amber-600 font-medium', tooltip: 'Needs Attention' };
+      return { colorClass: 'text-red-600 font-medium', tooltip: 'Deliverability Risk' };
+    
+    default:
+      return { colorClass: 'text-muted-foreground', tooltip: '' };
+  }
+};
+
+// Colored percentage cell component
+const ColoredPercent: React.FC<{ value: number; metricType: MetricType }> = ({ value, metricType }) => {
+  const { colorClass, tooltip } = getPercentageColor(value, metricType);
+  return (
+    <span className={colorClass} title={tooltip}>
+      {formatPercent(value)}
+    </span>
+  );
 };
 
 export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
@@ -429,19 +482,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         <td className="text-right py-2 px-3">{formatNumber(p.totalDeliveredUsers)}</td>
                       )}
                       <td className="text-right py-2 px-3">{formatNumber(p.uniqueViewed)}</td>
-                      <td className="text-right py-2 px-3 text-primary font-medium">{formatPercent(p.viewPercent)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={p.viewPercent} metricType="openRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(p.uniqueClicked)}</td>
-                      <td className="text-right py-2 px-3 text-secondary font-medium">{formatPercent(p.clickPercent)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={p.clickPercent} metricType="clickRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(p.unsubscribes)}</td>
-                      <td className="text-right py-2 px-3 text-muted-foreground">{formatPercent(p.unsubscribePercent)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={p.unsubscribePercent} metricType="unsubscribeRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(p.hardBounces)}</td>
-                      <td className={`text-right py-2 px-3 ${p.hardBouncePercent > 0.5 ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
-                        {formatPercent(p.hardBouncePercent)}
-                      </td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={p.hardBouncePercent} metricType="bounceRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(p.softBounces)}</td>
-                      <td className={`text-right py-2 px-3 ${p.softBouncePercent > 1 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}>
-                        {formatPercent(p.softBouncePercent)}
-                      </td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={p.softBouncePercent} metricType="bounceRate" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -493,21 +542,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       )}
                       <td className="text-right py-2 px-3">{formatNumber(m.uniqueSentUsers)}</td>
                       <td className="text-right py-2 px-3">{formatNumber(m.uniqueViewed)}</td>
-                      <td className="text-right py-2 px-3 text-primary font-medium">{formatPercent(m.viewPercent)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={m.viewPercent} metricType="openRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.uniqueClicked)}</td>
-                      <td className="text-right py-2 px-3 text-secondary font-medium">{formatPercent(m.clickPercent)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={m.clickPercent} metricType="clickRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.unsubscribes)}</td>
-                      <td className={`text-right py-2 px-3 ${m.unsubscribePercent > 0.2 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}>
-                        {formatPercent(m.unsubscribePercent)}
-                      </td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={m.unsubscribePercent} metricType="unsubscribeRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.hardBounces)}</td>
-                      <td className={`text-right py-2 px-3 ${m.hardBouncePercent > 0.5 ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
-                        {formatPercent(m.hardBouncePercent)}
-                      </td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={m.hardBouncePercent} metricType="bounceRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.softBounces)}</td>
-                      <td className={`text-right py-2 px-3 ${m.softBouncePercent > 1 ? 'text-amber-500 font-medium' : 'text-muted-foreground'}`}>
-                        {formatPercent(m.softBouncePercent)}
-                      </td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={m.softBouncePercent} metricType="bounceRate" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -531,21 +574,41 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   <tr className="border-b border-border">
                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Conv</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnostics.analysisReport.bestCampaigns.slice(0, 5).map((c, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                      <td className="py-2 px-3 max-w-xs truncate" title={c.subjectLine}>{c.subjectLine}</td>
-                      <td className="text-right py-2 px-3">{formatNumber(c.totalSentUsers)}</td>
-                      <td className="text-right py-2 px-3 text-green-500 font-medium">{formatPercent(c.openRate)}</td>
-                      <td className="text-right py-2 px-3">{formatPercent(c.clickRate)}</td>
-                      <td className="text-right py-2 px-3">{formatNumber(c.conversions)}</td>
-                    </tr>
-                  ))}
+                  {diagnostics.analysisReport.bestCampaigns.slice(0, 5).map((c, i) => {
+                    const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
+                    const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
+                    const hardBouncePercent = denominator > 0 ? (c.hardBounces / denominator) * 100 : 0;
+                    const softBouncePercent = denominator > 0 ? (c.softBounces / denominator) * 100 : 0;
+                    return (
+                      <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="py-2 px-3 max-w-xs truncate" title={cleanSubjectLine(c.subjectLine)}>{cleanSubjectLine(c.subjectLine)}</td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.totalSentUsers)}</td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.uniqueViewed)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={c.openRate} metricType="openRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.uniqueClicked)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={c.clickRate} metricType="clickRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.unsubscribes)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={unsubPercent} metricType="unsubscribeRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.hardBounces)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={hardBouncePercent} metricType="bounceRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.softBounces)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={softBouncePercent} metricType="bounceRate" /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -568,21 +631,41 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   <tr className="border-b border-border">
                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnostics.analysisReport.worstCampaigns.slice(0, 5).map((c, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                      <td className="py-2 px-3 max-w-xs truncate" title={c.subjectLine}>{c.subjectLine}</td>
-                      <td className="text-right py-2 px-3">{formatNumber(c.totalSentUsers)}</td>
-                      <td className="text-right py-2 px-3 text-red-500 font-medium">{formatPercent(c.openRate)}</td>
-                      <td className="text-right py-2 px-3">{formatPercent(c.clickRate)}</td>
-                      <td className="text-right py-2 px-3">{formatNumber(c.hardBounces)}</td>
-                    </tr>
-                  ))}
+                  {diagnostics.analysisReport.worstCampaigns.slice(0, 5).map((c, i) => {
+                    const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
+                    const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
+                    const hardBouncePercent = denominator > 0 ? (c.hardBounces / denominator) * 100 : 0;
+                    const softBouncePercent = denominator > 0 ? (c.softBounces / denominator) * 100 : 0;
+                    return (
+                      <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="py-2 px-3 max-w-xs truncate" title={cleanSubjectLine(c.subjectLine)}>{cleanSubjectLine(c.subjectLine)}</td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.totalSentUsers)}</td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.uniqueViewed)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={c.openRate} metricType="openRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.uniqueClicked)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={c.clickRate} metricType="clickRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.unsubscribes)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={unsubPercent} metricType="unsubscribeRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.hardBounces)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={hardBouncePercent} metricType="bounceRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(c.softBounces)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={softBouncePercent} metricType="bounceRate" /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
