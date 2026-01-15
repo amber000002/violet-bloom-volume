@@ -427,6 +427,7 @@ export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult 
 
 // CRITICAL: Parse DD/MM/YYYY format ONLY (day first, month second, year third)
 // MANDATORY: Do NOT assume MM/DD/YYYY - all dates are DD/MM/YYYY
+// SUPPORTS: 2-digit year (YY) and 4-digit year (YYYY)
 const parseDateDDMMYYYY = (dateStr: string): { date: Date | null; error: string | null } => {
   if (!dateStr) return { date: null, error: "Empty date string" };
   
@@ -439,7 +440,7 @@ const parseDateDDMMYYYY = (dateStr: string): { date: Date | null; error: string 
   // MANDATORY: Day = first value, Month = second value, Year = third value
   const day = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10);
-  const year = parseInt(parts[2], 10);
+  let year = parseInt(parts[2], 10);
   
   // Validate ranges
   if (isNaN(day) || isNaN(month) || isNaN(year)) {
@@ -452,6 +453,11 @@ const parseDateDDMMYYYY = (dateStr: string): { date: Date | null; error: string 
   
   if (month < 1 || month > 12) {
     return { date: null, error: `Invalid month value: ${month} in ${dateStr}` };
+  }
+  
+  // Handle 2-digit year: convert to full year (00-99 → 2000-2099)
+  if (year < 100) {
+    year = 2000 + year;
   }
   
   if (year < 1900 || year > 2100) {
@@ -656,14 +662,14 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
   // - Channel = Email (already filtered during parsing)
   const eligibleCampaigns = data.filter(c => c.totalSentUsers >= 1000);
 
-  // Step 2: Single sort by Unique Viewed Within Conversion Time (DESC)
-  const sortedByViewed = [...eligibleCampaigns].sort(
-    (a, b) => b.uniqueViewedWithinConversion - a.uniqueViewedWithinConversion
+  // Step 2: Sort by OPEN RATE (percentage, not absolute count) - DESC for best
+  const sortedByOpenRate = [...eligibleCampaigns].sort(
+    (a, b) => b.openRate - a.openRate
   );
 
-  // Step 3: Best Performing = Top 5 campaigns, lock these IDs
+  // Step 3: Best Performing = Top 5 campaigns by open rate (highest first), lock these IDs
   const bestCampaignIds = new Set<string>();
-  const bestCampaigns: TopCampaign[] = sortedByViewed.slice(0, 5).map(c => {
+  const bestCampaigns: TopCampaign[] = sortedByOpenRate.slice(0, 5).map(c => {
     bestCampaignIds.add(c.campaignId);
     return {
       campaignId: c.campaignId,
@@ -682,10 +688,10 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     };
   });
 
-  // Step 4: Worst Performing = From REMAINING campaigns only, sort ASC, take bottom 5
+  // Step 4: Worst Performing = From REMAINING campaigns only, sort by open rate ASC (lowest first)
   const remainingCampaigns = eligibleCampaigns.filter(c => !bestCampaignIds.has(c.campaignId));
   const sortedAscending = [...remainingCampaigns].sort(
-    (a, b) => a.uniqueViewedWithinConversion - b.uniqueViewedWithinConversion
+    (a, b) => a.openRate - b.openRate
   );
 
   const worstCampaigns: TopCampaign[] = sortedAscending.slice(0, 5).map(c => ({
