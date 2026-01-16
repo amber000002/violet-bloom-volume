@@ -15,8 +15,10 @@ import {
   ChevronUp,
   AlertTriangle,
   Lightbulb,
-  Shield
+  Shield,
+  Download
 } from "lucide-react";
+import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { 
   parseCSV, 
@@ -433,6 +435,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl font-semibold text-foreground">Analysis & Report</h2>
             <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => exportDiagnosticsToPPT(diagnostics, "analysis", "Campaign")}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Add to PPT
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setActiveReport(null)}>
                 ← Back
               </Button>
@@ -730,6 +741,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl font-semibold text-foreground">Reputation Repair Recommendations</h2>
             <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => exportDiagnosticsToPPT(diagnostics, "reputation", "Campaign")}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Add to PPT
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setActiveReport(null)}>
                 ← Back
               </Button>
