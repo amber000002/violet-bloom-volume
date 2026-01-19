@@ -885,26 +885,22 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                               );
                             })}
                           </tr>
-                          {/* Row 3: Trends */}
-                          <tr className="border-b border-border/50">
+                          {/* Row 3: Trend (Combined with Change) */}
+                          <tr>
                             <td className="py-2 px-3 font-medium text-muted-foreground">Trend</td>
                             {signalTable.map((row, i) => (
                               <td key={i} className={`text-center py-2 px-3 ${getTrendColor(row.signal, row.trend)}`}>
-                                <div className="flex items-center justify-center gap-1">
-                                  {row.trend === 'up' && <TrendingUp className="w-4 h-4" />}
-                                  {row.trend === 'down' && <TrendingDown className="w-4 h-4" />}
-                                  {row.trend === 'stable' && <span>–</span>}
-                                  {row.trend === 'N/A' && <span className="text-muted-foreground">N/A</span>}
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <div className="flex items-center gap-1">
+                                    {row.trend === 'up' && <TrendingUp className="w-4 h-4" />}
+                                    {row.trend === 'down' && <TrendingDown className="w-4 h-4" />}
+                                    {row.trend === 'stable' && <span>–</span>}
+                                    {row.trend === 'N/A' && <span className="text-muted-foreground">N/A</span>}
+                                  </div>
+                                  {row.trendDescription && (
+                                    <span className="text-xs opacity-80">{row.trendDescription}</span>
+                                  )}
                                 </div>
-                              </td>
-                            ))}
-                          </tr>
-                          {/* Row 4: Trend Descriptions */}
-                          <tr>
-                            <td className="py-2 px-3 font-medium text-muted-foreground">Change</td>
-                            {signalTable.map((row, i) => (
-                              <td key={i} className={`text-center py-2 px-3 text-xs ${getTrendColor(row.signal, row.trend)}`}>
-                                {row.trendDescription || '—'}
                               </td>
                             ))}
                           </tr>
@@ -971,9 +967,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </CollapsibleSection>
               )}
 
-              {/* 4️⃣ Send Mix Analysis - Horizontal Layout */}
+              {/* 4️⃣ Send Mix Analysis - Horizontal Layout with Summarization */}
               <CollapsibleSection
-                title="Send Mix & Lifecycle Pressure"
+                title="Send Mix & Campaign Use Case Analysis"
                 icon={<PieChart className="w-5 h-5 text-primary" />}
                 isOpen={expandedSections.best}
                 onToggle={() => toggleSection("best")}
@@ -984,16 +980,99 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   const mixValues = [mix.transactionalPercent, mix.lifecyclePercent, mix.promotionalPercent];
                   
                   const getMixColor = (value: number, type: string): string => {
-                    // Promotional heavy is concerning, lifecycle/transactional balance is healthy
                     if (type === 'Promotional' && value > 60) return 'text-red-600';
                     if (type === 'Promotional' && value > 40) return 'text-amber-600';
                     if (type === 'Transactional' && value > 30) return 'text-green-600';
                     if (type === 'Lifecycle' && value > 20) return 'text-green-600';
                     return 'text-foreground';
                   };
+
+                  // Generate use case categorization from campaign data
+                  const categorizeUseCases = () => {
+                    const rawData = diagnostics.rawData || [];
+                    const categories: Record<string, { count: number; examples: string[] }> = {
+                      'Payment/Collection Reminders': { count: 0, examples: [] },
+                      'Auto-Debit/NACH Setup': { count: 0, examples: [] },
+                      'Loan/Disbursal Notifications': { count: 0, examples: [] },
+                      'Onboarding/KYC Follow-ups': { count: 0, examples: [] },
+                      'Promotional Offers': { count: 0, examples: [] },
+                      'Recovery/Collections': { count: 0, examples: [] },
+                      'Account Status Updates': { count: 0, examples: [] },
+                      'Other/Uncategorized': { count: 0, examples: [] },
+                    };
+
+                    rawData.forEach((campaign: CampaignRow) => {
+                      const name = campaign.campaignName.toLowerCase();
+                      const subject = campaign.subjectLine?.toLowerCase() || '';
+                      
+                      if (name.includes('collection') || name.includes('prepay') || name.includes('emi') || subject.includes('emi due') || subject.includes('payment due')) {
+                        categories['Payment/Collection Reminders'].count++;
+                        if (categories['Payment/Collection Reminders'].examples.length < 2) {
+                          categories['Payment/Collection Reminders'].examples.push(campaign.campaignName);
+                        }
+                      } else if (name.includes('nach') || name.includes('ecs') || subject.includes('nach') || subject.includes('auto-pay')) {
+                        categories['Auto-Debit/NACH Setup'].count++;
+                        if (categories['Auto-Debit/NACH Setup'].examples.length < 2) {
+                          categories['Auto-Debit/NACH Setup'].examples.push(campaign.campaignName);
+                        }
+                      } else if (name.includes('disburs') || name.includes('refund') || name.includes('loan closed') || subject.includes('disbursal')) {
+                        categories['Loan/Disbursal Notifications'].count++;
+                        if (categories['Loan/Disbursal Notifications'].examples.length < 2) {
+                          categories['Loan/Disbursal Notifications'].examples.push(campaign.campaignName);
+                        }
+                      } else if (name.includes('sign up') || name.includes('kyc') || name.includes('rf pending') || subject.includes('complete')) {
+                        categories['Onboarding/KYC Follow-ups'].count++;
+                        if (categories['Onboarding/KYC Follow-ups'].examples.length < 2) {
+                          categories['Onboarding/KYC Follow-ups'].examples.push(campaign.campaignName);
+                        }
+                      } else if (name.includes('offer') || name.includes('launch') || name.includes('promo') || subject.includes('offer') || subject.includes('cashback')) {
+                        categories['Promotional Offers'].count++;
+                        if (categories['Promotional Offers'].examples.length < 2) {
+                          categories['Promotional Offers'].examples.push(campaign.campaignName);
+                        }
+                      } else if (name.includes('recovery') || name.includes('agent')) {
+                        categories['Recovery/Collections'].count++;
+                        if (categories['Recovery/Collections'].examples.length < 2) {
+                          categories['Recovery/Collections'].examples.push(campaign.campaignName);
+                        }
+                      } else if (name.includes('limit') || name.includes('status') || name.includes('restored') || subject.includes('account')) {
+                        categories['Account Status Updates'].count++;
+                        if (categories['Account Status Updates'].examples.length < 2) {
+                          categories['Account Status Updates'].examples.push(campaign.campaignName);
+                        }
+                      } else {
+                        categories['Other/Uncategorized'].count++;
+                        if (categories['Other/Uncategorized'].examples.length < 2) {
+                          categories['Other/Uncategorized'].examples.push(campaign.campaignName);
+                        }
+                      }
+                    });
+
+                    return categories;
+                  };
+
+                  const useCaseCategories = categorizeUseCases();
+                  const totalCampaigns = Object.values(useCaseCategories).reduce((sum, cat) => sum + cat.count, 0);
+                  const transactionalCount = useCaseCategories['Payment/Collection Reminders'].count + 
+                    useCaseCategories['Auto-Debit/NACH Setup'].count + 
+                    useCaseCategories['Loan/Disbursal Notifications'].count +
+                    useCaseCategories['Account Status Updates'].count;
+                  const transactionalPercent = totalCampaigns > 0 ? ((transactionalCount / totalCampaigns) * 100).toFixed(0) : 0;
+
+                  // Missing use cases detection
+                  const missingUseCases = [];
+                  if (!Object.entries(useCaseCategories).some(([key, val]) => key.includes('Welcome') && val.count > 0)) {
+                    missingUseCases.push('Welcome/Onboarding emails');
+                  }
+                  missingUseCases.push('Payment confirmations/receipts');
+                  missingUseCases.push('Account balance summaries');
+                  missingUseCases.push('Customer feedback/NPS surveys');
+                  missingUseCases.push('Re-engagement campaigns');
+                  missingUseCases.push('Educational/tip content');
                   
                   return (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+                      {/* Mix Table */}
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -1007,7 +1086,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                             </tr>
                           </thead>
                           <tbody>
-                            {/* Percentage row */}
                             <tr className="border-b border-border/50">
                               <td className="py-2 px-3 font-medium text-muted-foreground">Mix %</td>
                               {mixTypes.map((type, i) => (
@@ -1016,7 +1094,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                                 </td>
                               ))}
                             </tr>
-                            {/* Status row */}
                             <tr className="border-b border-border/50">
                               <td className="py-2 px-3 font-medium text-muted-foreground">Status</td>
                               {mixTypes.map((type, i) => (
@@ -1034,16 +1111,72 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                           </tbody>
                         </table>
                       </div>
-                      
-                      {/* Additional notes */}
+
+                      {/* Confidence badge */}
                       <div className="flex flex-wrap gap-3 text-xs">
                         <span className={`px-2 py-1 rounded ${mix.classificationConfidence === 'high' ? 'bg-green-500/20 text-green-600' : mix.classificationConfidence === 'medium' ? 'bg-amber-500/20 text-amber-600' : 'bg-red-500/20 text-red-600'}`}>
                           {mix.classificationConfidence} confidence
                         </span>
+                      </div>
+
+                      {/* Campaign Use Case Analysis Section */}
+                      <div className="border-t border-border pt-4 space-y-4">
+                        <h4 className="font-semibold text-foreground flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-primary" />
+                          Campaign Use Case Categorization
+                        </h4>
+                        
+                        {/* Use Case Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {Object.entries(useCaseCategories)
+                            .filter(([_, data]) => data.count > 0)
+                            .sort((a, b) => b[1].count - a[1].count)
+                            .map(([category, data]) => (
+                              <div key={category} className="bg-muted/30 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-medium text-sm">{category}</span>
+                                  <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded">
+                                    {data.count} campaigns
+                                  </span>
+                                </div>
+                                {data.examples.length > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                    e.g., {data.examples.slice(0, 2).join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+
+                        {/* Overall Campaign Nature */}
+                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                          <h5 className="font-semibold text-sm mb-2">Overall Campaign Nature</h5>
+                          <p className="text-sm text-muted-foreground">
+                            Campaign volume is <strong className="text-foreground">{Number(transactionalPercent) > 60 ? 'heavily weighted toward transactional alerts' : Number(transactionalPercent) > 40 ? 'balanced between transactional and promotional' : 'skewed toward promotional content'}</strong> ({transactionalPercent}% transactional).
+                            This {Number(transactionalPercent) > 60 ? 'suggests a mostly transactional sending strategy focusing on timely account/payment reminders' : 'indicates potential reputation pressure from promotional volume'}.
+                          </p>
+                        </div>
+
+                        {/* Missing Use Cases */}
+                        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4">
+                          <h5 className="font-semibold text-sm text-amber-700 mb-2">Missing Standard Use Cases</h5>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            The following industry-standard email journeys appear absent from this dataset:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {missingUseCases.map((useCase, i) => (
+                              <span key={i} className="text-xs px-2 py-1 bg-amber-500/10 text-amber-700 rounded">
+                                {useCase}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Strategic Notes */}
                         {mix.ambiguityNotes.length > 0 && (
-                          <span className="text-muted-foreground italic">
-                            {mix.ambiguityNotes.join('; ')}
-                          </span>
+                          <div className="text-xs text-muted-foreground italic border-t border-border pt-3">
+                            <strong>Notes:</strong> {mix.ambiguityNotes.join('; ')}
+                          </div>
                         )}
                       </div>
                     </div>
