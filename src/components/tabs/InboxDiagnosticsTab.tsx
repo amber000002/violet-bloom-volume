@@ -16,7 +16,9 @@ import {
   AlertTriangle,
   Lightbulb,
   Shield,
-  Download
+  Download,
+  Calendar,
+  PieChart
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
 import { ViewMode } from "@/hooks/usePresentationMode";
@@ -912,6 +914,141 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   );
                 })()}
                 <p className="text-xs text-muted-foreground mt-3">{diagnostics.reputationReport.enhancedReport.signalTableDenominatorNote}</p>
+              </CollapsibleSection>
+
+              {/* 3️⃣ MoM Analysis - Horizontal Layout */}
+              {diagnostics.reputationReport.enhancedReport.momAnalysis.comparisonAvailable && (
+                <CollapsibleSection
+                  title="Month-over-Month Analysis"
+                  icon={<Calendar className="w-5 h-5 text-primary" />}
+                  isOpen={expandedSections.monthly}
+                  onToggle={() => toggleSection("monthly")}
+                >
+                  {(() => {
+                    const mom = diagnostics.reputationReport.enhancedReport!.momAnalysis;
+                    const categories = ['Changes This Month', 'Stable Factors', 'Worsened Before Shift'];
+                    const categoryData = [mom.changesThisMonth, mom.stableFactors, mom.worsenedBeforeShift];
+                    const maxRows = Math.max(...categoryData.map(arr => arr.length), 1);
+                    
+                    return (
+                      <div className="space-y-4">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border">
+                                <th className="text-left py-2 px-3 font-medium text-muted-foreground w-24"></th>
+                                {categories.map((cat, i) => (
+                                  <th key={i} className={`text-center py-2 px-3 font-medium min-w-[180px] ${
+                                    i === 0 ? 'text-amber-600' : i === 1 ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {cat}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Array.from({ length: maxRows }).map((_, rowIdx) => (
+                                <tr key={rowIdx} className="border-b border-border/50">
+                                  <td className="py-2 px-3 font-medium text-muted-foreground text-xs">
+                                    {rowIdx === 0 ? 'Observations' : ''}
+                                  </td>
+                                  {categoryData.map((data, colIdx) => (
+                                    <td key={colIdx} className="text-center py-2 px-3 text-xs">
+                                      {data[rowIdx] || '—'}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {mom.comparisonNote && (
+                          <p className="text-xs text-muted-foreground italic">{mom.comparisonNote}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </CollapsibleSection>
+              )}
+
+              {/* 4️⃣ Send Mix Analysis - Horizontal Layout */}
+              <CollapsibleSection
+                title="Send Mix & Lifecycle Pressure"
+                icon={<PieChart className="w-5 h-5 text-primary" />}
+                isOpen={expandedSections.best}
+                onToggle={() => toggleSection("best")}
+              >
+                {(() => {
+                  const mix = diagnostics.reputationReport.enhancedReport!.sendMixAnalysis;
+                  const mixTypes = ['Transactional', 'Lifecycle', 'Promotional'];
+                  const mixValues = [mix.transactionalPercent, mix.lifecyclePercent, mix.promotionalPercent];
+                  
+                  const getMixColor = (value: number, type: string): string => {
+                    // Promotional heavy is concerning, lifecycle/transactional balance is healthy
+                    if (type === 'Promotional' && value > 60) return 'text-red-600';
+                    if (type === 'Promotional' && value > 40) return 'text-amber-600';
+                    if (type === 'Transactional' && value > 30) return 'text-green-600';
+                    if (type === 'Lifecycle' && value > 20) return 'text-green-600';
+                    return 'text-foreground';
+                  };
+                  
+                  return (
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border">
+                              <th className="text-left py-2 px-3 font-medium text-muted-foreground w-24"></th>
+                              {mixTypes.map((type, i) => (
+                                <th key={i} className="text-center py-2 px-3 font-medium text-muted-foreground min-w-[120px]">
+                                  {type}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* Percentage row */}
+                            <tr className="border-b border-border/50">
+                              <td className="py-2 px-3 font-medium text-muted-foreground">Mix %</td>
+                              {mixTypes.map((type, i) => (
+                                <td key={i} className={`text-center py-2 px-3 font-semibold ${getMixColor(mixValues[i], type)}`}>
+                                  {mixValues[i].toFixed(1)}%
+                                </td>
+                              ))}
+                            </tr>
+                            {/* Status row */}
+                            <tr className="border-b border-border/50">
+                              <td className="py-2 px-3 font-medium text-muted-foreground">Status</td>
+                              {mixTypes.map((type, i) => (
+                                <td key={i} className="text-center py-2 px-3 text-xs">
+                                  {mix.overweightedTypes.includes(type.toLowerCase()) ? (
+                                    <span className="text-red-600 font-medium">Overweighted</span>
+                                  ) : mix.underutilizedAbsorbers.includes(type.toLowerCase()) ? (
+                                    <span className="text-amber-600 font-medium">Underutilized</span>
+                                  ) : (
+                                    <span className="text-green-600">Balanced</span>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {/* Additional notes */}
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        <span className={`px-2 py-1 rounded ${mix.classificationConfidence === 'high' ? 'bg-green-500/20 text-green-600' : mix.classificationConfidence === 'medium' ? 'bg-amber-500/20 text-amber-600' : 'bg-red-500/20 text-red-600'}`}>
+                          {mix.classificationConfidence} confidence
+                        </span>
+                        {mix.ambiguityNotes.length > 0 && (
+                          <span className="text-muted-foreground italic">
+                            {mix.ambiguityNotes.join('; ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </CollapsibleSection>
 
               {/* 5️⃣ Root Cause Summary */}
