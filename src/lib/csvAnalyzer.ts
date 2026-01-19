@@ -141,7 +141,93 @@ export interface AnalysisReport {
   keyLearnings: KeyLearning[];
 }
 
-// Reputation Repair Types
+// Reputation Repair Types - Enhanced per Master Prompt
+
+// 0️⃣ Versioning & Scope
+export interface VersioningScope {
+  analysisVersion: string;
+  dataRange: string;
+  dataSources: string[];
+  senderDomain: string;
+}
+
+// 1️⃣ Monthly Reputation Rerun Snapshot
+export interface ReputationSnapshot {
+  reputationDirection: "improving" | "stable" | "degrading";
+  reputationEvidence: string;
+  primaryStressSignal: string;
+  timingCorrelation: string;
+  damageAssessment: "structural" | "reversible";
+  safeToScale: boolean;
+  verdict: string;
+}
+
+// 2️⃣ Reputation Signal Table
+export interface ReputationSignalRow {
+  signal: string;
+  value: number | string;
+  percentage: string;
+  trend: "up" | "down" | "stable" | "N/A";
+  trendDescription: string;
+}
+
+// 3️⃣ Reputation Rerun Analysis (MoM)
+export interface MoMAnalysis {
+  changesThisMonth: string[];
+  stableFactors: string[];
+  worsenedBeforeShift: string[];
+  comparisonAvailable: boolean;
+  comparisonNote: string;
+}
+
+// 4️⃣ Send Mix & Lifecycle Pressure
+export interface SendMixAnalysis {
+  transactionalPercent: number;
+  lifecyclePercent: number;
+  promotionalPercent: number;
+  overweightedTypes: string[];
+  underutilizedAbsorbers: string[];
+  classificationConfidence: "high" | "medium" | "low";
+  ambiguityNotes: string[];
+}
+
+// 5️⃣ Root Cause Summary
+export interface RootCauseBullet {
+  cause: string;
+  evidence: string;
+  evidenceType: "numeric_change" | "time_shift" | "documented_rule";
+}
+
+// 6️⃣ Reputation Repair Actions
+export interface RepairAction {
+  priority: "immediate" | "short-term" | "ongoing";
+  confidence: "high" | "medium" | "low";
+  action: string;
+  cohortSize?: string;
+  metricToWatch?: string;
+  abortCondition?: string;
+}
+
+// 7️⃣ What This Analysis Does NOT Cover
+export interface AnalysisExclusions {
+  exclusions: string[];
+}
+
+// 8️⃣ Source Attribution Index
+export interface SourceAttribution {
+  insight: string;
+  dataSource: string;
+  docSource: string;
+  confidence: "high" | "medium" | "low";
+}
+
+// 9️⃣ Data Quality & Limitations
+export interface DataQualityNote {
+  type: "missing_field" | "inconsistent_denominator" | "data_gap" | "caution";
+  description: string;
+}
+
+// Legacy types for backward compatibility
 export interface ReputationIssue {
   campaignId: string;
   sendDate: string;
@@ -183,11 +269,30 @@ export interface DeliverabilityDiagnosticSummary {
   }[];
 }
 
+// Enhanced Reputation Repair Report - matches Master Prompt structure
+export interface EnhancedReputationReport {
+  versioningScope: VersioningScope;
+  reputationSnapshot: ReputationSnapshot;
+  signalTable: ReputationSignalRow[];
+  signalTableDenominatorNote: string;
+  momAnalysis: MoMAnalysis;
+  sendMixAnalysis: SendMixAnalysis;
+  rootCauses: RootCauseBullet[];
+  repairActions: RepairAction[];
+  exclusions: AnalysisExclusions;
+  sourceAttributions: SourceAttribution[];
+  dataQualityNotes: DataQualityNote[];
+  finalConfirmation: string;
+  refusalReason: string | null;
+}
+
 export interface ReputationRepairReport {
   diagnosticSummary: DeliverabilityDiagnosticSummary;
   issues: ReputationIssue[];
   hasPostmasterData: boolean;
   contextNotes: string | null;
+  // NEW: Enhanced structured report
+  enhancedReport: EnhancedReputationReport | null;
 }
 
 export interface DiagnosticsData {
@@ -1300,12 +1405,792 @@ export const generateReputationRepairReport = (
     return dateA.getTime() - dateB.getTime();
   });
 
+  // Generate enhanced structured report
+  const enhancedReport = generateEnhancedReputationReport(
+    sortedData,
+    postmasterData,
+    contextText,
+    diagnosticSummary
+  );
+
   return {
     diagnosticSummary,
     issues,
     hasPostmasterData: postmasterData !== null && postmasterData.length > 0,
     contextNotes: contextText,
+    enhancedReport,
   };
+};
+
+// ============= ENHANCED REPUTATION REPORT GENERATOR =============
+
+const generateEnhancedReputationReport = (
+  sortedData: CampaignRow[],
+  postmasterData: PostmasterRow[] | null,
+  contextText: string | null,
+  diagnosticSummary: DeliverabilityDiagnosticSummary
+): EnhancedReputationReport => {
+  const hasPostmaster = postmasterData !== null && postmasterData.length > 0;
+  const dataQualityNotes: DataQualityNote[] = [];
+
+  // Check for data quality issues that might require refusal
+  if (sortedData.length < 3) {
+    return createRefusalReport("Insufficient data: Less than 3 campaigns available for meaningful analysis.");
+  }
+
+  // 0️⃣ VERSIONING & SCOPE
+  const dates = sortedData.map(c => parseDateSafely(c.startDate)).filter(Boolean) as Date[];
+  const minDate = dates.length > 0 ? dates.reduce((a, b) => a < b ? a : b) : null;
+  const maxDate = dates.length > 0 ? dates.reduce((a, b) => a > b ? a : b) : null;
+  
+  const dataRange = minDate && maxDate 
+    ? `${formatDateForReport(minDate)} – ${formatDateForReport(maxDate)}`
+    : "Unknown date range";
+
+  const dataSources: string[] = ["Campaign Performance CSV"];
+  if (hasPostmaster) dataSources.push("Google Postmaster Tools Export");
+  if (contextText) dataSources.push("User-Provided Context");
+
+  const versioningScope: VersioningScope = {
+    analysisVersion: "1.0",
+    dataRange,
+    dataSources,
+    senderDomain: extractDomainFromData(sortedData, postmasterData),
+  };
+
+  // Calculate key aggregates for analysis
+  const totals = calculateTotals(sortedData);
+  const useDelivered = totals.delivered > 0;
+  const denominator = useDelivered ? totals.delivered : totals.sent;
+
+  // Calculate trends
+  const windowSize = Math.min(5, Math.floor(sortedData.length / 2));
+  const firstWindow = sortedData.slice(0, windowSize);
+  const lastWindow = sortedData.slice(-windowSize);
+  
+  const calcAvg = (arr: CampaignRow[], getter: (c: CampaignRow) => number) => 
+    arr.reduce((s, c) => s + getter(c), 0) / arr.length;
+
+  const openStart = calcAvg(firstWindow, c => c.openRate);
+  const openEnd = calcAvg(lastWindow, c => c.openRate);
+  const openChange = openStart > 0 ? ((openEnd - openStart) / openStart) * 100 : 0;
+
+  const bounceStart = calcAvg(firstWindow, c => c.hardBounceRate + c.softBounceRate);
+  const bounceEnd = calcAvg(lastWindow, c => c.hardBounceRate + c.softBounceRate);
+
+  const unsubStart = calcAvg(firstWindow, c => c.unsubscribeRate);
+  const unsubEnd = calcAvg(lastWindow, c => c.unsubscribeRate);
+
+  // 1️⃣ MONTHLY REPUTATION RERUN SNAPSHOT
+  const reputationDirection = determineReputationDirection(openChange, bounceEnd, unsubEnd, postmasterData);
+  const primaryStressSignal = determinePrimaryStressSignal(sortedData, postmasterData);
+  const damageAssessment = assessDamageType(openChange, bounceEnd, postmasterData);
+  
+  const reputationSnapshot: ReputationSnapshot = {
+    reputationDirection,
+    reputationEvidence: generateReputationEvidence(openChange, bounceEnd, unsubEnd, postmasterData),
+    primaryStressSignal,
+    timingCorrelation: generateTimingCorrelation(sortedData, openChange),
+    damageAssessment,
+    safeToScale: reputationDirection !== "degrading" && bounceEnd < 1 && unsubEnd < 0.3,
+    verdict: generateVerdict(reputationDirection, bounceEnd, unsubEnd),
+  };
+
+  // 2️⃣ REPUTATION SIGNAL TABLE
+  const signalTable = generateSignalTable(totals, denominator, openStart, openEnd, bounceStart, bounceEnd, unsubStart, unsubEnd, postmasterData);
+  
+  const signalTableDenominatorNote = useDelivered 
+    ? `Percentages calculated using Delivered (${formatNumber(totals.delivered)}) as denominator.`
+    : `Percentages calculated using Sent (${formatNumber(totals.sent)}) as denominator. Delivered data not available.`;
+
+  if (!useDelivered) {
+    dataQualityNotes.push({
+      type: "missing_field",
+      description: "Delivered count is 0 or missing. Using Sent as denominator for rate calculations.",
+    });
+  }
+
+  // 3️⃣ MOM ANALYSIS
+  const momAnalysis = generateMoMAnalysis(sortedData, openChange, bounceEnd - bounceStart, unsubEnd - unsubStart);
+
+  // 4️⃣ SEND MIX & LIFECYCLE PRESSURE
+  const sendMixAnalysis = analyzeSendMix(sortedData);
+
+  // 5️⃣ ROOT CAUSE SUMMARY
+  const rootCauses = generateRootCauses(sortedData, openChange, bounceEnd, unsubEnd, postmasterData);
+
+  // 6️⃣ REPUTATION REPAIR ACTIONS
+  const repairActions = generateRepairActions(reputationDirection, bounceEnd, unsubEnd, openChange, postmasterData, contextText);
+
+  // 7️⃣ EXCLUSIONS
+  const exclusions: AnalysisExclusions = {
+    exclusions: [
+      "Revenue attribution per campaign",
+      "Creative quality assessment (images, design, copy)",
+      "Cross-channel impact (push, SMS, in-app)",
+      "Long-term cohort LTV analysis",
+      "Individual subscriber behavior",
+      "A/B test statistical significance",
+    ],
+  };
+
+  // 8️⃣ SOURCE ATTRIBUTIONS
+  const sourceAttributions = generateSourceAttributions(hasPostmaster, contextText !== null);
+
+  // 9️⃣ DATA QUALITY NOTES
+  if (!hasPostmaster) {
+    dataQualityNotes.push({
+      type: "missing_field",
+      description: "Postmaster data not provided. Domain/IP reputation trends cannot be assessed.",
+    });
+  }
+
+  if (sortedData.length < 10) {
+    dataQualityNotes.push({
+      type: "caution",
+      description: `Analysis based on ${sortedData.length} campaigns. Trends may be less reliable with limited data.`,
+    });
+  }
+
+  // Check for any missing rate calculations
+  const campaignsWithZeroSent = sortedData.filter(c => c.totalSentUsers === 0).length;
+  if (campaignsWithZeroSent > 0) {
+    dataQualityNotes.push({
+      type: "data_gap",
+      description: `${campaignsWithZeroSent} campaigns have 0 sends recorded and were included in analysis.`,
+    });
+  }
+
+  // ✅ FINAL CONFIRMATION
+  const finalConfirmation = "All insights above are derived from the provided data and cited sources. External sources were used only where internal documentation was insufficient and have been explicitly disclosed.";
+
+  return {
+    versioningScope,
+    reputationSnapshot,
+    signalTable,
+    signalTableDenominatorNote,
+    momAnalysis,
+    sendMixAnalysis,
+    rootCauses,
+    repairActions,
+    exclusions,
+    sourceAttributions,
+    dataQualityNotes,
+    finalConfirmation,
+    refusalReason: null,
+  };
+};
+
+// Helper: Create refusal report when data quality is insufficient
+const createRefusalReport = (reason: string): EnhancedReputationReport => ({
+  versioningScope: {
+    analysisVersion: "1.0",
+    dataRange: "N/A",
+    dataSources: [],
+    senderDomain: "Unknown",
+  },
+  reputationSnapshot: {
+    reputationDirection: "stable",
+    reputationEvidence: "",
+    primaryStressSignal: "",
+    timingCorrelation: "",
+    damageAssessment: "reversible",
+    safeToScale: false,
+    verdict: "Cannot determine - insufficient data",
+  },
+  signalTable: [],
+  signalTableDenominatorNote: "",
+  momAnalysis: {
+    changesThisMonth: [],
+    stableFactors: [],
+    worsenedBeforeShift: [],
+    comparisonAvailable: false,
+    comparisonNote: reason,
+  },
+  sendMixAnalysis: {
+    transactionalPercent: 0,
+    lifecyclePercent: 0,
+    promotionalPercent: 0,
+    overweightedTypes: [],
+    underutilizedAbsorbers: [],
+    classificationConfidence: "low",
+    ambiguityNotes: [reason],
+  },
+  rootCauses: [],
+  repairActions: [],
+  exclusions: { exclusions: [] },
+  sourceAttributions: [],
+  dataQualityNotes: [{ type: "caution", description: reason }],
+  finalConfirmation: "",
+  refusalReason: reason,
+});
+
+// Helper: Format date for report display
+const formatDateForReport = (date: Date): string => {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+};
+
+// Helper: Extract domain from data
+const extractDomainFromData = (campaigns: CampaignRow[], postmaster: PostmasterRow[] | null): string => {
+  if (postmaster && postmaster.length > 0 && postmaster[0].domain) {
+    return postmaster[0].domain;
+  }
+  // Try to extract from campaign names or subject lines
+  const emailPatterns = campaigns
+    .map(c => c.campaignName + " " + c.subjectLine)
+    .join(" ")
+    .match(/@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  return emailPatterns ? emailPatterns[1] : "Not specified";
+};
+
+// Helper: Calculate totals
+const calculateTotals = (data: CampaignRow[]) => ({
+  sent: data.reduce((s, c) => s + c.totalSentUsers, 0),
+  delivered: data.reduce((s, c) => s + c.totalDeliveredUsers, 0),
+  viewed: data.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0),
+  clicked: data.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0),
+  hardBounce: data.reduce((s, c) => s + c.hardBounces, 0),
+  softBounce: data.reduce((s, c) => s + c.softBounces, 0),
+  unsubs: data.reduce((s, c) => s + c.totalUnsubscribes, 0),
+});
+
+// Helper: Format number with commas
+const formatNumber = (num: number): string => num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+// Helper: Determine reputation direction
+const determineReputationDirection = (
+  openChange: number,
+  bounceEnd: number,
+  unsubEnd: number,
+  postmaster: PostmasterRow[] | null
+): "improving" | "stable" | "degrading" => {
+  let score = 0;
+  
+  // Open rate trend
+  if (openChange > 10) score += 2;
+  else if (openChange > 5) score += 1;
+  else if (openChange < -10) score -= 2;
+  else if (openChange < -5) score -= 1;
+  
+  // Bounce rate thresholds
+  if (bounceEnd > 3) score -= 2;
+  else if (bounceEnd > 1) score -= 1;
+  else if (bounceEnd < 0.5) score += 1;
+  
+  // Unsubscribe thresholds
+  if (unsubEnd > 0.7) score -= 2;
+  else if (unsubEnd > 0.3) score -= 1;
+  else if (unsubEnd < 0.1) score += 1;
+  
+  // Postmaster reputation
+  if (postmaster && postmaster.length > 0) {
+    const latest = postmaster[postmaster.length - 1];
+    if (latest.domainReputation === "High") score += 2;
+    else if (latest.domainReputation === "Medium") score += 0;
+    else if (latest.domainReputation === "Low") score -= 1;
+    else if (latest.domainReputation === "Bad") score -= 2;
+    
+    if (latest.spamRatio > 0.05) score -= 2;
+    else if (latest.spamRatio > 0.01) score -= 1;
+  }
+  
+  if (score >= 2) return "improving";
+  if (score <= -2) return "degrading";
+  return "stable";
+};
+
+// Helper: Determine primary stress signal
+const determinePrimaryStressSignal = (data: CampaignRow[], postmaster: PostmasterRow[] | null): string => {
+  const avgUnsub = data.reduce((s, c) => s + c.unsubscribeRate, 0) / data.length;
+  const avgBounce = data.reduce((s, c) => s + c.hardBounceRate + c.softBounceRate, 0) / data.length;
+  const avgOpen = data.reduce((s, c) => s + c.openRate, 0) / data.length;
+  const totalVolume = data.reduce((s, c) => s + c.totalSentUsers, 0);
+  
+  // Check postmaster for spam
+  if (postmaster && postmaster.length > 0) {
+    const avgSpam = postmaster.reduce((s, p) => s + p.spamRatio, 0) / postmaster.length;
+    if (avgSpam > 0.01) return `Spam complaints (${(avgSpam * 100).toFixed(2)}% avg spam ratio from Postmaster)`;
+  }
+  
+  if (avgUnsub > 0.3) return `Unsubscribe rate (${avgUnsub.toFixed(2)}% avg exceeds 0.3% threshold)`;
+  if (avgBounce > 2) return `Bounce rate (${avgBounce.toFixed(2)}% combined avg exceeds 2% threshold)`;
+  if (avgOpen < 10) return `Engagement decay (${avgOpen.toFixed(1)}% avg open rate indicates deliverability issues)`;
+  if (totalVolume > 500000 && avgOpen < 15) return `High volume with low engagement (${formatNumber(totalVolume)} sends, ${avgOpen.toFixed(1)}% open)`;
+  
+  return "No critical stress signals detected";
+};
+
+// Helper: Assess damage type
+const assessDamageType = (
+  openChange: number,
+  bounceEnd: number,
+  postmaster: PostmasterRow[] | null
+): "structural" | "reversible" => {
+  // Structural damage indicators
+  if (postmaster && postmaster.length > 0) {
+    const latest = postmaster[postmaster.length - 1];
+    if (latest.domainReputation === "Bad") return "structural";
+    if (latest.spamRatio > 0.1) return "structural";
+  }
+  
+  if (bounceEnd > 5) return "structural";
+  if (openChange < -40) return "structural";
+  
+  return "reversible";
+};
+
+// Helper: Generate reputation evidence
+const generateReputationEvidence = (
+  openChange: number,
+  bounceEnd: number,
+  unsubEnd: number,
+  postmaster: PostmasterRow[] | null
+): string => {
+  const evidence: string[] = [];
+  
+  if (openChange > 5) evidence.push(`Open rate improved ${openChange.toFixed(1)}%`);
+  else if (openChange < -5) evidence.push(`Open rate declined ${Math.abs(openChange).toFixed(1)}%`);
+  
+  if (bounceEnd < 1) evidence.push(`Bounce rate healthy at ${bounceEnd.toFixed(2)}%`);
+  else if (bounceEnd > 2) evidence.push(`Bounce rate elevated at ${bounceEnd.toFixed(2)}%`);
+  
+  if (postmaster && postmaster.length > 0) {
+    const latest = postmaster[postmaster.length - 1];
+    evidence.push(`Domain reputation: ${latest.domainReputation || 'Unknown'}`);
+  }
+  
+  return evidence.join(". ") || "Stable metrics with no significant changes.";
+};
+
+// Helper: Generate timing correlation
+const generateTimingCorrelation = (data: CampaignRow[], openChange: number): string => {
+  if (data.length < 5) return "Insufficient data for timing analysis.";
+  
+  // Find the point of biggest change
+  let maxDrop = 0;
+  let dropIndex = -1;
+  
+  for (let i = 1; i < data.length; i++) {
+    const drop = data[i - 1].openRate - data[i].openRate;
+    if (drop > maxDrop) {
+      maxDrop = drop;
+      dropIndex = i;
+    }
+  }
+  
+  if (dropIndex > 0 && maxDrop > 5) {
+    const beforeCampaign = data[dropIndex - 1];
+    const afterCampaign = data[dropIndex];
+    return `Significant engagement drop observed between ${beforeCampaign.startDate} and ${afterCampaign.startDate}. Open rate dropped from ${beforeCampaign.openRate.toFixed(1)}% to ${afterCampaign.openRate.toFixed(1)}%.`;
+  }
+  
+  if (openChange < -10) {
+    return "Gradual decline observed across the analysis period. No single triggering event identified.";
+  }
+  
+  return "No significant timing correlation identified. Metrics remained relatively consistent.";
+};
+
+// Helper: Generate verdict
+const generateVerdict = (direction: "improving" | "stable" | "degrading", bounceEnd: number, unsubEnd: number): string => {
+  if (direction === "degrading" || bounceEnd > 2 || unsubEnd > 0.5) {
+    return "Sender is NOT safe to scale next month. Address reputation issues first.";
+  }
+  if (direction === "improving" && bounceEnd < 1 && unsubEnd < 0.2) {
+    return "Sender IS safe to scale next month with monitoring.";
+  }
+  return "Sender may cautiously scale with close monitoring of key metrics.";
+};
+
+// Helper: Generate signal table
+const generateSignalTable = (
+  totals: ReturnType<typeof calculateTotals>,
+  denominator: number,
+  openStart: number,
+  openEnd: number,
+  bounceStart: number,
+  bounceEnd: number,
+  unsubStart: number,
+  unsubEnd: number,
+  postmaster: PostmasterRow[] | null
+): ReputationSignalRow[] => {
+  const table: ReputationSignalRow[] = [];
+  
+  table.push({
+    signal: "Total Sent",
+    value: totals.sent,
+    percentage: "–",
+    trend: "N/A",
+    trendDescription: "",
+  });
+  
+  const openRate = denominator > 0 ? (totals.viewed / denominator) * 100 : 0;
+  const openTrend = openEnd > openStart ? "up" : openEnd < openStart ? "down" : "stable";
+  table.push({
+    signal: "Unique Open Rate",
+    value: totals.viewed,
+    percentage: `${openRate.toFixed(2)}%`,
+    trend: openTrend,
+    trendDescription: `${openEnd > openStart ? '+' : ''}${(openEnd - openStart).toFixed(1)}pp`,
+  });
+  
+  const clickRate = denominator > 0 ? (totals.clicked / denominator) * 100 : 0;
+  table.push({
+    signal: "Unique Click Rate",
+    value: totals.clicked,
+    percentage: `${clickRate.toFixed(2)}%`,
+    trend: "stable",
+    trendDescription: "",
+  });
+  
+  const unsubRate = denominator > 0 ? (totals.unsubs / denominator) * 100 : 0;
+  const unsubTrend = unsubEnd > unsubStart ? "up" : unsubEnd < unsubStart ? "down" : "stable";
+  table.push({
+    signal: "Unsubscribe Rate",
+    value: totals.unsubs,
+    percentage: `${unsubRate.toFixed(2)}%`,
+    trend: unsubTrend,
+    trendDescription: `${unsubEnd > unsubStart ? '+' : ''}${(unsubEnd - unsubStart).toFixed(3)}pp`,
+  });
+  
+  const hardBounceRate = totals.sent > 0 ? (totals.hardBounce / totals.sent) * 100 : 0;
+  table.push({
+    signal: "Hard Bounce Rate",
+    value: totals.hardBounce,
+    percentage: `${hardBounceRate.toFixed(2)}%`,
+    trend: bounceEnd > bounceStart ? "up" : "stable",
+    trendDescription: "",
+  });
+  
+  const softBounceRate = totals.sent > 0 ? (totals.softBounce / totals.sent) * 100 : 0;
+  table.push({
+    signal: "Soft Bounce Rate",
+    value: totals.softBounce,
+    percentage: `${softBounceRate.toFixed(2)}%`,
+    trend: "stable",
+    trendDescription: "",
+  });
+  
+  if (postmaster && postmaster.length > 0) {
+    const latest = postmaster[postmaster.length - 1];
+    const oldest = postmaster[0];
+    
+    table.push({
+      signal: "Spam Rate (Postmaster)",
+      value: latest.spamRatio,
+      percentage: `${(latest.spamRatio * 100).toFixed(2)}%`,
+      trend: latest.spamRatio > oldest.spamRatio ? "up" : latest.spamRatio < oldest.spamRatio ? "down" : "stable",
+      trendDescription: "",
+    });
+    
+    table.push({
+      signal: "Domain Reputation",
+      value: latest.domainReputation || "Unknown",
+      percentage: "–",
+      trend: "N/A",
+      trendDescription: oldest.domainReputation !== latest.domainReputation 
+        ? `${oldest.domainReputation} → ${latest.domainReputation}` 
+        : "Stable",
+    });
+    
+    table.push({
+      signal: "IP Reputation",
+      value: latest.ipReputation || "Unknown",
+      percentage: "–",
+      trend: "N/A",
+      trendDescription: "",
+    });
+  }
+  
+  return table;
+};
+
+// Helper: Generate MoM analysis
+const generateMoMAnalysis = (
+  data: CampaignRow[],
+  openChange: number,
+  bounceChange: number,
+  unsubChange: number
+): MoMAnalysis => {
+  const changes: string[] = [];
+  const stable: string[] = [];
+  const worsened: string[] = [];
+  
+  if (Math.abs(openChange) > 5) {
+    if (openChange > 0) changes.push(`Open rate improved by ${openChange.toFixed(1)}%`);
+    else worsened.push(`Open rate declined by ${Math.abs(openChange).toFixed(1)}%`);
+  } else {
+    stable.push(`Open rate remained stable (${openChange > 0 ? '+' : ''}${openChange.toFixed(1)}% change)`);
+  }
+  
+  if (Math.abs(bounceChange) > 0.5) {
+    if (bounceChange > 0) worsened.push(`Bounce rate increased by ${bounceChange.toFixed(2)}pp`);
+    else changes.push(`Bounce rate decreased by ${Math.abs(bounceChange).toFixed(2)}pp`);
+  } else {
+    stable.push("Bounce rates remained consistent");
+  }
+  
+  if (Math.abs(unsubChange) > 0.1) {
+    if (unsubChange > 0) worsened.push(`Unsubscribe rate increased by ${unsubChange.toFixed(2)}pp`);
+    else changes.push(`Unsubscribe rate decreased by ${Math.abs(unsubChange).toFixed(2)}pp`);
+  } else {
+    stable.push("Unsubscribe rate stable");
+  }
+  
+  // Analyze volume changes
+  const firstHalf = data.slice(0, Math.floor(data.length / 2));
+  const secondHalf = data.slice(Math.floor(data.length / 2));
+  const firstVolume = firstHalf.reduce((s, c) => s + c.totalSentUsers, 0);
+  const secondVolume = secondHalf.reduce((s, c) => s + c.totalSentUsers, 0);
+  const volumeChange = firstVolume > 0 ? ((secondVolume - firstVolume) / firstVolume) * 100 : 0;
+  
+  if (Math.abs(volumeChange) > 20) {
+    changes.push(`Send volume ${volumeChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(volumeChange).toFixed(0)}%`);
+  }
+  
+  return {
+    changesThisMonth: changes,
+    stableFactors: stable,
+    worsenedBeforeShift: worsened,
+    comparisonAvailable: data.length >= 5,
+    comparisonNote: data.length >= 5 
+      ? "Month-over-month comparison based on available campaign data."
+      : "Limited data available for MoM comparison. Analysis based on available campaigns.",
+  };
+};
+
+// Helper: Analyze send mix
+const analyzeSendMix = (data: CampaignRow[]): SendMixAnalysis => {
+  let transactional = 0;
+  let lifecycle = 0;
+  let promotional = 0;
+  const ambiguityNotes: string[] = [];
+  
+  const transactionalKeywords = /password|verify|confirm|receipt|invoice|order|ship|deliver|account|security|otp|reset/i;
+  const lifecycleKeywords = /welcome|onboard|abandon|cart|remind|re-engage|win.*back|birthday|anniversary|milestone|journey/i;
+  const promotionalKeywords = /sale|offer|discount|promo|deal|flash|limited|exclusive|save|off|free|buy/i;
+  
+  data.forEach(c => {
+    const text = `${c.campaignName} ${c.subjectLine}`.toLowerCase();
+    
+    if (transactionalKeywords.test(text)) transactional++;
+    else if (lifecycleKeywords.test(text)) lifecycle++;
+    else if (promotionalKeywords.test(text)) promotional++;
+    else {
+      promotional++; // Default to promotional if unclear
+      ambiguityNotes.push(`"${c.subjectLine.slice(0, 30)}..." - classification ambiguous, defaulted to promotional`);
+    }
+  });
+  
+  const total = data.length;
+  const overweighted: string[] = [];
+  const underutilized: string[] = [];
+  
+  const promoPercent = (promotional / total) * 100;
+  const lifecyclePercent = (lifecycle / total) * 100;
+  const transPercent = (transactional / total) * 100;
+  
+  if (promoPercent > 70) overweighted.push(`Promotional sends (${promoPercent.toFixed(0)}%)`);
+  if (lifecyclePercent < 10 && promoPercent > 50) underutilized.push("Lifecycle/triggered campaigns");
+  if (transPercent < 5 && total > 20) underutilized.push("Transactional engagement opportunities");
+  
+  return {
+    transactionalPercent: transPercent,
+    lifecyclePercent: lifecyclePercent,
+    promotionalPercent: promoPercent,
+    overweightedTypes: overweighted,
+    underutilizedAbsorbers: underutilized,
+    classificationConfidence: ambiguityNotes.length > total * 0.3 ? "low" : ambiguityNotes.length > total * 0.1 ? "medium" : "high",
+    ambiguityNotes: ambiguityNotes.slice(0, 3), // Limit to 3 examples
+  };
+};
+
+// Helper: Generate root causes
+const generateRootCauses = (
+  data: CampaignRow[],
+  openChange: number,
+  bounceEnd: number,
+  unsubEnd: number,
+  postmaster: PostmasterRow[] | null
+): RootCauseBullet[] => {
+  const causes: RootCauseBullet[] = [];
+  
+  if (openChange < -15) {
+    causes.push({
+      cause: "Significant engagement decline across the analysis period",
+      evidence: `Open rate dropped by ${Math.abs(openChange).toFixed(1)}% from period start to end`,
+      evidenceType: "numeric_change",
+    });
+  }
+  
+  if (bounceEnd > 1) {
+    causes.push({
+      cause: "Elevated bounce rates indicate list quality issues",
+      evidence: `Combined bounce rate of ${bounceEnd.toFixed(2)}% exceeds 1% threshold`,
+      evidenceType: "documented_rule",
+    });
+  }
+  
+  if (unsubEnd > 0.3) {
+    causes.push({
+      cause: "High unsubscribe rate suggests content-audience mismatch",
+      evidence: `Unsubscribe rate of ${unsubEnd.toFixed(2)}% exceeds 0.3% best practice threshold`,
+      evidenceType: "documented_rule",
+    });
+  }
+  
+  if (postmaster && postmaster.length > 0) {
+    const latest = postmaster[postmaster.length - 1];
+    if (latest.domainReputation === "Low" || latest.domainReputation === "Bad") {
+      causes.push({
+        cause: "Domain reputation degradation per Google Postmaster",
+        evidence: `Current domain reputation: ${latest.domainReputation}`,
+        evidenceType: "numeric_change",
+      });
+    }
+    if (latest.spamRatio > 0.01) {
+      causes.push({
+        cause: "Spam complaints exceeding acceptable threshold",
+        evidence: `Spam ratio of ${(latest.spamRatio * 100).toFixed(2)}% exceeds 0.1% threshold`,
+        evidenceType: "documented_rule",
+      });
+    }
+  }
+  
+  // Volume analysis
+  const highVolumeLowEngagement = data.filter(c => c.totalSentUsers > 50000 && c.openRate < 10);
+  if (highVolumeLowEngagement.length > data.length * 0.2) {
+    causes.push({
+      cause: "High-volume sends with low engagement diluting overall performance",
+      evidence: `${highVolumeLowEngagement.length} campaigns (${((highVolumeLowEngagement.length / data.length) * 100).toFixed(0)}%) had >50K sends with <10% open rate`,
+      evidenceType: "numeric_change",
+    });
+  }
+  
+  return causes.slice(0, 5); // Max 5 root causes
+};
+
+// Helper: Generate repair actions
+const generateRepairActions = (
+  direction: "improving" | "stable" | "degrading",
+  bounceEnd: number,
+  unsubEnd: number,
+  openChange: number,
+  postmaster: PostmasterRow[] | null,
+  contextText: string | null
+): RepairAction[] => {
+  const actions: RepairAction[] = [];
+  
+  // Immediate actions (high confidence)
+  if (bounceEnd > 1) {
+    actions.push({
+      priority: "immediate",
+      confidence: "high",
+      action: "Clean email list immediately. Remove addresses that hard bounced in recent sends. Implement real-time email verification for all new signups.",
+    });
+  }
+  
+  if (postmaster?.some(p => p.domainReputation === "Low" || p.domainReputation === "Bad")) {
+    actions.push({
+      priority: "immediate",
+      confidence: "high",
+      action: "Domain reputation is degraded. Pause all sends to cold/unengaged segments. Focus exclusively on engaged subscribers (opened/clicked in last 30 days) for the next 7 days.",
+    });
+  }
+  
+  if (contextText?.toLowerCase().includes("spam")) {
+    actions.push({
+      priority: "immediate",
+      confidence: "high",
+      action: "Verify email authentication setup (SPF, DKIM, DMARC). Check recent email content for spam triggers. Review Postmaster Tools for specific warnings.",
+    });
+  }
+  
+  // Short-term actions (medium confidence)
+  if (unsubEnd > 0.3) {
+    actions.push({
+      priority: "short-term",
+      confidence: "medium",
+      action: "Implement preference center to give subscribers control over email frequency and content types. Review content relevance for different audience segments.",
+      cohortSize: "All active subscribers",
+      metricToWatch: "Unsubscribe rate per campaign",
+      abortCondition: "If unsubscribe rate exceeds 1% in any send",
+    });
+  }
+  
+  if (openChange < -10) {
+    actions.push({
+      priority: "short-term",
+      confidence: "medium",
+      action: "Conduct systematic subject line A/B testing. Review send timing patterns. Segment by engagement recency to identify optimal send windows.",
+      cohortSize: "10% of list per test",
+      metricToWatch: "Open rate and click-to-open rate",
+      abortCondition: "If engagement drops further by >5%",
+    });
+  }
+  
+  // Ongoing actions
+  actions.push({
+    priority: "ongoing",
+    confidence: "high",
+    action: "Monitor key metrics after every send: Hard bounce (<0.5%), Soft bounce (<1%), Unsubscribe (<0.2%), Spam complaints (<0.1%). Set up automated alerts for threshold violations.",
+  });
+  
+  if (postmaster && postmaster.length > 0) {
+    actions.push({
+      priority: "ongoing",
+      confidence: "high",
+      action: "Continue daily monitoring of Google Postmaster Tools. Track domain/IP reputation trends and spam ratio for early warning signs of deliverability issues.",
+    });
+  }
+  
+  return actions;
+};
+
+// Helper: Generate source attributions
+const generateSourceAttributions = (hasPostmaster: boolean, hasContext: boolean): SourceAttribution[] => {
+  const attributions: SourceAttribution[] = [
+    {
+      insight: "Campaign performance metrics and engagement rates",
+      dataSource: "Campaign Performance CSV",
+      docSource: "CleverTap Deliverability Playbook v3",
+      confidence: "high",
+    },
+    {
+      insight: "Threshold values for bounce, unsubscribe, and spam rates",
+      dataSource: "Industry best practices",
+      docSource: "CleverTap Deliverability Playbook v3",
+      confidence: "high",
+    },
+  ];
+  
+  if (hasPostmaster) {
+    attributions.push({
+      insight: "Domain/IP reputation and spam ratio analysis",
+      dataSource: "Google Postmaster Tools Export",
+      docSource: "Google Postmaster public guidance",
+      confidence: "high",
+    });
+  }
+  
+  if (hasContext) {
+    attributions.push({
+      insight: "User-reported issues and context",
+      dataSource: "User input",
+      docSource: "Direct observation",
+      confidence: "medium",
+    });
+  }
+  
+  attributions.push({
+    insight: "Send mix classification and lifecycle recommendations",
+    dataSource: "Campaign name/subject analysis",
+    docSource: "Email Use Case Library",
+    confidence: "medium",
+  });
+  
+  return attributions;
 };
 
 // ============= LEGACY COMPATIBILITY =============

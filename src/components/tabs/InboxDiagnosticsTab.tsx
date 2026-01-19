@@ -31,6 +31,8 @@ import {
   CampaignRow,
   PostmasterRow,
   DeliverabilityDiagnosticSummary,
+  EnhancedReputationReport,
+  ReputationSignalRow,
 } from "@/lib/csvAnalyzer";
 import { InboxDiagnosticsSlides } from "../presentation/InboxDiagnosticsSlides";
 import { Button } from "../ui/button";
@@ -730,7 +732,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
         </motion.div>
       )}
 
-      {/* Reputation Repair View */}
+      {/* Reputation Repair View - Enhanced Structure */}
       {activeReport === "reputation" && diagnostics?.reputationReport && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -739,7 +741,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
         >
           {/* Header */}
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-2xl font-semibold text-foreground">Reputation Repair Recommendations</h2>
+            <h2 className="font-display text-2xl font-semibold text-foreground">Reputation Repair Analysis</h2>
             <div className="flex gap-2">
               <Button 
                 variant="default" 
@@ -759,117 +761,167 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </div>
 
-          {/* Diagnostic Summary - NEW TOP SECTION */}
-          {diagnostics.reputationReport.diagnosticSummary && (
-            <div className="magic-card rounded-2xl p-6 border-2 border-primary/20 bg-primary/5">
-              <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
-                <BarChart3 className="w-5 h-5 text-primary" />
-                Deliverability & Performance Diagnostic Summary
-              </h3>
-              
-              {/* Trend Analysis */}
-              {diagnostics.reputationReport.diagnosticSummary.trendAnalysis.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Trend Analysis (Oldest → Newest)</h4>
-                  <div className="grid gap-2">
-                    {diagnostics.reputationReport.diagnosticSummary.trendAnalysis.map((t, i) => (
-                      <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg ${
-                        t.trend === 'improving' ? 'bg-green-500/10' : t.trend === 'declining' ? 'bg-red-500/10' : 'bg-muted/30'
-                      }`}>
-                        {t.trend === 'improving' ? <TrendingUp className="w-4 h-4 text-green-500" /> : 
-                         t.trend === 'declining' ? <TrendingDown className="w-4 h-4 text-red-500" /> : 
-                         <BarChart3 className="w-4 h-4 text-muted-foreground" />}
-                        <span className="text-sm">{t.observation}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Prioritized Recommendations */}
-              {diagnostics.reputationReport.diagnosticSummary.prioritizedRecommendations.length > 0 && (
+          {/* Refusal Notice (if applicable) */}
+          {diagnostics.reputationReport.enhancedReport?.refusalReason && (
+            <div className="magic-card rounded-2xl p-6 border-2 border-destructive/30 bg-destructive/5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-6 h-6 text-destructive shrink-0" />
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-2">Prioritized Recommendations</h4>
-                  <div className="space-y-2">
-                    {diagnostics.reputationReport.diagnosticSummary.prioritizedRecommendations.map((r, i) => (
-                      <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20">
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                          r.priority === 'immediate' ? 'bg-red-500/20 text-red-600' :
-                          r.priority === 'short-term' ? 'bg-amber-500/20 text-amber-600' :
-                          'bg-blue-500/20 text-blue-600'
-                        }`}>
-                          {r.priority === 'immediate' ? '0-7 days' : r.priority === 'short-term' ? '7-21 days' : 'Ongoing'}
-                        </span>
-                        <p className="text-sm">{r.recommendation}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <h3 className="font-semibold text-destructive">Analysis Cannot Be Completed</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{diagnostics.reputationReport.enhancedReport.refusalReason}</p>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* Status indicators */}
-          <div className="flex flex-wrap gap-3">
-            <div className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
-              diagnostics.reputationReport.hasPostmasterData 
-                ? "bg-green-500/10 text-green-600" 
-                : "bg-muted text-muted-foreground"
-            }`}>
-              <Shield className="w-3.5 h-3.5" />
-              Postmaster Data: {diagnostics.reputationReport.hasPostmasterData ? "Included" : "Not provided"}
-            </div>
-            {diagnostics.reputationReport.contextNotes && (
-              <div className="px-3 py-1.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5" />
-                Context provided
+          {/* 0️⃣ Versioning & Scope */}
+          {diagnostics.reputationReport.enhancedReport && !diagnostics.reputationReport.enhancedReport.refusalReason && (
+            <>
+              <div className="magic-card rounded-2xl p-4 bg-muted/30">
+                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  <span><strong>Version:</strong> {diagnostics.reputationReport.enhancedReport.versioningScope.analysisVersion}</span>
+                  <span><strong>Period:</strong> {diagnostics.reputationReport.enhancedReport.versioningScope.dataRange}</span>
+                  <span><strong>Domain:</strong> {diagnostics.reputationReport.enhancedReport.versioningScope.senderDomain}</span>
+                  <span><strong>Sources:</strong> {diagnostics.reputationReport.enhancedReport.versioningScope.dataSources.join(", ")}</span>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Issues */}
-          <CollapsibleSection
-            title={`Campaign-Level Issues (${diagnostics.reputationReport.issues.length})`}
-            icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
-            isOpen={expandedSections.issues}
-            onToggle={() => toggleSection("issues")}
-          >
-            {diagnostics.reputationReport.issues.length > 0 ? (
-              <div className="space-y-4">
-                {diagnostics.reputationReport.issues.map((issue, i) => (
-                  <div key={i} className="bg-muted/20 border border-border rounded-xl p-5">
-                    <div className="flex items-start justify-between gap-4 mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{issue.campaignId}</span>
-                        <span className="text-xs text-muted-foreground">{issue.sendDate}</span>
-                        {issue.priority && (
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                            issue.priority === 'immediate' ? 'bg-red-500/20 text-red-600' :
-                            issue.priority === 'short-term' ? 'bg-amber-500/20 text-amber-600' :
-                            'bg-blue-500/20 text-blue-600'
-                          }`}>{issue.priority}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <p><span className="font-medium">Observation:</span> {issue.observation}</p>
-                      <p><span className="font-medium text-amber-600">Impact:</span> {issue.impact}</p>
-                      <p><span className="font-medium">Root Cause:</span> {issue.rootCause}</p>
-                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2">
-                        <p className="text-primary font-medium">Recommendation:</p>
-                        <p>{issue.recommendation}</p>
-                      </div>
-                    </div>
+              {/* 1️⃣ Monthly Reputation Snapshot */}
+              <div className="magic-card rounded-2xl p-6 border-2 border-primary/20 bg-primary/5">
+                <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                  <Shield className="w-5 h-5 text-primary" />
+                  Reputation Snapshot (Executive View)
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection === 'improving' ? 'bg-green-500/20 text-green-600' :
+                      diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection === 'degrading' ? 'bg-red-500/20 text-red-600' :
+                      'bg-amber-500/20 text-amber-600'
+                    }`}>
+                      {diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection.toUpperCase()}
+                    </span>
+                    <span className="text-sm">{diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationEvidence}</span>
                   </div>
-                ))}
+                  <ul className="space-y-2 text-sm">
+                    <li><strong>Primary Stress Signal:</strong> {diagnostics.reputationReport.enhancedReport.reputationSnapshot.primaryStressSignal}</li>
+                    <li><strong>Timing Correlation:</strong> {diagnostics.reputationReport.enhancedReport.reputationSnapshot.timingCorrelation}</li>
+                    <li><strong>Damage Assessment:</strong> <span className={diagnostics.reputationReport.enhancedReport.reputationSnapshot.damageAssessment === 'structural' ? 'text-red-600 font-medium' : 'text-green-600'}>{diagnostics.reputationReport.enhancedReport.reputationSnapshot.damageAssessment}</span></li>
+                  </ul>
+                  <div className={`p-3 rounded-lg ${diagnostics.reputationReport.enhancedReport.reputationSnapshot.safeToScale ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                    <p className={`font-semibold ${diagnostics.reputationReport.enhancedReport.reputationSnapshot.safeToScale ? 'text-green-600' : 'text-red-600'}`}>
+                      {diagnostics.reputationReport.enhancedReport.reputationSnapshot.verdict}
+                    </p>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-green-500" />
-                <p className="font-medium">No threshold violations detected</p>
-              </div>
-            )}
-          </CollapsibleSection>
+
+              {/* 2️⃣ Reputation Signal Table */}
+              <CollapsibleSection
+                title="Reputation Signal Table"
+                icon={<BarChart3 className="w-5 h-5 text-primary" />}
+                isOpen={expandedSections.provider}
+                onToggle={() => toggleSection("provider")}
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Signal</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Value</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">%</th>
+                        <th className="text-center py-2 px-3 font-medium text-muted-foreground">Trend</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diagnostics.reputationReport.enhancedReport.signalTable.map((row, i) => (
+                        <tr key={i} className="border-b border-border/50">
+                          <td className="py-2 px-3 font-medium">{row.signal}</td>
+                          <td className="text-right py-2 px-3">{typeof row.value === 'number' ? row.value.toLocaleString() : row.value}</td>
+                          <td className="text-right py-2 px-3">{row.percentage}</td>
+                          <td className="text-center py-2 px-3">
+                            {row.trend === 'up' && <TrendingUp className="w-4 h-4 text-red-500 inline" />}
+                            {row.trend === 'down' && <TrendingDown className="w-4 h-4 text-green-500 inline" />}
+                            {row.trend === 'stable' && <span className="text-muted-foreground">–</span>}
+                            {row.trendDescription && <span className="ml-1 text-xs text-muted-foreground">{row.trendDescription}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">{diagnostics.reputationReport.enhancedReport.signalTableDenominatorNote}</p>
+              </CollapsibleSection>
+
+              {/* 5️⃣ Root Cause Summary */}
+              {diagnostics.reputationReport.enhancedReport.rootCauses.length > 0 && (
+                <CollapsibleSection
+                  title="Root Cause Summary"
+                  icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
+                  isOpen={expandedSections.worst}
+                  onToggle={() => toggleSection("worst")}
+                >
+                  <ul className="space-y-3">
+                    {diagnostics.reputationReport.enhancedReport.rootCauses.map((rc, i) => (
+                      <li key={i} className="bg-muted/20 rounded-lg p-4">
+                        <p className="font-medium">{rc.cause}</p>
+                        <p className="text-sm text-muted-foreground mt-1">Evidence: {rc.evidence}</p>
+                        <span className="text-xs px-2 py-0.5 bg-muted rounded mt-2 inline-block">{rc.evidenceType.replace('_', ' ')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CollapsibleSection>
+              )}
+
+              {/* 6️⃣ Repair Actions */}
+              <CollapsibleSection
+                title="Reputation Repair Actions"
+                icon={<Lightbulb className="w-5 h-5 text-primary" />}
+                isOpen={expandedSections.learnings}
+                onToggle={() => toggleSection("learnings")}
+              >
+                <div className="space-y-3">
+                  {diagnostics.reputationReport.enhancedReport.repairActions.map((action, i) => (
+                    <div key={i} className="bg-muted/20 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                          action.priority === 'immediate' ? 'bg-red-500/20 text-red-600' :
+                          action.priority === 'short-term' ? 'bg-amber-500/20 text-amber-600' :
+                          'bg-blue-500/20 text-blue-600'
+                        }`}>
+                          {action.priority === 'immediate' ? '0-7 days' : action.priority === 'short-term' ? '7-21 days' : 'Ongoing'}
+                        </span>
+                        <span className={`px-2 py-0.5 text-xs rounded ${action.confidence === 'high' ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>
+                          {action.confidence} confidence
+                        </span>
+                      </div>
+                      <p className="text-sm">{action.action}</p>
+                      {action.metricToWatch && (
+                        <p className="text-xs text-muted-foreground mt-2">Watch: {action.metricToWatch} | Abort if: {action.abortCondition}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleSection>
+
+              {/* 9️⃣ Data Quality Notes */}
+              {diagnostics.reputationReport.enhancedReport.dataQualityNotes.length > 0 && (
+                <div className="magic-card rounded-2xl p-4 bg-amber-500/5 border border-amber-500/20">
+                  <h4 className="font-medium text-sm text-amber-600 mb-2">Data Quality & Limitations</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {diagnostics.reputationReport.enhancedReport.dataQualityNotes.map((note, i) => (
+                      <li key={i}>• {note.description}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* ✅ Final Confirmation */}
+              <p className="text-xs text-muted-foreground italic text-center">
+                {diagnostics.reputationReport.enhancedReport.finalConfirmation}
+              </p>
+            </>
+          )}
         </motion.div>
       )}
     </div>
