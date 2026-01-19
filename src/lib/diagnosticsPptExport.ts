@@ -1,6 +1,6 @@
 // Inbox Diagnostics PPT Export - Professional Executive-Ready Deck
 import pptxgen from "pptxgenjs";
-import { DiagnosticsData, AnalysisReport } from "./csvAnalyzer";
+import { DiagnosticsData, AnalysisReport, ReputationSignalRow } from "./csvAnalyzer";
 
 // ============= STYLE CONSTANTS =============
 
@@ -621,70 +621,360 @@ export const exportDiagnosticsToPPT = async (
   // ========== REPUTATION REPAIR REPORT ==========
   if (activeReport === "reputation" && diagnostics.reputationReport) {
     const repReport = diagnostics.reputationReport;
+    const enhancedReport = repReport.enhancedReport;
     
-    // Slide 1: Diagnostic Summary
-    const summarySlide = pptx.addSlide();
-    addSlideHeader(summarySlide, "Deliverability & Performance Diagnostics");
-    
-    // Trend analysis
-    if (repReport.diagnosticSummary.trendAnalysis.length > 0) {
-      summarySlide.addText("Trend Analysis", {
-        x: 0.5,
-        y: 1.2,
-        w: 4.5,
-        h: 0.35,
-        fontSize: 14,
-        bold: true,
-        color: SLIDE_STYLES.headerColor,
-        fontFace: FONTS.primary,
-      });
+    // Helper to get signal metric color
+    const getSignalMetricColor = (signal: string, percentage: string): string => {
+      const value = parseFloat(percentage);
+      if (isNaN(value)) return SLIDE_STYLES.bodyColor;
       
-      repReport.diagnosticSummary.trendAnalysis.slice(0, 4).forEach((t, i) => {
-        const trendIcon = t.trend === 'improving' ? '↑' : t.trend === 'declining' ? '↓' : '→';
-        const trendColor = t.trend === 'improving' ? SLIDE_STYLES.greenText : t.trend === 'declining' ? SLIDE_STYLES.redText : SLIDE_STYLES.mutedColor;
-        summarySlide.addText(`${trendIcon} ${t.observation}`, {
+      const signalLower = signal.toLowerCase();
+      if (signalLower.includes('open') || signalLower.includes('view')) {
+        return getMetricColor(value, 'openRate');
+      } else if (signalLower.includes('click')) {
+        return getMetricColor(value, 'clickRate');
+      } else if (signalLower.includes('hard bounce')) {
+        return getMetricColor(value, 'bounceRate');
+      } else if (signalLower.includes('soft bounce')) {
+        // Soft bounce: more lenient thresholds
+        if (value < 2) return SLIDE_STYLES.greenText;
+        if (value <= 5) return SLIDE_STYLES.amberText;
+        return SLIDE_STYLES.redText;
+      } else if (signalLower.includes('unsub')) {
+        return getMetricColor(value, 'unsubscribeRate');
+      } else if (signalLower.includes('spam') || signalLower.includes('complaint')) {
+        if (value < 0.1) return SLIDE_STYLES.greenText;
+        if (value <= 0.3) return SLIDE_STYLES.amberText;
+        return SLIDE_STYLES.redText;
+      }
+      return SLIDE_STYLES.bodyColor;
+    };
+    
+    // Helper to get trend color
+    const getTrendColor = (signal: string, trend: string): string => {
+      const signalLower = signal.toLowerCase();
+      const isNegativeMetric = signalLower.includes('bounce') || 
+                               signalLower.includes('unsub') || 
+                               signalLower.includes('spam') ||
+                               signalLower.includes('complaint');
+      
+      if (trend === 'up') {
+        return isNegativeMetric ? SLIDE_STYLES.redText : SLIDE_STYLES.greenText;
+      } else if (trend === 'down') {
+        return isNegativeMetric ? SLIDE_STYLES.greenText : SLIDE_STYLES.redText;
+      }
+      return SLIDE_STYLES.mutedColor;
+    };
+    
+    // Slide 1: Reputation Signal Table (Horizontal Layout)
+    if (enhancedReport && enhancedReport.signalTable && enhancedReport.signalTable.length > 0) {
+      const signalSlide = pptx.addSlide();
+      addSlideHeader(signalSlide, "Reputation Signal Table");
+      
+      // Add snapshot info if available
+      if (enhancedReport.reputationSnapshot) {
+        const snapshot = enhancedReport.reputationSnapshot;
+        const statusColor = snapshot.primaryStressSignal.includes('Hard') ? SLIDE_STYLES.redText :
+                           snapshot.primaryStressSignal.includes('Spam') ? SLIDE_STYLES.redText :
+                           snapshot.primaryStressSignal === 'None identified' ? SLIDE_STYLES.greenText :
+                           SLIDE_STYLES.amberText;
+        
+        signalSlide.addText(`Primary Stress Signal: ${snapshot.primaryStressSignal}`, {
           x: 0.5,
-          y: 1.6 + i * 0.45,
-          w: 4.5,
-          h: 0.4,
-          fontSize: 11,
-          color: trendColor,
+          y: 1.0,
+          w: 9,
+          h: 0.3,
+          fontSize: 12,
+          bold: true,
+          color: statusColor,
           fontFace: FONTS.primary,
         });
+      }
+      
+      // Build horizontal signal table with signals as columns
+      const signals = enhancedReport.signalTable;
+      
+      // Header row: Signal names
+      const headerRow: pptxgen.TableCell[] = [
+        { text: "Metric", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "left" } },
+      ];
+      signals.forEach(s => {
+        headerRow.push({
+          text: s.signal.replace(' Rate', '').replace(' Ratio', ''),
+          options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center" }
+        });
       });
-    }
-    
-    // Prioritized recommendations
-    if (repReport.diagnosticSummary.prioritizedRecommendations.length > 0) {
-      summarySlide.addText("Prioritized Actions", {
-        x: 5.2,
-        y: 1.2,
-        w: 4.3,
-        h: 0.35,
-        fontSize: 14,
-        bold: true,
-        color: SLIDE_STYLES.headerColor,
+      
+      // Value row
+      const valueRow: pptxgen.TableCell[] = [
+        { text: "Value", options: { fontSize: 9, bold: true } },
+      ];
+      signals.forEach(s => {
+        valueRow.push({
+          text: typeof s.value === 'number' ? s.value.toLocaleString() : String(s.value),
+          options: { fontSize: 9, align: "center" }
+        });
+      });
+      
+      // Rate row with color coding
+      const rateRow: pptxgen.TableCell[] = [
+        { text: "Rate %", options: { fontSize: 9, bold: true } },
+      ];
+      signals.forEach(s => {
+        rateRow.push({
+          text: s.percentage,
+          options: { 
+            fontSize: 9, 
+            align: "center",
+            color: getSignalMetricColor(s.signal, s.percentage)
+          }
+        });
+      });
+      
+      // Trend row with icons and color coding
+      const trendRow: pptxgen.TableCell[] = [
+        { text: "Trend", options: { fontSize: 9, bold: true } },
+      ];
+      signals.forEach(s => {
+        const trendIcon = s.trend === 'up' ? '↑' : s.trend === 'down' ? '↓' : s.trend === 'stable' ? '→' : '–';
+        trendRow.push({
+          text: trendIcon,
+          options: { 
+            fontSize: 10, 
+            align: "center",
+            color: getTrendColor(s.signal, s.trend)
+          }
+        });
+      });
+      
+      // Change row
+      const changeRow: pptxgen.TableCell[] = [
+        { text: "Change", options: { fontSize: 9, bold: true } },
+      ];
+      signals.forEach(s => {
+        changeRow.push({
+          text: s.trendDescription || '–',
+          options: { 
+            fontSize: 8, 
+            align: "center",
+            color: getTrendColor(s.signal, s.trend)
+          }
+        });
+      });
+      
+      const signalTableRows: pptxgen.TableRow[] = [headerRow, valueRow, rateRow, trendRow, changeRow];
+      
+      // Calculate column widths: first col fixed, others equal
+      const numSignals = signals.length;
+      const firstColWidth = 0.8;
+      const remainingWidth = 8.7 - firstColWidth;
+      const signalColWidth = remainingWidth / numSignals;
+      const colWidths = [firstColWidth, ...Array(numSignals).fill(signalColWidth)];
+      
+      signalSlide.addTable(signalTableRows, {
+        x: 0.5,
+        y: 1.4,
+        w: 9,
+        colW: colWidths,
+        border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
         fontFace: FONTS.primary,
       });
       
-      repReport.diagnosticSummary.prioritizedRecommendations.slice(0, 4).forEach((r, i) => {
-        const priorityLabel = r.priority === 'immediate' ? '[0-7d]' : r.priority === 'short-term' ? '[7-21d]' : '[Ongoing]';
-        const priorityColor = r.priority === 'immediate' ? SLIDE_STYLES.redText : r.priority === 'short-term' ? SLIDE_STYLES.amberText : SLIDE_STYLES.mutedColor;
-        summarySlide.addText(`${priorityLabel} ${r.recommendation.substring(0, 60)}${r.recommendation.length > 60 ? '...' : ''}`, {
-          x: 5.2,
-          y: 1.6 + i * 0.55,
-          w: 4.3,
-          h: 0.5,
-          fontSize: 10,
-          color: priorityColor,
+      // Add denominator note
+      if (enhancedReport.signalTableDenominatorNote) {
+        signalSlide.addText(`* ${enhancedReport.signalTableDenominatorNote}`, {
+          x: 0.5,
+          y: 3.6,
+          w: 9,
+          h: 0.3,
+          fontSize: 9,
+          italic: true,
+          color: SLIDE_STYLES.mutedColor,
           fontFace: FONTS.primary,
         });
+      }
+      
+      // Add color legend
+      signalSlide.addText("Legend: ", {
+        x: 0.5,
+        y: 4.0,
+        w: 0.7,
+        h: 0.25,
+        fontSize: 9,
+        color: SLIDE_STYLES.mutedColor,
+        fontFace: FONTS.primary,
       });
+      signalSlide.addText("● Healthy", {
+        x: 1.2,
+        y: 4.0,
+        w: 1.0,
+        h: 0.25,
+        fontSize: 9,
+        color: SLIDE_STYLES.greenText,
+        fontFace: FONTS.primary,
+      });
+      signalSlide.addText("● Watch", {
+        x: 2.2,
+        y: 4.0,
+        w: 0.8,
+        h: 0.25,
+        fontSize: 9,
+        color: SLIDE_STYLES.amberText,
+        fontFace: FONTS.primary,
+      });
+      signalSlide.addText("● Risk", {
+        x: 3.0,
+        y: 4.0,
+        w: 0.6,
+        h: 0.25,
+        fontSize: 9,
+        color: SLIDE_STYLES.redText,
+        fontFace: FONTS.primary,
+      });
+      
+      addSlideFooter(signalSlide, hasPostmasterData);
     }
     
-    addSlideFooter(summarySlide, hasPostmasterData);
+    // Slide 2: Root Causes & Repair Actions
+    if (enhancedReport && (enhancedReport.rootCauses.length > 0 || enhancedReport.repairActions.length > 0)) {
+      const actionsSlide = pptx.addSlide();
+      addSlideHeader(actionsSlide, "Root Causes & Repair Actions");
+      
+      // Left column - Root Causes
+      if (enhancedReport.rootCauses.length > 0) {
+        actionsSlide.addText("Root Causes", {
+          x: 0.5,
+          y: 1.2,
+          w: 4.2,
+          h: 0.35,
+          fontSize: 14,
+          bold: true,
+          color: SLIDE_STYLES.amberText,
+          fontFace: FONTS.primary,
+        });
+        
+        enhancedReport.rootCauses.slice(0, 4).forEach((rc, i) => {
+          actionsSlide.addText(`• ${rc.cause}`, {
+            x: 0.5,
+            y: 1.6 + i * 0.7,
+            w: 4.2,
+            h: 0.35,
+            fontSize: 11,
+            bold: true,
+            color: SLIDE_STYLES.bodyColor,
+            fontFace: FONTS.primary,
+          });
+          actionsSlide.addText(`Evidence: ${rc.evidence}`, {
+            x: 0.6,
+            y: 1.9 + i * 0.7,
+            w: 4.1,
+            h: 0.3,
+            fontSize: 9,
+            color: SLIDE_STYLES.mutedColor,
+            fontFace: FONTS.primary,
+          });
+        });
+      }
+      
+      // Right column - Repair Actions
+      if (enhancedReport.repairActions.length > 0) {
+        actionsSlide.addText("Repair Actions", {
+          x: 5,
+          y: 1.2,
+          w: 4.5,
+          h: 0.35,
+          fontSize: 14,
+          bold: true,
+          color: SLIDE_STYLES.greenText,
+          fontFace: FONTS.primary,
+        });
+        
+        enhancedReport.repairActions.slice(0, 5).forEach((action, i) => {
+          const priorityLabel = action.priority === 'immediate' ? '[0-7d]' : 
+                               action.priority === 'short-term' ? '[7-21d]' : '[Ongoing]';
+          const priorityColor = action.priority === 'immediate' ? SLIDE_STYLES.redText : 
+                               action.priority === 'short-term' ? SLIDE_STYLES.amberText : SLIDE_STYLES.mutedColor;
+          
+          actionsSlide.addText(`${priorityLabel} ${action.action.substring(0, 55)}${action.action.length > 55 ? '...' : ''}`, {
+            x: 5,
+            y: 1.6 + i * 0.6,
+            w: 4.5,
+            h: 0.55,
+            fontSize: 10,
+            color: priorityColor,
+            fontFace: FONTS.primary,
+          });
+        });
+      }
+      
+      addSlideFooter(actionsSlide, hasPostmasterData);
+    }
     
-    // Slide 2: Issues Detail (if any)
+    // Slide 3: Legacy Diagnostic Summary (fallback if no enhanced report)
+    if (!enhancedReport) {
+      const summarySlide = pptx.addSlide();
+      addSlideHeader(summarySlide, "Deliverability & Performance Diagnostics");
+      
+      // Trend analysis
+      if (repReport.diagnosticSummary.trendAnalysis.length > 0) {
+        summarySlide.addText("Trend Analysis", {
+          x: 0.5,
+          y: 1.2,
+          w: 4.5,
+          h: 0.35,
+          fontSize: 14,
+          bold: true,
+          color: SLIDE_STYLES.headerColor,
+          fontFace: FONTS.primary,
+        });
+        
+        repReport.diagnosticSummary.trendAnalysis.slice(0, 4).forEach((t, i) => {
+          const trendIcon = t.trend === 'improving' ? '↑' : t.trend === 'declining' ? '↓' : '→';
+          const trendColor = t.trend === 'improving' ? SLIDE_STYLES.greenText : t.trend === 'declining' ? SLIDE_STYLES.redText : SLIDE_STYLES.mutedColor;
+          summarySlide.addText(`${trendIcon} ${t.observation}`, {
+            x: 0.5,
+            y: 1.6 + i * 0.45,
+            w: 4.5,
+            h: 0.4,
+            fontSize: 11,
+            color: trendColor,
+            fontFace: FONTS.primary,
+          });
+        });
+      }
+      
+      // Prioritized recommendations
+      if (repReport.diagnosticSummary.prioritizedRecommendations.length > 0) {
+        summarySlide.addText("Prioritized Actions", {
+          x: 5.2,
+          y: 1.2,
+          w: 4.3,
+          h: 0.35,
+          fontSize: 14,
+          bold: true,
+          color: SLIDE_STYLES.headerColor,
+          fontFace: FONTS.primary,
+        });
+        
+        repReport.diagnosticSummary.prioritizedRecommendations.slice(0, 4).forEach((r, i) => {
+          const priorityLabel = r.priority === 'immediate' ? '[0-7d]' : r.priority === 'short-term' ? '[7-21d]' : '[Ongoing]';
+          const priorityColor = r.priority === 'immediate' ? SLIDE_STYLES.redText : r.priority === 'short-term' ? SLIDE_STYLES.amberText : SLIDE_STYLES.mutedColor;
+          summarySlide.addText(`${priorityLabel} ${r.recommendation.substring(0, 60)}${r.recommendation.length > 60 ? '...' : ''}`, {
+            x: 5.2,
+            y: 1.6 + i * 0.55,
+            w: 4.3,
+            h: 0.5,
+            fontSize: 10,
+            color: priorityColor,
+            fontFace: FONTS.primary,
+          });
+        });
+      }
+      
+      addSlideFooter(summarySlide, hasPostmasterData);
+    }
+    
+    // Issues Detail Slide (if any)
     if (repReport.issues.length > 0) {
       const issuesSlide = pptx.addSlide();
       addSlideHeader(issuesSlide, `Campaign Issues Detected (${repReport.issues.length})`);
