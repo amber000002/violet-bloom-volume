@@ -1475,8 +1475,15 @@ const generateEnhancedReputationReport = (
   const openEnd = calcAvg(lastWindow, c => c.openRate);
   const openChange = openStart > 0 ? ((openEnd - openStart) / openStart) * 100 : 0;
 
-  const bounceStart = calcAvg(firstWindow, c => c.hardBounceRate + c.softBounceRate);
-  const bounceEnd = calcAvg(lastWindow, c => c.hardBounceRate + c.softBounceRate);
+  // Calculate separate hard and soft bounce averages (never combine for primary metrics)
+  const hardBounceStart = calcAvg(firstWindow, c => c.hardBounceRate);
+  const hardBounceEnd = calcAvg(lastWindow, c => c.hardBounceRate);
+  const softBounceStart = calcAvg(firstWindow, c => c.softBounceRate);
+  const softBounceEnd = calcAvg(lastWindow, c => c.softBounceRate);
+  
+  // Combined bounce for backward compatibility with some metrics
+  const bounceStart = hardBounceStart + softBounceStart;
+  const bounceEnd = hardBounceEnd + softBounceEnd;
 
   const unsubStart = calcAvg(firstWindow, c => c.unsubscribeRate);
   const unsubEnd = calcAvg(lastWindow, c => c.unsubscribeRate);
@@ -1488,16 +1495,16 @@ const generateEnhancedReputationReport = (
   
   const reputationSnapshot: ReputationSnapshot = {
     reputationDirection,
-    reputationEvidence: generateReputationEvidence(openChange, bounceEnd, unsubEnd, postmasterData),
+    reputationEvidence: generateReputationEvidence(openChange, hardBounceEnd, softBounceEnd, unsubEnd, postmasterData),
     primaryStressSignal,
     timingCorrelation: generateTimingCorrelation(sortedData, openChange),
     damageAssessment,
-    safeToScale: reputationDirection !== "degrading" && bounceEnd < 1 && unsubEnd < 0.3,
-    verdict: generateVerdict(reputationDirection, bounceEnd, unsubEnd),
+    safeToScale: reputationDirection !== "degrading" && hardBounceEnd < 0.5 && unsubEnd < 0.3,
+    verdict: generateVerdict(reputationDirection, hardBounceEnd, softBounceEnd, unsubEnd),
   };
 
   // 2️⃣ REPUTATION SIGNAL TABLE
-  const signalTable = generateSignalTable(totals, denominator, openStart, openEnd, bounceStart, bounceEnd, unsubStart, unsubEnd, postmasterData);
+  const signalTable = generateSignalTable(totals, denominator, openStart, openEnd, hardBounceStart, hardBounceEnd, softBounceStart, softBounceEnd, unsubStart, unsubEnd, postmasterData);
   
   const signalTableDenominatorNote = useDelivered 
     ? `Percentages calculated using Delivered (${formatNumber(totals.delivered)}) as denominator.`
@@ -1511,16 +1518,16 @@ const generateEnhancedReputationReport = (
   }
 
   // 3️⃣ MOM ANALYSIS
-  const momAnalysis = generateMoMAnalysis(sortedData, openChange, bounceEnd - bounceStart, unsubEnd - unsubStart);
+  const momAnalysis = generateMoMAnalysis(sortedData, openChange, hardBounceEnd - hardBounceStart, softBounceEnd - softBounceStart, unsubEnd - unsubStart);
 
   // 4️⃣ SEND MIX & LIFECYCLE PRESSURE
   const sendMixAnalysis = analyzeSendMix(sortedData);
 
   // 5️⃣ ROOT CAUSE SUMMARY
-  const rootCauses = generateRootCauses(sortedData, openChange, bounceEnd, unsubEnd, postmasterData);
+  const rootCauses = generateRootCauses(sortedData, openChange, hardBounceEnd, softBounceEnd, unsubEnd, postmasterData);
 
   // 6️⃣ REPUTATION REPAIR ACTIONS
-  const repairActions = generateRepairActions(reputationDirection, bounceEnd, unsubEnd, openChange, postmasterData, contextText);
+  const repairActions = generateRepairActions(reputationDirection, hardBounceEnd, softBounceEnd, unsubEnd, openChange, postmasterData, contextText);
 
   // 7️⃣ EXCLUSIONS
   const exclusions: AnalysisExclusions = {
@@ -1701,20 +1708,26 @@ const determineReputationDirection = (
 };
 
 // Helper: Determine primary stress signal
+// NOTE: Primary stress signal can NEVER be soft bounce - only hard bounce, spam, unsubscribe, or engagement decay
 const determinePrimaryStressSignal = (data: CampaignRow[], postmaster: PostmasterRow[] | null): string => {
-  const avgUnsub = data.reduce((s, c) => s + c.unsubscribeRate, 0) / data.length;
-  const avgBounce = data.reduce((s, c) => s + c.hardBounceRate + c.softBounceRate, 0) / data.length;
-  const avgOpen = data.reduce((s, c) => s + c.openRate, 0) / data.length;
-  const totalVolume = data.reduce((s, c) => s + c.totalSentUsers, 0);
+  // Filter to campaigns with ≥1000 sends for meaningful analysis
+  const significantCampaigns = data.filter(c => c.totalSentUsers >= 1000);
+  const campaignsToAnalyze = significantCampaigns.length >= data.length * 0.05 ? significantCampaigns : data;
   
-  // Check postmaster for spam
+  const avgUnsub = campaignsToAnalyze.reduce((s, c) => s + c.unsubscribeRate, 0) / campaignsToAnalyze.length;
+  const avgHardBounce = campaignsToAnalyze.reduce((s, c) => s + c.hardBounceRate, 0) / campaignsToAnalyze.length;
+  const avgOpen = campaignsToAnalyze.reduce((s, c) => s + c.openRate, 0) / campaignsToAnalyze.length;
+  const totalVolume = campaignsToAnalyze.reduce((s, c) => s + c.totalSentUsers, 0);
+  
+  // Check postmaster for spam - highest priority
   if (postmaster && postmaster.length > 0) {
     const avgSpam = postmaster.reduce((s, p) => s + p.spamRatio, 0) / postmaster.length;
     if (avgSpam > 0.01) return `Spam complaints (${(avgSpam * 100).toFixed(2)}% avg spam ratio from Postmaster)`;
   }
   
+  // Hard bounce is a primary stress signal (soft bounce is NOT)
+  if (avgHardBounce > 0.5) return `Hard bounce rate (${avgHardBounce.toFixed(2)}% avg exceeds 0.5% threshold)`;
   if (avgUnsub > 0.3) return `Unsubscribe rate (${avgUnsub.toFixed(2)}% avg exceeds 0.3% threshold)`;
-  if (avgBounce > 2) return `Bounce rate (${avgBounce.toFixed(2)}% combined avg exceeds 2% threshold)`;
   if (avgOpen < 10) return `Engagement decay (${avgOpen.toFixed(1)}% avg open rate indicates deliverability issues)`;
   if (totalVolume > 500000 && avgOpen < 15) return `High volume with low engagement (${formatNumber(totalVolume)} sends, ${avgOpen.toFixed(1)}% open)`;
   
@@ -1741,19 +1754,24 @@ const assessDamageType = (
 };
 
 // Helper: Generate reputation evidence
+// Uses separate hard bounce and soft bounce rates for clarity
 const generateReputationEvidence = (
   openChange: number,
-  bounceEnd: number,
+  hardBounceEnd: number,
+  softBounceEnd: number,
   unsubEnd: number,
   postmaster: PostmasterRow[] | null
 ): string => {
   const evidence: string[] = [];
   
-  if (openChange > 5) evidence.push(`Open rate improved ${openChange.toFixed(1)}%`);
-  else if (openChange < -5) evidence.push(`Open rate declined ${Math.abs(openChange).toFixed(1)}%`);
+  if (openChange > 5) evidence.push(`Open rate improved ${openChange.toFixed(1)}% (first half vs last half of data period)`);
+  else if (openChange < -5) evidence.push(`Open rate declined ${Math.abs(openChange).toFixed(1)}% (first half vs last half of data period)`);
   
-  if (bounceEnd < 1) evidence.push(`Bounce rate healthy at ${bounceEnd.toFixed(2)}%`);
-  else if (bounceEnd > 2) evidence.push(`Bounce rate elevated at ${bounceEnd.toFixed(2)}%`);
+  // Report hard and soft bounce separately
+  if (hardBounceEnd < 0.5) evidence.push(`Hard bounce rate healthy at ${hardBounceEnd.toFixed(2)}%`);
+  else if (hardBounceEnd > 0.5) evidence.push(`Hard bounce rate elevated at ${hardBounceEnd.toFixed(2)}% (exceeds 0.5% threshold)`);
+  
+  if (softBounceEnd > 1) evidence.push(`Soft bounce rate elevated at ${softBounceEnd.toFixed(2)}%`);
   
   if (postmaster && postmaster.length > 0) {
     const latest = postmaster[postmaster.length - 1];
@@ -1764,15 +1782,22 @@ const generateReputationEvidence = (
 };
 
 // Helper: Generate timing correlation
+// Only analyzes campaigns with ≥1000 sends for meaningful timing analysis
 const generateTimingCorrelation = (data: CampaignRow[], openChange: number): string => {
-  if (data.length < 5) return "Insufficient data for timing analysis.";
+  // Filter to campaigns with ≥1000 sends
+  const significantCampaigns = data.filter(c => c.totalSentUsers >= 1000);
   
-  // Find the point of biggest change
+  // Only proceed if >5% of campaigns are ≥1000 sends
+  if (significantCampaigns.length < data.length * 0.05 || significantCampaigns.length < 5) {
+    return "Insufficient high-volume campaigns (≥1,000 sends) for timing analysis.";
+  }
+  
+  // Find the point of biggest change among significant campaigns
   let maxDrop = 0;
   let dropIndex = -1;
   
-  for (let i = 1; i < data.length; i++) {
-    const drop = data[i - 1].openRate - data[i].openRate;
+  for (let i = 1; i < significantCampaigns.length; i++) {
+    const drop = significantCampaigns[i - 1].openRate - significantCampaigns[i].openRate;
     if (drop > maxDrop) {
       maxDrop = drop;
       dropIndex = i;
@@ -1780,9 +1805,9 @@ const generateTimingCorrelation = (data: CampaignRow[], openChange: number): str
   }
   
   if (dropIndex > 0 && maxDrop > 5) {
-    const beforeCampaign = data[dropIndex - 1];
-    const afterCampaign = data[dropIndex];
-    return `Significant engagement drop observed between ${beforeCampaign.startDate} and ${afterCampaign.startDate}. Open rate dropped from ${beforeCampaign.openRate.toFixed(1)}% to ${afterCampaign.openRate.toFixed(1)}%.`;
+    const beforeCampaign = significantCampaigns[dropIndex - 1];
+    const afterCampaign = significantCampaigns[dropIndex];
+    return `Significant engagement drop observed between ${beforeCampaign.startDate} and ${afterCampaign.startDate}. Open rate dropped from ${beforeCampaign.openRate.toFixed(1)}% to ${afterCampaign.openRate.toFixed(1)}% (campaigns ≥1,000 sends only).`;
   }
   
   if (openChange < -10) {
@@ -1793,24 +1818,28 @@ const generateTimingCorrelation = (data: CampaignRow[], openChange: number): str
 };
 
 // Helper: Generate verdict
-const generateVerdict = (direction: "improving" | "stable" | "degrading", bounceEnd: number, unsubEnd: number): string => {
-  if (direction === "degrading" || bounceEnd > 2 || unsubEnd > 0.5) {
+// Uses separate hard bounce for safety check (soft bounce is less critical)
+const generateVerdict = (direction: "improving" | "stable" | "degrading", hardBounceEnd: number, softBounceEnd: number, unsubEnd: number): string => {
+  if (direction === "degrading" || hardBounceEnd > 0.5 || unsubEnd > 0.5) {
     return "Sender is NOT safe to scale next month. Address reputation issues first.";
   }
-  if (direction === "improving" && bounceEnd < 1 && unsubEnd < 0.2) {
+  if (direction === "improving" && hardBounceEnd < 0.3 && unsubEnd < 0.2) {
     return "Sender IS safe to scale next month with monitoring.";
   }
   return "Sender may cautiously scale with close monitoring of key metrics.";
 };
 
 // Helper: Generate signal table
+// Uses separate hard bounce and soft bounce with individual trends
 const generateSignalTable = (
   totals: ReturnType<typeof calculateTotals>,
   denominator: number,
   openStart: number,
   openEnd: number,
-  bounceStart: number,
-  bounceEnd: number,
+  hardBounceStart: number,
+  hardBounceEnd: number,
+  softBounceStart: number,
+  softBounceEnd: number,
   unsubStart: number,
   unsubEnd: number,
   postmaster: PostmasterRow[] | null
@@ -1832,7 +1861,7 @@ const generateSignalTable = (
     value: totals.viewed,
     percentage: `${openRate.toFixed(2)}%`,
     trend: openTrend,
-    trendDescription: `${openEnd > openStart ? '+' : ''}${(openEnd - openStart).toFixed(1)}pp`,
+    trendDescription: `${openEnd > openStart ? '+' : ''}${(openEnd - openStart).toFixed(1)}pp (first half vs last half)`,
   });
   
   const clickRate = denominator > 0 ? (totals.clicked / denominator) * 100 : 0;
@@ -1854,22 +1883,26 @@ const generateSignalTable = (
     trendDescription: `${unsubEnd > unsubStart ? '+' : ''}${(unsubEnd - unsubStart).toFixed(3)}pp`,
   });
   
+  // Hard bounce with individual trend
   const hardBounceRate = totals.sent > 0 ? (totals.hardBounce / totals.sent) * 100 : 0;
+  const hardBounceTrend = hardBounceEnd > hardBounceStart ? "up" : hardBounceEnd < hardBounceStart ? "down" : "stable";
   table.push({
     signal: "Hard Bounce Rate",
     value: totals.hardBounce,
     percentage: `${hardBounceRate.toFixed(2)}%`,
-    trend: bounceEnd > bounceStart ? "up" : "stable",
-    trendDescription: "",
+    trend: hardBounceTrend,
+    trendDescription: `${hardBounceEnd > hardBounceStart ? '+' : ''}${(hardBounceEnd - hardBounceStart).toFixed(3)}pp`,
   });
   
+  // Soft bounce with individual trend
   const softBounceRate = totals.sent > 0 ? (totals.softBounce / totals.sent) * 100 : 0;
+  const softBounceTrend = softBounceEnd > softBounceStart ? "up" : softBounceEnd < softBounceStart ? "down" : "stable";
   table.push({
     signal: "Soft Bounce Rate",
     value: totals.softBounce,
     percentage: `${softBounceRate.toFixed(2)}%`,
-    trend: "stable",
-    trendDescription: "",
+    trend: softBounceTrend,
+    trendDescription: `${softBounceEnd > softBounceStart ? '+' : ''}${(softBounceEnd - softBounceStart).toFixed(3)}pp`,
   });
   
   if (postmaster && postmaster.length > 0) {
@@ -1907,10 +1940,12 @@ const generateSignalTable = (
 };
 
 // Helper: Generate MoM analysis
+// Uses separate hard bounce and soft bounce changes for clarity
 const generateMoMAnalysis = (
   data: CampaignRow[],
   openChange: number,
-  bounceChange: number,
+  hardBounceChange: number,
+  softBounceChange: number,
   unsubChange: number
 ): MoMAnalysis => {
   const changes: string[] = [];
@@ -1918,17 +1953,23 @@ const generateMoMAnalysis = (
   const worsened: string[] = [];
   
   if (Math.abs(openChange) > 5) {
-    if (openChange > 0) changes.push(`Open rate improved by ${openChange.toFixed(1)}%`);
-    else worsened.push(`Open rate declined by ${Math.abs(openChange).toFixed(1)}%`);
+    if (openChange > 0) changes.push(`Open rate improved by ${openChange.toFixed(1)}% (first half vs last half of data period)`);
+    else worsened.push(`Open rate declined by ${Math.abs(openChange).toFixed(1)}% (first half vs last half of data period)`);
   } else {
     stable.push(`Open rate remained stable (${openChange > 0 ? '+' : ''}${openChange.toFixed(1)}% change)`);
   }
   
-  if (Math.abs(bounceChange) > 0.5) {
-    if (bounceChange > 0) worsened.push(`Bounce rate increased by ${bounceChange.toFixed(2)}pp`);
-    else changes.push(`Bounce rate decreased by ${Math.abs(bounceChange).toFixed(2)}pp`);
+  // Separate hard and soft bounce reporting
+  if (Math.abs(hardBounceChange) > 0.2) {
+    if (hardBounceChange > 0) worsened.push(`Hard bounce rate increased by ${hardBounceChange.toFixed(2)}pp`);
+    else changes.push(`Hard bounce rate decreased by ${Math.abs(hardBounceChange).toFixed(2)}pp`);
   } else {
-    stable.push("Bounce rates remained consistent");
+    stable.push("Hard bounce rate remained consistent");
+  }
+  
+  if (Math.abs(softBounceChange) > 0.5) {
+    if (softBounceChange > 0) worsened.push(`Soft bounce rate increased by ${softBounceChange.toFixed(2)}pp`);
+    else changes.push(`Soft bounce rate decreased by ${Math.abs(softBounceChange).toFixed(2)}pp`);
   }
   
   if (Math.abs(unsubChange) > 0.1) {
@@ -2007,10 +2048,12 @@ const analyzeSendMix = (data: CampaignRow[]): SendMixAnalysis => {
 };
 
 // Helper: Generate root causes
+// NOTE: Uses specific hard bounce and soft bounce rates, never "combined bounce rate"
 const generateRootCauses = (
   data: CampaignRow[],
   openChange: number,
-  bounceEnd: number,
+  hardBounceAvg: number,
+  softBounceAvg: number,
   unsubEnd: number,
   postmaster: PostmasterRow[] | null
 ): RootCauseBullet[] => {
@@ -2019,15 +2062,24 @@ const generateRootCauses = (
   if (openChange < -15) {
     causes.push({
       cause: "Significant engagement decline across the analysis period",
-      evidence: `Open rate dropped by ${Math.abs(openChange).toFixed(1)}% from period start to end`,
+      evidence: `Open rate dropped by ${Math.abs(openChange).toFixed(1)}% comparing first half to last half of the data period`,
       evidenceType: "numeric_change",
     });
   }
   
-  if (bounceEnd > 1) {
+  // Separate hard bounce and soft bounce - never combine
+  if (hardBounceAvg > 0.5) {
     causes.push({
-      cause: "Elevated bounce rates indicate list quality issues",
-      evidence: `Combined bounce rate of ${bounceEnd.toFixed(2)}% exceeds 1% threshold`,
+      cause: "Elevated hard bounce rate indicates list quality issues",
+      evidence: `Average hard bounce rate of ${hardBounceAvg.toFixed(2)}% exceeds 0.5% threshold (campaigns ≥1,000 sends)`,
+      evidenceType: "documented_rule",
+    });
+  }
+  
+  if (softBounceAvg > 1) {
+    causes.push({
+      cause: "Elevated soft bounce rate suggests temporary delivery issues",
+      evidence: `Average soft bounce rate of ${softBounceAvg.toFixed(2)}% exceeds 1% threshold`,
       evidenceType: "documented_rule",
     });
   }
@@ -2058,12 +2110,13 @@ const generateRootCauses = (
     }
   }
   
-  // Volume analysis
-  const highVolumeLowEngagement = data.filter(c => c.totalSentUsers > 50000 && c.openRate < 10);
-  if (highVolumeLowEngagement.length > data.length * 0.2) {
+  // Volume analysis - only campaigns ≥1000 sends
+  const significantCampaigns = data.filter(c => c.totalSentUsers >= 1000);
+  const highVolumeLowEngagement = significantCampaigns.filter(c => c.totalSentUsers > 50000 && c.openRate < 10);
+  if (highVolumeLowEngagement.length > significantCampaigns.length * 0.2 && significantCampaigns.length >= data.length * 0.05) {
     causes.push({
       cause: "High-volume sends with low engagement diluting overall performance",
-      evidence: `${highVolumeLowEngagement.length} campaigns (${((highVolumeLowEngagement.length / data.length) * 100).toFixed(0)}%) had >50K sends with <10% open rate`,
+      evidence: `${highVolumeLowEngagement.length} campaigns (${((highVolumeLowEngagement.length / significantCampaigns.length) * 100).toFixed(0)}%) had >50K sends with <10% open rate`,
       evidenceType: "numeric_change",
     });
   }
@@ -2072,9 +2125,11 @@ const generateRootCauses = (
 };
 
 // Helper: Generate repair actions
+// Based on CleverTap Email Sender Reputation Best Practices
 const generateRepairActions = (
   direction: "improving" | "stable" | "degrading",
-  bounceEnd: number,
+  hardBounceAvg: number,
+  softBounceAvg: number,
   unsubEnd: number,
   openChange: number,
   postmaster: PostmasterRow[] | null,
@@ -2082,20 +2137,32 @@ const generateRepairActions = (
 ): RepairAction[] => {
   const actions: RepairAction[] = [];
   
-  // Immediate actions (high confidence)
-  if (bounceEnd > 1) {
+  // IMMEDIATE ACTIONS (0-7 days) - High confidence, from CleverTap playbook
+  
+  // Hard bounce issues - primary indicator of list quality
+  if (hardBounceAvg > 0.5) {
     actions.push({
       priority: "immediate",
       confidence: "high",
-      action: "Clean email list immediately. Remove addresses that hard bounced in recent sends. Implement real-time email verification for all new signups.",
+      action: "Clean email list immediately. Remove addresses that hard bounced in recent sends. A high hard bounce rate indicates invalid email addresses - possible purchased list or outdated data. Implement real-time email verification for all new signups.",
     });
   }
   
+  // Domain reputation degraded - from CleverTap: focus on engaged subscribers
   if (postmaster?.some(p => p.domainReputation === "Low" || p.domainReputation === "Bad")) {
     actions.push({
       priority: "immediate",
       confidence: "high",
-      action: "Domain reputation is degraded. Pause all sends to cold/unengaged segments. Focus exclusively on engaged subscribers (opened/clicked in last 30 days) for the next 7 days.",
+      action: "Domain reputation is degraded per Google Postmaster. Pause all sends to cold/unengaged segments. Focus exclusively on engaged subscribers (opened/clicked in last 30 days) for the next 7 days. Avoid email blasts or spikes - keep volume consistent.",
+    });
+  }
+  
+  // Spam complaints - from CleverTap: significant impact on sender reputation
+  if (postmaster?.some(p => p.spamRatio > 0.01)) {
+    actions.push({
+      priority: "immediate",
+      confidence: "high",
+      action: "High spam complaint rate detected. This could significantly impact sender reputation. Review email content for spam triggers, verify authentication (SPF/DKIM/DMARC), and ensure recipients have opted in. Consider using seed testing to measure actual inbox placement.",
     });
   }
   
@@ -2103,34 +2170,53 @@ const generateRepairActions = (
     actions.push({
       priority: "immediate",
       confidence: "high",
-      action: "Verify email authentication setup (SPF, DKIM, DMARC). Check recent email content for spam triggers. Review Postmaster Tools for specific warnings.",
+      action: "User reports emails landing in spam. Verify email authentication setup (SPF, DKIM, DMARC). Check block lists using MXToolbox. Review content for excessive caps or misleading subjects.",
     });
   }
   
-  // Short-term actions (medium confidence)
+  // SHORT-TERM ACTIONS (7-21 days) - Medium confidence
+  
+  // High unsubscribe - from CleverTap: indicates unwanted emails
   if (unsubEnd > 0.3) {
     actions.push({
       priority: "short-term",
       confidence: "medium",
-      action: "Implement preference center to give subscribers control over email frequency and content types. Review content relevance for different audience segments.",
+      action: "High unsubscribe rates indicate recipients are not finding value in emails. ISPs interpret this as unwanted mail. Implement preference center for frequency control. Review content relevance for different audience segments.",
       cohortSize: "All active subscribers",
       metricToWatch: "Unsubscribe rate per campaign",
       abortCondition: "If unsubscribe rate exceeds 1% in any send",
     });
   }
   
+  // Low open rates - from CleverTap: indicates unwanted emails over time
   if (openChange < -10) {
     actions.push({
       priority: "short-term",
       confidence: "medium",
-      action: "Conduct systematic subject line A/B testing. Review send timing patterns. Segment by engagement recency to identify optimal send windows.",
+      action: "Low open rates indicate recipients consistently fail to open emails. Over time, this leads to spam folder placement. Conduct subject line A/B testing. Segment by engagement recency. Consider re-engagement campaign for inactive subscribers.",
       cohortSize: "10% of list per test",
       metricToWatch: "Open rate and click-to-open rate",
       abortCondition: "If engagement drops further by >5%",
     });
   }
   
-  // Ongoing actions
+  // Soft bounce issues - temporary, less critical than hard bounce
+  if (softBounceAvg > 1) {
+    actions.push({
+      priority: "short-term",
+      confidence: "medium",
+      action: "Elevated soft bounce rate indicates temporary delivery issues (mailbox full, server issues). Retry soft bounces after 24-48 hours. Review email size and optimize images to stay under Gmail's 102KB clipping limit.",
+    });
+  }
+  
+  // ONGOING ACTIONS - from CleverTap: monitoring is crucial
+  
+  actions.push({
+    priority: "ongoing",
+    confidence: "high",
+    action: "Maintain consistent sending calendar - avoid spikes (>2x your largest send in last 30 days) and long periods of inactivity. If scaling volume, follow IP warmup schedule by gradually increasing over days.",
+  });
+  
   actions.push({
     priority: "ongoing",
     confidence: "high",
@@ -2141,7 +2227,7 @@ const generateRepairActions = (
     actions.push({
       priority: "ongoing",
       confidence: "high",
-      action: "Continue daily monitoring of Google Postmaster Tools. Track domain/IP reputation trends and spam ratio for early warning signs of deliverability issues.",
+      action: "Continue monitoring reputation health: Use Google Postmaster Tools daily, check block lists with MXToolbox, and measure actual inbox placement via seed testing. Track domain/IP reputation trends for early warning signs.",
     });
   }
   
