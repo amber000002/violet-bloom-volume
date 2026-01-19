@@ -816,40 +816,101 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </div>
               </div>
 
-              {/* 2️⃣ Reputation Signal Table */}
+              {/* 2️⃣ Reputation Signal Table - Horizontal Layout */}
               <CollapsibleSection
                 title="Reputation Signal Table"
                 icon={<BarChart3 className="w-5 h-5 text-primary" />}
                 isOpen={expandedSections.provider}
                 onToggle={() => toggleSection("provider")}
               >
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Signal</th>
-                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Value</th>
-                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">%</th>
-                        <th className="text-center py-2 px-3 font-medium text-muted-foreground">Trend</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {diagnostics.reputationReport.enhancedReport.signalTable.map((row, i) => (
-                        <tr key={i} className="border-b border-border/50">
-                          <td className="py-2 px-3 font-medium">{row.signal}</td>
-                          <td className="text-right py-2 px-3">{typeof row.value === 'number' ? row.value.toLocaleString() : row.value}</td>
-                          <td className="text-right py-2 px-3">{row.percentage}</td>
-                          <td className="text-center py-2 px-3">
-                            {row.trend === 'up' && <TrendingUp className="w-4 h-4 text-red-500 inline" />}
-                            {row.trend === 'down' && <TrendingDown className="w-4 h-4 text-green-500 inline" />}
-                            {row.trend === 'stable' && <span className="text-muted-foreground">–</span>}
-                            {row.trendDescription && <span className="ml-1 text-xs text-muted-foreground">{row.trendDescription}</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {(() => {
+                  const signalTable = diagnostics.reputationReport.enhancedReport.signalTable;
+                  const getSignalMetricType = (signal: string): MetricType | null => {
+                    const lower = signal.toLowerCase();
+                    if (lower.includes('open') || lower.includes('view')) return 'openRate';
+                    if (lower.includes('click')) return 'clickRate';
+                    if (lower.includes('bounce')) return 'bounceRate';
+                    if (lower.includes('unsub')) return 'unsubscribeRate';
+                    return null;
+                  };
+                  
+                  const getTrendColor = (signal: string, trend: string): string => {
+                    const isNegativeMetric = signal.toLowerCase().includes('bounce') || 
+                                             signal.toLowerCase().includes('unsub') ||
+                                             signal.toLowerCase().includes('spam');
+                    if (trend === 'up') return isNegativeMetric ? 'text-red-600' : 'text-green-600';
+                    if (trend === 'down') return isNegativeMetric ? 'text-green-600' : 'text-red-600';
+                    return 'text-muted-foreground';
+                  };
+
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground w-24"></th>
+                            {signalTable.map((row, i) => (
+                              <th key={i} className="text-center py-2 px-3 font-medium text-muted-foreground min-w-[100px]">
+                                {row.signal}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Row 1: Values */}
+                          <tr className="border-b border-border/50">
+                            <td className="py-2 px-3 font-medium text-muted-foreground">Value</td>
+                            {signalTable.map((row, i) => (
+                              <td key={i} className="text-center py-2 px-3 font-medium">
+                                {typeof row.value === 'number' ? row.value.toLocaleString() : row.value}
+                              </td>
+                            ))}
+                          </tr>
+                          {/* Row 2: Percentages with color coding */}
+                          <tr className="border-b border-border/50">
+                            <td className="py-2 px-3 font-medium text-muted-foreground">Rate %</td>
+                            {signalTable.map((row, i) => {
+                              const metricType = getSignalMetricType(row.signal);
+                              const numericValue = parseFloat(row.percentage.replace('%', ''));
+                              return (
+                                <td key={i} className="text-center py-2 px-3">
+                                  {metricType && !isNaN(numericValue) ? (
+                                    <ColoredPercent value={numericValue} metricType={metricType} />
+                                  ) : (
+                                    <span className="font-medium">{row.percentage}</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                          {/* Row 3: Trends */}
+                          <tr className="border-b border-border/50">
+                            <td className="py-2 px-3 font-medium text-muted-foreground">Trend</td>
+                            {signalTable.map((row, i) => (
+                              <td key={i} className={`text-center py-2 px-3 ${getTrendColor(row.signal, row.trend)}`}>
+                                <div className="flex items-center justify-center gap-1">
+                                  {row.trend === 'up' && <TrendingUp className="w-4 h-4" />}
+                                  {row.trend === 'down' && <TrendingDown className="w-4 h-4" />}
+                                  {row.trend === 'stable' && <span>–</span>}
+                                  {row.trend === 'N/A' && <span className="text-muted-foreground">N/A</span>}
+                                </div>
+                              </td>
+                            ))}
+                          </tr>
+                          {/* Row 4: Trend Descriptions */}
+                          <tr>
+                            <td className="py-2 px-3 font-medium text-muted-foreground">Change</td>
+                            {signalTable.map((row, i) => (
+                              <td key={i} className={`text-center py-2 px-3 text-xs ${getTrendColor(row.signal, row.trend)}`}>
+                                {row.trendDescription || '—'}
+                              </td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
                 <p className="text-xs text-muted-foreground mt-3">{diagnostics.reputationReport.enhancedReport.signalTableDenominatorNote}</p>
               </CollapsibleSection>
 
