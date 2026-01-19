@@ -835,7 +835,210 @@ export const exportDiagnosticsToPPT = async (
       addSlideFooter(signalSlide, hasPostmasterData);
     }
     
-    // Slide 2: Root Causes & Repair Actions
+    // Slide 2: MoM Analysis (Horizontal Layout)
+    if (enhancedReport && enhancedReport.momAnalysis && enhancedReport.momAnalysis.comparisonAvailable) {
+      const momSlide = pptx.addSlide();
+      addSlideHeader(momSlide, "Month-over-Month Analysis");
+      
+      const mom = enhancedReport.momAnalysis;
+      const categories = ['Changes This Month', 'Stable Factors', 'Worsened Before Shift'];
+      const categoryData = [mom.changesThisMonth || [], mom.stableFactors || [], mom.worsenedBeforeShift || []];
+      const maxRows = Math.max(...categoryData.map(arr => arr.length), 1);
+      
+      // Header row
+      const momHeaderRow: pptxgen.TableCell[] = [
+        { text: "", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
+      ];
+      categories.forEach((cat, i) => {
+        const color = i === 0 ? SLIDE_STYLES.amberText : i === 1 ? SLIDE_STYLES.greenText : SLIDE_STYLES.redText;
+        momHeaderRow.push({
+          text: cat,
+          options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center", color }
+        });
+      });
+      
+      const momTableRows: pptxgen.TableRow[] = [momHeaderRow];
+      
+      // Data rows
+      for (let rowIdx = 0; rowIdx < maxRows; rowIdx++) {
+        const row: pptxgen.TableCell[] = [
+          { text: rowIdx === 0 ? "Observations" : "", options: { fontSize: 9, bold: true, color: SLIDE_STYLES.mutedColor } },
+        ];
+        categoryData.forEach(data => {
+          row.push({
+            text: data[rowIdx] || '—',
+            options: { fontSize: 9, align: "center" }
+          });
+        });
+        momTableRows.push(row);
+      }
+      
+      momSlide.addTable(momTableRows, {
+        x: 0.5,
+        y: 1.2,
+        w: 9,
+        colW: [0.9, 2.7, 2.7, 2.7],
+        border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
+        fontFace: FONTS.primary,
+      });
+      
+      // Comparison note
+      if (mom.comparisonNote) {
+        momSlide.addText(mom.comparisonNote, {
+          x: 0.5,
+          y: 4.2,
+          w: 9,
+          h: 0.4,
+          fontSize: 10,
+          italic: true,
+          color: SLIDE_STYLES.mutedColor,
+          fontFace: FONTS.primary,
+        });
+      }
+      
+      addSlideFooter(momSlide, hasPostmasterData);
+    }
+    
+    // Slide 3: Send Mix Analysis (Horizontal Layout)
+    if (enhancedReport && enhancedReport.sendMixAnalysis) {
+      const mixSlide = pptx.addSlide();
+      addSlideHeader(mixSlide, "Send Mix & Lifecycle Pressure");
+      
+      const mix = enhancedReport.sendMixAnalysis;
+      const mixTypes = ['Transactional', 'Lifecycle', 'Promotional'];
+      const mixValues = [mix.transactionalPercent, mix.lifecyclePercent, mix.promotionalPercent];
+      
+      // Get color for mix values
+      const getMixColor = (value: number, type: string): string => {
+        if (type === 'Promotional' && value > 60) return SLIDE_STYLES.redText;
+        if (type === 'Promotional' && value > 40) return SLIDE_STYLES.amberText;
+        if (type === 'Transactional' && value > 30) return SLIDE_STYLES.greenText;
+        if (type === 'Lifecycle' && value > 20) return SLIDE_STYLES.greenText;
+        return SLIDE_STYLES.bodyColor;
+      };
+      
+      // Get status for each type
+      const getStatus = (type: string): { text: string; color: string } => {
+        const typeLower = type.toLowerCase();
+        if (mix.overweightedTypes.includes(typeLower)) {
+          return { text: 'Overweighted', color: SLIDE_STYLES.redText };
+        }
+        if (mix.underutilizedAbsorbers.includes(typeLower)) {
+          return { text: 'Underutilized', color: SLIDE_STYLES.amberText };
+        }
+        return { text: 'Balanced', color: SLIDE_STYLES.greenText };
+      };
+      
+      // Header row
+      const mixHeaderRow: pptxgen.TableCell[] = [
+        { text: "", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10 } },
+      ];
+      mixTypes.forEach(type => {
+        mixHeaderRow.push({
+          text: type,
+          options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "center" }
+        });
+      });
+      
+      // Mix % row
+      const mixValueRow: pptxgen.TableCell[] = [
+        { text: "Mix %", options: { fontSize: 10, bold: true } },
+      ];
+      mixTypes.forEach((type, i) => {
+        mixValueRow.push({
+          text: `${mixValues[i].toFixed(1)}%`,
+          options: { fontSize: 12, bold: true, align: "center", color: getMixColor(mixValues[i], type) }
+        });
+      });
+      
+      // Status row
+      const statusRow: pptxgen.TableCell[] = [
+        { text: "Status", options: { fontSize: 10, bold: true } },
+      ];
+      mixTypes.forEach(type => {
+        const status = getStatus(type);
+        statusRow.push({
+          text: status.text,
+          options: { fontSize: 10, align: "center", color: status.color }
+        });
+      });
+      
+      const mixTableRows: pptxgen.TableRow[] = [mixHeaderRow, mixValueRow, statusRow];
+      
+      mixSlide.addTable(mixTableRows, {
+        x: 1.5,
+        y: 1.4,
+        w: 7,
+        colW: [1.2, 1.9, 1.9, 1.9],
+        border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
+        fontFace: FONTS.primary,
+      });
+      
+      // Confidence badge
+      const confidenceColor = mix.classificationConfidence === 'high' ? SLIDE_STYLES.greenText :
+                              mix.classificationConfidence === 'medium' ? SLIDE_STYLES.amberText :
+                              SLIDE_STYLES.redText;
+      mixSlide.addText(`Classification Confidence: ${mix.classificationConfidence.toUpperCase()}`, {
+        x: 0.5,
+        y: 3.2,
+        w: 4,
+        h: 0.3,
+        fontSize: 10,
+        color: confidenceColor,
+        fontFace: FONTS.primary,
+      });
+      
+      // Ambiguity notes
+      if (mix.ambiguityNotes && mix.ambiguityNotes.length > 0) {
+        mixSlide.addText(`Notes: ${mix.ambiguityNotes.join('; ')}`, {
+          x: 0.5,
+          y: 3.6,
+          w: 9,
+          h: 0.4,
+          fontSize: 9,
+          italic: true,
+          color: SLIDE_STYLES.mutedColor,
+          fontFace: FONTS.primary,
+        });
+      }
+      
+      // Visual bar chart representation
+      const barY = 4.2;
+      const barHeight = 0.4;
+      const totalWidth = 8;
+      
+      let currentX = 1;
+      const colors = ['059669', 'D97706', 'DC2626']; // green, amber, red for trans, life, promo
+      
+      mixTypes.forEach((type, i) => {
+        const width = (mixValues[i] / 100) * totalWidth;
+        if (width > 0.1) {
+          mixSlide.addShape("rect" as pptxgen.SHAPE_NAME, {
+            x: currentX,
+            y: barY,
+            w: width,
+            h: barHeight,
+            fill: { color: colors[i] },
+          });
+          currentX += width;
+        }
+      });
+      
+      // Bar labels
+      mixSlide.addText("■ Transactional  ■ Lifecycle  ■ Promotional", {
+        x: 1,
+        y: 4.7,
+        w: 8,
+        h: 0.25,
+        fontSize: 9,
+        color: SLIDE_STYLES.mutedColor,
+        fontFace: FONTS.primary,
+      });
+      
+      addSlideFooter(mixSlide, hasPostmasterData);
+    }
+    
+    // Slide 4: Root Causes & Repair Actions
     if (enhancedReport && (enhancedReport.rootCauses.length > 0 || enhancedReport.repairActions.length > 0)) {
       const actionsSlide = pptx.addSlide();
       addSlideHeader(actionsSlide, "Root Causes & Repair Actions");
