@@ -18,8 +18,7 @@ interface ResourceLibraryContextType {
   getResourcesForTab: (tab: TabRelevance, industry?: string) => Resource[];
   findMatchingResources: (
     tab: TabRelevance, 
-    industry: string, 
-    keywords: string[]
+    industry: string
   ) => ResourceMatch[];
   getConfidenceLevel: (matches: ResourceMatch[]) => ConfidenceLevel;
   isLibraryOpen: boolean;
@@ -97,8 +96,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
 
   const findMatchingResources = useCallback((
     tab: TabRelevance, 
-    industry: string, 
-    keywords: string[]
+    industry: string
   ): ResourceMatch[] => {
     const tabResources = getResourcesForTab(tab, industry);
     const matches: ResourceMatch[] = [];
@@ -111,30 +109,14 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     });
 
     for (const resource of sortedResources) {
-      const matchedKeywords = keywords.filter(kw => 
-        resource.keywords.some(rk => 
-          rk.toLowerCase().includes(kw.toLowerCase()) || 
-          kw.toLowerCase().includes(rk.toLowerCase())
-        )
-      );
-
-      if (matchedKeywords.length > 0) {
-        const relevanceScore = (matchedKeywords.length / keywords.length) * (resource.isPrimary ? 1.5 : 1);
-        matches.push({
-          resource,
-          relevanceScore,
-          matchedKeywords,
-          matchType: relevanceScore > 0.7 ? "exact" : "partial",
-        });
-      } else if (resource.tabs.includes(tab)) {
-        // Fallback match - same tab but no keyword match
-        matches.push({
-          resource,
-          relevanceScore: 0.2,
-          matchedKeywords: [],
-          matchType: "fallback",
-        });
-      }
+      // Match based purely on tab + industry alignment
+      const relevanceScore = resource.isPrimary ? 1.0 : 0.8;
+      matches.push({
+        resource,
+        relevanceScore,
+        matchedKeywords: [], // No longer used
+        matchType: resource.isPrimary ? "exact" : "partial",
+      });
     }
 
     return matches.sort((a, b) => b.relevanceScore - a.relevanceScore);
@@ -143,11 +125,10 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   const getConfidenceLevel = useCallback((matches: ResourceMatch[]): ConfidenceLevel => {
     if (matches.length === 0) return "low";
     
-    const hasExactMatch = matches.some(m => m.matchType === "exact");
-    const hasPrimaryMatch = matches.some(m => m.resource.isPrimary && m.matchType !== "fallback");
+    const hasPrimaryMatch = matches.some(m => m.resource.isPrimary);
     
-    if (hasExactMatch && hasPrimaryMatch) return "high";
-    if (hasExactMatch || hasPrimaryMatch) return "medium";
+    if (hasPrimaryMatch) return "high";
+    if (matches.length > 0) return "medium";
     return "low";
   }, []);
 

@@ -5,13 +5,11 @@ import {
   CheckCircle2, 
   AlertCircle, 
   HelpCircle,
-  ExternalLink,
   ChevronDown,
   ChevronUp,
-  AlertTriangle,
-  Info
+  AlertTriangle
 } from "lucide-react";
-import { ResourceCitation, ConfidenceLevel, Resource } from "@/types/resources";
+import { ResourceCitation, ConfidenceLevel } from "@/types/resources";
 
 interface CoverageStats {
   journeysFromResource: number;
@@ -22,9 +20,6 @@ interface CoverageStats {
 
 interface MatchDiagnostic {
   resourceTitle: string;
-  resourceKeywords: string[];
-  searchKeywords: string[];
-  matchedKeywords: string[];
   industryMatch: boolean;
   tabMatch: boolean;
   isEnabled: boolean;
@@ -83,7 +78,7 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
     return null;
   }
 
-  const unmatchedResources = diagnostics?.filter(d => d.matchedKeywords.length === 0 && d.tabMatch && d.industryMatch);
+  const unmatchedResources = diagnostics?.filter(d => !d.tabMatch || !d.industryMatch || !d.isEnabled);
 
   return (
     <motion.div
@@ -219,7 +214,7 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
                     <div 
                       key={idx}
                       className={`p-2 rounded-lg text-xs ${
-                        diag.matchedKeywords.length > 0 
+                        diag.tabMatch && diag.industryMatch && diag.isEnabled
                           ? "bg-emerald-500/10 border border-emerald-500/20" 
                           : "bg-amber-500/10 border border-amber-500/20"
                       }`}
@@ -253,50 +248,11 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
                           <span>Enabled: {diag.isEnabled ? "Yes" : "No"}</span>
                         </div>
 
-                        {diag.tabMatch && diag.industryMatch && diag.isEnabled && (
-                          <>
-                            <div className="mt-2 pt-2 border-t border-border/50">
-                              <div className="flex items-center gap-1 mb-1">
-                                <Info className="w-3 h-3" />
-                                <span className="font-medium">Keyword Analysis:</span>
-                              </div>
-                              <div className="ml-4 space-y-1">
-                                <div>
-                                  <span className="text-muted-foreground">Resource keywords: </span>
-                                  <span className="text-foreground">
-                                    {diag.resourceKeywords.length > 0 
-                                      ? diag.resourceKeywords.join(", ") 
-                                      : "(none defined)"}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Looking for: </span>
-                                  <span className="text-foreground">
-                                    {diag.searchKeywords.slice(0, 10).join(", ")}
-                                    {diag.searchKeywords.length > 10 && "..."}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Matched: </span>
-                                  <span className={diag.matchedKeywords.length > 0 ? "text-emerald-400" : "text-red-400"}>
-                                    {diag.matchedKeywords.length > 0 
-                                      ? diag.matchedKeywords.join(", ")
-                                      : "No keyword overlap found"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-2 p-2 bg-muted/50 rounded text-[11px]">
-                              <span className="font-medium text-amber-400">Suggestion: </span>
-                              <span>
-                                {diag.matchedKeywords.length === 0 
-                                  ? `Add keywords like "${diag.searchKeywords.slice(0, 3).join('", "')}" to your resource for better matching.`
-                                  : diag.reason}
-                              </span>
-                            </div>
-                          </>
-                        )}
+                        <div className="mt-2 p-2 bg-muted/50 rounded text-[11px]">
+                          <span className={diag.tabMatch && diag.industryMatch && diag.isEnabled ? "text-emerald-400" : "text-amber-400"}>
+                            {diag.reason}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -281,53 +281,32 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   // Resource Library: Find matching internal resources for current context
   const resourceMatches = useMemo(() => {
     if (!industry || !selectedStage) return [];
-    
-    // Build keywords from current context
-    const keywords = [
-      industry,
-      selectedStage,
-      framework,
-      ...journeys.map(j => j.name.toLowerCase()),
-      ...campaigns.map(c => c.name.toLowerCase()),
-      "use case",
-      "journey",
-      "campaign",
-    ].filter(Boolean);
-    
-    return findMatchingResources("use-case-studio", industry, keywords);
-  }, [industry, selectedStage, framework, journeys, campaigns, findMatchingResources]);
+    return findMatchingResources("use-case-studio", industry);
+  }, [industry, selectedStage, findMatchingResources]);
 
-  // Track which journeys/campaigns are covered by resources vs native intelligence
+  // All use cases are covered by resources if we have matching resources
   const useCaseAttribution = useMemo(() => {
     const journeyCoverage: Record<string, { resourceTitle: string; matchType: "exact" | "partial" | "fallback" } | null> = {};
     const campaignCoverage: Record<string, { resourceTitle: string; matchType: "exact" | "partial" | "fallback" } | null> = {};
     
+    const primaryMatch = resourceMatches.find(m => m.resource.isPrimary);
+    const firstMatch = resourceMatches[0];
+    const coveringResource = primaryMatch || firstMatch;
+    
     journeys.forEach(journey => {
-      const journeyKeywords = journey.name.toLowerCase().split(/\s+/);
-      const matchingResource = resourceMatches.find(match => 
-        journeyKeywords.some(kw => match.matchedKeywords.includes(kw)) ||
-        match.matchedKeywords.includes(selectedStage) ||
-        match.matchType === "exact"
-      );
-      journeyCoverage[journey.name] = matchingResource 
-        ? { resourceTitle: matchingResource.resource.title, matchType: matchingResource.matchType }
+      journeyCoverage[journey.name] = coveringResource 
+        ? { resourceTitle: coveringResource.resource.title, matchType: coveringResource.matchType }
         : null;
     });
     
     campaigns.forEach(campaign => {
-      const campaignKeywords = campaign.name.toLowerCase().split(/\s+/);
-      const matchingResource = resourceMatches.find(match => 
-        campaignKeywords.some(kw => match.matchedKeywords.includes(kw)) ||
-        match.matchedKeywords.includes(selectedStage) ||
-        match.matchType === "exact"
-      );
-      campaignCoverage[campaign.name] = matchingResource 
-        ? { resourceTitle: matchingResource.resource.title, matchType: matchingResource.matchType }
+      campaignCoverage[campaign.name] = coveringResource 
+        ? { resourceTitle: coveringResource.resource.title, matchType: coveringResource.matchType }
         : null;
     });
     
     return { journeyCoverage, campaignCoverage };
-  }, [journeys, campaigns, resourceMatches, selectedStage]);
+  }, [journeys, campaigns, resourceMatches]);
 
   // Compute confidence level and citations
   const confidenceLevel = useMemo(() => {
@@ -339,15 +318,11 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
       resourceId: match.resource.id,
       resourceTitle: match.resource.title,
       matchType: match.matchType,
-      excerpt: match.matchedKeywords.length > 0 
-        ? `Matched: ${match.matchedKeywords.join(", ")}`
-        : undefined,
     }));
   }, [resourceMatches]);
 
   // Determine if native intelligence was used (when no internal resources cover this)
-  const usedNativeIntelligence = resourceMatches.length === 0 || 
-    !resourceMatches.some(m => m.matchType === "exact");
+  const usedNativeIntelligence = resourceMatches.length === 0;
   
   // Count how many use cases are covered by resources vs native
   const coverageStats = useMemo(() => {
@@ -361,33 +336,12 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     };
   }, [useCaseAttribution, journeys.length, campaigns.length]);
 
-  // Build keywords being searched for diagnostics
-  const searchKeywords = useMemo(() => {
-    return [
-      industry,
-      selectedStage,
-      framework,
-      ...journeys.map(j => j.name.toLowerCase()),
-      ...campaigns.map(c => c.name.toLowerCase()),
-      "use case",
-      "journey",
-      "campaign",
-    ].filter(Boolean);
-  }, [industry, selectedStage, framework, journeys, campaigns]);
-
-  // Generate diagnostics for each resource to explain why it matched or didn't
+  // Generate simplified diagnostics for each resource to explain why it matched or didn't
   const resourceDiagnostics = useMemo(() => {
     return resources.map(resource => {
       const tabMatch = resource.tabs.includes("use-case-studio");
       const industryMatch = resource.industries.includes("all") || 
         resource.industries.includes(industry as any);
-      
-      const matchedKeywords = searchKeywords.filter(kw => 
-        resource.keywords.some(rk => 
-          rk.toLowerCase().includes(kw.toLowerCase()) || 
-          kw.toLowerCase().includes(rk.toLowerCase())
-        )
-      );
 
       let reason = "";
       if (!resource.isEnabled) {
@@ -396,19 +350,12 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         reason = "Resource is not tagged for the Use Case Studio tab.";
       } else if (!industryMatch) {
         reason = `Resource is not tagged for the "${industry}" industry.`;
-      } else if (matchedKeywords.length === 0) {
-        reason = "No keyword overlap between resource and current context.";
-      } else if (matchedKeywords.length < 3) {
-        reason = "Partial keyword match - add more relevant keywords for exact matching.";
       } else {
-        reason = "Good match! Resource is being referenced.";
+        reason = "✓ Resource is being referenced (matches tab + industry).";
       }
 
       return {
         resourceTitle: resource.title,
-        resourceKeywords: resource.keywords,
-        searchKeywords,
-        matchedKeywords,
         industryMatch,
         tabMatch,
         isEnabled: resource.isEnabled,
@@ -416,7 +363,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         reason,
       };
     });
-  }, [resources, searchKeywords, industry]);
+  }, [resources, industry]);
 
   // Get all journeys and campaigns across all stages for export
   const allJourneys = useMemo(() => {
