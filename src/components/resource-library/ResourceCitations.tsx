@@ -7,9 +7,11 @@ import {
   HelpCircle,
   ExternalLink,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  AlertTriangle,
+  Info
 } from "lucide-react";
-import { ResourceCitation, ConfidenceLevel } from "@/types/resources";
+import { ResourceCitation, ConfidenceLevel, Resource } from "@/types/resources";
 
 interface CoverageStats {
   journeysFromResource: number;
@@ -18,11 +20,24 @@ interface CoverageStats {
   campaignsFromNative: number;
 }
 
+interface MatchDiagnostic {
+  resourceTitle: string;
+  resourceKeywords: string[];
+  searchKeywords: string[];
+  matchedKeywords: string[];
+  industryMatch: boolean;
+  tabMatch: boolean;
+  isEnabled: boolean;
+  isPrimary: boolean;
+  reason: string;
+}
+
 interface ResourceCitationsProps {
   citations: ResourceCitation[];
   confidenceLevel: ConfidenceLevel;
   usedNativeIntelligence: boolean;
   coverageStats?: CoverageStats;
+  diagnostics?: MatchDiagnostic[];
 }
 
 const confidenceConfig: Record<ConfidenceLevel, { 
@@ -56,8 +71,10 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
   confidenceLevel,
   usedNativeIntelligence,
   coverageStats,
+  diagnostics,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const [showDiagnostics, setShowDiagnostics] = React.useState(false);
   
   const config = confidenceConfig[confidenceLevel];
   const ConfidenceIcon = config.icon;
@@ -65,6 +82,8 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
   if (citations.length === 0 && !usedNativeIntelligence) {
     return null;
   }
+
+  const unmatchedResources = diagnostics?.filter(d => d.matchedKeywords.length === 0 && d.tabMatch && d.industryMatch);
 
   return (
     <motion.div
@@ -150,6 +169,9 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
                   }`}>
                     {citation.matchType}
                   </span>
+                  {citation.excerpt && (
+                    <span className="ml-2 text-xs text-muted-foreground">{citation.excerpt}</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -167,6 +189,121 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
           <p className="text-xs text-muted-foreground mt-2">
             {config.description}
           </p>
+
+          {/* Diagnostics Section */}
+          {diagnostics && diagnostics.length > 0 && (
+            <div className="pt-2 border-t border-border/50">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDiagnostics(!showDiagnostics);
+                }}
+                className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Why aren't my resources matching?</span>
+                {showDiagnostics ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+
+              {showDiagnostics && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mt-2 space-y-2"
+                >
+                  {diagnostics.map((diag, idx) => (
+                    <div 
+                      key={idx}
+                      className={`p-2 rounded-lg text-xs ${
+                        diag.matchedKeywords.length > 0 
+                          ? "bg-emerald-500/10 border border-emerald-500/20" 
+                          : "bg-amber-500/10 border border-amber-500/20"
+                      }`}
+                    >
+                      <div className="font-medium text-foreground mb-1 flex items-center gap-2">
+                        {diag.resourceTitle}
+                        {diag.isPrimary && (
+                          <span className="px-1 py-0.5 bg-primary/20 text-primary rounded text-[10px]">Primary</span>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-1 text-muted-foreground">
+                        <div className="flex items-start gap-1">
+                          <span className={diag.tabMatch ? "text-emerald-400" : "text-red-400"}>
+                            {diag.tabMatch ? "✓" : "✗"}
+                          </span>
+                          <span>Tab match: {diag.tabMatch ? "Yes" : "No (resource not tagged for this tab)"}</span>
+                        </div>
+                        
+                        <div className="flex items-start gap-1">
+                          <span className={diag.industryMatch ? "text-emerald-400" : "text-red-400"}>
+                            {diag.industryMatch ? "✓" : "✗"}
+                          </span>
+                          <span>Industry match: {diag.industryMatch ? "Yes" : "No (resource not tagged for this industry)"}</span>
+                        </div>
+                        
+                        <div className="flex items-start gap-1">
+                          <span className={diag.isEnabled ? "text-emerald-400" : "text-red-400"}>
+                            {diag.isEnabled ? "✓" : "✗"}
+                          </span>
+                          <span>Enabled: {diag.isEnabled ? "Yes" : "No"}</span>
+                        </div>
+
+                        {diag.tabMatch && diag.industryMatch && diag.isEnabled && (
+                          <>
+                            <div className="mt-2 pt-2 border-t border-border/50">
+                              <div className="flex items-center gap-1 mb-1">
+                                <Info className="w-3 h-3" />
+                                <span className="font-medium">Keyword Analysis:</span>
+                              </div>
+                              <div className="ml-4 space-y-1">
+                                <div>
+                                  <span className="text-muted-foreground">Resource keywords: </span>
+                                  <span className="text-foreground">
+                                    {diag.resourceKeywords.length > 0 
+                                      ? diag.resourceKeywords.join(", ") 
+                                      : "(none defined)"}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Looking for: </span>
+                                  <span className="text-foreground">
+                                    {diag.searchKeywords.slice(0, 10).join(", ")}
+                                    {diag.searchKeywords.length > 10 && "..."}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Matched: </span>
+                                  <span className={diag.matchedKeywords.length > 0 ? "text-emerald-400" : "text-red-400"}>
+                                    {diag.matchedKeywords.length > 0 
+                                      ? diag.matchedKeywords.join(", ")
+                                      : "No keyword overlap found"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-2 p-2 bg-muted/50 rounded text-[11px]">
+                              <span className="font-medium text-amber-400">Suggestion: </span>
+                              <span>
+                                {diag.matchedKeywords.length === 0 
+                                  ? `Add keywords like "${diag.searchKeywords.slice(0, 3).join('", "')}" to your resource for better matching.`
+                                  : diag.reason}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+          )}
         </motion.div>
       )}
     </motion.div>
