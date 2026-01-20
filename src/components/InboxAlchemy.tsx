@@ -11,6 +11,8 @@ import { CreativeAnalyzerTab } from "./tabs/CreativeAnalyzerTab";
 import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
+import { ResourceLibraryProvider } from "@/contexts/ResourceLibraryContext";
+import { ResourceLibrary } from "./resource-library";
 
 const industryOptions = Object.entries(industryConfigs).map(([key, config]) => ({
   value: key,
@@ -364,14 +366,19 @@ const InboxAlchemyContent: React.FC = () => {
           onClick={() => setShowDeckOptions(false)}
         />
       )}
+
+      {/* Resource Library */}
+      <ResourceLibrary />
     </div>
   );
 };
 
 export const InboxAlchemy: React.FC = () => {
   return (
-    <PresentationProvider>
-      <InboxAlchemyContent />
-    </PresentationProvider>
+    <ResourceLibraryProvider>
+      <PresentationProvider>
+        <InboxAlchemyContent />
+      </PresentationProvider>
+    </ResourceLibraryProvider>
   );
 };
