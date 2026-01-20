@@ -17,14 +17,33 @@ export type TabRelevance =
 
 export type IndustryRelevance = 
   | "all" 
-  | "ecommerce" 
-  | "fintech" 
-  | "gaming" 
-  | "media" 
-  | "travel" 
+  | "banking"
+  | "nbfcs"
+  | "amcs"
+  | "insurance"
+  | "travel-hospitality"
+  | "aviation"
+  | "cab-aggregators"
+  | "food-tech"
+  | "apparel-fashion"
+  | "retail"
+  | "quick-commerce"
+  | "beauty"
+  | "edtech"
+  | "fintech"
+  | "ott"
   | "healthcare"
-  | "education"
-  | "saas";
+  | "gaming"
+  | "news-media"
+  | "telecom"
+  | "home-services"
+  | "ticket-booking"
+  | "real-estate"
+  | "job-portals"
+  | "d2c-subscriptions"
+  | "fitness-wellness"
+  | "education-marketplace"
+  | "auto-mobility";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
