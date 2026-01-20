@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Clock, Zap, Shield, Lightbulb, Target, Calendar, 
   UserMinus, Activity, TrendingUp, Workflow, Info,
-  ChevronDown, ChevronUp, Layers, Users
+  ChevronDown, ChevronUp, Layers, Users, BookOpen, Sparkles
 } from "lucide-react";
 import {
   industryConfigs,
@@ -297,6 +297,38 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     return findMatchingResources("use-case-studio", industry, keywords);
   }, [industry, selectedStage, framework, journeys, campaigns, findMatchingResources]);
 
+  // Track which journeys/campaigns are covered by resources vs native intelligence
+  const useCaseAttribution = useMemo(() => {
+    const journeyCoverage: Record<string, { resourceTitle: string; matchType: "exact" | "partial" | "fallback" } | null> = {};
+    const campaignCoverage: Record<string, { resourceTitle: string; matchType: "exact" | "partial" | "fallback" } | null> = {};
+    
+    journeys.forEach(journey => {
+      const journeyKeywords = journey.name.toLowerCase().split(/\s+/);
+      const matchingResource = resourceMatches.find(match => 
+        journeyKeywords.some(kw => match.matchedKeywords.includes(kw)) ||
+        match.matchedKeywords.includes(selectedStage) ||
+        match.matchType === "exact"
+      );
+      journeyCoverage[journey.name] = matchingResource 
+        ? { resourceTitle: matchingResource.resource.title, matchType: matchingResource.matchType }
+        : null;
+    });
+    
+    campaigns.forEach(campaign => {
+      const campaignKeywords = campaign.name.toLowerCase().split(/\s+/);
+      const matchingResource = resourceMatches.find(match => 
+        campaignKeywords.some(kw => match.matchedKeywords.includes(kw)) ||
+        match.matchedKeywords.includes(selectedStage) ||
+        match.matchType === "exact"
+      );
+      campaignCoverage[campaign.name] = matchingResource 
+        ? { resourceTitle: matchingResource.resource.title, matchType: matchingResource.matchType }
+        : null;
+    });
+    
+    return { journeyCoverage, campaignCoverage };
+  }, [journeys, campaigns, resourceMatches, selectedStage]);
+
   // Compute confidence level and citations
   const confidenceLevel = useMemo(() => {
     return getConfidenceLevel(resourceMatches);
@@ -316,6 +348,18 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   // Determine if native intelligence was used (when no internal resources cover this)
   const usedNativeIntelligence = resourceMatches.length === 0 || 
     !resourceMatches.some(m => m.matchType === "exact");
+  
+  // Count how many use cases are covered by resources vs native
+  const coverageStats = useMemo(() => {
+    const journeysFromResource = Object.values(useCaseAttribution.journeyCoverage).filter(Boolean).length;
+    const campaignsFromResource = Object.values(useCaseAttribution.campaignCoverage).filter(Boolean).length;
+    return {
+      journeysFromResource,
+      journeysFromNative: journeys.length - journeysFromResource,
+      campaignsFromResource,
+      campaignsFromNative: campaigns.length - campaignsFromResource,
+    };
+  }, [useCaseAttribution, journeys.length, campaigns.length]);
 
   // Get all journeys and campaigns across all stages for export
   const allJourneys = useMemo(() => {
@@ -504,6 +548,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                 {journeys.map((journey, index) => {
                   const journeyName = journey.name;
                   const isExpanded = expandedJourney === journeyName;
+                  const attribution = useCaseAttribution.journeyCoverage[journeyName];
                   
                   if (isFrameworkJourney(journey)) {
                     // Framework mapping journey (AIDA, 4P, 7P)
@@ -513,7 +558,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
+                        className={`magic-card rounded-xl p-5 space-y-3 ${
+                          attribution ? "ring-1 ring-emerald-500/30" : ""
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -531,11 +578,22 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                           </button>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
                             <Zap className="w-3 h-3" />
                             {journey.triggerType}
                           </span>
+                          {attribution ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
+                              <BookOpen className="w-3 h-3" />
+                              Internal
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                              <Sparkles className="w-3 h-3" />
+                              Native
+                            </span>
+                          )}
                         </div>
 
                         <p className="text-sm text-muted-foreground">
@@ -599,7 +657,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
+                        className={`magic-card rounded-xl p-5 space-y-3 ${
+                          attribution ? "ring-1 ring-emerald-500/30" : ""
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -617,11 +677,22 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                           </button>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
                             <TriggerIcon className="w-3 h-3" />
                             {getTriggerTypeLabel(journey.triggerType)}
                           </span>
+                          {attribution ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
+                              <BookOpen className="w-3 h-3" />
+                              Internal
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                              <Sparkles className="w-3 h-3" />
+                              Native
+                            </span>
+                          )}
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -720,6 +791,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                 {campaigns.map((campaign, index) => {
                   const campaignName = campaign.name;
                   const isExpanded = expandedCampaign === campaignName;
+                  const attribution = useCaseAttribution.campaignCoverage[campaignName];
 
                   if (isFrameworkCampaign(campaign)) {
                     // Framework mapping campaign (AIDA, 4P, 7P)
@@ -729,7 +801,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
+                        className={`magic-card rounded-xl p-5 space-y-3 ${
+                          attribution ? "ring-1 ring-emerald-500/30" : ""
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -745,6 +819,21 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                           </button>
+                        </div>
+
+                        {/* Source indicator */}
+                        <div className="flex items-center gap-2">
+                          {attribution ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
+                              <BookOpen className="w-3 h-3" />
+                              Internal
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                              <Sparkles className="w-3 h-3" />
+                              Native
+                            </span>
+                          )}
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -822,7 +911,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
+                        className={`magic-card rounded-xl p-5 space-y-3 ${
+                          attribution ? "ring-1 ring-emerald-500/30" : ""
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -838,6 +929,21 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                           </button>
+                        </div>
+
+                        {/* Source indicator */}
+                        <div className="flex items-center gap-2">
+                          {attribution ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
+                              <BookOpen className="w-3 h-3" />
+                              Internal
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                              <Sparkles className="w-3 h-3" />
+                              Native
+                            </span>
+                          )}
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -951,6 +1057,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           citations={citations}
           confidenceLevel={confidenceLevel}
           usedNativeIntelligence={usedNativeIntelligence}
+          coverageStats={coverageStats}
         />
       )}
     </div>
