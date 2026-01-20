@@ -11,10 +11,18 @@ import {
 } from "lucide-react";
 import { ResourceCitation, ConfidenceLevel } from "@/types/resources";
 
+interface CoverageStats {
+  journeysFromResource: number;
+  journeysFromNative: number;
+  campaignsFromResource: number;
+  campaignsFromNative: number;
+}
+
 interface ResourceCitationsProps {
   citations: ResourceCitation[];
   confidenceLevel: ConfidenceLevel;
   usedNativeIntelligence: boolean;
+  coverageStats?: CoverageStats;
 }
 
 const confidenceConfig: Record<ConfidenceLevel, { 
@@ -47,6 +55,7 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
   citations,
   confidenceLevel,
   usedNativeIntelligence,
+  coverageStats,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   
@@ -95,34 +104,62 @@ export const ResourceCitations: React.FC<ResourceCitationsProps> = ({
         <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
-          className="mt-3 pt-3 border-t border-border space-y-2"
+          className="mt-3 pt-3 border-t border-border space-y-3"
         >
-          {citations.map((citation, idx) => (
-            <div 
-              key={citation.resourceId}
-              className="flex items-start gap-2 text-sm"
-            >
-              <span className="text-muted-foreground">{idx + 1}.</span>
-              <div className="flex-1">
-                <span className="text-foreground">{citation.resourceTitle}</span>
-                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                  citation.matchType === "exact" 
-                    ? "bg-emerald-500/20 text-emerald-400"
-                    : citation.matchType === "partial"
-                    ? "bg-amber-500/20 text-amber-400"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {citation.matchType}
-                </span>
+          {/* Coverage Breakdown */}
+          {coverageStats && (
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-medium text-emerald-400">From Internal Resources</span>
+                </div>
+                <div className="text-muted-foreground">
+                  {coverageStats.journeysFromResource} journeys, {coverageStats.campaignsFromResource} campaigns
+                </div>
+              </div>
+              <div className="p-2 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="font-medium text-muted-foreground">From Native Intelligence</span>
+                </div>
+                <div className="text-muted-foreground">
+                  {coverageStats.journeysFromNative} journeys, {coverageStats.campaignsFromNative} campaigns
+                </div>
               </div>
             </div>
-          ))}
+          )}
+
+          {/* Resource List */}
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-muted-foreground">Referenced Resources:</span>
+            {citations.map((citation, idx) => (
+              <div 
+                key={citation.resourceId}
+                className="flex items-start gap-2 text-sm"
+              >
+                <span className="text-muted-foreground">{idx + 1}.</span>
+                <div className="flex-1">
+                  <span className="text-foreground">{citation.resourceTitle}</span>
+                  <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                    citation.matchType === "exact" 
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : citation.matchType === "partial"
+                      ? "bg-amber-500/20 text-amber-400"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {citation.matchType}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
 
           {usedNativeIntelligence && (
             <div className="flex items-start gap-2 text-sm pt-2 border-t border-border/50">
               <span className="text-muted-foreground">+</span>
               <span className="text-muted-foreground italic">
-                Extended by Lovable native intelligence
+                Extended by native intelligence for uncovered use cases
               </span>
             </div>
           )}
