@@ -27,6 +27,9 @@ import {
 
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { UseCaseStudioSlides } from "../presentation/UseCaseStudioSlides";
+import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
+import { ResourceCitations } from "@/components/resource-library/ResourceCitations";
+import { ResourceCitation } from "@/types/resources";
 
 interface UseCaseStudioTabProps {
   industry: string;
@@ -205,6 +208,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const [expandedJourney, setExpandedJourney] = useState<string | null>(null);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
 
+  // Resource Library integration
+  const { findMatchingResources, getConfidenceLevel, resources } = useResourceLibrary();
+
   const config = industry ? industryConfigs[industry] : null;
   
   // Infer business model from industry
@@ -271,6 +277,45 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     if (!industry || !selectedStage) return null;
     return getStageInsight(industry, selectedStage, framework);
   }, [industry, selectedStage, framework]);
+
+  // Resource Library: Find matching internal resources for current context
+  const resourceMatches = useMemo(() => {
+    if (!industry || !selectedStage) return [];
+    
+    // Build keywords from current context
+    const keywords = [
+      industry,
+      selectedStage,
+      framework,
+      ...journeys.map(j => j.name.toLowerCase()),
+      ...campaigns.map(c => c.name.toLowerCase()),
+      "use case",
+      "journey",
+      "campaign",
+    ].filter(Boolean);
+    
+    return findMatchingResources("use-case-studio", industry, keywords);
+  }, [industry, selectedStage, framework, journeys, campaigns, findMatchingResources]);
+
+  // Compute confidence level and citations
+  const confidenceLevel = useMemo(() => {
+    return getConfidenceLevel(resourceMatches);
+  }, [resourceMatches, getConfidenceLevel]);
+
+  const citations: ResourceCitation[] = useMemo(() => {
+    return resourceMatches.map(match => ({
+      resourceId: match.resource.id,
+      resourceTitle: match.resource.title,
+      matchType: match.matchType,
+      excerpt: match.matchedKeywords.length > 0 
+        ? `Matched: ${match.matchedKeywords.join(", ")}`
+        : undefined,
+    }));
+  }, [resourceMatches]);
+
+  // Determine if native intelligence was used (when no internal resources cover this)
+  const usedNativeIntelligence = resourceMatches.length === 0 || 
+    !resourceMatches.some(m => m.matchType === "exact");
 
   // Get all journeys and campaigns across all stages for export
   const allJourneys = useMemo(() => {
@@ -898,6 +943,15 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
             </div>
           </div>
         </motion.div>
+      )}
+
+      {/* Resource Library Citations */}
+      {resources.length > 0 && (
+        <ResourceCitations
+          citations={citations}
+          confidenceLevel={confidenceLevel}
+          usedNativeIntelligence={usedNativeIntelligence}
+        />
       )}
     </div>
   );
