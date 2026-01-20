@@ -361,6 +361,63 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     };
   }, [useCaseAttribution, journeys.length, campaigns.length]);
 
+  // Build keywords being searched for diagnostics
+  const searchKeywords = useMemo(() => {
+    return [
+      industry,
+      selectedStage,
+      framework,
+      ...journeys.map(j => j.name.toLowerCase()),
+      ...campaigns.map(c => c.name.toLowerCase()),
+      "use case",
+      "journey",
+      "campaign",
+    ].filter(Boolean);
+  }, [industry, selectedStage, framework, journeys, campaigns]);
+
+  // Generate diagnostics for each resource to explain why it matched or didn't
+  const resourceDiagnostics = useMemo(() => {
+    return resources.map(resource => {
+      const tabMatch = resource.tabs.includes("use-case-studio");
+      const industryMatch = resource.industries.includes("all") || 
+        resource.industries.includes(industry as any);
+      
+      const matchedKeywords = searchKeywords.filter(kw => 
+        resource.keywords.some(rk => 
+          rk.toLowerCase().includes(kw.toLowerCase()) || 
+          kw.toLowerCase().includes(rk.toLowerCase())
+        )
+      );
+
+      let reason = "";
+      if (!resource.isEnabled) {
+        reason = "Resource is disabled.";
+      } else if (!tabMatch) {
+        reason = "Resource is not tagged for the Use Case Studio tab.";
+      } else if (!industryMatch) {
+        reason = `Resource is not tagged for the "${industry}" industry.`;
+      } else if (matchedKeywords.length === 0) {
+        reason = "No keyword overlap between resource and current context.";
+      } else if (matchedKeywords.length < 3) {
+        reason = "Partial keyword match - add more relevant keywords for exact matching.";
+      } else {
+        reason = "Good match! Resource is being referenced.";
+      }
+
+      return {
+        resourceTitle: resource.title,
+        resourceKeywords: resource.keywords,
+        searchKeywords,
+        matchedKeywords,
+        industryMatch,
+        tabMatch,
+        isEnabled: resource.isEnabled,
+        isPrimary: resource.isPrimary,
+        reason,
+      };
+    });
+  }, [resources, searchKeywords, industry]);
+
   // Get all journeys and campaigns across all stages for export
   const allJourneys = useMemo(() => {
     if (framework === "aida" || framework === "4p" || framework === "7p") {
@@ -1058,6 +1115,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           confidenceLevel={confidenceLevel}
           usedNativeIntelligence={usedNativeIntelligence}
           coverageStats={coverageStats}
+          diagnostics={resourceDiagnostics}
         />
       )}
     </div>
