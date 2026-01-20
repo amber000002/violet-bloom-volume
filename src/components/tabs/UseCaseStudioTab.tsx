@@ -29,7 +29,7 @@ import { ViewMode } from "@/hooks/usePresentationMode";
 import { UseCaseStudioSlides } from "../presentation/UseCaseStudioSlides";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { ResourceCitations } from "@/components/resource-library/ResourceCitations";
-import { ResourceCitation } from "@/types/resources";
+import { ResourceCitation, ResourceJourney, ResourceCampaign } from "@/types/resources";
 
 interface UseCaseStudioTabProps {
   industry: string;
@@ -239,10 +239,52 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     setExpandedCampaign(null);
   }, [availableStages]);
 
-  // Get journeys and campaigns for selected stage
-  // For AIDA, 4P, 7P: use framework mappings
-  // For lifecycle/aarrr: use industry config
-  const journeys: (JourneyUseCase | JourneyMapping)[] = useMemo(() => {
+  // Resource Library: Find matching internal resources for current context
+  const resourceMatches = useMemo(() => {
+    if (!industry || !selectedStage) return [];
+    return findMatchingResources("use-case-studio", industry);
+  }, [industry, selectedStage, findMatchingResources]);
+
+  // Extract journeys FROM internal resources (these are the true "Internal" use cases)
+  const internalJourneys = useMemo((): Array<ResourceJourney & { sourceResource: string }> => {
+    const result: Array<ResourceJourney & { sourceResource: string }> = [];
+    
+    for (const match of resourceMatches) {
+      const resource = match.resource;
+      if (resource.journeys && resource.journeys.length > 0) {
+        for (const journey of resource.journeys) {
+          // Include if no stage specified, or if stage matches
+          if (!journey.stage || journey.stage === selectedStage) {
+            result.push({ ...journey, sourceResource: resource.title });
+          }
+        }
+      }
+    }
+    
+    return result;
+  }, [resourceMatches, selectedStage]);
+
+  // Extract campaigns FROM internal resources
+  const internalCampaigns = useMemo((): Array<ResourceCampaign & { sourceResource: string }> => {
+    const result: Array<ResourceCampaign & { sourceResource: string }> = [];
+    
+    for (const match of resourceMatches) {
+      const resource = match.resource;
+      if (resource.campaigns && resource.campaigns.length > 0) {
+        for (const campaign of resource.campaigns) {
+          // Include if no stage specified, or if stage matches
+          if (!campaign.stage || campaign.stage === selectedStage) {
+            result.push({ ...campaign, sourceResource: resource.title });
+          }
+        }
+      }
+    }
+    
+    return result;
+  }, [resourceMatches, selectedStage]);
+
+  // Get native intelligence journeys (fallback/supplement)
+  const nativeJourneys: (JourneyUseCase | JourneyMapping)[] = useMemo(() => {
     if (!selectedStage) return [];
     
     if (framework === "aida" || framework === "4p" || framework === "7p") {
@@ -253,7 +295,8 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     return config.journeys[selectedStage] || [];
   }, [config, selectedStage, framework]);
 
-  const campaigns: (CampaignUseCase | CampaignMapping)[] = useMemo(() => {
+  // Get native intelligence campaigns (fallback/supplement)
+  const nativeCampaigns: (CampaignUseCase | CampaignMapping)[] = useMemo(() => {
     if (!selectedStage) return [];
     
     if (framework === "aida" || framework === "4p" || framework === "7p") {
@@ -278,63 +321,38 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     return getStageInsight(industry, selectedStage, framework);
   }, [industry, selectedStage, framework]);
 
-  // Resource Library: Find matching internal resources for current context
-  const resourceMatches = useMemo(() => {
-    if (!industry || !selectedStage) return [];
-    return findMatchingResources("use-case-studio", industry);
-  }, [industry, selectedStage, findMatchingResources]);
-
-  // All use cases are covered by resources if we have matching resources
-  const useCaseAttribution = useMemo(() => {
-    const journeyCoverage: Record<string, { resourceTitle: string; matchType: "exact" | "partial" | "fallback" } | null> = {};
-    const campaignCoverage: Record<string, { resourceTitle: string; matchType: "exact" | "partial" | "fallback" } | null> = {};
-    
-    const primaryMatch = resourceMatches.find(m => m.resource.isPrimary);
-    const firstMatch = resourceMatches[0];
-    const coveringResource = primaryMatch || firstMatch;
-    
-    journeys.forEach(journey => {
-      journeyCoverage[journey.name] = coveringResource 
-        ? { resourceTitle: coveringResource.resource.title, matchType: coveringResource.matchType }
-        : null;
-    });
-    
-    campaigns.forEach(campaign => {
-      campaignCoverage[campaign.name] = coveringResource 
-        ? { resourceTitle: coveringResource.resource.title, matchType: coveringResource.matchType }
-        : null;
-    });
-    
-    return { journeyCoverage, campaignCoverage };
-  }, [journeys, campaigns, resourceMatches]);
+  // Determine what to show: Internal first, then native as supplement
+  const hasInternalContent = internalJourneys.length > 0 || internalCampaigns.length > 0;
 
   // Compute confidence level and citations
   const confidenceLevel = useMemo(() => {
-    return getConfidenceLevel(resourceMatches);
-  }, [resourceMatches, getConfidenceLevel]);
+    // High confidence if we have actual internal content
+    if (hasInternalContent) return "high";
+    // Medium if resources match but have no content
+    if (resourceMatches.length > 0) return "medium";
+    return "low";
+  }, [hasInternalContent, resourceMatches]);
 
   const citations: ResourceCitation[] = useMemo(() => {
     return resourceMatches.map(match => ({
       resourceId: match.resource.id,
       resourceTitle: match.resource.title,
-      matchType: match.matchType,
+      matchType: hasInternalContent ? "exact" : "partial",
     }));
-  }, [resourceMatches]);
+  }, [resourceMatches, hasInternalContent]);
 
-  // Determine if native intelligence was used (when no internal resources cover this)
-  const usedNativeIntelligence = resourceMatches.length === 0;
+  // Native intelligence is used when internal resources don't have content
+  const usedNativeIntelligence = !hasInternalContent;
   
-  // Count how many use cases are covered by resources vs native
+  // Count actual coverage
   const coverageStats = useMemo(() => {
-    const journeysFromResource = Object.values(useCaseAttribution.journeyCoverage).filter(Boolean).length;
-    const campaignsFromResource = Object.values(useCaseAttribution.campaignCoverage).filter(Boolean).length;
     return {
-      journeysFromResource,
-      journeysFromNative: journeys.length - journeysFromResource,
-      campaignsFromResource,
-      campaignsFromNative: campaigns.length - campaignsFromResource,
+      journeysFromResource: internalJourneys.length,
+      journeysFromNative: nativeJourneys.length,
+      campaignsFromResource: internalCampaigns.length,
+      campaignsFromNative: nativeCampaigns.length,
     };
-  }, [useCaseAttribution, journeys.length, campaigns.length]);
+  }, [internalJourneys.length, nativeJourneys.length, internalCampaigns.length, nativeCampaigns.length]);
 
   // Generate simplified diagnostics for each resource to explain why it matched or didn't
   const resourceDiagnostics = useMemo(() => {
@@ -547,24 +565,124 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
               </div>
             </div>
 
-            {journeys.length > 0 ? (
+            {/* Internal Journeys (from Resources) */}
+            {internalJourneys.length > 0 && (
               <div className="space-y-4">
-                {journeys.map((journey, index) => {
+                <div className="flex items-center gap-2 text-xs text-emerald-400 mb-2">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>From Internal Resources</span>
+                </div>
+                {internalJourneys.map((journey, index) => {
+                  const isExpanded = expandedJourney === journey.name;
+                  return (
+                    <motion.div
+                      key={`internal-${journey.name}-${index}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="magic-card rounded-xl p-5 space-y-3 ring-1 ring-emerald-500/30"
+                    >
+                      <div className="flex items-start justify-between">
+                        <h4 className="font-display font-semibold text-foreground">
+                          {journey.name}
+                        </h4>
+                        <button
+                          onClick={() => setExpandedJourney(isExpanded ? null : journey.name)}
+                          className="p-1 hover:bg-muted rounded"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
+                          <Zap className="w-3 h-3" />
+                          {journey.triggerType}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${journey.sourceResource}`}>
+                          <BookOpen className="w-3 h-3" />
+                          {journey.sourceResource}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-muted-foreground">
+                        {journey.description}
+                      </p>
+
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="border-t border-border pt-3 mt-3 space-y-3"
+                          >
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                                <Layers className="w-3.5 h-3.5 text-primary" />
+                                Key Events
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {stageEvents.map((event) => (
+                                  <span
+                                    key={event.name}
+                                    className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
+                                    title={event.description}
+                                  >
+                                    {event.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                                <Users className="w-3.5 h-3.5 text-secondary" />
+                                Target Segments
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {stageSegments.map((segment) => (
+                                  <span
+                                    key={segment.name}
+                                    className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
+                                    title={segment.description}
+                                  >
+                                    {segment.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Native Journeys (Lovable Intelligence) */}
+            {nativeJourneys.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{internalJourneys.length > 0 ? "Supplemental (Native Intelligence)" : "Native Intelligence"}</span>
+                </div>
+                {nativeJourneys.map((journey, index) => {
                   const journeyName = journey.name;
                   const isExpanded = expandedJourney === journeyName;
-                  const attribution = useCaseAttribution.journeyCoverage[journeyName];
                   
                   if (isFrameworkJourney(journey)) {
-                    // Framework mapping journey (AIDA, 4P, 7P)
                     return (
                       <motion.div
                         key={journey.name}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`magic-card rounded-xl p-5 space-y-3 ${
-                          attribution ? "ring-1 ring-emerald-500/30" : ""
-                        }`}
+                        transition={{ delay: (internalJourneys.length + index) * 0.1 }}
+                        className="magic-card rounded-xl p-5 space-y-3"
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -587,24 +705,16 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                             <Zap className="w-3 h-3" />
                             {journey.triggerType}
                           </span>
-                          {attribution ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
-                              <BookOpen className="w-3 h-3" />
-                              Internal
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                              <Sparkles className="w-3 h-3" />
-                              Native
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                            <Sparkles className="w-3 h-3" />
+                            Native
+                          </span>
                         </div>
 
                         <p className="text-sm text-muted-foreground">
                           {journey.description}
                         </p>
 
-                        {/* Expandable Events & Segments */}
                         <AnimatePresence>
                           {isExpanded && (
                             <motion.div
@@ -653,17 +763,14 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                       </motion.div>
                     );
                   } else {
-                    // Industry config journey (Lifecycle, AARRR)
                     const TriggerIcon = triggerTypeIcons[journey.triggerType];
                     return (
                       <motion.div
                         key={journey.name}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`magic-card rounded-xl p-5 space-y-3 ${
-                          attribution ? "ring-1 ring-emerald-500/30" : ""
-                        }`}
+                        transition={{ delay: (internalJourneys.length + index) * 0.1 }}
+                        className="magic-card rounded-xl p-5 space-y-3"
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -686,17 +793,10 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                             <TriggerIcon className="w-3 h-3" />
                             {getTriggerTypeLabel(journey.triggerType)}
                           </span>
-                          {attribution ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
-                              <BookOpen className="w-3 h-3" />
-                              Internal
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                              <Sparkles className="w-3 h-3" />
-                              Native
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                            <Sparkles className="w-3 h-3" />
+                            Native
+                          </span>
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -714,7 +814,6 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                           </div>
                         </div>
 
-                        {/* Expandable Events & Segments */}
                         <AnimatePresence>
                           {isExpanded && (
                             <motion.div
@@ -765,7 +864,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   }
                 })}
               </div>
-            ) : (
+            )}
+
+            {internalJourneys.length === 0 && nativeJourneys.length === 0 && (
               <div className="p-6 rounded-xl bg-muted/30 border border-border text-center">
                 <p className="text-sm text-muted-foreground">
                   No journeys defined for this stage.
@@ -790,24 +891,135 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
               </div>
             </div>
 
-            {campaigns.length > 0 ? (
+            {/* Internal Campaigns (from Resources) */}
+            {internalCampaigns.length > 0 && (
               <div className="space-y-4">
-                {campaigns.map((campaign, index) => {
+                <div className="flex items-center gap-2 text-xs text-emerald-400 mb-2">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>From Internal Resources</span>
+                </div>
+                {internalCampaigns.map((campaign, index) => {
+                  const isExpanded = expandedCampaign === campaign.name;
+                  return (
+                    <motion.div
+                      key={`internal-${campaign.name}-${index}`}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="magic-card rounded-xl p-5 space-y-3 ring-1 ring-emerald-500/30"
+                    >
+                      <div className="flex items-start justify-between">
+                        <h4 className="font-display font-semibold text-foreground">
+                          {campaign.name}
+                        </h4>
+                        <button
+                          onClick={() => setExpandedCampaign(isExpanded ? null : campaign.name)}
+                          className="p-1 hover:bg-muted rounded"
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${campaign.sourceResource}`}>
+                          <BookOpen className="w-3 h-3" />
+                          {campaign.sourceResource}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start gap-2">
+                          <Target className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <span className="text-foreground">{campaign.purpose}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Calendar className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
+                          <span className="text-muted-foreground">
+                            Timing: {campaign.timing}
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <UserMinus className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+                          <span className="text-muted-foreground">
+                            Suppression: {campaign.suppression}
+                          </span>
+                        </div>
+                      </div>
+
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="border-t border-border pt-3 mt-3 space-y-3"
+                          >
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                                <Layers className="w-3.5 h-3.5 text-primary" />
+                                Key Events
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {stageEvents.map((event) => (
+                                  <span
+                                    key={event.name}
+                                    className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
+                                    title={event.description}
+                                  >
+                                    {event.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                                <Users className="w-3.5 h-3.5 text-secondary" />
+                                Target Segments
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {stageSegments.map((segment) => (
+                                  <span
+                                    key={segment.name}
+                                    className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
+                                    title={segment.description}
+                                  >
+                                    {segment.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Native Campaigns (Lovable Intelligence) */}
+            {nativeCampaigns.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{internalCampaigns.length > 0 ? "Supplemental (Native Intelligence)" : "Native Intelligence"}</span>
+                </div>
+                {nativeCampaigns.map((campaign, index) => {
                   const campaignName = campaign.name;
                   const isExpanded = expandedCampaign === campaignName;
-                  const attribution = useCaseAttribution.campaignCoverage[campaignName];
-
+                  
                   if (isFrameworkCampaign(campaign)) {
-                    // Framework mapping campaign (AIDA, 4P, 7P)
                     return (
                       <motion.div
                         key={campaign.name}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`magic-card rounded-xl p-5 space-y-3 ${
-                          attribution ? "ring-1 ring-emerald-500/30" : ""
-                        }`}
+                        transition={{ delay: (internalCampaigns.length + index) * 0.1 }}
+                        className="magic-card rounded-xl p-5 space-y-3"
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -825,19 +1037,11 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                           </button>
                         </div>
 
-                        {/* Source indicator */}
                         <div className="flex items-center gap-2">
-                          {attribution ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
-                              <BookOpen className="w-3 h-3" />
-                              Internal
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                              <Sparkles className="w-3 h-3" />
-                              Native
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                            <Sparkles className="w-3 h-3" />
+                            Native
+                          </span>
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -859,7 +1063,6 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                           </div>
                         </div>
 
-                        {/* Expandable Events & Segments */}
                         <AnimatePresence>
                           {isExpanded && (
                             <motion.div
@@ -908,16 +1111,13 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                       </motion.div>
                     );
                   } else {
-                    // Industry config campaign (Lifecycle, AARRR)
                     return (
                       <motion.div
                         key={campaign.name}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`magic-card rounded-xl p-5 space-y-3 ${
-                          attribution ? "ring-1 ring-emerald-500/30" : ""
-                        }`}
+                        transition={{ delay: (internalCampaigns.length + index) * 0.1 }}
+                        className="magic-card rounded-xl p-5 space-y-3"
                       >
                         <div className="flex items-start justify-between">
                           <h4 className="font-display font-semibold text-foreground">
@@ -935,19 +1135,11 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                           </button>
                         </div>
 
-                        {/* Source indicator */}
                         <div className="flex items-center gap-2">
-                          {attribution ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${attribution.resourceTitle}`}>
-                              <BookOpen className="w-3 h-3" />
-                              Internal
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                              <Sparkles className="w-3 h-3" />
-                              Native
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
+                            <Sparkles className="w-3 h-3" />
+                            Native
+                          </span>
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -969,7 +1161,6 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                           </div>
                         </div>
 
-                        {/* Expandable Events & Segments */}
                         <AnimatePresence>
                           {isExpanded && (
                             <motion.div
@@ -1020,7 +1211,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   }
                 })}
               </div>
-            ) : (
+            )}
+
+            {internalCampaigns.length === 0 && nativeCampaigns.length === 0 && (
               <div className="p-6 rounded-xl bg-muted/30 border border-border text-center">
                 <p className="text-sm text-muted-foreground">
                   No campaigns defined for this stage.

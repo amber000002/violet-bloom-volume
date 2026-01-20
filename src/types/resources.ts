@@ -47,6 +47,22 @@ export type IndustryRelevance =
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
+// Use case definitions that can be stored in resources
+export interface ResourceJourney {
+  name: string;
+  triggerType: "event" | "segment" | "schedule" | "api" | "past-behavior" | "live-event" | "segment-change" | "time-based";
+  description: string;
+  stage?: string;
+}
+
+export interface ResourceCampaign {
+  name: string;
+  purpose: string;
+  timing: string;
+  suppression: string;
+  stage?: string;
+}
+
 export interface Resource {
   id: string;
   title: string;
@@ -56,6 +72,9 @@ export interface Resource {
   industries: IndustryRelevance[];
   keywords: string[];
   content?: string; // Parsed content from URL/file
+  // Use cases defined in this resource
+  journeys?: ResourceJourney[];
+  campaigns?: ResourceCampaign[];
   isEnabled: boolean;
   isPrimary: boolean; // Confidence-locked primary resource
   createdAt: Date;

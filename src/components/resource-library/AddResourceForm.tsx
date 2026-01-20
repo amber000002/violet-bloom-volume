@@ -10,7 +10,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
-import { ResourceType, TabRelevance, IndustryRelevance } from "@/types/resources";
+import { ResourceType, TabRelevance, IndustryRelevance, ResourceJourney, ResourceCampaign } from "@/types/resources";
 
 interface AddResourceFormProps {
   onClose: () => void;
@@ -74,6 +74,8 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({ onClose }) => 
   const [selectedIndustries, setSelectedIndustries] = useState<IndustryRelevance[]>(["all"]);
   const [keywords, setKeywords] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
+  const [journeys, setJourneys] = useState<ResourceJourney[]>([]);
+  const [campaigns, setCampaigns] = useState<ResourceCampaign[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -132,9 +134,11 @@ export const AddResourceForm: React.FC<AddResourceFormProps> = ({ onClose }) => 
         tabs: selectedTabs,
         industries: selectedIndustries.length > 0 ? selectedIndustries : ["all"],
         keywords: keywordList,
+        journeys: journeys.length > 0 ? journeys : undefined,
+        campaigns: campaigns.length > 0 ? campaigns : undefined,
         isEnabled: true,
         isPrimary,
-        content: undefined, // Will be parsed when needed
+        content: undefined,
       });
 
       onClose();
