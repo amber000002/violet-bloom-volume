@@ -9,7 +9,9 @@ import {
   ExternalLink,
   Link as LinkIcon,
   FileText,
-  Globe
+  Globe,
+  FileJson,
+  BookOpen,
 } from "lucide-react";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { Resource, ResourceType, TabRelevance } from "@/types/resources";
@@ -25,6 +27,7 @@ const typeIcons: Record<ResourceType, typeof LinkIcon> = {
   pdf: FileText,
   word: FileText,
   dashboard: LinkIcon,
+  json: FileJson,
 };
 
 const tabLabels: Record<TabRelevance, string> = {
@@ -140,8 +143,29 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({ resource }) => {
         ))}
       </div>
 
-      {/* Keywords */}
-      {resource.keywords.length > 0 && (
+      {/* Content Stats (for JSON resources) */}
+      {resource.type === "json" && (
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          {resource.journeys && resource.journeys.length > 0 && (
+            <span className="flex items-center gap-1">
+              <BookOpen className="w-3 h-3 text-emerald-400" />
+              {resource.journeys.length} journeys
+            </span>
+          )}
+          {resource.campaigns && resource.campaigns.length > 0 && (
+            <span className="flex items-center gap-1">
+              <BookOpen className="w-3 h-3 text-emerald-400" />
+              {resource.campaigns.length} campaigns
+            </span>
+          )}
+          {resource.version && resource.version > 1 && (
+            <span className="text-amber-400">v{resource.version}</span>
+          )}
+        </div>
+      )}
+
+      {/* Keywords (for non-JSON resources) */}
+      {resource.type !== "json" && resource.keywords.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {resource.keywords.slice(0, 5).map((keyword, idx) => (
             <span 
@@ -162,14 +186,21 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({ resource }) => {
       {/* Metadata */}
       <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between text-[10px] text-muted-foreground">
         <span>Added {resource.createdAt.toLocaleDateString()}</span>
-        <a 
-          href={resource.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 hover:text-primary"
-        >
-          Open <ExternalLink className="w-3 h-3" />
-        </a>
+        {resource.type !== "json" ? (
+          <a 
+            href={resource.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:text-primary"
+          >
+            Open <ExternalLink className="w-3 h-3" />
+          </a>
+        ) : (
+          <span className="flex items-center gap-1 text-emerald-400">
+            <FileJson className="w-3 h-3" />
+            JSON Source
+          </span>
+        )}
       </div>
     </motion.div>
   );

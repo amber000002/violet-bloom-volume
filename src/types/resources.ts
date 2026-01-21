@@ -6,7 +6,8 @@ export type ResourceType =
   | "google-doc" 
   | "pdf" 
   | "word" 
-  | "dashboard";
+  | "dashboard"
+  | "json"; // New: JSON-based ingestion
 
 export type TabRelevance = 
   | "inbox-potential" 
@@ -47,20 +48,32 @@ export type IndustryRelevance =
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
+// Attribution source types for output traceability
+export type SourceAttribution = 
+  | "internal" 
+  | "internal-extended" 
+  | "native";
+
 // Use case definitions that can be stored in resources
 export interface ResourceJourney {
+  id?: string; // Unique ID for merge logic
   name: string;
   triggerType: "event" | "segment" | "schedule" | "api" | "past-behavior" | "live-event" | "segment-change" | "time-based";
   description: string;
   stage?: string;
+  framework?: string; // lifecycle, aida, 4p, 7p
+  events?: string[]; // Key events for this journey
+  segments?: string[]; // Target segments
 }
 
 export interface ResourceCampaign {
+  id?: string; // Unique ID for merge logic
   name: string;
   purpose: string;
   timing: string;
   suppression: string;
   stage?: string;
+  framework?: string;
 }
 
 export interface Resource {
@@ -77,9 +90,60 @@ export interface Resource {
   campaigns?: ResourceCampaign[];
   isEnabled: boolean;
   isPrimary: boolean; // Confidence-locked primary resource
+  // JSON ingestion metadata
+  version?: number;
+  lastUpdated?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ===== JSON INGESTION SCHEMA =====
+// This defines the expected format for JSON file uploads
+
+export interface JSONResourceMetadata {
+  source: string;
+  version: string;
+  last_updated: string;
+  author?: string;
+  description?: string;
+}
+
+export interface JSONUseCase {
+  use_case_id: string;
+  name: string;
+  type: "journey" | "campaign";
+  // Journey fields
+  trigger_type?: ResourceJourney["triggerType"];
+  description?: string;
+  events?: string[];
+  segments?: string[];
+  // Campaign fields
+  purpose?: string;
+  timing?: string;
+  suppression?: string;
+  // Common fields
+  stage?: string;
+  framework?: string;
+  industry?: IndustryRelevance;
+  tabs?: TabRelevance[];
+  is_primary?: boolean;
+}
+
+export interface JSONResourceFile {
+  metadata: JSONResourceMetadata;
+  use_cases: JSONUseCase[];
+}
+
+// Validation result for JSON parsing
+export interface JSONValidationResult {
+  isValid: boolean;
+  errors: string[];
+  parsedUseCases: number;
+  duplicatesSkipped: number;
+  updatedUseCases: number;
+}
+
+// ===== EXISTING TYPES =====
 
 export interface ResourceMatch {
   resource: Resource;
@@ -93,6 +157,7 @@ export interface ResourceCitation {
   resourceTitle: string;
   matchType: "exact" | "partial" | "fallback";
   excerpt?: string;
+  sourceAttribution?: SourceAttribution;
 }
 
 export interface IntelligenceResult {
@@ -100,4 +165,8 @@ export interface IntelligenceResult {
   citations: ResourceCitation[];
   confidenceLevel: ConfidenceLevel;
   usedNativeIntelligence: boolean;
+  sourceBreakdown?: {
+    internalCount: number;
+    nativeCount: number;
+  };
 }

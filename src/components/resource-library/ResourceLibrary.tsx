@@ -4,23 +4,16 @@ import {
   Library, 
   Plus, 
   X, 
-  Link as LinkIcon, 
-  FileText, 
-  Globe, 
   Database,
-  Star,
-  StarOff,
-  ToggleLeft,
-  ToggleRight,
-  Trash2,
   ExternalLink,
-  Filter,
-  Search
+  Search,
+  FileJson,
 } from "lucide-react";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
-import { Resource, ResourceType, TabRelevance, IndustryRelevance } from "@/types/resources";
+import { TabRelevance } from "@/types/resources";
 import { AddResourceForm } from "./AddResourceForm";
 import { ResourceCard } from "./ResourceCard";
+import { JSONResourceUpload } from "./JSONResourceUpload";
 
 const tabLabels: Record<TabRelevance, string> = {
   "inbox-potential": "Inbox Potential",
@@ -30,9 +23,11 @@ const tabLabels: Record<TabRelevance, string> = {
   "creative": "Creative Analyzer",
 };
 
+type ViewMode = "list" | "add-form" | "add-json";
+
 export const ResourceLibrary: React.FC = () => {
   const { resources, isLibraryOpen, setIsLibraryOpen } = useResourceLibrary();
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filterTab, setFilterTab] = useState<TabRelevance | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -44,6 +39,7 @@ export const ResourceLibrary: React.FC = () => {
 
   const enabledCount = resources.filter(r => r.isEnabled).length;
   const primaryCount = resources.filter(r => r.isPrimary).length;
+  const jsonCount = resources.filter(r => r.type === "json").length;
 
   return (
     <>
@@ -135,20 +131,50 @@ export const ResourceLibrary: React.FC = () => {
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-6">
-                {showAddForm ? (
-                  <AddResourceForm onClose={() => setShowAddForm(false)} />
+                {viewMode === "add-form" ? (
+                  <AddResourceForm onClose={() => setViewMode("list")} />
+                ) : viewMode === "add-json" ? (
+                  <JSONResourceUpload onClose={() => setViewMode("list")} />
                 ) : (
                   <div className="space-y-4">
-                    {/* Add Button */}
-                    <motion.button
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                      onClick={() => setShowAddForm(true)}
-                      className="w-full p-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-5 h-5" />
-                      Add Resource
-                    </motion.button>
+                    {/* Add Buttons */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <motion.button
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setViewMode("add-form")}
+                        className="p-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors flex flex-col items-center justify-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        <span className="text-sm font-medium">Add Resource</span>
+                        <span className="text-xs text-muted-foreground">Form-based entry</span>
+                      </motion.button>
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setViewMode("add-json")}
+                        className="p-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-emerald-500 hover:text-emerald-500 transition-colors flex flex-col items-center justify-center gap-2"
+                      >
+                        <FileJson className="w-5 h-5" />
+                        <span className="text-sm font-medium">Upload JSON</span>
+                        <span className="text-xs text-muted-foreground">Bulk import</span>
+                      </motion.button>
+                    </div>
+
+                    {/* Stats Banner */}
+                    {jsonCount > 0 && (
+                      <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-xs">
+                        <FileJson className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-400">
+                          {jsonCount} JSON resource{jsonCount !== 1 ? "s" : ""} with{" "}
+                          {resources
+                            .filter(r => r.type === "json")
+                            .reduce((acc, r) => acc + (r.journeys?.length || 0) + (r.campaigns?.length || 0), 0)
+                          } use cases
+                        </span>
+                      </div>
+                    )}
 
                     {/* Resource List */}
                     {filteredResources.length === 0 ? (
