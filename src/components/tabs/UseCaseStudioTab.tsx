@@ -221,11 +221,65 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   
   const businessModelLabel = inferredBusinessModel ? getBusinessModelLabel(inferredBusinessModel) : "";
 
-  // Get dynamic stages based on framework and industry
-  const availableStages = useMemo(() => {
+  // Helper to normalize stage strings (lowercase, trimmed)
+  const normalizeStage = (stage: string): string => {
+    return stage.toLowerCase().trim().replace(/\s+/g, "-");
+  };
+
+  // Helper to create display label from normalized stage
+  const stageToLabel = (stage: string): string => {
+    return stage
+      .split("-")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  // Extract unique stages from internal resources (document-driven)
+  const internalStages = useMemo(() => {
+    const stagesSet = new Set<string>();
+    
+    for (const resource of resources) {
+      if (!resource.isEnabled) continue;
+      if (!resource.tabs.includes("use-case-studio")) continue;
+      if (!resource.industries.includes("all") && !resource.industries.includes(industry as any)) continue;
+      
+      // Extract stages from journeys
+      resource.journeys?.forEach(j => {
+        if (j.stage) stagesSet.add(normalizeStage(j.stage));
+      });
+      
+      // Extract stages from campaigns
+      resource.campaigns?.forEach(c => {
+        if (c.stage) stagesSet.add(normalizeStage(c.stage));
+      });
+    }
+    
+    return Array.from(stagesSet);
+  }, [resources, industry]);
+
+  // Get predefined stages based on framework and industry
+  const predefinedStages = useMemo(() => {
     if (!industry) return [];
     return getFrameworkStages(framework, industry);
   }, [industry, framework]);
+
+  // Merge predefined stages with document-driven stages (internal stages added at the end if new)
+  const availableStages = useMemo(() => {
+    const predefinedIds = new Set(predefinedStages.map(s => normalizeStage(s.id)));
+    const merged = [...predefinedStages];
+    
+    // Add any internal stages that don't exist in predefined
+    for (const stage of internalStages) {
+      if (!predefinedIds.has(stage)) {
+        merged.push({
+          id: stage,
+          label: stageToLabel(stage),
+        });
+      }
+    }
+    
+    return merged;
+  }, [predefinedStages, internalStages]);
 
   // Reset selected stage when framework or industry changes
   React.useEffect(() => {
@@ -246,15 +300,18 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   }, [industry, selectedStage, findMatchingResources]);
 
   // Extract journeys FROM internal resources (these are the true "Internal" use cases)
+  // Uses normalized stage matching for document-driven flexibility
   const internalJourneys = useMemo((): Array<ResourceJourney & { sourceResource: string }> => {
     const result: Array<ResourceJourney & { sourceResource: string }> = [];
+    const normalizedSelectedStage = normalizeStage(selectedStage);
     
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.journeys && resource.journeys.length > 0) {
         for (const journey of resource.journeys) {
-          // Include if no stage specified, or if stage matches
-          if (!journey.stage || journey.stage === selectedStage) {
+          // Include if no stage specified, or if normalized stage matches
+          const journeyStage = journey.stage ? normalizeStage(journey.stage) : "";
+          if (!journeyStage || journeyStage === normalizedSelectedStage) {
             result.push({ ...journey, sourceResource: resource.title });
           }
         }
@@ -265,15 +322,18 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   }, [resourceMatches, selectedStage]);
 
   // Extract campaigns FROM internal resources
+  // Uses normalized stage matching for document-driven flexibility
   const internalCampaigns = useMemo((): Array<ResourceCampaign & { sourceResource: string }> => {
     const result: Array<ResourceCampaign & { sourceResource: string }> = [];
+    const normalizedSelectedStage = normalizeStage(selectedStage);
     
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.campaigns && resource.campaigns.length > 0) {
         for (const campaign of resource.campaigns) {
-          // Include if no stage specified, or if stage matches
-          if (!campaign.stage || campaign.stage === selectedStage) {
+          // Include if no stage specified, or if normalized stage matches
+          const campaignStage = campaign.stage ? normalizeStage(campaign.stage) : "";
+          if (!campaignStage || campaignStage === normalizedSelectedStage) {
             result.push({ ...campaign, sourceResource: resource.title });
           }
         }

@@ -19,7 +19,7 @@ interface JSONResourceUploadProps {
   onClose: () => void;
 }
 
-// Sample JSON template for users
+// Sample JSON template for users - demonstrates document-driven stages
 const sampleTemplate: JSONResourceFile = {
   metadata: {
     source: "CleverTap OTT Playbook",
@@ -35,8 +35,8 @@ const sampleTemplate: JSONResourceFile = {
       type: "journey",
       trigger_type: "event",
       description: "Triggered when a new user completes registration. Guides them through content discovery.",
-      stage: "activation",
-      framework: "lifecycle",
+      stage: "activation", // Free-text stage - any string accepted
+      framework: "lifecycle", // Always "lifecycle"
       industry: "ott",
       tabs: ["use-case-studio"],
       is_primary: true,
@@ -44,13 +44,36 @@ const sampleTemplate: JSONResourceFile = {
       segments: ["New Users"],
     },
     {
-      use_case_id: "ott_retention_001",
-      name: "Binge Reminder Campaign",
+      use_case_id: "ott_engagement_001",
+      name: "Trending Content Discovery",
       type: "campaign",
-      purpose: "Re-engage users who started but didn't finish a series",
-      timing: "48 hours after last watch session",
+      purpose: "Drive repeat content consumption using trending titles",
+      timing: "Weekly on Fridays",
       suppression: "Skip if user watched in last 24 hours",
-      stage: "retention",
+      stage: "engagement", // Document-driven stage - auto-creates UI tab
+      framework: "lifecycle",
+      industry: "ott",
+      tabs: ["use-case-studio"],
+    },
+    {
+      use_case_id: "ott_monetization_001",
+      name: "Premium Upsell Campaign",
+      type: "campaign",
+      purpose: "Convert free or basic users to premium plans",
+      timing: "After 7 days of active usage",
+      suppression: "Skip if already premium subscriber",
+      stage: "monetization", // Custom stage - will appear as new tab
+      framework: "lifecycle",
+      industry: "ott",
+      tabs: ["use-case-studio"],
+    },
+    {
+      use_case_id: "ott_winback_001",
+      name: "Dormant User Reactivation Journey",
+      type: "journey",
+      trigger_type: "segment",
+      description: "Re-engage users who have stopped watching content for 30+ days",
+      stage: "winback", // Custom stage from internal docs
       framework: "lifecycle",
       industry: "ott",
       tabs: ["use-case-studio"],
