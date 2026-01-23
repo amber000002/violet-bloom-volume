@@ -813,7 +813,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 useCaseCategories['Auto-Debit/NACH Setup'].count + 
                 useCaseCategories['Loan/Disbursal Notifications'].count +
                 useCaseCategories['Account Status Updates'].count;
-              const promotionalCount = useCaseCategories['Promotional Offers'].count;
+              const promotionalCount = useCaseCategories['Promotional Offers'].count + 
+                useCaseCategories['Other/Uncategorized'].count; // Include uncategorized as promotional
               const lifecycleCount = useCaseCategories['Onboarding/KYC Follow-ups'].count + 
                 useCaseCategories['Recovery/Collections'].count;
               
@@ -860,6 +861,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         </tr>
                       </tbody>
                     </table>
+                    <p className="text-xs text-muted-foreground mt-2 italic">
+                      * Mix percentages are based on the number of campaigns, not send volume. Uncategorized campaigns are counted as promotional.
+                    </p>
                   </div>
 
                   {/* Campaign Use Case Analysis Section */}
