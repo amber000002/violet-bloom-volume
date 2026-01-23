@@ -509,6 +509,38 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  {(() => {
+                    const totals = diagnostics.analysisReport.providerAggregates.reduce((acc, p) => ({
+                      totalSentUsers: acc.totalSentUsers + p.totalSentUsers,
+                      totalDeliveredUsers: acc.totalDeliveredUsers + p.totalDeliveredUsers,
+                      uniqueViewed: acc.uniqueViewed + p.uniqueViewed,
+                      uniqueClicked: acc.uniqueClicked + p.uniqueClicked,
+                      unsubscribes: acc.unsubscribes + p.unsubscribes,
+                      hardBounces: acc.hardBounces + p.hardBounces,
+                      softBounces: acc.softBounces + p.softBounces,
+                    }), { totalSentUsers: 0, totalDeliveredUsers: 0, uniqueViewed: 0, uniqueClicked: 0, unsubscribes: 0, hardBounces: 0, softBounces: 0 });
+                    const useDelivered = diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator;
+                    const denom = useDelivered ? totals.totalDeliveredUsers : totals.totalSentUsers;
+                    return (
+                      <tr className="border-t-2 border-border bg-muted/30 font-semibold">
+                        <td className="py-2 px-3">Grand Total</td>
+                        <td className="text-right py-2 px-3">{formatNumber(totals.totalSentUsers)}</td>
+                        {useDelivered && <td className="text-right py-2 px-3">{formatNumber(totals.totalDeliveredUsers)}</td>}
+                        <td className="text-right py-2 px-3">{formatNumber(totals.uniqueViewed)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.uniqueViewed / denom) * 100 : 0} metricType="openRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(totals.uniqueClicked)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.uniqueClicked / denom) * 100 : 0} metricType="clickRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(totals.unsubscribes)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.unsubscribes / denom) * 100 : 0} metricType="unsubscribeRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(totals.hardBounces)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.hardBounces / denom) * 100 : 0} metricType="bounceRate" /></td>
+                        <td className="text-right py-2 px-3">{formatNumber(totals.softBounces)}</td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.softBounces / denom) * 100 : 0} metricType="bounceRate" /></td>
+                      </tr>
+                    );
+                  })()}
+                </tfoot>
               </table>
             </div>
             <p className="text-xs text-muted-foreground mt-3">
@@ -587,6 +619,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
@@ -609,6 +642,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     const softBouncePercent = denominator > 0 ? (c.softBounces / denominator) * 100 : 0;
                     return (
                       <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="py-2 px-3 max-w-[150px] truncate" title={c.campaignName}>{c.campaignName}</td>
                         <td className="py-2 px-3 max-w-xs truncate" title={cleanSubjectLine(c.subjectLine)}>{cleanSubjectLine(c.subjectLine)}</td>
                         <td className="text-right py-2 px-3">{formatNumber(c.totalSentUsers)}</td>
                         <td className="text-right py-2 px-3">{formatNumber(c.uniqueViewed)}</td>
@@ -644,6 +678,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
@@ -666,6 +701,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     const softBouncePercent = denominator > 0 ? (c.softBounces / denominator) * 100 : 0;
                     return (
                       <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                        <td className="py-2 px-3 max-w-[150px] truncate" title={c.campaignName}>{c.campaignName}</td>
                         <td className="py-2 px-3 max-w-xs truncate" title={cleanSubjectLine(c.subjectLine)}>{cleanSubjectLine(c.subjectLine)}</td>
                         <td className="text-right py-2 px-3">{formatNumber(c.totalSentUsers)}</td>
                         <td className="text-right py-2 px-3">{formatNumber(c.uniqueViewed)}</td>
@@ -690,25 +726,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </CollapsibleSection>
 
-          {/* Report 4: Engagement Trends */}
-          <CollapsibleSection
-            title="Engagement Trends"
-            icon={<BarChart3 className="w-5 h-5 text-primary" />}
-            isOpen={expandedSections.trends}
-            onToggle={() => toggleSection("trends")}
-          >
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {diagnostics.analysisReport.engagementTrends.slice(-4).map((t, i) => (
-                <div key={i} className="bg-muted/30 rounded-xl p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">{t.month}</p>
-                  <p className="text-lg font-bold text-primary">{formatPercent(t.openRate)}</p>
-                  <p className="text-xs text-muted-foreground">Open Rate</p>
-                  <p className="text-sm font-medium text-secondary mt-1">{formatPercent(t.clickRate)}</p>
-                  <p className="text-xs text-muted-foreground">Click Rate</p>
-                </div>
-              ))}
-            </div>
-          </CollapsibleSection>
 
           {/* Report 5: Key Learnings */}
           <CollapsibleSection

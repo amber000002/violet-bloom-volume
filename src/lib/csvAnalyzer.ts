@@ -104,6 +104,7 @@ export interface MonthlyOverview {
 
 export interface TopCampaign {
   campaignId: string;
+  campaignName: string;
   subjectLine: string;
   totalSentUsers: number;
   totalDeliveredUsers: number;
@@ -778,6 +779,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     bestCampaignIds.add(c.campaignId);
     return {
       campaignId: c.campaignId,
+      campaignName: c.campaignName,
       subjectLine: c.subjectLine,
       totalSentUsers: c.totalSentUsers,
       totalDeliveredUsers: c.totalDeliveredUsers,
@@ -801,6 +803,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
 
   const worstCampaigns: TopCampaign[] = sortedAscending.slice(0, 5).map(c => ({
     campaignId: c.campaignId,
+    campaignName: c.campaignName,
     subjectLine: c.subjectLine,
     totalSentUsers: c.totalSentUsers,
     totalDeliveredUsers: c.totalDeliveredUsers,
