@@ -67,13 +67,14 @@ const formatPercent = (num: number): string => {
   return `${num.toFixed(2)}%`;
 };
 
-// Clean subject line by removing "{Subject:" prefix and preheader text (after "|")
+// Clean subject line by removing "{Subject:" prefix and preheader text (after "|" or ",Preheader:")
 const cleanSubjectLine = (subject: string): string => {
   if (!subject) return '';
   // Remove {Subject: prefix
   let cleaned = subject.replace(/^\{Subject:\s*/i, '').replace(/\}$/, '').trim();
-  // Remove preheader text (everything after "|")
+  // Remove preheader text (everything after "|" or ",Preheader:")
   cleaned = cleaned.split('|')[0].trim();
+  cleaned = cleaned.split(',Preheader:')[0].trim();
   return cleaned;
 };
 
