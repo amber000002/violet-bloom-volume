@@ -585,9 +585,17 @@ const parseDateDDMMYYYY = (dateStr: string): { date: Date | null; error: string 
   return { date: parsedDate, error: null };
 };
 
-// Valid months for this dataset: October (10), November (11), December (12)
-const VALID_MONTHS = [10, 11, 12]; // Oct, Nov, Dec
+// Dynamic month names - no hardcoded restrictions
 const MONTH_NAMES: Record<number, string> = {
+  1: "January",
+  2: "February",
+  3: "March",
+  4: "April",
+  5: "May",
+  6: "June",
+  7: "July",
+  8: "August",
+  9: "September",
   10: "October",
   11: "November", 
   12: "December"
@@ -615,13 +623,13 @@ const getMonthFromDate = (dateStr: string): MonthParseResult => {
   const month = date.getMonth() + 1; // 1-indexed
   const year = date.getFullYear();
   
-  // VALIDATION RULE: Only Oct, Nov, Dec are valid
-  if (!VALID_MONTHS.includes(month)) {
+  // All months 1-12 are valid
+  if (month < 1 || month > 12) {
     return { 
       monthName: "PARSING_ERROR", 
       monthSortKey: "0000-00", 
       isValid: false, 
-      error: `Month ${month} extracted from ${dateStr} is outside valid range (Oct-Dec). This indicates incorrect parsing.` 
+      error: `Invalid month ${month} extracted from ${dateStr}.` 
     };
   }
   
@@ -1473,13 +1481,36 @@ const generateEnhancedReputationReport = (
   const useDelivered = totals.delivered > 0;
   const denominator = useDelivered ? totals.delivered : totals.sent;
 
-  // Calculate trends
+  // Calculate trends based on first week vs last week of the time period
+  // Group campaigns by week and compare first week to last week
+  const campaignsByDate = sortedData
+    .map(c => ({ ...c, parsedDate: parseDateSafely(c.startDate) }))
+    .filter(c => c.parsedDate !== null)
+    .sort((a, b) => (a.parsedDate!.getTime() - b.parsedDate!.getTime()));
+  
+  // Get first and last week's campaigns (7 days from start and end of data period)
+  const getWeekCampaigns = (campaigns: typeof campaignsByDate, isFirstWeek: boolean) => {
+    if (campaigns.length === 0) return [];
+    const referenceDate = isFirstWeek ? campaigns[0].parsedDate! : campaigns[campaigns.length - 1].parsedDate!;
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    return campaigns.filter(c => {
+      const timeDiff = isFirstWeek 
+        ? c.parsedDate!.getTime() - referenceDate.getTime()
+        : referenceDate.getTime() - c.parsedDate!.getTime();
+      return timeDiff >= 0 && timeDiff <= weekMs;
+    });
+  };
+  
+  const firstWeekCampaigns = getWeekCampaigns(campaignsByDate, true);
+  const lastWeekCampaigns = getWeekCampaigns(campaignsByDate, false);
+  
+  // Fallback to window-based if weeks have insufficient data
   const windowSize = Math.min(5, Math.floor(sortedData.length / 2));
-  const firstWindow = sortedData.slice(0, windowSize);
-  const lastWindow = sortedData.slice(-windowSize);
+  const firstWindow = firstWeekCampaigns.length >= 3 ? firstWeekCampaigns : sortedData.slice(0, windowSize);
+  const lastWindow = lastWeekCampaigns.length >= 3 ? lastWeekCampaigns : sortedData.slice(-windowSize);
   
   const calcAvg = (arr: CampaignRow[], getter: (c: CampaignRow) => number) => 
-    arr.reduce((s, c) => s + getter(c), 0) / arr.length;
+    arr.length > 0 ? arr.reduce((s, c) => s + getter(c), 0) / arr.length : 0;
 
   const openStart = calcAvg(firstWindow, c => c.openRate);
   const openEnd = calcAvg(lastWindow, c => c.openRate);
@@ -1719,6 +1750,7 @@ const determineReputationDirection = (
 
 // Helper: Determine primary stress signal
 // NOTE: Primary stress signal can NEVER be soft bounce - only hard bounce, spam, unsubscribe, or engagement decay
+// All open rates are based on Unique Viewed (users) / denominator
 const determinePrimaryStressSignal = (data: CampaignRow[], postmaster: PostmasterRow[] | null): string => {
   // Filter to campaigns with ≥1000 sends for meaningful analysis
   const significantCampaigns = data.filter(c => c.totalSentUsers >= 1000);
@@ -1726,8 +1758,13 @@ const determinePrimaryStressSignal = (data: CampaignRow[], postmaster: Postmaste
   
   const avgUnsub = campaignsToAnalyze.reduce((s, c) => s + c.unsubscribeRate, 0) / campaignsToAnalyze.length;
   const avgHardBounce = campaignsToAnalyze.reduce((s, c) => s + c.hardBounceRate, 0) / campaignsToAnalyze.length;
+  // Open rate is based on Unique Viewed (users), already calculated in CampaignRow
   const avgOpen = campaignsToAnalyze.reduce((s, c) => s + c.openRate, 0) / campaignsToAnalyze.length;
+  
+  // Calculate total volume from Total Sent (users)
   const totalVolume = campaignsToAnalyze.reduce((s, c) => s + c.totalSentUsers, 0);
+  // Calculate total unique viewed for accurate reporting
+  const totalUniqueViewed = campaignsToAnalyze.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
   
   // Check postmaster for spam - highest priority
   if (postmaster && postmaster.length > 0) {
@@ -1738,8 +1775,8 @@ const determinePrimaryStressSignal = (data: CampaignRow[], postmaster: Postmaste
   // Hard bounce is a primary stress signal (soft bounce is NOT)
   if (avgHardBounce > 0.5) return `Hard bounce rate (${avgHardBounce.toFixed(2)}% avg exceeds 0.5% threshold)`;
   if (avgUnsub > 0.3) return `Unsubscribe rate (${avgUnsub.toFixed(2)}% avg exceeds 0.3% threshold)`;
-  if (avgOpen < 10) return `Engagement decay (${avgOpen.toFixed(1)}% avg open rate indicates deliverability issues)`;
-  if (totalVolume > 500000 && avgOpen < 15) return `High volume with low engagement (${formatNumber(totalVolume)} sends, ${avgOpen.toFixed(1)}% open)`;
+  if (avgOpen < 10) return `Engagement decay (${avgOpen.toFixed(1)}% avg unique open rate indicates deliverability issues)`;
+  if (totalVolume > 500000 && avgOpen < 15) return `High volume with low engagement (${formatNumber(totalVolume)} Total Sent users, ${formatNumber(totalUniqueViewed)} Unique Viewed users, ${avgOpen.toFixed(1)}% unique open rate)`;
   
   return "No critical stress signals detected";
 };
@@ -1765,6 +1802,7 @@ const assessDamageType = (
 
 // Helper: Generate reputation evidence
 // Uses separate hard bounce and soft bounce rates for clarity
+// Open rate trend is compared between first week and last week of the data period
 const generateReputationEvidence = (
   openChange: number,
   hardBounceEnd: number,
@@ -1774,8 +1812,8 @@ const generateReputationEvidence = (
 ): string => {
   const evidence: string[] = [];
   
-  if (openChange > 5) evidence.push(`Open rate improved ${openChange.toFixed(1)}% (first half vs last half of data period)`);
-  else if (openChange < -5) evidence.push(`Open rate declined ${Math.abs(openChange).toFixed(1)}% (first half vs last half of data period)`);
+  if (openChange > 5) evidence.push(`Unique open rate improved ${openChange.toFixed(1)}% (first week vs last week of data period)`);
+  else if (openChange < -5) evidence.push(`Unique open rate declined ${Math.abs(openChange).toFixed(1)}% (first week vs last week of data period)`);
   
   // Report hard and soft bounce separately
   if (hardBounceEnd < 0.5) evidence.push(`Hard bounce rate healthy at ${hardBounceEnd.toFixed(2)}%`);
@@ -1871,7 +1909,7 @@ const generateSignalTable = (
     value: totals.viewed,
     percentage: `${openRate.toFixed(2)}%`,
     trend: openTrend,
-    trendDescription: `${openEnd > openStart ? '+' : ''}${(openEnd - openStart).toFixed(1)}pp (first half vs last half)`,
+    trendDescription: `${openEnd > openStart ? '+' : ''}${(openEnd - openStart).toFixed(1)}pp (first week vs last week)`,
   });
   
   const clickRate = denominator > 0 ? (totals.clicked / denominator) * 100 : 0;
@@ -1951,6 +1989,7 @@ const generateSignalTable = (
 
 // Helper: Generate MoM analysis
 // Uses separate hard bounce and soft bounce changes for clarity
+// Trend comparisons are based on first week vs last week of the data period
 const generateMoMAnalysis = (
   data: CampaignRow[],
   openChange: number,
@@ -1963,10 +2002,10 @@ const generateMoMAnalysis = (
   const worsened: string[] = [];
   
   if (Math.abs(openChange) > 5) {
-    if (openChange > 0) changes.push(`Open rate improved by ${openChange.toFixed(1)}% (first half vs last half of data period)`);
-    else worsened.push(`Open rate declined by ${Math.abs(openChange).toFixed(1)}% (first half vs last half of data period)`);
+    if (openChange > 0) changes.push(`Unique open rate improved by ${openChange.toFixed(1)}% (first week vs last week of data period)`);
+    else worsened.push(`Unique open rate declined by ${Math.abs(openChange).toFixed(1)}% (first week vs last week of data period)`);
   } else {
-    stable.push(`Open rate remained stable (${openChange > 0 ? '+' : ''}${openChange.toFixed(1)}% change)`);
+    stable.push(`Unique open rate remained stable (${openChange > 0 ? '+' : ''}${openChange.toFixed(1)}% change)`);
   }
   
   // Separate hard and soft bounce reporting
