@@ -374,10 +374,17 @@ export const parseCSV = (csvText: string): ValidationResult => {
   const delimiter = lines[0].includes(";") ? ";" : ",";
   const rawHeaders = parseCSVLine(lines[0], delimiter).map(h => h.trim().replace(/"/g, "").toLowerCase());
 
-  // Create header index map
+  // Normalize header: remove spaces before parentheses (e.g., "total sent(users)" -> "total sent (users)")
+  const normalizeHeader = (header: string): string => {
+    // Add space before opening parenthesis if missing (e.g., "sent(users)" -> "sent (users)")
+    return header.replace(/(\w)\(/g, "$1 (");
+  };
+
+  // Create header index map with normalized headers
   const headerIndexMap: Record<string, number> = {};
   rawHeaders.forEach((header, idx) => {
-    headerIndexMap[header] = idx;
+    const normalized = normalizeHeader(header);
+    headerIndexMap[normalized] = idx;
   });
 
   // Check required headers
