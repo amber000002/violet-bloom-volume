@@ -421,10 +421,14 @@ export const parseCSV = (csvText: string): ValidationResult => {
     };
 
     // Only process Email channel and Completed/Stopped status
-    const channel = getValue("channel");
-    const status = getValue("status").toLowerCase();
+    const channel = getValue("channel").toLowerCase().trim();
+    const status = getValue("status").toLowerCase().trim();
     
-    if (channel.toLowerCase() !== "email" || (status !== "completed" && status !== "stopped")) {
+    // Check for valid status - handle variations like "Completed", "STOPPED", "stopped", etc.
+    const isValidStatus = status === "completed" || status === "stopped" || 
+                          status.startsWith("completed") || status.startsWith("stopped");
+    
+    if (channel !== "email" || !isValidStatus) {
       continue;
     }
 
