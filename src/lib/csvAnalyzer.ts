@@ -420,11 +420,11 @@ export const parseCSV = (csvText: string): ValidationResult => {
       return parseFloat(val.replace(/,/g, "").replace("%", "")) || 0;
     };
 
-    // Only process Email channel and Completed status
+    // Only process Email channel and Completed/Stopped status
     const channel = getValue("channel");
-    const status = getValue("status");
+    const status = getValue("status").toLowerCase();
     
-    if (channel.toLowerCase() !== "email" || status.toLowerCase() !== "completed") {
+    if (channel.toLowerCase() !== "email" || (status !== "completed" && status !== "stopped")) {
       continue;
     }
 

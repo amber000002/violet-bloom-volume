@@ -51,11 +51,9 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ campaign
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">Data Integrity & Calculation Rules</span>
-          {hasActiveWarnings && (
-            <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-600 rounded-full">
-              {warnings.deliveredFallbackCount + warnings.excludedStatusCount} notes
-            </span>
-          )}
+          <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full">
+            {warnings.totalCampaignsAnalyzed} campaigns analyzed
+          </span>
         </div>
         {isExpanded ? (
           <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -107,7 +105,7 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ campaign
                     🧮 Campaign Inclusion Rules
                   </h4>
                   <ul className="text-xs text-muted-foreground space-y-0.5">
-                    <li>• Included if: Channel = Email, Status = Completed</li>
+                    <li>• Included if: Channel = Email, Status = Completed or Stopped</li>
                     <li>• Minimum 1,000 users applies only to:</li>
                     <li className="pl-2 text-muted-foreground/70">Best Performing & Worst Performing lists</li>
                     <li>• Aggregate and trend reports include all valid campaigns</li>
