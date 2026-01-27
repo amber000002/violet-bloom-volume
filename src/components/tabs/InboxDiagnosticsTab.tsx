@@ -38,6 +38,7 @@ import {
 } from "@/lib/csvAnalyzer";
 import { InboxDiagnosticsSlides } from "../presentation/InboxDiagnosticsSlides";
 import { Button } from "../ui/button";
+import { DataIntegrityPanel } from "../DataIntegrityPanel";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
@@ -463,6 +464,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               </Button>
             </div>
           </div>
+
+          {/* Data Integrity & Calculation Rules Panel */}
+          <DataIntegrityPanel campaignData={campaignData} />
 
           {/* Report 1a: Campaign Overview by Provider with Percentages */}
           <CollapsibleSection
