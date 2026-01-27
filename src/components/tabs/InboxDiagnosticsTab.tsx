@@ -213,12 +213,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     if (campaignData.length === 0) return;
     
     const analysisReport = generateAnalysisReport(campaignData);
+    // Also generate reputation report for Reputation Snapshot, Root Cause Summary, and Repair Actions
+    const reputationReport = generateReputationRepairReport(campaignData, postmasterData, contextText || null);
     const newDiagnostics: DiagnosticsData = {
       rawData: campaignData,
       postmasterData,
       contextText: contextText || null,
       analysisReport,
-      reputationReport: null,
+      reputationReport,
     };
     setDiagnostics(newDiagnostics);
     setActiveReport("analysis");
@@ -612,6 +614,91 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               * Dates parsed as DD/MM/YYYY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
             </p>
           </CollapsibleSection>
+
+          {/* Reputation Snapshot (from Reputation Repair) */}
+          {diagnostics.reputationReport?.enhancedReport && (
+            <div className="magic-card rounded-2xl p-6 border-2 border-primary/20 bg-primary/5">
+              <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                <Shield className="w-5 h-5 text-primary" />
+                Reputation Snapshot (Executive View)
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection === 'improving' ? 'bg-green-500/20 text-green-600' :
+                    diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection === 'degrading' ? 'bg-red-500/20 text-red-600' :
+                    'bg-amber-500/20 text-amber-600'
+                  }`}>
+                    {diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection.toUpperCase()}
+                  </span>
+                  <span className="text-sm">{diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationEvidence}</span>
+                </div>
+                <ul className="space-y-2 text-sm">
+                  <li><strong>Primary Stress Signal:</strong> {diagnostics.reputationReport.enhancedReport.reputationSnapshot.primaryStressSignal}</li>
+                  <li><strong>Timing Correlation:</strong> {diagnostics.reputationReport.enhancedReport.reputationSnapshot.timingCorrelation}</li>
+                  <li><strong>Damage Assessment:</strong> <span className={diagnostics.reputationReport.enhancedReport.reputationSnapshot.damageAssessment === 'structural' ? 'text-red-600 font-medium' : 'text-green-600'}>{diagnostics.reputationReport.enhancedReport.reputationSnapshot.damageAssessment}</span></li>
+                </ul>
+                <div className={`p-3 rounded-lg ${diagnostics.reputationReport.enhancedReport.reputationSnapshot.safeToScale ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                  <p className={`font-semibold ${diagnostics.reputationReport.enhancedReport.reputationSnapshot.safeToScale ? 'text-green-600' : 'text-red-600'}`}>
+                    {diagnostics.reputationReport.enhancedReport.reputationSnapshot.verdict}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Root Cause Summary (from Reputation Repair) */}
+          {diagnostics.reputationReport?.enhancedReport?.rootCauses && diagnostics.reputationReport.enhancedReport.rootCauses.length > 0 && (
+            <CollapsibleSection
+              title="Root Cause Summary"
+              icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
+              isOpen={expandedSections.issues}
+              onToggle={() => toggleSection("issues")}
+            >
+              <ul className="space-y-3">
+                {diagnostics.reputationReport.enhancedReport.rootCauses.map((rc, i) => (
+                  <li key={i} className="bg-muted/20 rounded-lg p-4">
+                    <p className="font-medium">{rc.cause}</p>
+                    <p className="text-sm text-muted-foreground mt-1">Evidence: {rc.evidence}</p>
+                    <span className="text-xs px-2 py-0.5 bg-muted rounded mt-2 inline-block">{rc.evidenceType.replace('_', ' ')}</span>
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleSection>
+          )}
+
+          {/* Reputation Repair Actions (from Reputation Repair) */}
+          {diagnostics.reputationReport?.enhancedReport?.repairActions && (
+            <CollapsibleSection
+              title="Reputation Repair Actions"
+              icon={<Lightbulb className="w-5 h-5 text-primary" />}
+              isOpen={expandedSections.learnings}
+              onToggle={() => toggleSection("learnings")}
+            >
+              <div className="space-y-3">
+                {diagnostics.reputationReport.enhancedReport.repairActions.map((action, i) => (
+                  <div key={i} className="bg-muted/20 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                        action.priority === 'immediate' ? 'bg-red-500/20 text-red-600' :
+                        action.priority === 'short-term' ? 'bg-amber-500/20 text-amber-600' :
+                        'bg-blue-500/20 text-blue-600'
+                      }`}>
+                        {action.priority === 'immediate' ? '0-7 days' : action.priority === 'short-term' ? '7-21 days' : 'Ongoing'}
+                      </span>
+                      <span className={`px-2 py-0.5 text-xs rounded ${action.confidence === 'high' ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>
+                        {action.confidence} confidence
+                      </span>
+                    </div>
+                    <p className="text-sm">{action.action}</p>
+                    {action.metricToWatch && (
+                      <p className="text-xs text-muted-foreground mt-2">Watch: {action.metricToWatch} | Abort if: {action.abortCondition}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
 
           {/* Report 2: Best Performing */}
           <CollapsibleSection
