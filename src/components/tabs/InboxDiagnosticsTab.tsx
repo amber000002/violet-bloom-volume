@@ -623,7 +623,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               </table>
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              * Dates parsed as DD/MM/YYYY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
+              * Dates parsed as DD/MM/YY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
             </p>
           </CollapsibleSection>
 

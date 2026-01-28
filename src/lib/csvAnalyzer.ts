@@ -494,7 +494,7 @@ const validateCalendarDate = (dateStr: string): { isValid: boolean; reason: stri
 
 /**
  * Complete date validation following PRD rules:
- * 1. Check format matches DD/MM/YYYY regex
+ * 1. Check format matches DD/MM/YY regex (2-digit year)
  * 2. Check calendar correctness
  * 
  * Returns detailed status for Data Integrity Panel
@@ -794,42 +794,47 @@ export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult 
 
 // ============= ANALYSIS FUNCTIONS =============
 
-// CRITICAL: Parse DD/MM/YYYY format ONLY (day first, month second, year third)
-// MANDATORY: Do NOT assume MM/DD/YYYY - all dates are DD/MM/YYYY
+// CRITICAL: Parse DD/MM/YY format ONLY (day first, month second, 2-digit year)
+// MANDATORY: Do NOT assume MM/DD/YY - all dates are DD/MM/YY
 // NO locale inference, NO format guessing, NO auto-correction permitted
-const parseDateDDMMYYYY = (dateStr: string): { date: Date | null; error: string | null } => {
+// Year (YY) must NOT be expanded, inferred, or converted to four digits in source data
+const parseDateDDMMYY = (dateStr: string): { date: Date | null; error: string | null; yearYY: number | null } => {
   if (!dateStr || dateStr.trim() === "") {
-    return { date: null, error: "Empty date string" };
+    return { date: null, error: "Empty date string", yearYY: null };
   }
   
   const trimmed = dateStr.trim();
   
-  // STRICT: Only accept DD/MM/YYYY format with forward slashes
-  // Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$
-  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/;
+  // STRICT: Only accept DD/MM/YY format with forward slashes (2-digit year)
+  // Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{2}$
+  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{2}$/;
   
   if (!strictPattern.test(trimmed)) {
-    return { date: null, error: `Does not match DD/MM/YYYY format: ${dateStr}` };
+    return { date: null, error: `Does not match DD/MM/YY format: ${dateStr}`, yearYY: null };
   }
   
   const parts = trimmed.split('/');
   const day = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10);
-  const year = parseInt(parts[2], 10);
+  const yearYY = parseInt(parts[2], 10);
+  
+  // Convert YY to full year for calendar validation ONLY (not stored)
+  // Using 2000 + YY for years 00-99 (covers 2000-2099)
+  const fullYear = 2000 + yearYY;
   
   // Create date and validate calendar correctness
-  const parsedDate = new Date(year, month - 1, day);
+  const parsedDate = new Date(fullYear, month - 1, day);
   
-  // Verify the date components match (catches invalid dates like 31/02/2024)
+  // Verify the date components match (catches invalid dates like 31/02/24)
   if (
-    parsedDate.getFullYear() !== year ||
+    parsedDate.getFullYear() !== fullYear ||
     parsedDate.getMonth() !== month - 1 ||
     parsedDate.getDate() !== day
   ) {
-    return { date: null, error: `Invalid calendar date: ${dateStr}` };
+    return { date: null, error: `Invalid calendar date: ${dateStr}`, yearYY: null };
   }
   
-  return { date: parsedDate, error: null };
+  return { date: parsedDate, error: null, yearYY };
 };
 
 // Dynamic month names - no hardcoded restrictions
@@ -856,7 +861,7 @@ interface MonthParseResult {
 }
 
 const getMonthFromDate = (dateStr: string): MonthParseResult => {
-  const { date, error } = parseDateDDMMYYYY(dateStr);
+  const { date, error } = parseDateDDMMYY(dateStr);
   
   if (!date || error) {
     return { 
@@ -890,7 +895,7 @@ const getMonthFromDate = (dateStr: string): MonthParseResult => {
 
 // BACKWARD COMPATIBILITY: Wrapper for legacy code that uses parseDateSafely
 const parseDateSafely = (dateStr: string): Date | null => {
-  const { date } = parseDateDDMMYYYY(dateStr);
+  const { date } = parseDateDDMMYY(dateStr);
   return date;
 };
 
@@ -949,7 +954,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     return agg;
   });
 
-  // Report 1b: Monthly Overview (with STRICT DD/MM/YYYY parsing → Oct/Nov/Dec only)
+  // Report 1b: Monthly Overview - dynamically groups campaigns by calendar month from Start Date
   const monthMap: Record<string, MonthlyOverview> = {};
   const monthParsingErrors: string[] = [];
   
