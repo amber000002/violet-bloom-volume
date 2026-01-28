@@ -35,6 +35,7 @@ import {
   DeliverabilityDiagnosticSummary,
   EnhancedReputationReport,
   ReputationSignalRow,
+  ProcessingSummary,
 } from "@/lib/csvAnalyzer";
 import { InboxDiagnosticsSlides } from "../presentation/InboxDiagnosticsSlides";
 import { Button } from "../ui/button";
@@ -142,6 +143,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [postmasterValidation, setPostmasterValidation] = useState<PostmasterValidationResult | null>(null);
   const [campaignData, setCampaignData] = useState<CampaignRow[]>([]);
   const [postmasterData, setPostmasterData] = useState<PostmasterRow[] | null>(null);
+  const [processingSummary, setProcessingSummary] = useState<ProcessingSummary | null>(null);
   const [contextText, setContextText] = useState<string>("");
   const [campaignFileName, setCampaignFileName] = useState<string>("");
   const [postmasterFileName, setPostmasterFileName] = useState<string>("");
@@ -175,6 +177,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       const text = e.target?.result as string;
       const result = parseCSV(text);
       setCampaignValidation(result);
+      setProcessingSummary(result.processingSummary);
       if (result.isValid) {
         setCampaignData(result.data);
       }
@@ -253,6 +256,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setPostmasterValidation(null);
     setCampaignData([]);
     setPostmasterData(null);
+    setProcessingSummary(null);
     setContextText("");
     setCampaignFileName("");
     setPostmasterFileName("");
@@ -470,7 +474,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           </div>
 
           {/* Data Integrity & Calculation Rules Panel */}
-          <DataIntegrityPanel campaignData={campaignData} />
+          {processingSummary && <DataIntegrityPanel processingSummary={processingSummary} />}
 
           {/* Report 1a: Campaign Overview by Provider with Percentages */}
           <CollapsibleSection
