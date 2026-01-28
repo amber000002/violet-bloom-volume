@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Info, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { Info, ChevronDown, ChevronUp, AlertTriangle, Calendar } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ProcessingSummary, ExcludedCampaign } from "@/lib/csvAnalyzer";
+import { ProcessingSummary, ExcludedCampaign, DateIssueCampaign } from "@/lib/csvAnalyzer";
 import {
   Tooltip,
   TooltipContent,
@@ -14,9 +14,12 @@ interface DataIntegrityPanelProps {
 }
 
 export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processingSummary }) => {
-  // Auto-expand if there are exclusions
-  const [isExpanded, setIsExpanded] = useState(processingSummary.campaignsExcluded > 0);
+  // Auto-expand if there are exclusions or date issues
+  const hasExclusions = processingSummary.campaignsExcluded > 0;
+  const hasDateIssues = processingSummary.dateIssueCampaigns.length > 0;
+  const [isExpanded, setIsExpanded] = useState(hasExclusions || hasDateIssues);
   const [showExcludedDetails, setShowExcludedDetails] = useState(false);
+  const [showDateIssueDetails, setShowDateIssueDetails] = useState(false);
 
   const { 
     totalRowsInCSV, 
@@ -24,25 +27,32 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
     campaignsExcluded, 
     exclusionBreakdown, 
     excludedCampaigns,
+    dateIssueCampaigns,
     deliveredFallbackCount 
   } = processingSummary;
 
-  const hasExclusions = campaignsExcluded > 0;
-
   // Build exclusion reasons list
   const exclusionReasons: { reason: string; count: number }[] = [];
-  if (exclusionBreakdown.invalidStartDate > 0) {
-    exclusionReasons.push({ reason: "Invalid or missing Start Date", count: exclusionBreakdown.invalidStartDate });
-  }
   if (exclusionBreakdown.channelMismatch > 0) {
     exclusionReasons.push({ reason: 'Channel not equal to "Email"', count: exclusionBreakdown.channelMismatch });
-  }
-  if (exclusionBreakdown.duplicateAggregated > 0) {
-    exclusionReasons.push({ reason: "Duplicate Campaign ID aggregated", count: exclusionBreakdown.duplicateAggregated });
   }
   if (exclusionBreakdown.other > 0) {
     exclusionReasons.push({ reason: "Other processing constraints", count: exclusionBreakdown.other });
   }
+
+  // Build date issue reasons list (these are NOT exclusions, just tracked separately)
+  const dateIssueReasons: { reason: string; count: number }[] = [];
+  if (exclusionBreakdown.missingStartDate > 0) {
+    dateIssueReasons.push({ reason: "Missing Start Date", count: exclusionBreakdown.missingStartDate });
+  }
+  if (exclusionBreakdown.invalidStartDateFormat > 0) {
+    dateIssueReasons.push({ reason: "Invalid Start Date format (not DD/MM/YYYY)", count: exclusionBreakdown.invalidStartDateFormat });
+  }
+  if (exclusionBreakdown.invalidStartDateCalendar > 0) {
+    dateIssueReasons.push({ reason: "Invalid calendar date (e.g., 31/02/2024)", count: exclusionBreakdown.invalidStartDateCalendar });
+  }
+
+  const totalDateIssues = dateIssueCampaigns.length;
 
   return (
     <div className="bg-muted/30 border border-border rounded-xl overflow-hidden">
@@ -68,6 +78,11 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
             {hasExclusions && (
               <span className="px-2 py-0.5 text-xs bg-amber-500/10 text-amber-600 rounded-full">
                 {campaignsExcluded} excluded
+              </span>
+            )}
+            {hasDateIssues && (
+              <span className="px-2 py-0.5 text-xs bg-blue-500/10 text-blue-600 rounded-full">
+                {totalDateIssues} date issues
               </span>
             )}
           </div>
@@ -246,7 +261,8 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
                     <h5 className="text-xs font-medium text-muted-foreground">Campaign Inclusion</h5>
                     <ul className="text-xs text-muted-foreground/80 space-y-0.5">
                       <li>• Channel = Email (all status values included)</li>
-                      <li>• Valid Start Date required (dd/mm/yyyy)</li>
+                      <li>• Each CSV row = unique analytical unit (no Campaign ID aggregation)</li>
+                      <li>• Invalid dates: included in analysis, excluded from Monthly View</li>
                       <li>• 1,000 user minimum only for Best/Worst lists</li>
                     </ul>
                   </div>
@@ -255,8 +271,9 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
                   <div className="space-y-1">
                     <h5 className="text-xs font-medium text-muted-foreground">Date Handling</h5>
                     <ul className="text-xs text-muted-foreground/80 space-y-0.5">
-                      <li>• Start Date parsed strictly as dd/mm/yyyy</li>
-                      <li>• No automatic date inference or locale guessing</li>
+                      <li>• Date Format: Strictly DD/MM/YYYY only</li>
+                      <li>• No locale inference, format guessing, or auto-correction</li>
+                      <li>• Invalid dates flagged, not excluded from analysis</li>
                     </ul>
                   </div>
                 </div>

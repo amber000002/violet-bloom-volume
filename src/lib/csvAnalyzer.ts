@@ -52,16 +52,31 @@ export interface ExcludedCampaign {
 }
 
 export type ExclusionReason = 
-  | "invalid_start_date"
+  | "invalid_start_date_format"
+  | "invalid_start_date_calendar"
+  | "missing_start_date"
   | "channel_mismatch"
-  | "duplicate_aggregated"
   | "other";
 
+// Date validation status - campaigns with invalid dates are included in analysis
+// but excluded from time-based views (Monthly View)
+export type DateValidityStatus = "valid" | "invalid_format" | "invalid_calendar" | "missing";
+
 export interface ExclusionBreakdown {
-  invalidStartDate: number;
+  invalidStartDateFormat: number;
+  invalidStartDateCalendar: number;
+  missingStartDate: number;
   channelMismatch: number;
-  duplicateAggregated: number;
   other: number;
+}
+
+// Tracking for campaigns with date issues (included in analysis, excluded from time-based views)
+export interface DateIssueCampaign {
+  campaignName: string;
+  campaignId: string;
+  startDate: string;
+  issue: string;
+  issueType: DateValidityStatus;
 }
 
 export interface ProcessingSummary {
@@ -70,6 +85,8 @@ export interface ProcessingSummary {
   campaignsExcluded: number;
   exclusionBreakdown: ExclusionBreakdown;
   excludedCampaigns: ExcludedCampaign[];
+  // Campaigns with date issues - included in analysis but excluded from Monthly View
+  dateIssueCampaigns: DateIssueCampaign[];
   deliveredFallbackCount: number;
 }
 
@@ -399,21 +416,106 @@ const createEmptyProcessingSummary = (totalRows: number = 0): ProcessingSummary 
   campaignsIncluded: 0,
   campaignsExcluded: 0,
   exclusionBreakdown: {
-    invalidStartDate: 0,
+    invalidStartDateFormat: 0,
+    invalidStartDateCalendar: 0,
+    missingStartDate: 0,
     channelMismatch: 0,
-    duplicateAggregated: 0,
     other: 0,
   },
   excludedCampaigns: [],
+  dateIssueCampaigns: [],
   deliveredFallbackCount: 0,
 });
 
-// Helper to validate date format (dd/mm/yyyy)
+// ============= STRICT DATE VALIDATION (DD/MM/YYYY ONLY) =============
+// CRITICAL: No locale inference, no format guessing, no auto-correction
+
+/**
+ * Validates if a date string matches STRICT DD/MM/YYYY format
+ * Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$
+ * 
+ * @returns { isValid: boolean, reason: string | null }
+ */
+const validateDateFormat = (dateStr: string): { isValid: boolean; reason: string | null } => {
+  if (!dateStr || dateStr.trim() === "") {
+    return { isValid: false, reason: "missing" };
+  }
+  
+  const trimmed = dateStr.trim();
+  
+  // STRICT regex for DD/MM/YYYY only - no other formats allowed
+  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/;
+  
+  if (!strictPattern.test(trimmed)) {
+    return { isValid: false, reason: "format" };
+  }
+  
+  return { isValid: true, reason: null };
+};
+
+/**
+ * Validates calendar correctness of a DD/MM/YYYY date
+ * Examples:
+ *   - 29/02/2024 → valid (leap year)
+ *   - 29/02/2023 → invalid (not leap year)
+ *   - 31/04/2024 → invalid (April has 30 days)
+ */
+const validateCalendarDate = (dateStr: string): { isValid: boolean; reason: string | null } => {
+  const trimmed = dateStr.trim();
+  const parts = trimmed.split('/');
+  
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  
+  // Create date and verify it matches input (catches invalid dates like 31/02)
+  const date = new Date(year, month - 1, day);
+  
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return { isValid: false, reason: "calendar" };
+  }
+  
+  return { isValid: true, reason: null };
+};
+
+/**
+ * Complete date validation following PRD rules:
+ * 1. Check format matches DD/MM/YYYY regex
+ * 2. Check calendar correctness
+ * 
+ * Returns detailed status for Data Integrity Panel
+ */
+export const validateStartDate = (dateStr: string): {
+  isValid: boolean;
+  status: DateValidityStatus;
+  errorMessage: string | null;
+} => {
+  // Step 1: Check format
+  const formatCheck = validateDateFormat(dateStr);
+  if (!formatCheck.isValid) {
+    if (formatCheck.reason === "missing") {
+      return { isValid: false, status: "missing", errorMessage: "Missing Start Date" };
+    }
+    return { isValid: false, status: "invalid_format", errorMessage: "Does not match DD/MM/YYYY format" };
+  }
+  
+  // Step 2: Check calendar correctness
+  const calendarCheck = validateCalendarDate(dateStr);
+  if (!calendarCheck.isValid) {
+    return { isValid: false, status: "invalid_calendar", errorMessage: "Invalid calendar date" };
+  }
+  
+  return { isValid: true, status: "valid", errorMessage: null };
+};
+
+// Legacy wrapper for backward compatibility
 const isValidDateFormat = (dateStr: string): boolean => {
-  if (!dateStr || dateStr.trim() === "") return false;
-  // Accept formats: dd/mm/yyyy, dd/mm/yy, d/m/yyyy, d/m/yy
-  const datePattern = /^\d{1,2}\/\d{1,2}\/\d{2,4}$/;
-  return datePattern.test(dateStr.trim());
+  const result = validateStartDate(dateStr);
+  return result.isValid;
 };
 
 export const parseCSV = (csvText: string): ValidationResult => {
@@ -422,10 +524,12 @@ export const parseCSV = (csvText: string): ValidationResult => {
   const warnings: string[] = [];
   const data: CampaignRow[] = [];
   const excludedCampaigns: ExcludedCampaign[] = [];
+  const dateIssueCampaigns: DateIssueCampaign[] = [];
   const exclusionBreakdown: ExclusionBreakdown = {
-    invalidStartDate: 0,
+    invalidStartDateFormat: 0,
+    invalidStartDateCalendar: 0,
+    missingStartDate: 0,
     channelMismatch: 0,
-    duplicateAggregated: 0,
     other: 0,
   };
 
@@ -508,47 +612,53 @@ export const parseCSV = (csvText: string): ValidationResult => {
     const startDate = getValue("start date");
     const channel = getValue("channel").toLowerCase().trim();
 
-    // Check channel mismatch
+    // Check channel mismatch - ONLY exclusion reason
     if (channel !== "email") {
       exclusionBreakdown.channelMismatch++;
       excludedCampaigns.push({
         campaignName,
         campaignId,
         startDate: startDate || "—",
-        reason: "Channel mismatch (not Email)",
+        reason: "Channel not equal to Email",
         reasonCode: "channel_mismatch",
       });
       continue;
     }
 
-    // Check for invalid/missing start date
-    if (!isValidDateFormat(startDate)) {
-      exclusionBreakdown.invalidStartDate++;
-      excludedCampaigns.push({
+    // Validate start date - campaigns with date issues are INCLUDED in analysis
+    // but tracked separately for transparency and excluded from time-based views
+    const dateValidation = validateStartDate(startDate);
+    if (!dateValidation.isValid) {
+      // Track the date issue
+      let issueType: DateValidityStatus = dateValidation.status;
+      let issueMessage = dateValidation.errorMessage || "Unknown date issue";
+      
+      if (issueType === "missing") {
+        exclusionBreakdown.missingStartDate++;
+        issueMessage = "Missing Start Date";
+      } else if (issueType === "invalid_format") {
+        exclusionBreakdown.invalidStartDateFormat++;
+        issueMessage = `Invalid format (expected DD/MM/YYYY): "${startDate}"`;
+      } else if (issueType === "invalid_calendar") {
+        exclusionBreakdown.invalidStartDateCalendar++;
+        issueMessage = `Invalid calendar date: "${startDate}"`;
+      }
+      
+      dateIssueCampaigns.push({
         campaignName,
         campaignId,
         startDate: startDate || "—",
-        reason: "Invalid or missing Start Date",
-        reasonCode: "invalid_start_date",
+        issue: issueMessage,
+        issueType,
       });
-      continue;
+      
+      // NOTE: We do NOT continue here - campaign is still included in analysis
+      // It will be excluded from Monthly View but included in global totals
     }
 
-    // Check for duplicate campaign ID
-    if (seenCampaignIds.has(campaignId)) {
-      exclusionBreakdown.duplicateAggregated++;
-      excludedCampaigns.push({
-        campaignName,
-        campaignId,
-        startDate,
-        reason: "Duplicate Campaign ID (aggregated)",
-        reasonCode: "duplicate_aggregated",
-      });
-      continue;
-    }
-
-    // Mark this campaign ID as seen
-    seenCampaignIds.set(campaignId, data.length);
+    // REMOVED: Duplicate Campaign ID aggregation
+    // Per PRD: "Treat each CSV row as a unique analytical unit, regardless of Campaign ID duplication"
+    // seenCampaignIds is now only used for informational purposes, not exclusion
 
     // Extract subject line from title (before preheader)
     const fullTitle = getValue("title");
@@ -605,6 +715,7 @@ export const parseCSV = (csvText: string): ValidationResult => {
     campaignsExcluded: excludedCampaigns.length,
     exclusionBreakdown,
     excludedCampaigns,
+    dateIssueCampaigns,
     deliveredFallbackCount,
   };
 
@@ -675,46 +786,37 @@ export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult 
 
 // CRITICAL: Parse DD/MM/YYYY format ONLY (day first, month second, year third)
 // MANDATORY: Do NOT assume MM/DD/YYYY - all dates are DD/MM/YYYY
-// SUPPORTS: 2-digit year (YY) and 4-digit year (YYYY)
+// NO locale inference, NO format guessing, NO auto-correction permitted
 const parseDateDDMMYYYY = (dateStr: string): { date: Date | null; error: string | null } => {
-  if (!dateStr) return { date: null, error: "Empty date string" };
-  
-  // Split by / or - delimiter
-  const parts = dateStr.split(/[\/\-]/);
-  if (parts.length !== 3) {
-    return { date: null, error: `Invalid date format: ${dateStr}` };
+  if (!dateStr || dateStr.trim() === "") {
+    return { date: null, error: "Empty date string" };
   }
   
-  // MANDATORY: Day = first value, Month = second value, Year = third value
+  const trimmed = dateStr.trim();
+  
+  // STRICT: Only accept DD/MM/YYYY format with forward slashes
+  // Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$
+  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/;
+  
+  if (!strictPattern.test(trimmed)) {
+    return { date: null, error: `Does not match DD/MM/YYYY format: ${dateStr}` };
+  }
+  
+  const parts = trimmed.split('/');
   const day = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10);
-  let year = parseInt(parts[2], 10);
+  const year = parseInt(parts[2], 10);
   
-  // Validate ranges
-  if (isNaN(day) || isNaN(month) || isNaN(year)) {
-    return { date: null, error: `Non-numeric date parts: ${dateStr}` };
-  }
-  
-  if (day < 1 || day > 31) {
-    return { date: null, error: `Invalid day value: ${day} in ${dateStr}` };
-  }
-  
-  if (month < 1 || month > 12) {
-    return { date: null, error: `Invalid month value: ${month} in ${dateStr}` };
-  }
-  
-  // Handle 2-digit year: convert to full year (00-99 → 2000-2099)
-  if (year < 100) {
-    year = 2000 + year;
-  }
-  
-  if (year < 1900 || year > 2100) {
-    return { date: null, error: `Invalid year value: ${year} in ${dateStr}` };
-  }
-  
+  // Create date and validate calendar correctness
   const parsedDate = new Date(year, month - 1, day);
-  if (isNaN(parsedDate.getTime())) {
-    return { date: null, error: `Failed to create date from: ${dateStr}` };
+  
+  // Verify the date components match (catches invalid dates like 31/02/2024)
+  if (
+    parsedDate.getFullYear() !== year ||
+    parsedDate.getMonth() !== month - 1 ||
+    parsedDate.getDate() !== day
+  ) {
+    return { date: null, error: `Invalid calendar date: ${dateStr}` };
   }
   
   return { date: parsedDate, error: null };
