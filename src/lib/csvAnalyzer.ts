@@ -42,11 +42,43 @@ export interface PostmasterRow {
   errorRatio: number;
 }
 
+// Exclusion tracking for Data Integrity Panel
+export interface ExcludedCampaign {
+  campaignName: string;
+  campaignId: string;
+  startDate: string;
+  reason: string;
+  reasonCode: ExclusionReason;
+}
+
+export type ExclusionReason = 
+  | "invalid_start_date"
+  | "channel_mismatch"
+  | "duplicate_aggregated"
+  | "other";
+
+export interface ExclusionBreakdown {
+  invalidStartDate: number;
+  channelMismatch: number;
+  duplicateAggregated: number;
+  other: number;
+}
+
+export interface ProcessingSummary {
+  totalRowsInCSV: number;
+  campaignsIncluded: number;
+  campaignsExcluded: number;
+  exclusionBreakdown: ExclusionBreakdown;
+  excludedCampaigns: ExcludedCampaign[];
+  deliveredFallbackCount: number;
+}
+
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
   data: CampaignRow[];
+  processingSummary: ProcessingSummary;
 }
 
 export interface PostmasterValidationResult {
@@ -361,14 +393,54 @@ const parseCSVLine = (line: string, delimiter: string): string[] => {
   return result;
 };
 
+// Helper to create empty processing summary
+const createEmptyProcessingSummary = (totalRows: number = 0): ProcessingSummary => ({
+  totalRowsInCSV: totalRows,
+  campaignsIncluded: 0,
+  campaignsExcluded: 0,
+  exclusionBreakdown: {
+    invalidStartDate: 0,
+    channelMismatch: 0,
+    duplicateAggregated: 0,
+    other: 0,
+  },
+  excludedCampaigns: [],
+  deliveredFallbackCount: 0,
+});
+
+// Helper to validate date format (dd/mm/yyyy)
+const isValidDateFormat = (dateStr: string): boolean => {
+  if (!dateStr || dateStr.trim() === "") return false;
+  // Accept formats: dd/mm/yyyy, dd/mm/yy, d/m/yyyy, d/m/yy
+  const datePattern = /^\d{1,2}\/\d{1,2}\/\d{2,4}$/;
+  return datePattern.test(dateStr.trim());
+};
+
 export const parseCSV = (csvText: string): ValidationResult => {
   const lines = csvText.trim().split("\n");
   const errors: string[] = [];
   const warnings: string[] = [];
   const data: CampaignRow[] = [];
+  const excludedCampaigns: ExcludedCampaign[] = [];
+  const exclusionBreakdown: ExclusionBreakdown = {
+    invalidStartDate: 0,
+    channelMismatch: 0,
+    duplicateAggregated: 0,
+    other: 0,
+  };
+
+  // Count actual data rows (excluding header and empty lines)
+  const dataLines = lines.slice(1).filter(line => line.trim() !== "");
+  const totalRowsInCSV = dataLines.length;
 
   if (lines.length < 2) {
-    return { isValid: false, errors: ["CSV file must have a header row and at least one data row"], warnings: [], data: [] };
+    return { 
+      isValid: false, 
+      errors: ["CSV file must have a header row and at least one data row"], 
+      warnings: [], 
+      data: [],
+      processingSummary: createEmptyProcessingSummary(0)
+    };
   }
 
   const delimiter = lines[0].includes(";") ? ";" : ",";
@@ -398,10 +470,20 @@ export const parseCSV = (csvText: string): ValidationResult => {
     );
     if (criticalMissing.length > 0) {
       errors.push(`Missing required columns: ${criticalMissing.join(", ")}`);
-      return { isValid: false, errors, warnings, data: [] };
+      return { 
+        isValid: false, 
+        errors, 
+        warnings, 
+        data: [],
+        processingSummary: createEmptyProcessingSummary(totalRowsInCSV)
+      };
     }
     warnings.push(`Optional columns not found: ${missingHeaders.join(", ")}`);
   }
+
+  // Track seen campaign IDs for duplicate detection
+  const seenCampaignIds = new Map<string, number>(); // campaignId -> index in data array
+  let deliveredFallbackCount = 0;
 
   // Parse data rows
   for (let i = 1; i < lines.length; i++) {
@@ -420,15 +502,53 @@ export const parseCSV = (csvText: string): ValidationResult => {
       return parseFloat(val.replace(/,/g, "").replace("%", "")) || 0;
     };
 
-    // Only process Email channel - include ALL status values
+    // Get basic campaign info for exclusion tracking
+    const campaignName = getValue("campaign name");
+    const campaignId = getValue("campaign id");
+    const startDate = getValue("start date");
     const channel = getValue("channel").toLowerCase().trim();
-    const status = getValue("status").toLowerCase().trim();
-    
-    // Include all campaigns regardless of status (Completed, Stopped, Running, Draft, etc.)
-    // Only filter by channel = email
+
+    // Check channel mismatch
     if (channel !== "email") {
+      exclusionBreakdown.channelMismatch++;
+      excludedCampaigns.push({
+        campaignName,
+        campaignId,
+        startDate: startDate || "—",
+        reason: "Channel mismatch (not Email)",
+        reasonCode: "channel_mismatch",
+      });
       continue;
     }
+
+    // Check for invalid/missing start date
+    if (!isValidDateFormat(startDate)) {
+      exclusionBreakdown.invalidStartDate++;
+      excludedCampaigns.push({
+        campaignName,
+        campaignId,
+        startDate: startDate || "—",
+        reason: "Invalid or missing Start Date",
+        reasonCode: "invalid_start_date",
+      });
+      continue;
+    }
+
+    // Check for duplicate campaign ID
+    if (seenCampaignIds.has(campaignId)) {
+      exclusionBreakdown.duplicateAggregated++;
+      excludedCampaigns.push({
+        campaignName,
+        campaignId,
+        startDate,
+        reason: "Duplicate Campaign ID (aggregated)",
+        reasonCode: "duplicate_aggregated",
+      });
+      continue;
+    }
+
+    // Mark this campaign ID as seen
+    seenCampaignIds.set(campaignId, data.length);
 
     // Extract subject line from title (before preheader)
     const fullTitle = getValue("title");
@@ -442,19 +562,23 @@ export const parseCSV = (csvText: string): ValidationResult => {
     const softBounces = getNumericValue("error: email soft bounced");
     const unsubscribes = getNumericValue("total unsubscribes");
 
+    // Track delivered fallback usage
     const baseForRates = totalDelivered > 0 ? totalDelivered : totalSent;
+    if (totalDelivered === 0 && totalSent > 0) {
+      deliveredFallbackCount++;
+    }
 
     const row: CampaignRow = {
-      campaignName: getValue("campaign name"),
-      campaignId: getValue("campaign id"),
+      campaignName,
+      campaignId,
       channel,
       title: fullTitle,
       subjectLine,
-      startDate: getValue("start date"),
+      startDate,
       startTime: getValue("start time"),
       serviceProvider: getValue("service provider"),
       providerName: getValue("provider name"),
-      status,
+      status: getValue("status").toLowerCase().trim(),
       totalSentUsers: totalSent,
       totalDeliveredUsers: totalDelivered,
       totalSentEvents: getNumericValue("total sent (events)"),
@@ -475,12 +599,21 @@ export const parseCSV = (csvText: string): ValidationResult => {
     data.push(row);
   }
 
+  const processingSummary: ProcessingSummary = {
+    totalRowsInCSV,
+    campaignsIncluded: data.length,
+    campaignsExcluded: excludedCampaigns.length,
+    exclusionBreakdown,
+    excludedCampaigns,
+    deliveredFallbackCount,
+  };
+
   if (data.length === 0) {
     errors.push("No valid Email campaigns found in the CSV");
-    return { isValid: false, errors, warnings, data: [] };
+    return { isValid: false, errors, warnings, data: [], processingSummary };
   }
 
-  return { isValid: true, errors, warnings, data };
+  return { isValid: true, errors, warnings, data, processingSummary };
 };
 
 export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult => {
