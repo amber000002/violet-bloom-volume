@@ -40,6 +40,7 @@ import { InboxDiagnosticsSlides } from "../presentation/InboxDiagnosticsSlides";
 import { Button } from "../ui/button";
 import { DataIntegrityPanel } from "../DataIntegrityPanel";
 import { UseCaseCoverageAnalysis } from "../UseCaseCoverageAnalysis";
+import { LifecycleCoverageMatrix } from "../LifecycleCoverageMatrix";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
@@ -159,6 +160,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     learnings: true,
     issues: true,
     useCaseCoverage: true,
+    lifecycleCoverage: true,
   });
 
   const toggleSection = (section: string) => {
@@ -836,6 +838,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             onToggle={() => toggleSection("useCaseCoverage")}
           />
 
+          {/* Lifecycle Coverage Visualization & Insight Engine */}
+          <LifecycleCoverageMatrix
+            campaignData={diagnostics.rawData}
+            industry={industry}
+            isOpen={expandedSections.lifecycleCoverage}
+            onToggle={() => toggleSection("lifecycleCoverage")}
+          />
+
           {/* Report 5: Key Learnings */}
           <CollapsibleSection
             title="Key Learnings & Recommendations"
@@ -1099,6 +1109,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 industry={industry}
                 isOpen={expandedSections.useCaseCoverage}
                 onToggle={() => toggleSection("useCaseCoverage")}
+              />
+
+              {/* 4.5️⃣ Lifecycle Coverage Visualization & Insight Engine */}
+              <LifecycleCoverageMatrix
+                campaignData={diagnostics.rawData}
+                industry={industry}
+                isOpen={expandedSections.lifecycleCoverage}
+                onToggle={() => toggleSection("lifecycleCoverage")}
               />
 
               {/* 5️⃣ Root Cause Summary */}
