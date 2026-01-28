@@ -427,12 +427,13 @@ const createEmptyProcessingSummary = (totalRows: number = 0): ProcessingSummary 
   deliveredFallbackCount: 0,
 });
 
-// ============= STRICT DATE VALIDATION (DD/MM/YYYY ONLY) =============
+// ============= STRICT DATE VALIDATION (DD/MM/YY ONLY) =============
 // CRITICAL: No locale inference, no format guessing, no auto-correction
+// Year (YY) must be interpreted exactly as provided - NO conversion to YYYY
 
 /**
- * Validates if a date string matches STRICT DD/MM/YYYY format
- * Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$
+ * Validates if a date string matches STRICT DD/MM/YY format
+ * Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{2}$
  * 
  * @returns { isValid: boolean, reason: string | null }
  */
@@ -443,8 +444,8 @@ const validateDateFormat = (dateStr: string): { isValid: boolean; reason: string
   
   const trimmed = dateStr.trim();
   
-  // STRICT regex for DD/MM/YYYY only - no other formats allowed
-  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/;
+  // STRICT regex for DD/MM/YY only - no other formats allowed
+  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{2}$/;
   
   if (!strictPattern.test(trimmed)) {
     return { isValid: false, reason: "format" };
@@ -454,11 +455,15 @@ const validateDateFormat = (dateStr: string): { isValid: boolean; reason: string
 };
 
 /**
- * Validates calendar correctness of a DD/MM/YYYY date
+ * Validates calendar correctness of a DD/MM/YY date
  * Examples:
- *   - 29/02/2024 → valid (leap year)
- *   - 29/02/2023 → invalid (not leap year)
- *   - 31/04/2024 → invalid (April has 30 days)
+ *   - 29/02/24 → valid (2024 is leap year)
+ *   - 29/02/23 → invalid (2023 is not leap year)
+ *   - 31/04/25 → invalid (April has 30 days)
+ * 
+ * NOTE: Year is kept as YY for validation purposes only.
+ * We use 2000 + YY for calendar correctness check (leap year detection)
+ * but the original YY value is preserved - NO transformation occurs.
  */
 const validateCalendarDate = (dateStr: string): { isValid: boolean; reason: string | null } => {
   const trimmed = dateStr.trim();
@@ -466,13 +471,18 @@ const validateCalendarDate = (dateStr: string): { isValid: boolean; reason: stri
   
   const day = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10);
-  const year = parseInt(parts[2], 10);
+  const yearYY = parseInt(parts[2], 10);
+  
+  // For calendar validation only, interpret as 2000s (e.g., 24 -> 2024)
+  // This is ONLY for checking leap years and month lengths
+  // The original YY value is never modified or expanded
+  const yearForValidation = 2000 + yearYY;
   
   // Create date and verify it matches input (catches invalid dates like 31/02)
-  const date = new Date(year, month - 1, day);
+  const date = new Date(yearForValidation, month - 1, day);
   
   if (
-    date.getFullYear() !== year ||
+    date.getFullYear() !== yearForValidation ||
     date.getMonth() !== month - 1 ||
     date.getDate() !== day
   ) {
@@ -500,7 +510,7 @@ export const validateStartDate = (dateStr: string): {
     if (formatCheck.reason === "missing") {
       return { isValid: false, status: "missing", errorMessage: "Missing Start Date" };
     }
-    return { isValid: false, status: "invalid_format", errorMessage: "Does not match DD/MM/YYYY format" };
+    return { isValid: false, status: "invalid_format", errorMessage: "Does not match DD/MM/YY format" };
   }
   
   // Step 2: Check calendar correctness
@@ -638,7 +648,7 @@ export const parseCSV = (csvText: string): ValidationResult => {
         issueMessage = "Missing Start Date";
       } else if (issueType === "invalid_format") {
         exclusionBreakdown.invalidStartDateFormat++;
-        issueMessage = `Invalid format (expected DD/MM/YYYY): "${startDate}"`;
+        issueMessage = `Invalid format (expected DD/MM/YY): "${startDate}"`;
       } else if (issueType === "invalid_calendar") {
         exclusionBreakdown.invalidStartDateCalendar++;
         issueMessage = `Invalid calendar date: "${startDate}"`;
