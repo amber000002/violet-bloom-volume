@@ -420,15 +420,13 @@ export const parseCSV = (csvText: string): ValidationResult => {
       return parseFloat(val.replace(/,/g, "").replace("%", "")) || 0;
     };
 
-    // Only process Email channel and Completed/Stopped status
+    // Only process Email channel - include ALL status values
     const channel = getValue("channel").toLowerCase().trim();
     const status = getValue("status").toLowerCase().trim();
     
-    // Check for valid status - handle variations like "Completed", "STOPPED", "stopped", etc.
-    const isValidStatus = status === "completed" || status === "stopped" || 
-                          status.startsWith("completed") || status.startsWith("stopped");
-    
-    if (channel !== "email" || !isValidStatus) {
+    // Include all campaigns regardless of status (Completed, Stopped, Running, Draft, etc.)
+    // Only filter by channel = email
+    if (channel !== "email") {
       continue;
     }
 
@@ -478,7 +476,7 @@ export const parseCSV = (csvText: string): ValidationResult => {
   }
 
   if (data.length === 0) {
-    errors.push("No valid Email campaigns with Completed status found");
+    errors.push("No valid Email campaigns found in the CSV");
     return { isValid: false, errors, warnings, data: [] };
   }
 

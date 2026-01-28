@@ -105,7 +105,7 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ campaign
                     🧮 Campaign Inclusion Rules
                   </h4>
                   <ul className="text-xs text-muted-foreground space-y-0.5">
-                    <li>• Included if: Channel = Email, Status = Completed or Stopped</li>
+                    <li>• Included if: Channel = Email (all status values included)</li>
                     <li>• Minimum 1,000 users applies only to:</li>
                     <li className="pl-2 text-muted-foreground/70">Best Performing & Worst Performing lists</li>
                     <li>• Aggregate and trend reports include all valid campaigns</li>
