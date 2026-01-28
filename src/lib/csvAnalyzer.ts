@@ -427,56 +427,59 @@ const createEmptyProcessingSummary = (totalRows: number = 0): ProcessingSummary 
   deliveredFallbackCount: 0,
 });
 
-// ============= STRICT DATE VALIDATION (DD/MM/YY ONLY) =============
+// ============= STRICT DATE VALIDATION (DD/MM/YY or DD/MM/YYYY) =============
 // CRITICAL: No locale inference, no format guessing, no auto-correction
-// Year (YY) must be interpreted exactly as provided - NO conversion to YYYY
+// Accepts both 2-digit year (YY) and 4-digit year (YYYY) formats
 
 /**
- * Validates if a date string matches STRICT DD/MM/YY format
- * Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{2}$
+ * Validates if a date string matches DD/MM/YY or DD/MM/YYYY format
+ * Regex for YY: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{2}$
+ * Regex for YYYY: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$
  * 
- * @returns { isValid: boolean, reason: string | null }
+ * @returns { isValid: boolean, reason: string | null, is4DigitYear: boolean }
  */
-const validateDateFormat = (dateStr: string): { isValid: boolean; reason: string | null } => {
+const validateDateFormat = (dateStr: string): { isValid: boolean; reason: string | null; is4DigitYear: boolean } => {
   if (!dateStr || dateStr.trim() === "") {
-    return { isValid: false, reason: "missing" };
+    return { isValid: false, reason: "missing", is4DigitYear: false };
   }
   
   const trimmed = dateStr.trim();
   
-  // STRICT regex for DD/MM/YY only - no other formats allowed
-  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{2}$/;
+  // Accept both DD/MM/YY (2-digit) and DD/MM/YYYY (4-digit) year formats
+  const pattern2Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{2}$/;
+  const pattern4Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/;
   
-  if (!strictPattern.test(trimmed)) {
-    return { isValid: false, reason: "format" };
+  if (pattern4Digit.test(trimmed)) {
+    return { isValid: true, reason: null, is4DigitYear: true };
   }
   
-  return { isValid: true, reason: null };
+  if (pattern2Digit.test(trimmed)) {
+    return { isValid: true, reason: null, is4DigitYear: false };
+  }
+  
+  return { isValid: false, reason: "format", is4DigitYear: false };
 };
 
 /**
- * Validates calendar correctness of a DD/MM/YY date
+ * Validates calendar correctness of a DD/MM/YY or DD/MM/YYYY date
  * Examples:
  *   - 29/02/24 → valid (2024 is leap year)
+ *   - 29/02/2024 → valid (2024 is leap year)
  *   - 29/02/23 → invalid (2023 is not leap year)
  *   - 31/04/25 → invalid (April has 30 days)
  * 
- * NOTE: Year is kept as YY for validation purposes only.
- * We use 2000 + YY for calendar correctness check (leap year detection)
- * but the original YY value is preserved - NO transformation occurs.
+ * Handles both 2-digit and 4-digit year formats.
  */
-const validateCalendarDate = (dateStr: string): { isValid: boolean; reason: string | null } => {
+const validateCalendarDate = (dateStr: string, is4DigitYear: boolean): { isValid: boolean; reason: string | null } => {
   const trimmed = dateStr.trim();
   const parts = trimmed.split('/');
   
   const day = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10);
-  const yearYY = parseInt(parts[2], 10);
+  const yearRaw = parseInt(parts[2], 10);
   
-  // For calendar validation only, interpret as 2000s (e.g., 24 -> 2024)
-  // This is ONLY for checking leap years and month lengths
-  // The original YY value is never modified or expanded
-  const yearForValidation = 2000 + yearYY;
+  // Convert to full year for calendar validation
+  const yearForValidation = is4DigitYear ? yearRaw : (2000 + yearRaw);
   
   // Create date and verify it matches input (catches invalid dates like 31/02)
   const date = new Date(yearForValidation, month - 1, day);
@@ -494,9 +497,9 @@ const validateCalendarDate = (dateStr: string): { isValid: boolean; reason: stri
 
 /**
  * Complete date validation following PRD rules:
- * 1. Check format matches DD/MM/YY regex (2-digit year)
+ * 1. Check format matches DD/MM/YY or DD/MM/YYYY regex
  * 2. Check calendar correctness
- * 
+ *
  * Returns detailed status for Data Integrity Panel
  */
 export const validateStartDate = (dateStr: string): {
@@ -504,17 +507,17 @@ export const validateStartDate = (dateStr: string): {
   status: DateValidityStatus;
   errorMessage: string | null;
 } => {
-  // Step 1: Check format
+  // Step 1: Check format (accepts both DD/MM/YY and DD/MM/YYYY)
   const formatCheck = validateDateFormat(dateStr);
   if (!formatCheck.isValid) {
     if (formatCheck.reason === "missing") {
       return { isValid: false, status: "missing", errorMessage: "Missing Start Date" };
     }
-    return { isValid: false, status: "invalid_format", errorMessage: "Does not match DD/MM/YY format" };
+    return { isValid: false, status: "invalid_format", errorMessage: "Does not match DD/MM/YY or DD/MM/YYYY format" };
   }
   
-  // Step 2: Check calendar correctness
-  const calendarCheck = validateCalendarDate(dateStr);
+  // Step 2: Check calendar correctness (pass format info for year handling)
+  const calendarCheck = validateCalendarDate(dateStr, formatCheck.is4DigitYear);
   if (!calendarCheck.isValid) {
     return { isValid: false, status: "invalid_calendar", errorMessage: "Invalid calendar date" };
   }
@@ -648,7 +651,7 @@ export const parseCSV = (csvText: string): ValidationResult => {
         issueMessage = "Missing Start Date";
       } else if (issueType === "invalid_format") {
         exclusionBreakdown.invalidStartDateFormat++;
-        issueMessage = `Invalid format (expected DD/MM/YY): "${startDate}"`;
+        issueMessage = `Invalid format (expected DD/MM/YY or DD/MM/YYYY): "${startDate}"`;
       } else if (issueType === "invalid_calendar") {
         exclusionBreakdown.invalidStartDateCalendar++;
         issueMessage = `Invalid calendar date: "${startDate}"`;
@@ -794,33 +797,38 @@ export const parsePostmasterCSV = (csvText: string): PostmasterValidationResult 
 
 // ============= ANALYSIS FUNCTIONS =============
 
-// CRITICAL: Parse DD/MM/YY format ONLY (day first, month second, 2-digit year)
-// MANDATORY: Do NOT assume MM/DD/YY - all dates are DD/MM/YY
+// CRITICAL: Parse DD/MM/YY or DD/MM/YYYY format (day first, month second)
+// MANDATORY: Do NOT assume MM/DD format - all dates are DD/MM
 // NO locale inference, NO format guessing, NO auto-correction permitted
-// Year (YY) must NOT be expanded, inferred, or converted to four digits in source data
-const parseDateDDMMYY = (dateStr: string): { date: Date | null; error: string | null; yearYY: number | null } => {
+const parseDateDDMM = (dateStr: string): { date: Date | null; error: string | null } => {
   if (!dateStr || dateStr.trim() === "") {
-    return { date: null, error: "Empty date string", yearYY: null };
+    return { date: null, error: "Empty date string" };
   }
   
   const trimmed = dateStr.trim();
   
-  // STRICT: Only accept DD/MM/YY format with forward slashes (2-digit year)
-  // Regex: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{2}$
-  const strictPattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{2}$/;
+  // Accept both DD/MM/YY (2-digit) and DD/MM/YYYY (4-digit) year formats
+  const pattern2Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/([0-9]{2})$/;
+  const pattern4Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/([0-9]{4})$/;
   
-  if (!strictPattern.test(trimmed)) {
-    return { date: null, error: `Does not match DD/MM/YY format: ${dateStr}`, yearYY: null };
+  let match = trimmed.match(pattern4Digit);
+  let is4Digit = true;
+  
+  if (!match) {
+    match = trimmed.match(pattern2Digit);
+    is4Digit = false;
   }
   
-  const parts = trimmed.split('/');
-  const day = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10);
-  const yearYY = parseInt(parts[2], 10);
+  if (!match) {
+    return { date: null, error: `Does not match DD/MM/YY or DD/MM/YYYY format: ${dateStr}` };
+  }
   
-  // Convert YY to full year for calendar validation ONLY (not stored)
-  // Using 2000 + YY for years 00-99 (covers 2000-2099)
-  const fullYear = 2000 + yearYY;
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const yearRaw = parseInt(match[3], 10);
+  
+  // Convert to full year for date creation
+  const fullYear = is4Digit ? yearRaw : (2000 + yearRaw);
   
   // Create date and validate calendar correctness
   const parsedDate = new Date(fullYear, month - 1, day);
@@ -831,10 +839,10 @@ const parseDateDDMMYY = (dateStr: string): { date: Date | null; error: string | 
     parsedDate.getMonth() !== month - 1 ||
     parsedDate.getDate() !== day
   ) {
-    return { date: null, error: `Invalid calendar date: ${dateStr}`, yearYY: null };
+    return { date: null, error: `Invalid calendar date: ${dateStr}` };
   }
   
-  return { date: parsedDate, error: null, yearYY };
+  return { date: parsedDate, error: null };
 };
 
 // Dynamic month names - no hardcoded restrictions
@@ -861,7 +869,7 @@ interface MonthParseResult {
 }
 
 const getMonthFromDate = (dateStr: string): MonthParseResult => {
-  const { date, error } = parseDateDDMMYY(dateStr);
+  const { date, error } = parseDateDDMM(dateStr);
   
   if (!date || error) {
     return { 
@@ -895,7 +903,7 @@ const getMonthFromDate = (dateStr: string): MonthParseResult => {
 
 // BACKWARD COMPATIBILITY: Wrapper for legacy code that uses parseDateSafely
 const parseDateSafely = (dateStr: string): Date | null => {
-  const { date } = parseDateDDMMYY(dateStr);
+  const { date } = parseDateDDMM(dateStr);
   return date;
 };
 

@@ -46,7 +46,7 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
     dateIssueReasons.push({ reason: "Missing Start Date", count: exclusionBreakdown.missingStartDate });
   }
   if (exclusionBreakdown.invalidStartDateFormat > 0) {
-    dateIssueReasons.push({ reason: "Invalid Start Date format (not DD/MM/YY)", count: exclusionBreakdown.invalidStartDateFormat });
+    dateIssueReasons.push({ reason: "Invalid Start Date format (not DD/MM/YY or DD/MM/YYYY)", count: exclusionBreakdown.invalidStartDateFormat });
   }
   if (exclusionBreakdown.invalidStartDateCalendar > 0) {
     dateIssueReasons.push({ reason: "Invalid calendar date (e.g., 31/02/2024)", count: exclusionBreakdown.invalidStartDateCalendar });
@@ -271,7 +271,7 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
                   <div className="space-y-1">
                     <h5 className="text-xs font-medium text-muted-foreground">Date Handling</h5>
                     <ul className="text-xs text-muted-foreground/80 space-y-0.5">
-                      <li>• Date Format: Strictly DD/MM/YY only</li>
+                      <li>• Date Format: DD/MM/YY or DD/MM/YYYY accepted</li>
                       <li>• No locale inference, format guessing, or auto-correction</li>
                       <li>• Invalid dates flagged, not excluded from analysis</li>
                     </ul>
