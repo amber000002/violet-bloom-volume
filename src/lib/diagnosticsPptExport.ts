@@ -333,35 +333,11 @@ export const exportDiagnosticsToPPT = async (
     const bestSlide = pptx.addSlide();
     addSlideHeader(bestSlide, "Best Performing Campaigns (by Views)");
     
-    // Left column - What worked
-    const bestInsights = report.bestSummary.split('. ').filter(s => s.trim()).slice(0, 3);
-    
-    bestSlide.addText("What Worked:", {
-      x: 0.5,
-      y: 1.2,
-      w: 3.5,
-      h: 0.35,
-      fontSize: 12,
-      bold: true,
-      color: SLIDE_STYLES.greenText,
-      fontFace: FONTS.primary,
-    });
-    
-    bestInsights.forEach((insight, i) => {
-      bestSlide.addText(`• ${insight.trim()}`, {
-        x: 0.5,
-        y: 1.6 + i * 0.5,
-        w: 3.5,
-        h: 0.45,
-        fontSize: 11,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    // Right column - Best campaigns table
+    // Centered table - Best campaigns
     const bestTableRows: pptxgen.TableRow[] = [
       [
+        { text: "Campaign Name", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
+        { text: "Start Date", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center" } },
         { text: "Subject Line", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
         { text: "View %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
         { text: "Click %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
@@ -375,9 +351,13 @@ export const exportDiagnosticsToPPT = async (
       const unsubPercent = denom > 0 ? (c.unsubscribes / denom) * 100 : 0;
       const bouncePercent = denom > 0 ? ((c.hardBounces + c.softBounces) / denom) * 100 : 0;
       const subject = cleanSubjectLine(c.subjectLine);
-      const truncatedSubject = subject.length > 35 ? subject.substring(0, 32) + '...' : subject;
+      const truncatedSubject = subject.length > 30 ? subject.substring(0, 27) + '...' : subject;
+      const campaignName = c.campaignName || '';
+      const truncatedCampaign = campaignName.length > 25 ? campaignName.substring(0, 22) + '...' : campaignName;
       
       bestTableRows.push([
+        { text: truncatedCampaign, options: { fontSize: 9 } },
+        { text: c.startDate || '—', options: { fontSize: 9, align: "center" } },
         { text: truncatedSubject, options: { fontSize: 9 } },
         { text: formatPercent(c.openRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.openRate, 'openRate') } },
         { text: formatPercent(c.clickRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.clickRate, 'clickRate') } },
@@ -386,13 +366,42 @@ export const exportDiagnosticsToPPT = async (
       ]);
     });
     
+    // Center the table horizontally (slide width 10, table width 9)
     bestSlide.addTable(bestTableRows, {
-      x: 4.2,
+      x: 0.5,
       y: 1.1,
-      w: 5.3,
-      colW: [2.1, 0.8, 0.8, 0.8, 0.8],
+      w: 9,
+      colW: [1.6, 0.9, 2.3, 0.8, 0.8, 0.8, 0.8],
       border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
       fontFace: FONTS.primary,
+    });
+    
+    // What Worked - Left-aligned bullet points below table
+    const bestInsights = report.bestSummary.split('. ').filter(s => s.trim()).slice(0, 4);
+    const bestTableHeight = 0.3 + (bestTableRows.length * 0.25); // Approx row height
+    const bestBulletStartY = 1.1 + bestTableHeight + 0.2;
+    
+    bestSlide.addText("What Worked:", {
+      x: 0.5,
+      y: bestBulletStartY,
+      w: 9,
+      h: 0.3,
+      fontSize: 11,
+      bold: true,
+      color: SLIDE_STYLES.greenText,
+      fontFace: FONTS.primary,
+    });
+    
+    bestInsights.forEach((insight, i) => {
+      bestSlide.addText(`• ${insight.trim()}`, {
+        x: 0.5,
+        y: bestBulletStartY + 0.35 + i * 0.3,
+        w: 9,
+        h: 0.28,
+        fontSize: 10,
+        color: SLIDE_STYLES.bodyColor,
+        fontFace: FONTS.primary,
+      });
     });
     
     addSlideFooter(bestSlide, hasPostmasterData);
@@ -401,35 +410,11 @@ export const exportDiagnosticsToPPT = async (
     const worstSlide = pptx.addSlide();
     addSlideHeader(worstSlide, "Underperforming Campaigns");
     
-    // Left column - What didn't work
-    const worstInsights = report.worstSummary.split('. ').filter(s => s.trim()).slice(0, 3);
-    
-    worstSlide.addText("What Didn't Work:", {
-      x: 0.5,
-      y: 1.2,
-      w: 3.5,
-      h: 0.35,
-      fontSize: 12,
-      bold: true,
-      color: SLIDE_STYLES.redText,
-      fontFace: FONTS.primary,
-    });
-    
-    worstInsights.forEach((insight, i) => {
-      worstSlide.addText(`• ${insight.trim()}`, {
-        x: 0.5,
-        y: 1.6 + i * 0.5,
-        w: 3.5,
-        h: 0.45,
-        fontSize: 11,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    // Right column - Worst campaigns table
+    // Centered table - Worst campaigns
     const worstTableRows: pptxgen.TableRow[] = [
       [
+        { text: "Campaign Name", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
+        { text: "Start Date", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center" } },
         { text: "Subject Line", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
         { text: "View %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
         { text: "Click %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
@@ -443,9 +428,13 @@ export const exportDiagnosticsToPPT = async (
       const unsubPercent = denom > 0 ? (c.unsubscribes / denom) * 100 : 0;
       const bouncePercent = denom > 0 ? ((c.hardBounces + c.softBounces) / denom) * 100 : 0;
       const subject = cleanSubjectLine(c.subjectLine);
-      const truncatedSubject = subject.length > 35 ? subject.substring(0, 32) + '...' : subject;
+      const truncatedSubject = subject.length > 30 ? subject.substring(0, 27) + '...' : subject;
+      const campaignName = c.campaignName || '';
+      const truncatedCampaign = campaignName.length > 25 ? campaignName.substring(0, 22) + '...' : campaignName;
       
       worstTableRows.push([
+        { text: truncatedCampaign, options: { fontSize: 9 } },
+        { text: c.startDate || '—', options: { fontSize: 9, align: "center" } },
         { text: truncatedSubject, options: { fontSize: 9 } },
         { text: formatPercent(c.openRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.openRate, 'openRate') } },
         { text: formatPercent(c.clickRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.clickRate, 'clickRate') } },
@@ -454,13 +443,42 @@ export const exportDiagnosticsToPPT = async (
       ]);
     });
     
+    // Center the table horizontally (slide width 10, table width 9)
     worstSlide.addTable(worstTableRows, {
-      x: 4.2,
+      x: 0.5,
       y: 1.1,
-      w: 5.3,
-      colW: [2.1, 0.8, 0.8, 0.8, 0.8],
+      w: 9,
+      colW: [1.6, 0.9, 2.3, 0.8, 0.8, 0.8, 0.8],
       border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
       fontFace: FONTS.primary,
+    });
+    
+    // What Didn't Work - Left-aligned bullet points below table
+    const worstInsights = report.worstSummary.split('. ').filter(s => s.trim()).slice(0, 4);
+    const worstTableHeight = 0.3 + (worstTableRows.length * 0.25); // Approx row height
+    const worstBulletStartY = 1.1 + worstTableHeight + 0.2;
+    
+    worstSlide.addText("What Didn't Work:", {
+      x: 0.5,
+      y: worstBulletStartY,
+      w: 9,
+      h: 0.3,
+      fontSize: 11,
+      bold: true,
+      color: SLIDE_STYLES.redText,
+      fontFace: FONTS.primary,
+    });
+    
+    worstInsights.forEach((insight, i) => {
+      worstSlide.addText(`• ${insight.trim()}`, {
+        x: 0.5,
+        y: worstBulletStartY + 0.35 + i * 0.3,
+        w: 9,
+        h: 0.28,
+        fontSize: 10,
+        color: SLIDE_STYLES.bodyColor,
+        fontFace: FONTS.primary,
+      });
     });
     
     addSlideFooter(worstSlide, hasPostmasterData);
