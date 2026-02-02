@@ -329,159 +329,146 @@ export const exportDiagnosticsToPPT = async (
     
     addSlideFooter(monthlySlide, hasPostmasterData);
     
-    // ========== SLIDE 3: Best Performing Campaigns ==========
-    const bestSlide = pptx.addSlide();
-    addSlideHeader(bestSlide, "Best Performing Campaigns (by Views)");
+    // ========== BEST & WORST PERFORMING CAMPAIGNS - FULL FIDELITY EXPORT ==========
+    // STRICT: 1:1 match with UI tables - all 14 columns, no truncation, multi-slide overflow
     
-    // Centered table - Best campaigns
-    const bestTableRows: pptxgen.TableRow[] = [
-      [
-        { text: "Campaign Name", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-        { text: "Start Date", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center" } },
-        { text: "Subject Line", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-        { text: "View %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-        { text: "Click %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-        { text: "Unsub %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-        { text: "Bounce %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-      ],
+    const createCampaignTableHeader = (): pptxgen.TableRow => [
+      { text: "Start Date", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "left" } },
+      { text: "Campaign Name", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "left" } },
+      { text: "Subject Line", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "left" } },
+      { text: "Sent", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Viewed", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Open %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Clicked", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Click %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Unsubs", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Unsub %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Hard Bounce", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Hard %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Soft Bounce", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
+      { text: "Soft %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
     ];
     
-    report.bestCampaigns.slice(0, 5).forEach(c => {
+    const createCampaignDataRow = (c: typeof report.bestCampaigns[0]): pptxgen.TableRow => {
       const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
       const unsubPercent = denom > 0 ? (c.unsubscribes / denom) * 100 : 0;
-      const bouncePercent = denom > 0 ? ((c.hardBounces + c.softBounces) / denom) * 100 : 0;
+      const hardBouncePercent = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
+      const softBouncePercent = denom > 0 ? (c.softBounces / denom) * 100 : 0;
+      // NO TRUNCATION - full text display
       const subject = cleanSubjectLine(c.subjectLine);
-      const truncatedSubject = subject.length > 30 ? subject.substring(0, 27) + '...' : subject;
       const campaignName = c.campaignName || '';
-      const truncatedCampaign = campaignName.length > 25 ? campaignName.substring(0, 22) + '...' : campaignName;
       
-      bestTableRows.push([
-        { text: truncatedCampaign, options: { fontSize: 9 } },
-        { text: c.startDate || '—', options: { fontSize: 9, align: "center" } },
-        { text: truncatedSubject, options: { fontSize: 9 } },
-        { text: formatPercent(c.openRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.openRate, 'openRate') } },
-        { text: formatPercent(c.clickRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.clickRate, 'clickRate') } },
-        { text: formatPercent(unsubPercent), options: { fontSize: 9, align: "right", color: getMetricColor(unsubPercent, 'unsubscribeRate') } },
-        { text: formatPercent(bouncePercent), options: { fontSize: 9, align: "right", color: getMetricColor(bouncePercent, 'bounceRate') } },
-      ]);
-    });
+      return [
+        { text: c.startDate || '—', options: { fontSize: 8, align: "left" } },
+        { text: campaignName, options: { fontSize: 8, align: "left" } },
+        { text: subject, options: { fontSize: 8, align: "left" } },
+        { text: formatNumber(c.totalSentUsers), options: { fontSize: 8, align: "right" } },
+        { text: formatNumber(c.uniqueViewed), options: { fontSize: 8, align: "right" } },
+        { text: formatPercent(c.openRate), options: { fontSize: 8, align: "right", color: getMetricColor(c.openRate, 'openRate') } },
+        { text: formatNumber(c.uniqueClicked), options: { fontSize: 8, align: "right" } },
+        { text: formatPercent(c.clickRate), options: { fontSize: 8, align: "right", color: getMetricColor(c.clickRate, 'clickRate') } },
+        { text: formatNumber(c.unsubscribes), options: { fontSize: 8, align: "right" } },
+        { text: formatPercent(unsubPercent), options: { fontSize: 8, align: "right", color: getMetricColor(unsubPercent, 'unsubscribeRate') } },
+        { text: formatNumber(c.hardBounces), options: { fontSize: 8, align: "right" } },
+        { text: formatPercent(hardBouncePercent), options: { fontSize: 8, align: "right", color: getMetricColor(hardBouncePercent, 'bounceRate') } },
+        { text: formatNumber(c.softBounces), options: { fontSize: 8, align: "right" } },
+        { text: formatPercent(softBouncePercent), options: { fontSize: 8, align: "right", color: getMetricColor(softBouncePercent, 'bounceRate') } },
+      ];
+    };
     
-    // Center the table horizontally (slide width 10, table width 9)
-    bestSlide.addTable(bestTableRows, {
-      x: 0.5,
-      y: 1.1,
-      w: 9,
-      colW: [1.6, 0.9, 2.3, 0.8, 0.8, 0.8, 0.8],
-      border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-      fontFace: FONTS.primary,
-    });
+    // Column widths for 14-column table (total 9.5" to use full slide width with 0.25" margins)
+    const campaignTableColWidths = [0.65, 1.4, 1.8, 0.55, 0.55, 0.55, 0.55, 0.55, 0.5, 0.5, 0.55, 0.5, 0.55, 0.5];
+    const MAX_ROWS_PER_SLIDE = 8; // Header + 7 data rows max per slide to avoid overflow
     
-    // What Worked - Left-aligned bullet points below table
-    const bestInsights = report.bestSummary.split('. ').filter(s => s.trim()).slice(0, 4);
-    const bestTableHeight = 0.3 + (bestTableRows.length * 0.25); // Approx row height
-    const bestBulletStartY = 1.1 + bestTableHeight + 0.2;
-    
-    bestSlide.addText("What Worked:", {
-      x: 0.5,
-      y: bestBulletStartY,
-      w: 9,
-      h: 0.3,
-      fontSize: 11,
-      bold: true,
-      color: SLIDE_STYLES.greenText,
-      fontFace: FONTS.primary,
-    });
-    
-    bestInsights.forEach((insight, i) => {
-      bestSlide.addText(`• ${insight.trim()}`, {
-        x: 0.5,
-        y: bestBulletStartY + 0.35 + i * 0.3,
-        w: 9,
-        h: 0.28,
-        fontSize: 10,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    addSlideFooter(bestSlide, hasPostmasterData);
-    
-    // ========== SLIDE 4: Worst Performing Campaigns ==========
-    const worstSlide = pptx.addSlide();
-    addSlideHeader(worstSlide, "Underperforming Campaigns");
-    
-    // Centered table - Worst campaigns
-    const worstTableRows: pptxgen.TableRow[] = [
-      [
-        { text: "Campaign Name", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-        { text: "Start Date", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center" } },
-        { text: "Subject Line", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-        { text: "View %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-        { text: "Click %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-        { text: "Unsub %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-        { text: "Bounce %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "right" } },
-      ],
-    ];
-    
-    report.worstCampaigns.slice(0, 5).forEach(c => {
-      const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
-      const unsubPercent = denom > 0 ? (c.unsubscribes / denom) * 100 : 0;
-      const bouncePercent = denom > 0 ? ((c.hardBounces + c.softBounces) / denom) * 100 : 0;
-      const subject = cleanSubjectLine(c.subjectLine);
-      const truncatedSubject = subject.length > 30 ? subject.substring(0, 27) + '...' : subject;
-      const campaignName = c.campaignName || '';
-      const truncatedCampaign = campaignName.length > 25 ? campaignName.substring(0, 22) + '...' : campaignName;
+    // Helper to add campaign table slides with overflow handling
+    const addCampaignTableSlides = (
+      campaigns: typeof report.bestCampaigns,
+      baseTitle: string,
+      summaryTitle: string,
+      summaryColor: string,
+      summary: string
+    ) => {
+      const allCampaigns = campaigns; // No slicing - export ALL campaigns
+      const totalSlides = Math.ceil(allCampaigns.length / (MAX_ROWS_PER_SLIDE - 1)); // -1 for header row
       
-      worstTableRows.push([
-        { text: truncatedCampaign, options: { fontSize: 9 } },
-        { text: c.startDate || '—', options: { fontSize: 9, align: "center" } },
-        { text: truncatedSubject, options: { fontSize: 9 } },
-        { text: formatPercent(c.openRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.openRate, 'openRate') } },
-        { text: formatPercent(c.clickRate), options: { fontSize: 9, align: "right", color: getMetricColor(c.clickRate, 'clickRate') } },
-        { text: formatPercent(unsubPercent), options: { fontSize: 9, align: "right", color: getMetricColor(unsubPercent, 'unsubscribeRate') } },
-        { text: formatPercent(bouncePercent), options: { fontSize: 9, align: "right", color: getMetricColor(bouncePercent, 'bounceRate') } },
-      ]);
-    });
+      for (let slideIdx = 0; slideIdx < totalSlides; slideIdx++) {
+        const slide = pptx.addSlide();
+        const startRow = slideIdx * (MAX_ROWS_PER_SLIDE - 1);
+        const endRow = Math.min(startRow + (MAX_ROWS_PER_SLIDE - 1), allCampaigns.length);
+        const campaignsOnSlide = allCampaigns.slice(startRow, endRow);
+        
+        // Title with slide indicator for multi-slide
+        const slideTitle = totalSlides > 1 
+          ? `${baseTitle} (${slideIdx + 1}/${totalSlides})`
+          : baseTitle;
+        addSlideHeader(slide, slideTitle);
+        
+        // Build table with header repeated on each slide
+        const tableRows: pptxgen.TableRow[] = [createCampaignTableHeader()];
+        campaignsOnSlide.forEach(c => tableRows.push(createCampaignDataRow(c)));
+        
+        slide.addTable(tableRows, {
+          x: 0.25,
+          y: 1.0,
+          w: 9.5,
+          colW: campaignTableColWidths,
+          border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
+          fontFace: FONTS.primary,
+          autoPage: false, // We handle pagination manually
+          autoPageLineWeight: 0,
+        });
+        
+        // Only add summary on last slide
+        if (slideIdx === totalSlides - 1) {
+          const tableHeight = 0.35 + (tableRows.length * 0.3);
+          const bulletStartY = 1.0 + tableHeight + 0.15;
+          
+          slide.addText(`${summaryTitle}:`, {
+            x: 0.25,
+            y: bulletStartY,
+            w: 9.5,
+            h: 0.25,
+            fontSize: 10,
+            bold: true,
+            color: summaryColor,
+            fontFace: FONTS.primary,
+          });
+          
+          const insights = summary.split('. ').filter(s => s.trim()).slice(0, 3);
+          insights.forEach((insight, i) => {
+            slide.addText(`• ${insight.trim()}`, {
+              x: 0.25,
+              y: bulletStartY + 0.28 + i * 0.25,
+              w: 9.5,
+              h: 0.23,
+              fontSize: 9,
+              color: SLIDE_STYLES.bodyColor,
+              fontFace: FONTS.primary,
+            });
+          });
+        }
+        
+        addSlideFooter(slide, hasPostmasterData);
+      }
+    };
     
-    // Center the table horizontally (slide width 10, table width 9)
-    worstSlide.addTable(worstTableRows, {
-      x: 0.5,
-      y: 1.1,
-      w: 9,
-      colW: [1.6, 0.9, 2.3, 0.8, 0.8, 0.8, 0.8],
-      border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-      fontFace: FONTS.primary,
-    });
+    // ========== SLIDE 3+: Best Performing Campaigns (all rows, no truncation) ==========
+    addCampaignTableSlides(
+      report.bestCampaigns,
+      "Best Performing Campaigns (by Views)",
+      "What Worked",
+      SLIDE_STYLES.greenText,
+      report.bestSummary
+    );
     
-    // What Didn't Work - Left-aligned bullet points below table
-    const worstInsights = report.worstSummary.split('. ').filter(s => s.trim()).slice(0, 4);
-    const worstTableHeight = 0.3 + (worstTableRows.length * 0.25); // Approx row height
-    const worstBulletStartY = 1.1 + worstTableHeight + 0.2;
-    
-    worstSlide.addText("What Didn't Work:", {
-      x: 0.5,
-      y: worstBulletStartY,
-      w: 9,
-      h: 0.3,
-      fontSize: 11,
-      bold: true,
-      color: SLIDE_STYLES.redText,
-      fontFace: FONTS.primary,
-    });
-    
-    worstInsights.forEach((insight, i) => {
-      worstSlide.addText(`• ${insight.trim()}`, {
-        x: 0.5,
-        y: worstBulletStartY + 0.35 + i * 0.3,
-        w: 9,
-        h: 0.28,
-        fontSize: 10,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    addSlideFooter(worstSlide, hasPostmasterData);
+    // ========== SLIDE 4+: Worst Performing Campaigns (all rows, no truncation) ==========
+    addCampaignTableSlides(
+      report.worstCampaigns,
+      "Underperforming Campaigns",
+      "What Didn't Work",
+      SLIDE_STYLES.redText,
+      report.worstSummary
+    );
     
     // ========== SLIDE 5: Deliverability & Reputation Diagnostics ==========
     const deliverabilitySlide = pptx.addSlide();
