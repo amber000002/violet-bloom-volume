@@ -79,15 +79,42 @@ export interface DateIssueCampaign {
   issueType: DateValidityStatus;
 }
 
+// Reconciliation result for metric integrity checks
+export interface ReconciliationResult {
+  status: "PASS" | "FAIL";
+  checks: {
+    metric: string;
+    sourceTotal: number;
+    aggregateTotal: number;
+    monthlyTotal: number;
+    aggregateDelta: number;
+    monthlyDelta: number;
+    aggregateDeltaPercent: number;
+    monthlyDeltaPercent: number;
+    passed: boolean;
+  }[];
+  errorRows: {
+    campaignId: string;
+    campaignName: string;
+    startDate: string;
+    reason: string;
+    metric: string;
+    sourceValue: number;
+    contributedValue: number;
+  }[];
+}
+
 export interface ProcessingSummary {
   totalRowsInCSV: number;
   campaignsIncluded: number;
   campaignsExcluded: number;
   exclusionBreakdown: ExclusionBreakdown;
   excludedCampaigns: ExcludedCampaign[];
-  // Campaigns with date issues - included in analysis but excluded from Monthly View
+  // Campaigns with date issues - NOW INCLUDED in Monthly View with "Unknown" month bucket
   dateIssueCampaigns: DateIssueCampaign[];
   deliveredFallbackCount: number;
+  // Reconciliation status
+  reconciliation: ReconciliationResult | null;
 }
 
 export interface ValidationResult {
@@ -425,6 +452,7 @@ const createEmptyProcessingSummary = (totalRows: number = 0): ProcessingSummary 
   excludedCampaigns: [],
   dateIssueCampaigns: [],
   deliveredFallbackCount: 0,
+  reconciliation: null,
 });
 
 // ============= STRICT DATE VALIDATION (DD/MM/YY or DD/MM/YYYY) =============
@@ -432,9 +460,9 @@ const createEmptyProcessingSummary = (totalRows: number = 0): ProcessingSummary 
 // Accepts both 2-digit year (YY) and 4-digit year (YYYY) formats
 
 /**
- * Validates if a date string matches DD/MM/YY or DD/MM/YYYY format
- * Regex for YY: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{2}$
- * Regex for YYYY: ^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$
+ * Validates if a date string matches D/M/YY or DD/MM/YYYY format (permissive)
+ * STRICT RULE: All dates are DD/MM/YY format - day first, month second
+ * Accepts single or double digit day/month: 1/8/25, 01/08/25, 1/8/2025, 01/08/2025
  * 
  * @returns { isValid: boolean, reason: string | null, is4DigitYear: boolean }
  */
@@ -445,9 +473,10 @@ const validateDateFormat = (dateStr: string): { isValid: boolean; reason: string
   
   const trimmed = dateStr.trim();
   
-  // Accept both DD/MM/YY (2-digit) and DD/MM/YYYY (4-digit) year formats
-  const pattern2Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{2}$/;
-  const pattern4Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$/;
+  // Permissive patterns: accept 1-2 digit day, 1-2 digit month, 2 or 4 digit year
+  // D/M/YY or DD/MM/YY or D/M/YYYY or DD/MM/YYYY
+  const pattern2Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])\/([1-9]|0[1-9]|1[0-2])\/[0-9]{2}$/;
+  const pattern4Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])\/([1-9]|0[1-9]|1[0-2])\/[0-9]{4}$/;
   
   if (pattern4Digit.test(trimmed)) {
     return { isValid: true, reason: null, is4DigitYear: true };
@@ -730,6 +759,7 @@ export const parseCSV = (csvText: string): ValidationResult => {
     excludedCampaigns,
     dateIssueCampaigns,
     deliveredFallbackCount,
+    reconciliation: null, // Will be populated after analysis
   };
 
   if (data.length === 0) {
@@ -807,9 +837,10 @@ const parseDateDDMM = (dateStr: string): { date: Date | null; error: string | nu
   
   const trimmed = dateStr.trim();
   
-  // Accept both DD/MM/YY (2-digit) and DD/MM/YYYY (4-digit) year formats
-  const pattern2Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/([0-9]{2})$/;
-  const pattern4Digit = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/([0-9]{4})$/;
+  // Permissive patterns: accept 1-2 digit day, 1-2 digit month, 2 or 4 digit year
+  // Examples: 1/8/25, 01/08/25, 1/8/2025, 01/08/2025
+  const pattern2Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])\/([1-9]|0[1-9]|1[0-2])\/([0-9]{2})$/;
+  const pattern4Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])\/([1-9]|0[1-9]|1[0-2])\/([0-9]{4})$/;
   
   let match = trimmed.match(pattern4Digit);
   let is4Digit = true;
@@ -820,7 +851,7 @@ const parseDateDDMM = (dateStr: string): { date: Date | null; error: string | nu
   }
   
   if (!match) {
-    return { date: null, error: `Does not match DD/MM/YY or DD/MM/YYYY format: ${dateStr}` };
+    return { date: null, error: `Does not match D/M/YY or DD/MM/YYYY format: ${dateStr}` };
   }
   
   const day = parseInt(match[1], 10);
@@ -963,19 +994,25 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
   });
 
   // Report 1b: Monthly Overview - dynamically groups campaigns by calendar month from Start Date
+  // CRITICAL: Every row MUST be included - invalid dates go to "Unknown Date" bucket
   const monthMap: Record<string, MonthlyOverview> = {};
   const monthParsingErrors: string[] = [];
   
   data.forEach(row => {
     const monthResult = getMonthFromDate(row.startDate);
     
-    // Flag parsing errors but don't auto-correct
+    // Use "Unknown Date" for invalid dates - NO EXCLUSION
+    let monthName: string;
+    let monthSortKey: string;
+    
     if (!monthResult.isValid) {
       monthParsingErrors.push(monthResult.error || `Invalid date: ${row.startDate}`);
-      return; // Skip this row for monthly aggregation
+      monthName = "Unknown Date";
+      monthSortKey = "9999-99"; // Sort at end
+    } else {
+      monthName = monthResult.monthName;
+      monthSortKey = monthResult.monthSortKey;
     }
-    
-    const { monthName, monthSortKey } = monthResult;
     
     if (!monthMap[monthName]) {
       monthMap[monthName] = {
@@ -1125,6 +1162,141 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     worstSummary,
     engagementTrends,
     keyLearnings,
+  };
+};
+
+// ============= RECONCILIATION CHECK (MANDATORY) =============
+// Validates that: SUM(monthly) = Aggregate = Source CSV totals
+export const runReconciliationCheck = (
+  data: CampaignRow[],
+  providerAggregates: ProviderAggregate[],
+  monthlyOverview: MonthlyOverview[]
+): ReconciliationResult => {
+  const checks: ReconciliationResult["checks"] = [];
+  const errorRows: ReconciliationResult["errorRows"] = [];
+  
+  // Calculate source totals directly from CSV rows
+  const sourceTotals = {
+    sent: data.reduce((sum, row) => sum + row.totalSentUsers, 0),
+    delivered: data.reduce((sum, row) => sum + row.totalDeliveredUsers, 0),
+    viewed: data.reduce((sum, row) => sum + row.uniqueViewedWithinConversion, 0),
+    clicked: data.reduce((sum, row) => sum + row.uniqueClickedWithinConversion, 0),
+    unsubscribes: data.reduce((sum, row) => sum + row.totalUnsubscribes, 0),
+    hardBounces: data.reduce((sum, row) => sum + row.hardBounces, 0),
+    softBounces: data.reduce((sum, row) => sum + row.softBounces, 0),
+  };
+  
+  // Calculate aggregate totals (sum across all providers)
+  const aggregateTotals = {
+    sent: providerAggregates.reduce((sum, agg) => sum + agg.totalSentUsers, 0),
+    delivered: providerAggregates.reduce((sum, agg) => sum + agg.totalDeliveredUsers, 0),
+    viewed: providerAggregates.reduce((sum, agg) => sum + agg.uniqueViewed, 0),
+    clicked: providerAggregates.reduce((sum, agg) => sum + agg.uniqueClicked, 0),
+    unsubscribes: providerAggregates.reduce((sum, agg) => sum + agg.unsubscribes, 0),
+    hardBounces: providerAggregates.reduce((sum, agg) => sum + agg.hardBounces, 0),
+    softBounces: providerAggregates.reduce((sum, agg) => sum + agg.softBounces, 0),
+  };
+  
+  // Calculate monthly totals (sum across all months)
+  const monthlyTotals = {
+    sent: monthlyOverview.reduce((sum, m) => sum + m.totalSentUsers, 0),
+    delivered: monthlyOverview.reduce((sum, m) => sum + m.totalDeliveredUsers, 0),
+    viewed: monthlyOverview.reduce((sum, m) => sum + m.uniqueViewed, 0),
+    clicked: monthlyOverview.reduce((sum, m) => sum + m.uniqueClicked, 0),
+    unsubscribes: monthlyOverview.reduce((sum, m) => sum + m.unsubscribes, 0),
+    hardBounces: monthlyOverview.reduce((sum, m) => sum + m.hardBounces, 0),
+    softBounces: monthlyOverview.reduce((sum, m) => sum + m.softBounces, 0),
+  };
+  
+  // Check each metric
+  const metrics: (keyof typeof sourceTotals)[] = [
+    "sent", "delivered", "viewed", "clicked", "unsubscribes", "hardBounces", "softBounces"
+  ];
+  
+  const metricLabels: Record<string, string> = {
+    sent: "Total Sent (users)",
+    delivered: "Total Delivered (users)",
+    viewed: "Unique Viewed (users)",
+    clicked: "Unique Clicked (users)",
+    unsubscribes: "Total Unsubscribes",
+    hardBounces: "Hard Bounces",
+    softBounces: "Soft Bounces",
+  };
+  
+  let allPassed = true;
+  
+  for (const metric of metrics) {
+    const source = sourceTotals[metric];
+    const aggregate = aggregateTotals[metric];
+    const monthly = monthlyTotals[metric];
+    
+    const aggregateDelta = aggregate - source;
+    const monthlyDelta = monthly - source;
+    const aggregateDeltaPercent = source > 0 ? (aggregateDelta / source) * 100 : 0;
+    const monthlyDeltaPercent = source > 0 ? (monthlyDelta / source) * 100 : 0;
+    
+    // Check passes if both deltas are 0
+    const passed = aggregateDelta === 0 && monthlyDelta === 0;
+    if (!passed) allPassed = false;
+    
+    checks.push({
+      metric: metricLabels[metric] || metric,
+      sourceTotal: source,
+      aggregateTotal: aggregate,
+      monthlyTotal: monthly,
+      aggregateDelta,
+      monthlyDelta,
+      aggregateDeltaPercent,
+      monthlyDeltaPercent,
+      passed,
+    });
+  }
+  
+  // If there are mismatches, identify which rows are causing issues
+  // (This should not happen with correct logic, but included for debugging)
+  if (!allPassed) {
+    // Track row contributions to identify discrepancies
+    const rowContributions = new Map<string, { 
+      campaignId: string; 
+      campaignName: string;
+      startDate: string;
+      sent: number;
+    }>();
+    
+    data.forEach(row => {
+      const key = `${row.campaignId}|${row.startDate}`;
+      rowContributions.set(key, {
+        campaignId: row.campaignId,
+        campaignName: row.campaignName,
+        startDate: row.startDate,
+        sent: row.totalSentUsers,
+      });
+    });
+    
+    // If monthly doesn't match source, flag rows with date issues
+    const sentCheck = checks.find(c => c.metric === "Total Sent (users)");
+    if (sentCheck && !sentCheck.passed && sentCheck.monthlyDelta !== 0) {
+      data.forEach(row => {
+        const monthResult = getMonthFromDate(row.startDate);
+        if (!monthResult.isValid) {
+          errorRows.push({
+            campaignId: row.campaignId,
+            campaignName: row.campaignName,
+            startDate: row.startDate || "—",
+            reason: monthResult.error || "Invalid date format",
+            metric: "Total Sent (users)",
+            sourceValue: row.totalSentUsers,
+            contributedValue: row.totalSentUsers, // Now included via "Unknown Date" bucket
+          });
+        }
+      });
+    }
+  }
+  
+  return {
+    status: allPassed ? "PASS" : "FAIL",
+    checks,
+    errorRows,
   };
 };
 
