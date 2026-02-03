@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Info, ChevronDown, ChevronUp, AlertTriangle, Calendar } from "lucide-react";
+import { Info, ChevronDown, ChevronUp, AlertTriangle, Calendar, CheckCircle2, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ProcessingSummary, ExcludedCampaign, DateIssueCampaign } from "@/lib/csvAnalyzer";
+import { ProcessingSummary, ExcludedCampaign, DateIssueCampaign, ReconciliationResult } from "@/lib/csvAnalyzer";
 import {
   Tooltip,
   TooltipContent,
@@ -13,13 +13,20 @@ interface DataIntegrityPanelProps {
   processingSummary: ProcessingSummary;
 }
 
+// Format large numbers with commas
+const formatNumber = (num: number): string => {
+  return num.toLocaleString();
+};
+
 export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processingSummary }) => {
-  // Auto-expand if there are exclusions or date issues
+  // Auto-expand if there are exclusions, date issues, or reconciliation failures
   const hasExclusions = processingSummary.campaignsExcluded > 0;
   const hasDateIssues = processingSummary.dateIssueCampaigns.length > 0;
-  const [isExpanded, setIsExpanded] = useState(hasExclusions || hasDateIssues);
+  const hasReconciliationFailure = processingSummary.reconciliation?.status === "FAIL";
+  const [isExpanded, setIsExpanded] = useState(hasExclusions || hasDateIssues || hasReconciliationFailure);
   const [showExcludedDetails, setShowExcludedDetails] = useState(false);
   const [showDateIssueDetails, setShowDateIssueDetails] = useState(false);
+  const [showReconciliationDetails, setShowReconciliationDetails] = useState(hasReconciliationFailure);
 
   const { 
     totalRowsInCSV, 
@@ -28,7 +35,8 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
     exclusionBreakdown, 
     excludedCampaigns,
     dateIssueCampaigns,
-    deliveredFallbackCount 
+    deliveredFallbackCount,
+    reconciliation
   } = processingSummary;
 
   // Build exclusion reasons list
@@ -40,16 +48,16 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
     exclusionReasons.push({ reason: "Other processing constraints", count: exclusionBreakdown.other });
   }
 
-  // Build date issue reasons list (these are NOT exclusions, just tracked separately)
+  // Build date issue reasons list (these are NOT exclusions, campaigns are still included)
   const dateIssueReasons: { reason: string; count: number }[] = [];
   if (exclusionBreakdown.missingStartDate > 0) {
     dateIssueReasons.push({ reason: "Missing Start Date", count: exclusionBreakdown.missingStartDate });
   }
   if (exclusionBreakdown.invalidStartDateFormat > 0) {
-    dateIssueReasons.push({ reason: "Invalid Start Date format (not DD/MM/YY or DD/MM/YYYY)", count: exclusionBreakdown.invalidStartDateFormat });
+    dateIssueReasons.push({ reason: "Invalid Start Date format (grouped in 'Unknown Date')", count: exclusionBreakdown.invalidStartDateFormat });
   }
   if (exclusionBreakdown.invalidStartDateCalendar > 0) {
-    dateIssueReasons.push({ reason: "Invalid calendar date (e.g., 31/02/2024)", count: exclusionBreakdown.invalidStartDateCalendar });
+    dateIssueReasons.push({ reason: "Invalid calendar date (grouped in 'Unknown Date')", count: exclusionBreakdown.invalidStartDateCalendar });
   }
 
   const totalDateIssues = dateIssueCampaigns.length;
@@ -82,7 +90,21 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
             )}
             {hasDateIssues && (
               <span className="px-2 py-0.5 text-xs bg-blue-500/10 text-blue-600 rounded-full">
-                {totalDateIssues} date issues
+                {totalDateIssues} date issues (included in Unknown Date)
+              </span>
+            )}
+            {reconciliation && (
+              <span className={`px-2 py-0.5 text-xs rounded-full flex items-center gap-1 ${
+                reconciliation.status === "PASS" 
+                  ? "bg-emerald-500/10 text-emerald-600" 
+                  : "bg-red-500/10 text-red-600"
+              }`}>
+                {reconciliation.status === "PASS" ? (
+                  <CheckCircle2 className="w-3 h-3" />
+                ) : (
+                  <XCircle className="w-3 h-3" />
+                )}
+                Reconciliation: {reconciliation.status}
               </span>
             )}
           </div>
@@ -217,6 +239,127 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
                 </div>
               )}
 
+              {/* D. Reconciliation Status (MANDATORY) */}
+              {reconciliation && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setShowReconciliationDetails(!showReconciliationDetails)}
+                    className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide hover:text-foreground transition-colors ${
+                      reconciliation.status === "PASS" ? "text-emerald-600" : "text-red-600"
+                    }`}
+                  >
+                    {showReconciliationDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    {reconciliation.status === "PASS" ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <XCircle className="w-4 h-4" />
+                    )}
+                    Metric Reconciliation: {reconciliation.status}
+                  </button>
+                  
+                  <AnimatePresence>
+                    {showReconciliationDetails && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="space-y-3">
+                          {/* Reconciliation Summary Table */}
+                          <div className="bg-background/50 rounded-lg border border-border/50 overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-muted/30">
+                                <tr className="border-b border-border/50">
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Metric</th>
+                                  <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Source CSV</th>
+                                  <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Aggregate</th>
+                                  <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Monthly Sum</th>
+                                  <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {reconciliation.checks.map((check, idx) => (
+                                  <tr key={idx} className="border-b border-border/30 last:border-0">
+                                    <td className="px-3 py-2 text-xs text-foreground font-medium">{check.metric}</td>
+                                    <td className="px-3 py-2 text-xs text-right text-muted-foreground font-mono">
+                                      {formatNumber(check.sourceTotal)}
+                                    </td>
+                                    <td className={`px-3 py-2 text-xs text-right font-mono ${
+                                      check.aggregateDelta !== 0 ? "text-red-600" : "text-muted-foreground"
+                                    }`}>
+                                      {formatNumber(check.aggregateTotal)}
+                                      {check.aggregateDelta !== 0 && (
+                                        <span className="ml-1">
+                                          ({check.aggregateDelta > 0 ? "+" : ""}{formatNumber(check.aggregateDelta)})
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className={`px-3 py-2 text-xs text-right font-mono ${
+                                      check.monthlyDelta !== 0 ? "text-red-600" : "text-muted-foreground"
+                                    }`}>
+                                      {formatNumber(check.monthlyTotal)}
+                                      {check.monthlyDelta !== 0 && (
+                                        <span className="ml-1">
+                                          ({check.monthlyDelta > 0 ? "+" : ""}{formatNumber(check.monthlyDelta)})
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                      {check.passed ? (
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-600 inline" />
+                                      ) : (
+                                        <XCircle className="w-4 h-4 text-red-600 inline" />
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          
+                          {/* Error Rows Detail (if any) */}
+                          {reconciliation.errorRows.length > 0 && (
+                            <div className="space-y-2">
+                              <h5 className="text-xs font-medium text-red-600">
+                                ⚠️ Rows Contributing to Discrepancy ({reconciliation.errorRows.length})
+                              </h5>
+                              <div className="bg-red-500/5 rounded-lg border border-red-500/20 overflow-hidden max-h-48 overflow-y-auto">
+                                <table className="w-full text-sm">
+                                  <thead className="sticky top-0 bg-red-500/10">
+                                    <tr className="border-b border-red-500/20">
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-red-600">Campaign ID</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-red-600">Campaign Name</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-red-600">Start Date</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-red-600">Reason</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {reconciliation.errorRows.map((row, idx) => (
+                                      <tr key={idx} className="border-b border-red-500/10 last:border-0">
+                                        <td className="px-3 py-2 text-xs text-foreground font-mono">{row.campaignId}</td>
+                                        <td className="px-3 py-2 text-xs text-foreground max-w-[200px] truncate">{row.campaignName}</td>
+                                        <td className="px-3 py-2 text-xs text-muted-foreground">{row.startDate}</td>
+                                        <td className="px-3 py-2 text-xs text-red-600">{row.reason}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <p className="text-xs text-muted-foreground/70 italic">
+                            Validation: Source CSV = Aggregate = Sum(Monthly). All rows must be counted exactly once.
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
               {/* Delivered Fallback Warning */}
               {deliveredFallbackCount > 0 && (
                 <div className="flex items-start gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
@@ -262,7 +405,7 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
                     <ul className="text-xs text-muted-foreground/80 space-y-0.5">
                       <li>• Channel = Email (all status values included)</li>
                       <li>• Each CSV row = unique analytical unit (no Campaign ID aggregation)</li>
-                      <li>• Invalid dates: included in analysis, excluded from Monthly View</li>
+                      <li>• Invalid dates: included in "Unknown Date" bucket in Monthly View</li>
                       <li>• 1,000 user minimum only for Best/Worst lists</li>
                     </ul>
                   </div>
@@ -271,9 +414,10 @@ export const DataIntegrityPanel: React.FC<DataIntegrityPanelProps> = ({ processi
                   <div className="space-y-1">
                     <h5 className="text-xs font-medium text-muted-foreground">Date Handling</h5>
                     <ul className="text-xs text-muted-foreground/80 space-y-0.5">
-                      <li>• Date Format: DD/MM/YY or DD/MM/YYYY accepted</li>
+                      <li>• Date Format: D/M/YY or DD/MM/YYYY accepted (permissive)</li>
                       <li>• No locale inference, format guessing, or auto-correction</li>
-                      <li>• Invalid dates flagged, not excluded from analysis</li>
+                      <li>• Invalid dates grouped in "Unknown Date" - never excluded</li>
+                      <li>• All rows counted exactly once in both Aggregate and Monthly</li>
                     </ul>
                   </div>
                 </div>

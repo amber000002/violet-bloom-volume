@@ -27,6 +27,7 @@ import {
   parsePostmasterCSV,
   generateAnalysisReport,
   generateReputationRepairReport,
+  runReconciliationCheck,
   DiagnosticsData,
   ValidationResult,
   PostmasterValidationResult,
@@ -221,6 +222,22 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     if (campaignData.length === 0) return;
     
     const analysisReport = generateAnalysisReport(campaignData);
+    
+    // Run reconciliation check (MANDATORY)
+    const reconciliation = runReconciliationCheck(
+      campaignData,
+      analysisReport.providerAggregates,
+      analysisReport.monthlyOverview
+    );
+    
+    // Update processing summary with reconciliation results
+    if (processingSummary) {
+      setProcessingSummary({
+        ...processingSummary,
+        reconciliation,
+      });
+    }
+    
     // Also generate reputation report for Reputation Snapshot, Root Cause Summary, and Repair Actions
     const reputationReport = generateReputationRepairReport(campaignData, postmasterData, contextText || null);
     const newDiagnostics: DiagnosticsData = {
@@ -233,7 +250,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setDiagnostics(newDiagnostics);
     setActiveReport("analysis");
     onDataChange?.(newDiagnostics);
-  }, [campaignData, postmasterData, contextText, onDataChange]);
+  }, [campaignData, postmasterData, contextText, processingSummary, onDataChange]);
 
   const runReputationReport = useCallback(() => {
     if (campaignData.length === 0) return;
