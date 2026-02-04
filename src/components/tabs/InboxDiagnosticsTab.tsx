@@ -18,7 +18,8 @@ import {
   Shield,
   Download,
   Calendar,
-  PieChart
+  PieChart,
+  Activity
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
 import { ViewMode } from "@/hooks/usePresentationMode";
@@ -43,6 +44,15 @@ import { Button } from "../ui/button";
 import { DataIntegrityPanel } from "../DataIntegrityPanel";
 import { UseCaseCoverageAnalysis } from "../UseCaseCoverageAnalysis";
 import { LifecycleCoverageMatrix } from "../LifecycleCoverageMatrix";
+import {
+  ReputationTrendChart,
+  SignalHealthTable,
+  RootCauseCorrelation,
+  RepairActionsModule,
+  ThresholdBreach,
+  calculateSignalHealth,
+  analyzeRootCauses,
+} from "../reputation";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
@@ -154,9 +164,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [isDraggingPostmaster, setIsDraggingPostmaster] = useState(false);
   const [activeReport, setActiveReport] = useState<"analysis" | "reputation" | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsData | null>(null);
+  const [thresholdBreaches, setThresholdBreaches] = useState<ThresholdBreach[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     provider: true,
     monthly: true,
+    reputationTrends: true,
+    signalHealth: true,
+    rootCause: true,
+    repairActions: true,
     best: true,
     worst: true,
     trends: true,
@@ -644,7 +659,74 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </p>
           </CollapsibleSection>
 
-          {/* Reputation Snapshot (from Reputation Repair) */}
+          {/* ============= REPUTATION INTELLIGENCE SECTION ============= */}
+          
+          {/* 1. Reputation Trends Dashboard (Postmaster Data Required) */}
+          {postmasterData && postmasterData.length > 0 && (
+            <CollapsibleSection
+              title="Reputation Trends"
+              icon={<Activity className="w-5 h-5 text-primary" />}
+              isOpen={expandedSections.reputationTrends}
+              onToggle={() => toggleSection("reputationTrends")}
+            >
+              <ReputationTrendChart
+                postmasterData={postmasterData}
+                onBreachDetected={setThresholdBreaches}
+              />
+            </CollapsibleSection>
+          )}
+
+          {/* 2. Signal Health Table */}
+          <CollapsibleSection
+            title="Reputation Signal Health"
+            icon={<Shield className="w-5 h-5 text-primary" />}
+            isOpen={expandedSections.signalHealth}
+            onToggle={() => toggleSection("signalHealth")}
+          >
+            <SignalHealthTable
+              postmasterData={postmasterData}
+              campaignData={diagnostics.rawData}
+            />
+          </CollapsibleSection>
+
+          {/* 3. Root Cause Correlation Engine */}
+          {thresholdBreaches.length > 0 && (
+            <CollapsibleSection
+              title="Root Cause Summary"
+              icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
+              isOpen={expandedSections.rootCause}
+              onToggle={() => toggleSection("rootCause")}
+            >
+              <RootCauseCorrelation
+                postmasterData={postmasterData}
+                campaignData={diagnostics.rawData}
+                breaches={thresholdBreaches}
+              />
+            </CollapsibleSection>
+          )}
+
+          {/* 4. Reputation Repair Actions */}
+          <CollapsibleSection
+            title="Reputation Repair Actions"
+            icon={<Lightbulb className="w-5 h-5 text-primary" />}
+            isOpen={expandedSections.repairActions}
+            onToggle={() => toggleSection("repairActions")}
+          >
+            {(() => {
+              const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
+              const rootCauses = analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches);
+              return (
+                <RepairActionsModule
+                  signalHealth={signalHealth}
+                  rootCauses={rootCauses}
+                />
+              );
+            })()}
+          </CollapsibleSection>
+
+          {/* ============= END REPUTATION INTELLIGENCE ============= */}
+
+          {/* Legacy Reputation Snapshot (from Reputation Repair - kept for backward compatibility) */}
           {diagnostics.reputationReport?.enhancedReport && (
             <div className="magic-card rounded-2xl p-6 border-2 border-primary/20 bg-primary/5">
               <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
