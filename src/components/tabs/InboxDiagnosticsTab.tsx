@@ -45,6 +45,11 @@ import { DataIntegrityPanel } from "../DataIntegrityPanel";
 import { UseCaseCoverageAnalysis } from "../UseCaseCoverageAnalysis";
 import { LifecycleCoverageMatrix } from "../LifecycleCoverageMatrix";
 import {
+  EmailMetricsTrendChart,
+  InfrastructureDetailsTable,
+  ReputationSmallMultiples,
+} from "../metrics";
+import {
   ReputationTrendChart,
   SignalHealthTable,
   RootCauseCorrelation,
@@ -179,6 +184,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     issues: true,
     useCaseCoverage: true,
     lifecycleCoverage: true,
+    infrastructure: true,
+    emailMetricsTrend: true,
   });
 
   const toggleSection = (section: string) => {
@@ -659,12 +666,46 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </p>
           </CollapsibleSection>
 
-          {/* ============= REPUTATION INTELLIGENCE SECTION ============= */}
-          
-          {/* 1. Reputation Trends Dashboard (Postmaster Data Required) */}
+          {/* ============= EMAIL METRICS TREND CHART ============= */}
+          <CollapsibleSection
+            title="Email Metrics Trend"
+            icon={<TrendingUp className="w-5 h-5 text-primary" />}
+            isOpen={expandedSections.trends}
+            onToggle={() => toggleSection("trends")}
+          >
+            <EmailMetricsTrendChart campaignData={diagnostics.rawData} />
+          </CollapsibleSection>
+
+          {/* ============= INFRASTRUCTURE DETAILS ============= */}
+          <CollapsibleSection
+            title="Infrastructure Details"
+            icon={<Shield className="w-5 h-5 text-secondary" />}
+            isOpen={expandedSections.infrastructure ?? true}
+            onToggle={() => toggleSection("infrastructure")}
+          >
+            <InfrastructureDetailsTable
+              campaignData={diagnostics.rawData}
+              postmasterData={postmasterData}
+            />
+          </CollapsibleSection>
+
+          {/* ============= REPUTATION TRENDS (SMALL MULTIPLES) ============= */}
+          <CollapsibleSection
+            title="Reputation Trends"
+            icon={<Activity className="w-5 h-5 text-primary" />}
+            isOpen={expandedSections.reputationTrends}
+            onToggle={() => toggleSection("reputationTrends")}
+          >
+            <ReputationSmallMultiples
+              postmasterData={postmasterData}
+              campaignData={diagnostics.rawData}
+            />
+          </CollapsibleSection>
+
+          {/* ============= LEGACY REPUTATION TREND CHART (COMBINED VIEW) ============= */}
           {postmasterData && postmasterData.length > 0 && (
             <CollapsibleSection
-              title="Reputation Trends"
+              title="Reputation Trends (Combined)"
               icon={<Activity className="w-5 h-5 text-primary" />}
               isOpen={expandedSections.reputationTrends}
               onToggle={() => toggleSection("reputationTrends")}
