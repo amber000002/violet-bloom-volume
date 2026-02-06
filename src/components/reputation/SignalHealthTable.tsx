@@ -17,21 +17,24 @@ export interface SignalHealth {
   trendChange: string;
 }
 
-// Parse DD/MM/YY date strictly
+// Parse reputation date strictly as "MMM D, YYYY" (e.g., "Jan 9, 2026")
+const MONTH_MAP: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
-  const match = dateStr.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  const match = dateStr.trim().match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
   if (!match) return null;
-  
-  const day = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  let year = parseInt(match[3], 10);
-  
-  if (year < 100) {
-    year = year < 50 ? 2000 + year : 1900 + year;
-  }
-  
-  const date = new Date(year, month - 1, day);
+
+  const monthIndex = MONTH_MAP[match[1]];
+  if (monthIndex === undefined) return null;
+
+  const day = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+
+  const date = new Date(year, monthIndex, day);
   return isNaN(date.getTime()) ? null : date;
 };
 

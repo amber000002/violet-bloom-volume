@@ -70,27 +70,29 @@ const THRESHOLDS = {
   domainReputation: 3, // Below "Medium" (i.e., < 3)
 };
 
-// Parse DD/MM/YY date strictly
-const parsePostmasterDate = (dateStr: string): Date | null => {
+// Parse reputation date strictly as "MMM D, YYYY" (e.g., "Jan 9, 2026")
+const MONTH_MAP: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+const parseReputationDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
   const trimmed = dateStr.trim();
-  
-  // Match D/M/YY or DD/MM/YY or DD/MM/YYYY
-  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+
+  // Match "MMM D, YYYY" or "MMM DD, YYYY"
+  const match = trimmed.match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
   if (!match) return null;
-  
-  const day = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  let year = parseInt(match[3], 10);
-  
-  // Handle 2-digit year
-  if (year < 100) {
-    year = year < 50 ? 2000 + year : 1900 + year;
-  }
-  
-  const date = new Date(year, month - 1, day);
+
+  const monthIndex = MONTH_MAP[match[1]];
+  if (monthIndex === undefined) return null;
+
+  const day = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+
+  const date = new Date(year, monthIndex, day);
   if (isNaN(date.getTime())) return null;
-  
+
   return date;
 };
 
@@ -159,7 +161,7 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
   const chartData: ChartDataPoint[] = React.useMemo(() => {
     const processed = postmasterData
       .map((row) => {
-        const dateObj = parsePostmasterDate(row.date);
+        const dateObj = parseReputationDate(row.date);
         if (!dateObj) return null;
         
         const point = {

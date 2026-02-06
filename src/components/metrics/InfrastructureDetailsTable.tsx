@@ -96,11 +96,12 @@
      // Extract domains from postmaster data and get latest reputation
      if (postmasterData && postmasterData.length > 0) {
        // Sort by date to get latest
-       const sorted = [...postmasterData].sort((a, b) => {
-         const dateA = new Date(a.date.split("/").reverse().join("-"));
-         const dateB = new Date(b.date.split("/").reverse().join("-"));
-         return dateB.getTime() - dateA.getTime();
-       });
+        const sorted = [...postmasterData].sort((a, b) => {
+          // Parse "MMM D, YYYY" format for sorting
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          return dateB.getTime() - dateA.getTime();
+        });
  
        // Get latest reputation for each domain
        const latestDomainRep = new Map<string, { reputation: string; date: string }>();
@@ -194,49 +195,38 @@
            Domain Details ({domains.length} unique)
          </h4>
          <div className="border rounded-lg overflow-hidden">
-           <Table>
-             <TableHeader>
-               <TableRow>
-                 <TableHead>Domain / Service Provider</TableHead>
-                 <TableHead>Source</TableHead>
-                 <TableHead>Provider Name</TableHead>
-                 <TableHead>Latest Reputation</TableHead>
-                 <TableHead>As of Date</TableHead>
-               </TableRow>
-             </TableHeader>
-             <TableBody>
-               {domains.map((d, i) => {
-                 const badge = getReputationBadge(d.latestReputation || "");
-                 const IconComponent = badge.icon;
-                 
-                 return (
-                   <TableRow key={i}>
-                     <TableCell className="font-medium">{d.domain}</TableCell>
-                     <TableCell>
-                       <Badge variant="outline" className="text-xs">
-                         {d.source === "both" ? "Campaign + Postmaster" : 
-                          d.source === "campaign" ? "Campaign" : "Postmaster"}
-                       </Badge>
-                     </TableCell>
-                     <TableCell>{d.serviceProvider || "—"}</TableCell>
-                     <TableCell>
-                       {d.latestReputation ? (
-                         <Badge variant={badge.variant} className={badge.className}>
-                           {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
-                           {d.latestReputation}
-                         </Badge>
-                       ) : (
-                         <span className="text-muted-foreground">—</span>
-                       )}
-                     </TableCell>
-                     <TableCell className="text-muted-foreground text-sm">
-                       {d.reputationDate || "—"}
-                     </TableCell>
-                   </TableRow>
-                 );
-               })}
-             </TableBody>
-           </Table>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Domain</TableHead>
+                  <TableHead>Service Provider</TableHead>
+                  <TableHead>Domain Reputation</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {domains.map((d, i) => {
+                  const badge = getReputationBadge(d.latestReputation || "");
+                  const IconComponent = badge.icon;
+                  
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{d.domain}</TableCell>
+                      <TableCell>{d.serviceProvider || "—"}</TableCell>
+                      <TableCell>
+                        {d.latestReputation ? (
+                          <Badge variant={badge.variant} className={badge.className}>
+                            {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
+                            {d.latestReputation}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
          </div>
        </div>
  
@@ -248,42 +238,36 @@
              IP Details ({ips.length} unique)
            </h4>
            <div className="border rounded-lg overflow-hidden">
-             <Table>
-               <TableHeader>
-                 <TableRow>
-                   <TableHead>IP Address</TableHead>
-                   <TableHead>IP Count</TableHead>
-                   <TableHead>Latest Reputation</TableHead>
-                   <TableHead>As of Date</TableHead>
-                 </TableRow>
-               </TableHeader>
-               <TableBody>
-                 {ips.map((ip, i) => {
-                   const badge = getReputationBadge(ip.latestReputation || "");
-                   const IconComponent = badge.icon;
-                   
-                   return (
-                     <TableRow key={i}>
-                       <TableCell className="font-mono text-sm">{ip.ip}</TableCell>
-                       <TableCell>{ip.count}</TableCell>
-                       <TableCell>
-                         {ip.latestReputation ? (
-                           <Badge variant={badge.variant} className={badge.className}>
-                             {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
-                             {ip.latestReputation}
-                           </Badge>
-                         ) : (
-                           <span className="text-muted-foreground">—</span>
-                         )}
-                       </TableCell>
-                       <TableCell className="text-muted-foreground text-sm">
-                         {ip.reputationDate || "—"}
-                       </TableCell>
-                     </TableRow>
-                   );
-                 })}
-               </TableBody>
-             </Table>
+            <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>IP Address</TableHead>
+                    <TableHead>Latest Reputation</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ips.map((ip, i) => {
+                    const badge = getReputationBadge(ip.latestReputation || "");
+                    const IconComponent = badge.icon;
+                    
+                    return (
+                      <TableRow key={i}>
+                        <TableCell className="font-mono text-sm">{ip.ip}</TableCell>
+                        <TableCell>
+                          {ip.latestReputation ? (
+                            <Badge variant={badge.variant} className={badge.className}>
+                              {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
+                              {ip.latestReputation}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
            </div>
          </div>
        )}
