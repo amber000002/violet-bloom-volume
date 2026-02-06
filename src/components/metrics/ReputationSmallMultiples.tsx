@@ -54,27 +54,30 @@
    return map[num] || "Unknown";
  };
  
- // Parse DD/MM/YY date strictly
- const parsePostmasterDate = (dateStr: string): Date | null => {
-   if (!dateStr) return null;
-   const trimmed = dateStr.trim();
-   
-   const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-   if (!match) return null;
-   
-   const day = parseInt(match[1], 10);
-   const month = parseInt(match[2], 10);
-   let year = parseInt(match[3], 10);
-   
-   if (year < 100) {
-     year = year < 50 ? 2000 + year : 1900 + year;
-   }
-   
-   const date = new Date(year, month - 1, day);
-   if (isNaN(date.getTime())) return null;
-   
-   return date;
- };
+// Parse reputation date strictly as "MMM D, YYYY" (e.g., "Jan 9, 2026")
+const MONTH_MAP: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+const parseReputationDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  const trimmed = dateStr.trim();
+
+  const match = trimmed.match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
+  if (!match) return null;
+
+  const monthIndex = MONTH_MAP[match[1]];
+  if (monthIndex === undefined) return null;
+
+  const day = parseInt(match[2], 10);
+  const year = parseInt(match[3], 10);
+
+  const date = new Date(year, monthIndex, day);
+  if (isNaN(date.getTime())) return null;
+
+  return date;
+};
  
  // Threshold config from PRD
  const THRESHOLDS = {
@@ -364,125 +367,133 @@
    postmasterData,
    campaignData,
  }) => {
-   // Process data for all 4 charts
-   const { ipRepChart, domainRepChart, spamChart, errorChart } = useMemo(() => {
-     if (!postmasterData || postmasterData.length === 0) {
-       return {
-         ipRepChart: { data: [], observations: [] },
-         domainRepChart: { data: [], observations: [] },
-         spamChart: { data: [], observations: [] },
-         errorChart: { data: [], observations: [] },
-       };
-     }
- 
-     // Sort postmaster data chronologically
-     const sorted = [...postmasterData]
-       .map((row) => {
-         const dateObj = parsePostmasterDate(row.date);
-         return dateObj ? { ...row, dateObj } : null;
-       })
-       .filter((r): r is PostmasterRow & { dateObj: Date } => r !== null)
-       .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
- 
-     if (sorted.length === 0) {
-       return {
-         ipRepChart: { data: [], observations: [] },
-         domainRepChart: { data: [], observations: [] },
-         spamChart: { data: [], observations: [] },
-         errorChart: { data: [], observations: [] },
-       };
-     }
- 
-     // Calculate baseline from campaign data
-     const baseline = calculateBaseline(campaignData);
- 
-     // Process IP Reputation
-     const ipRepData: ChartDataPoint[] = [];
-     const ipRepObs: Observation[] = [];
-     
-     // Process Domain Reputation
-     const domainRepData: ChartDataPoint[] = [];
-     const domainRepObs: Observation[] = [];
-     
-     // Process Spam Ratio
-     const spamData: ChartDataPoint[] = [];
-     const spamObs: Observation[] = [];
-     
-     // Process Error Ratio
-     const errorData: ChartDataPoint[] = [];
-     const errorObs: Observation[] = [];
- 
-     sorted.forEach((row, i) => {
-       const campaignsOnDate = getCampaignsOnDate(campaignData, row.date);
-       
-       // IP Reputation
-       const ipRepValue = reputationToNumber(row.ipReputation);
-       const ipRepBreach = ipRepValue > 0 && ipRepValue < THRESHOLDS.ipReputation;
-       ipRepData.push({
-         date: row.date,
-         dateObj: row.dateObj,
-         value: ipRepValue,
-         valueRaw: row.ipReputation,
-         hasBreach: ipRepBreach,
-       });
-       
-       if (i > 0 && ipRepValue > 0) {
-         const prevIpRep = reputationToNumber(sorted[i - 1].ipReputation);
-         const obs = generateReputationObservation("IP reputation", row.date, prevIpRep, ipRepValue, campaignsOnDate, baseline);
-         if (obs) ipRepObs.push(obs);
-       }
- 
-       // Domain Reputation
-       const domainRepValue = reputationToNumber(row.domainReputation);
-       const domainRepBreach = domainRepValue > 0 && domainRepValue < THRESHOLDS.domainReputation;
-       domainRepData.push({
-         date: row.date,
-         dateObj: row.dateObj,
-         value: domainRepValue,
-         valueRaw: row.domainReputation,
-         hasBreach: domainRepBreach,
-       });
-       
-       if (i > 0 && domainRepValue > 0) {
-         const prevDomainRep = reputationToNumber(sorted[i - 1].domainReputation);
-         const obs = generateReputationObservation("Domain reputation", row.date, prevDomainRep, domainRepValue, campaignsOnDate, baseline);
-         if (obs) domainRepObs.push(obs);
-       }
- 
-       // Spam Ratio
-       const spamValue = row.spamRatio || 0;
-       const spamBreach = spamValue > THRESHOLDS.spamRatio;
-       spamData.push({
-         date: row.date,
-         dateObj: row.dateObj,
-         value: spamValue,
-         hasBreach: spamBreach,
-       });
-       
-       const spamObservation = generateRatioObservation("Spam Ratio", row.date, spamValue, THRESHOLDS.spamRatio, campaignsOnDate, baseline);
-       if (spamObservation) spamObs.push(spamObservation);
- 
-       // Error Ratio
-       const errorValue = row.errorRatio || 0;
-       const errorBreach = errorValue > THRESHOLDS.errorRatio;
-       errorData.push({
-         date: row.date,
-         dateObj: row.dateObj,
-         value: errorValue,
-         hasBreach: errorBreach,
-       });
-       
-       const errorObservation = generateRatioObservation("Delivery Error Ratio", row.date, errorValue, THRESHOLDS.errorRatio, campaignsOnDate, baseline);
-       if (errorObservation) errorObs.push(errorObservation);
-     });
- 
-     return {
-       ipRepChart: { data: ipRepData, observations: ipRepObs },
-       domainRepChart: { data: domainRepData, observations: domainRepObs },
-       spamChart: { data: spamData, observations: spamObs },
-       errorChart: { data: errorData, observations: errorObs },
-     };
-   }, [postmasterData, campaignData]);
+    // Process data for all 4 charts
+    const { ipRepChart, domainRepChart, spamChart, errorChart, invalidDateCount } = useMemo(() => {
+      if (!postmasterData || postmasterData.length === 0) {
+        return {
+          ipRepChart: { data: [], observations: [] },
+          domainRepChart: { data: [], observations: [] },
+          spamChart: { data: [], observations: [] },
+          errorChart: { data: [], observations: [] },
+          invalidDateCount: 0,
+        };
+      }
+
+      // Sort postmaster data chronologically, track invalid dates
+      let invalidCount = 0;
+      const sorted = [...postmasterData]
+        .map((row) => {
+          const dateObj = parseReputationDate(row.date);
+          if (!dateObj) {
+            invalidCount++;
+            return null;
+          }
+          return { ...row, dateObj };
+        })
+        .filter((r): r is PostmasterRow & { dateObj: Date } => r !== null)
+        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+      if (sorted.length === 0) {
+        return {
+          ipRepChart: { data: [], observations: [] },
+          domainRepChart: { data: [], observations: [] },
+          spamChart: { data: [], observations: [] },
+          errorChart: { data: [], observations: [] },
+          invalidDateCount: invalidCount,
+        };
+      }
+
+      // Calculate baseline from campaign data
+      const baseline = calculateBaseline(campaignData);
+
+      // Process IP Reputation
+      const ipRepData: ChartDataPoint[] = [];
+      const ipRepObs: Observation[] = [];
+      
+      // Process Domain Reputation
+      const domainRepData: ChartDataPoint[] = [];
+      const domainRepObs: Observation[] = [];
+      
+      // Process Spam Ratio
+      const spamData: ChartDataPoint[] = [];
+      const spamObs: Observation[] = [];
+      
+      // Process Error Ratio
+      const errorData: ChartDataPoint[] = [];
+      const errorObs: Observation[] = [];
+
+      sorted.forEach((row, i) => {
+        const campaignsOnDate = getCampaignsOnDate(campaignData, row.date);
+        
+        // IP Reputation
+        const ipRepValue = reputationToNumber(row.ipReputation);
+        const ipRepBreach = ipRepValue > 0 && ipRepValue < THRESHOLDS.ipReputation;
+        ipRepData.push({
+          date: row.date,
+          dateObj: row.dateObj,
+          value: ipRepValue,
+          valueRaw: row.ipReputation,
+          hasBreach: ipRepBreach,
+        });
+        
+        if (i > 0 && ipRepValue > 0) {
+          const prevIpRep = reputationToNumber(sorted[i - 1].ipReputation);
+          const obs = generateReputationObservation("IP reputation", row.date, prevIpRep, ipRepValue, campaignsOnDate, baseline);
+          if (obs) ipRepObs.push(obs);
+        }
+
+        // Domain Reputation
+        const domainRepValue = reputationToNumber(row.domainReputation);
+        const domainRepBreach = domainRepValue > 0 && domainRepValue < THRESHOLDS.domainReputation;
+        domainRepData.push({
+          date: row.date,
+          dateObj: row.dateObj,
+          value: domainRepValue,
+          valueRaw: row.domainReputation,
+          hasBreach: domainRepBreach,
+        });
+        
+        if (i > 0 && domainRepValue > 0) {
+          const prevDomainRep = reputationToNumber(sorted[i - 1].domainReputation);
+          const obs = generateReputationObservation("Domain reputation", row.date, prevDomainRep, domainRepValue, campaignsOnDate, baseline);
+          if (obs) domainRepObs.push(obs);
+        }
+
+        // Spam Ratio
+        const spamValue = row.spamRatio || 0;
+        const spamBreach = spamValue > THRESHOLDS.spamRatio;
+        spamData.push({
+          date: row.date,
+          dateObj: row.dateObj,
+          value: spamValue,
+          hasBreach: spamBreach,
+        });
+        
+        const spamObservation = generateRatioObservation("Spam Ratio", row.date, spamValue, THRESHOLDS.spamRatio, campaignsOnDate, baseline);
+        if (spamObservation) spamObs.push(spamObservation);
+
+        // Error Ratio
+        const errorValue = row.errorRatio || 0;
+        const errorBreach = errorValue > THRESHOLDS.errorRatio;
+        errorData.push({
+          date: row.date,
+          dateObj: row.dateObj,
+          value: errorValue,
+          hasBreach: errorBreach,
+        });
+        
+        const errorObservation = generateRatioObservation("Delivery Error Ratio", row.date, errorValue, THRESHOLDS.errorRatio, campaignsOnDate, baseline);
+        if (errorObservation) errorObs.push(errorObservation);
+      });
+
+      return {
+        ipRepChart: { data: ipRepData, observations: ipRepObs },
+        domainRepChart: { data: domainRepData, observations: domainRepObs },
+        spamChart: { data: spamData, observations: spamObs },
+        errorChart: { data: errorData, observations: errorObs },
+        invalidDateCount: invalidCount,
+      };
+    }, [postmasterData, campaignData]);
  
    if (!postmasterData || postmasterData.length === 0) {
      return (
@@ -492,13 +503,21 @@
      );
    }
  
-   return (
-     <motion.div
-       initial={{ opacity: 0, y: 10 }}
-       animate={{ opacity: 1, y: 0 }}
-       className="space-y-4"
-     >
-       {/* 2x2 Grid of Small Multiples */}
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-4"
+      >
+        {/* Invalid Date Integrity Counter */}
+        {invalidDateCount > 0 && (
+          <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-600 text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              <strong>{invalidDateCount} row{invalidDateCount > 1 ? "s" : ""}</strong> excluded from reputation trend charts due to invalid date format (expected: MMM D, YYYY).
+            </span>
+          </div>
+        )}
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
          <MiniChart
            title="IP Reputation"
