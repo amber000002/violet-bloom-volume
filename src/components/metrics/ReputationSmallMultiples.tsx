@@ -33,16 +33,18 @@
    severity: "info" | "warning" | "critical";
  }
  
- // Convert reputation strings to numeric values for charting
- const reputationToNumber = (rep: string): number => {
-   const map: Record<string, number> = {
-     "High": 4,
-     "Medium": 3,
-     "Low": 2,
-     "Bad": 1,
-   };
-   return map[rep] || 0;
- };
+// Convert reputation strings to numeric values for charting (case-insensitive, no silent fallback)
+const reputationToNumber = (rep: string): number | null => {
+  if (!rep) return null;
+  const map: Record<string, number> = {
+    "high": 4,
+    "medium": 3,
+    "low": 2,
+    "bad": 1,
+  };
+  const result = map[rep.trim().toLowerCase()];
+  return result !== undefined ? result : null;
+};
  
  const numberToReputation = (num: number): string => {
    const map: Record<number, string> = {
@@ -422,41 +424,49 @@ const parseReputationDate = (dateStr: string): Date | null => {
       const errorData: ChartDataPoint[] = [];
       const errorObs: Observation[] = [];
 
-      sorted.forEach((row, i) => {
+       sorted.forEach((row, i) => {
         const campaignsOnDate = getCampaignsOnDate(campaignData, row.date);
         
-        // IP Reputation
+        // IP Reputation - skip rows with invalid reputation values
         const ipRepValue = reputationToNumber(row.ipReputation);
-        const ipRepBreach = ipRepValue > 0 && ipRepValue < THRESHOLDS.ipReputation;
-        ipRepData.push({
-          date: row.date,
-          dateObj: row.dateObj,
-          value: ipRepValue,
-          valueRaw: row.ipReputation,
-          hasBreach: ipRepBreach,
-        });
-        
-        if (i > 0 && ipRepValue > 0) {
-          const prevIpRep = reputationToNumber(sorted[i - 1].ipReputation);
-          const obs = generateReputationObservation("IP reputation", row.date, prevIpRep, ipRepValue, campaignsOnDate, baseline);
-          if (obs) ipRepObs.push(obs);
+        if (ipRepValue !== null) {
+          const ipRepBreach = ipRepValue < THRESHOLDS.ipReputation;
+          ipRepData.push({
+            date: row.date,
+            dateObj: row.dateObj,
+            value: ipRepValue,
+            valueRaw: row.ipReputation,
+            hasBreach: ipRepBreach,
+          });
+          
+          if (i > 0) {
+            const prevIpRep = reputationToNumber(sorted[i - 1].ipReputation);
+            if (prevIpRep !== null) {
+              const obs = generateReputationObservation("IP reputation", row.date, prevIpRep, ipRepValue, campaignsOnDate, baseline);
+              if (obs) ipRepObs.push(obs);
+            }
+          }
         }
 
-        // Domain Reputation
+        // Domain Reputation - skip rows with invalid reputation values
         const domainRepValue = reputationToNumber(row.domainReputation);
-        const domainRepBreach = domainRepValue > 0 && domainRepValue < THRESHOLDS.domainReputation;
-        domainRepData.push({
-          date: row.date,
-          dateObj: row.dateObj,
-          value: domainRepValue,
-          valueRaw: row.domainReputation,
-          hasBreach: domainRepBreach,
-        });
-        
-        if (i > 0 && domainRepValue > 0) {
-          const prevDomainRep = reputationToNumber(sorted[i - 1].domainReputation);
-          const obs = generateReputationObservation("Domain reputation", row.date, prevDomainRep, domainRepValue, campaignsOnDate, baseline);
-          if (obs) domainRepObs.push(obs);
+        if (domainRepValue !== null) {
+          const domainRepBreach = domainRepValue < THRESHOLDS.domainReputation;
+          domainRepData.push({
+            date: row.date,
+            dateObj: row.dateObj,
+            value: domainRepValue,
+            valueRaw: row.domainReputation,
+            hasBreach: domainRepBreach,
+          });
+          
+          if (i > 0) {
+            const prevDomainRep = reputationToNumber(sorted[i - 1].domainReputation);
+            if (prevDomainRep !== null) {
+              const obs = generateReputationObservation("Domain reputation", row.date, prevDomainRep, domainRepValue, campaignsOnDate, baseline);
+              if (obs) domainRepObs.push(obs);
+            }
+          }
         }
 
         // Spam Ratio

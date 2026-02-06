@@ -41,15 +41,17 @@ interface ChartDataPoint {
   breaches: ThresholdBreach[];
 }
 
-// Convert reputation strings to numeric values for charting
-const reputationToNumber = (rep: string): number => {
+// Convert reputation strings to numeric values for charting (case-insensitive, no silent fallback)
+const reputationToNumber = (rep: string): number | null => {
+  if (!rep) return null;
   const map: Record<string, number> = {
-    "High": 4,
-    "Medium": 3,
-    "Low": 2,
-    "Bad": 1,
+    "high": 4,
+    "medium": 3,
+    "low": 2,
+    "bad": 1,
   };
-  return map[rep] || 0;
+  const result = map[rep.trim().toLowerCase()];
+  return result !== undefined ? result : null;
 };
 
 const numberToReputation = (num: number): string => {
@@ -122,7 +124,7 @@ const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreac
   }
   
   // IP Reputation below Medium
-  if (point.ipReputation > 0 && point.ipReputation < THRESHOLDS.ipReputation) {
+  if (point.ipReputation !== null && point.ipReputation < THRESHOLDS.ipReputation) {
     breaches.push({
       date: point.date,
       metric: "IP Reputation",
@@ -133,7 +135,7 @@ const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreac
   }
   
   // Domain Reputation below Medium
-  if (point.domainReputation > 0 && point.domainReputation < THRESHOLDS.domainReputation) {
+  if (point.domainReputation !== null && point.domainReputation < THRESHOLDS.domainReputation) {
     breaches.push({
       date: point.date,
       metric: "Domain Reputation",
@@ -164,11 +166,17 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
         const dateObj = parseReputationDate(row.date);
         if (!dateObj) return null;
         
+        const ipRep = reputationToNumber(row.ipReputation);
+        const domainRep = reputationToNumber(row.domainReputation);
+        
+        // Exclude rows with invalid reputation values
+        if (ipRep === null || domainRep === null) return null;
+        
         const point = {
           date: row.date,
           dateObj,
-          ipReputation: reputationToNumber(row.ipReputation),
-          domainReputation: reputationToNumber(row.domainReputation),
+          ipReputation: ipRep,
+          domainReputation: domainRep,
           spamRatio: row.spamRatio || 0,
           errorRatio: row.errorRatio || 0,
           ipReputationRaw: row.ipReputation,

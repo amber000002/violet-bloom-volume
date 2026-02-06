@@ -12,7 +12,7 @@ export interface SignalHealth {
   signal: string;
   latestValue: string | number;
   threshold: string;
-  status: "healthy" | "warning" | "breached";
+  status: "healthy" | "warning" | "risk" | "breached" | "critical";
   trend: "improving" | "stable" | "worsening";
   trendChange: string;
 }
@@ -49,9 +49,24 @@ const THRESHOLDS = {
   unsubscribeRate: { value: 0.2, label: "< 0.2%" },
 };
 
-const reputationToNumber = (rep: string): number => {
-  const map: Record<string, number> = { "High": 4, "Medium": 3, "Low": 2, "Bad": 1 };
-  return map[rep] || 0;
+// Case-insensitive reputation mapping with no silent fallback
+const reputationToNumber = (rep: string): number | null => {
+  if (!rep) return null;
+  const map: Record<string, number> = { "high": 4, "medium": 3, "low": 2, "bad": 1 };
+  const result = map[rep.trim().toLowerCase()];
+  return result !== undefined ? result : null;
+};
+
+// Derive status directly from the original CSV enum (case-insensitive)
+const reputationToStatus = (rep: string): "healthy" | "warning" | "risk" | "critical" | null => {
+  if (!rep) return null;
+  const map: Record<string, "healthy" | "warning" | "risk" | "critical"> = {
+    "high": "healthy",
+    "medium": "warning",
+    "low": "risk",
+    "bad": "critical",
+  };
+  return map[rep.trim().toLowerCase()] || null;
 };
 
 export const calculateSignalHealth = (
@@ -132,30 +147,38 @@ export const calculateSignalHealth = (
     });
     
     // IP Reputation
-    const ipValues = sortedPM.map((p) => reputationToNumber(p.ipReputation));
-    const latestIP = reputationToNumber(latest.ipReputation);
+    const ipValues = sortedPM
+      .map((p) => reputationToNumber(p.ipReputation))
+      .filter((v): v is number => v !== null);
     const ipTrend = calcTrend(ipValues, true);
-    signals.push({
-      signal: "IP Reputation",
-      latestValue: latest.ipReputation || "Unknown",
-      threshold: THRESHOLDS.ipReputation.label,
-      status: latestIP === 0 ? "warning" : latestIP < 3 ? "breached" : latestIP === 3 ? "warning" : "healthy",
-      trend: ipTrend.trend,
-      trendChange: ipTrend.change,
-    });
+    const latestIPStatus = reputationToStatus(latest.ipReputation);
+    if (latestIPStatus !== null) {
+      signals.push({
+        signal: "IP Reputation",
+        latestValue: latest.ipReputation?.trim() || "Unknown",
+        threshold: THRESHOLDS.ipReputation.label,
+        status: latestIPStatus === "healthy" ? "healthy" : latestIPStatus === "warning" ? "warning" : latestIPStatus === "risk" ? "risk" : "critical",
+        trend: ipTrend.trend,
+        trendChange: ipTrend.change,
+      });
+    }
     
     // Domain Reputation
-    const domainValues = sortedPM.map((p) => reputationToNumber(p.domainReputation));
-    const latestDomain = reputationToNumber(latest.domainReputation);
+    const domainValues = sortedPM
+      .map((p) => reputationToNumber(p.domainReputation))
+      .filter((v): v is number => v !== null);
     const domainTrend = calcTrend(domainValues, true);
-    signals.push({
-      signal: "Domain Reputation",
-      latestValue: latest.domainReputation || "Unknown",
-      threshold: THRESHOLDS.domainReputation.label,
-      status: latestDomain === 0 ? "warning" : latestDomain < 3 ? "breached" : latestDomain === 3 ? "warning" : "healthy",
-      trend: domainTrend.trend,
-      trendChange: domainTrend.change,
-    });
+    const latestDomainStatus = reputationToStatus(latest.domainReputation);
+    if (latestDomainStatus !== null) {
+      signals.push({
+        signal: "Domain Reputation",
+        latestValue: latest.domainReputation?.trim() || "Unknown",
+        threshold: THRESHOLDS.domainReputation.label,
+        status: latestDomainStatus === "healthy" ? "healthy" : latestDomainStatus === "warning" ? "warning" : latestDomainStatus === "risk" ? "risk" : "critical",
+        trend: domainTrend.trend,
+        trendChange: domainTrend.change,
+      });
+    }
   }
   
   // Campaign-based signals
@@ -210,7 +233,10 @@ const StatusIcon: React.FC<{ status: SignalHealth["status"] }> = ({ status }) =>
       return <CheckCircle2 className="w-4 h-4 text-green-500" />;
     case "warning":
       return <AlertTriangle className="w-4 h-4 text-amber-500" />;
+    case "risk":
+      return <AlertTriangle className="w-4 h-4 text-orange-500" />;
     case "breached":
+    case "critical":
       return <XCircle className="w-4 h-4 text-red-500" />;
   }
 };
@@ -274,10 +300,12 @@ export const SignalHealthTable: React.FC<SignalHealthTableProps> = ({
                         ? "text-green-600"
                         : signal.status === "warning"
                         ? "text-amber-600"
+                        : signal.status === "risk"
+                        ? "text-orange-600"
                         : "text-red-600"
                     }`}
                   >
-                    {signal.status === "healthy" ? "✓ OK" : signal.status === "warning" ? "⚠ Watch" : "🚨 Breach"}
+                    {signal.status === "healthy" ? "✓ OK" : signal.status === "warning" ? "⚠ Watch" : signal.status === "risk" ? "⚠ Risk" : "🚨 Critical"}
                   </span>
                 </div>
               </td>
