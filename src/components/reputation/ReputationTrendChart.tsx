@@ -45,10 +45,10 @@ interface ChartDataPoint {
 const reputationToNumber = (rep: string): number | null => {
   if (!rep) return null;
   const map: Record<string, number> = {
-    "high": 4,
-    "medium": 3,
-    "low": 2,
-    "bad": 1,
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+    "bad": 0,
   };
   const result = map[rep.trim().toLowerCase()];
   return result !== undefined ? result : null;
@@ -56,10 +56,10 @@ const reputationToNumber = (rep: string): number | null => {
 
 const numberToReputation = (num: number): string => {
   const map: Record<number, string> = {
-    4: "High",
-    3: "Medium",
-    2: "Low",
-    1: "Bad",
+    3: "High",
+    2: "Medium",
+    1: "Low",
+    0: "Bad",
   };
   return map[num] || "Unknown";
 };
@@ -68,8 +68,8 @@ const numberToReputation = (num: number): string => {
 const THRESHOLDS = {
   spamRatio: 0.001, // > 0.1%
   errorRatio: 0, // > 0%
-  ipReputation: 3, // Below "Medium" (i.e., < 3)
-  domainReputation: 3, // Below "Medium" (i.e., < 3)
+  ipReputation: 2, // Below "Medium" (i.e., < 2)
+  domainReputation: 2, // Below "Medium" (i.e., < 2)
 };
 
 // Parse reputation date strictly as "MMM D, YYYY" (e.g., "Jan 9, 2026")
@@ -130,7 +130,7 @@ const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreac
       metric: "IP Reputation",
       value: point.ipReputationRaw,
       threshold: "Below Medium",
-      severity: point.ipReputation === 1 ? "critical" : "warning",
+      severity: point.ipReputation === 0 ? "critical" : "warning",
     });
   }
   
@@ -141,7 +141,7 @@ const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreac
       metric: "Domain Reputation",
       value: point.domainReputationRaw,
       threshold: "Below Medium",
-      severity: point.domainReputation === 1 ? "critical" : "warning",
+      severity: point.domainReputation === 0 ? "critical" : "warning",
     });
   }
   
@@ -315,8 +315,8 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
             {/* Left Y-axis for Reputation (1-4 scale) */}
             <YAxis
               yAxisId="reputation"
-              domain={[0, 5]}
-              ticks={[1, 2, 3, 4]}
+              domain={[0, 4]}
+              ticks={[0, 1, 2, 3]}
               tickFormatter={(v) => numberToReputation(v)}
               tick={{ fontSize: 11 }}
               className="fill-muted-foreground"
@@ -339,7 +339,7 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
             {/* Reference lines for thresholds */}
             <ReferenceLine
               yAxisId="reputation"
-              y={3}
+              y={2}
               stroke="hsl(var(--muted-foreground))"
               strokeDasharray="5 5"
               label={{ value: "Medium", position: "left", fontSize: 10 }}

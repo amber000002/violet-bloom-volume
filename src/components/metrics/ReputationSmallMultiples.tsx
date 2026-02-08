@@ -37,24 +37,24 @@
 const reputationToNumber = (rep: string): number | null => {
   if (!rep) return null;
   const map: Record<string, number> = {
-    "high": 4,
-    "medium": 3,
-    "low": 2,
-    "bad": 1,
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+    "bad": 0,
   };
   const result = map[rep.trim().toLowerCase()];
   return result !== undefined ? result : null;
 };
  
- const numberToReputation = (num: number): string => {
-   const map: Record<number, string> = {
-     4: "High",
-     3: "Medium",
-     2: "Low",
-     1: "Bad",
-   };
-   return map[num] || "Unknown";
- };
+const numberToReputation = (num: number): string => {
+  const map: Record<number, string> = {
+    3: "High",
+    2: "Medium",
+    1: "Low",
+    0: "Bad",
+  };
+  return map[num] || "Unknown";
+};
  
 // Parse reputation date strictly as "MMM D, YYYY" (e.g., "Jan 9, 2026")
 const MONTH_MAP: Record<string, number> = {
@@ -82,12 +82,12 @@ const parseReputationDate = (dateStr: string): Date | null => {
 };
  
  // Threshold config from PRD
- const THRESHOLDS = {
-   spamRatio: 0.001, // 0.1%
-   errorRatio: 0,
-   ipReputation: 3, // Below Medium
-   domainReputation: 3, // Below Medium
- };
+const THRESHOLDS = {
+  spamRatio: 0.001, // 0.1%
+  errorRatio: 0,
+  ipReputation: 2, // Below Medium
+  domainReputation: 2, // Below Medium
+};
  
  // Color coding thresholds for engagement metrics
  const ENGAGEMENT_THRESHOLDS = {
@@ -128,7 +128,7 @@ const parseReputationDate = (dateStr: string): Date | null => {
    campaignsOnDate: CampaignRow[],
    baseline: ReturnType<typeof calculateBaseline>
  ): Observation | null => {
-   if (prevValue <= currentValue) return null;
+    if (prevValue <= currentValue) return null;
    
    const prevRep = numberToReputation(prevValue);
    const currRep = numberToReputation(currentValue);
@@ -163,7 +163,7 @@ const parseReputationDate = (dateStr: string): Date | null => {
    return {
      date,
      message,
-     severity: currentValue === 1 ? "critical" : "warning",
+     severity: currentValue === 0 ? "critical" : "warning",
    };
  };
  
@@ -280,9 +280,9 @@ const parseReputationDate = (dateStr: string): Date | null => {
                  className="fill-muted-foreground"
                  interval="preserveStartEnd"
                />
-               <YAxis
-                 domain={isReputation ? [0, 5] : [0, "auto"]}
-                 ticks={isReputation ? [1, 2, 3, 4] : undefined}
+                <YAxis
+                  domain={isReputation ? [0, 4] : [0, "auto"]}
+                  ticks={isReputation ? [0, 1, 2, 3] : undefined}
                  tickFormatter={(v) => isReputation ? numberToReputation(v).charAt(0) : `${(v * 100).toFixed(1)}%`}
                  tick={{ fontSize: 9 }}
                  className="fill-muted-foreground"
