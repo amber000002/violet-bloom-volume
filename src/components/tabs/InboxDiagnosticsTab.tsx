@@ -38,6 +38,7 @@ import {
   EnhancedReputationReport,
   ReputationSignalRow,
   ProcessingSummary,
+  TopCampaign,
 } from "@/lib/csvAnalyzer";
 import { InboxDiagnosticsSlides } from "../presentation/InboxDiagnosticsSlides";
 import { Button } from "../ui/button";
@@ -98,7 +99,41 @@ const cleanSubjectLine = (subject: string): string => {
   return cleaned;
 };
 
-// Color coding logic for percentage metrics (WCAG AA compliant)
+// Export campaign data to CSV
+const exportCampaignsToCSV = (campaigns: TopCampaign[], filename: string) => {
+  const headers = ["Start Date","Campaign Name","Subject Line","Sent","Viewed","Open %","Clicked","Click %","Unsubs","Unsub %","Hard Bounce","Hard %","Soft Bounce","Soft %"];
+  const rows = campaigns.map(c => {
+    const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
+    const unsubPct = denom > 0 ? (c.unsubscribes / denom) * 100 : 0;
+    const hardPct = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
+    const softPct = denom > 0 ? (c.softBounces / denom) * 100 : 0;
+    return [
+      c.startDate,
+      `"${c.campaignName.replace(/"/g, '""')}"`,
+      `"${cleanSubjectLine(c.subjectLine).replace(/"/g, '""')}"`,
+      c.totalSentUsers,
+      c.uniqueViewed,
+      c.openRate.toFixed(2),
+      c.uniqueClicked,
+      c.clickRate.toFixed(2),
+      c.unsubscribes,
+      unsubPct.toFixed(2),
+      c.hardBounces,
+      hardPct.toFixed(2),
+      c.softBounces,
+      softPct.toFixed(2),
+    ].join(",");
+  });
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${filename}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 type MetricType = 'openRate' | 'clickRate' | 'bounceRate' | 'unsubscribeRate';
 
 interface ColorResult {
@@ -717,9 +752,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </CollapsibleSection>
           )}
 
-          {/* 2. Signal Health Table */}
+          {/* 2. Reputation Scorecard */}
           <CollapsibleSection
-            title="Reputation Signal Health"
+            title="Reputation Scorecard"
             icon={<Shield className="w-5 h-5 text-primary" />}
             isOpen={expandedSections.signalHealth}
             onToggle={() => toggleSection("signalHealth")}
@@ -859,6 +894,11 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             isOpen={expandedSections.best}
             onToggle={() => toggleSection("best")}
           >
+            <div className="flex justify-end mb-2">
+              <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.bestCampaigns, "best-performing-campaigns")}>
+                <Download className="w-4 h-4 mr-1" /> Export CSV
+              </Button>
+            </div>
             <div className="overflow-x-auto mb-4">
               <table className="w-full text-sm">
                 <thead>
@@ -913,13 +953,18 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </CollapsibleSection>
 
-          {/* Report 3: Worst Performing */}
+          {/* Report 3: Under-Performing */}
           <CollapsibleSection
-            title="Worst Performing Campaigns"
+            title="Under-Performing Campaigns"
             icon={<TrendingDown className="w-5 h-5 text-red-500" />}
             isOpen={expandedSections.worst}
             onToggle={() => toggleSection("worst")}
           >
+            <div className="flex justify-end mb-2">
+              <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.worstCampaigns, "under-performing-campaigns")}>
+                <Download className="w-4 h-4 mr-1" /> Export CSV
+              </Button>
+            </div>
             <div className="overflow-x-auto mb-4">
               <table className="w-full text-sm">
                 <thead>

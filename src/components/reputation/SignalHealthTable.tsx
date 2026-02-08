@@ -11,6 +11,7 @@ interface SignalHealthTableProps {
 export interface SignalHealth {
   signal: string;
   latestValue: string | number;
+  latestDate: string;
   threshold: string;
   status: "healthy" | "warning" | "risk" | "breached" | "critical";
   trend: "improving" | "stable" | "worsening";
@@ -119,6 +120,7 @@ export const calculateSignalHealth = (
   // Postmaster-based signals
   if (sortedPM.length > 0) {
     const latest = sortedPM[sortedPM.length - 1];
+    const latestPMDate = latest.date || "N/A";
     
     // Spam Ratio
     const spamValues = sortedPM.map((p) => p.spamRatio || 0);
@@ -127,6 +129,7 @@ export const calculateSignalHealth = (
     signals.push({
       signal: "Spam Ratio",
       latestValue: `${(latestSpam * 100).toFixed(2)}%`,
+      latestDate: latestPMDate,
       threshold: THRESHOLDS.spamRatio.label,
       status: latestSpam > 0.003 ? "breached" : latestSpam > 0.001 ? "warning" : "healthy",
       trend: spamTrend.trend,
@@ -140,6 +143,7 @@ export const calculateSignalHealth = (
     signals.push({
       signal: "Error Ratio",
       latestValue: `${(latestError * 100).toFixed(2)}%`,
+      latestDate: latestPMDate,
       threshold: THRESHOLDS.errorRatio.label,
       status: latestError > 0.01 ? "breached" : latestError > 0 ? "warning" : "healthy",
       trend: errorTrend.trend,
@@ -156,6 +160,7 @@ export const calculateSignalHealth = (
       signals.push({
         signal: "IP Reputation",
         latestValue: latest.ipReputation?.trim() || "Unknown",
+        latestDate: latestPMDate,
         threshold: THRESHOLDS.ipReputation.label,
         status: latestIPStatus === "healthy" ? "healthy" : latestIPStatus === "warning" ? "warning" : latestIPStatus === "risk" ? "risk" : "critical",
         trend: ipTrend.trend,
@@ -173,6 +178,7 @@ export const calculateSignalHealth = (
       signals.push({
         signal: "Domain Reputation",
         latestValue: latest.domainReputation?.trim() || "Unknown",
+        latestDate: latestPMDate,
         threshold: THRESHOLDS.domainReputation.label,
         status: latestDomainStatus === "healthy" ? "healthy" : latestDomainStatus === "warning" ? "warning" : latestDomainStatus === "risk" ? "risk" : "critical",
         trend: domainTrend.trend,
@@ -183,6 +189,8 @@ export const calculateSignalHealth = (
   
   // Campaign-based signals
   if (sortedCampaigns.length > 0) {
+    const latestCampaignDate = sortedCampaigns[sortedCampaigns.length - 1].startDate || "N/A";
+    
     // Open Rate
     const openValues = sortedCampaigns.map((c) => c.openRate);
     const latestOpen = sortedCampaigns[sortedCampaigns.length - 1].openRate;
@@ -191,6 +199,7 @@ export const calculateSignalHealth = (
     signals.push({
       signal: "Open Rate",
       latestValue: `${latestOpen.toFixed(2)}%`,
+      latestDate: latestCampaignDate,
       threshold: THRESHOLDS.openRate.label,
       status: avgOpen < 10 ? "breached" : avgOpen < 15 ? "warning" : "healthy",
       trend: openTrend.trend,
@@ -204,6 +213,7 @@ export const calculateSignalHealth = (
     signals.push({
       signal: "Bounce Rate",
       latestValue: `${avgBounce.toFixed(2)}%`,
+      latestDate: latestCampaignDate,
       threshold: THRESHOLDS.bounceRate.label,
       status: avgBounce > 3 ? "breached" : avgBounce > 1 ? "warning" : "healthy",
       trend: bounceTrend.trend,
@@ -217,6 +227,7 @@ export const calculateSignalHealth = (
     signals.push({
       signal: "Unsubscribe Rate",
       latestValue: `${avgUnsub.toFixed(2)}%`,
+      latestDate: latestCampaignDate,
       threshold: THRESHOLDS.unsubscribeRate.label,
       status: avgUnsub > 0.7 ? "breached" : avgUnsub > 0.2 ? "warning" : "healthy",
       trend: unsubTrend.trend,
@@ -280,6 +291,7 @@ export const SignalHealthTable: React.FC<SignalHealthTableProps> = ({
           <tr className="border-b border-border">
             <th className="text-left py-3 px-4 font-medium text-muted-foreground">Signal</th>
             <th className="text-right py-3 px-4 font-medium text-muted-foreground">Latest Value</th>
+            <th className="text-right py-3 px-4 font-medium text-muted-foreground">Latest Date</th>
             <th className="text-right py-3 px-4 font-medium text-muted-foreground">Threshold</th>
             <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
             <th className="text-center py-3 px-4 font-medium text-muted-foreground">Trend</th>
@@ -290,6 +302,7 @@ export const SignalHealthTable: React.FC<SignalHealthTableProps> = ({
             <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
               <td className="py-3 px-4 font-medium">{signal.signal}</td>
               <td className="text-right py-3 px-4 font-mono">{signal.latestValue}</td>
+              <td className="text-right py-3 px-4 text-muted-foreground text-xs">{signal.latestDate}</td>
               <td className="text-right py-3 px-4 text-muted-foreground">{signal.threshold}</td>
               <td className="py-3 px-4">
                 <div className="flex items-center justify-center gap-2">

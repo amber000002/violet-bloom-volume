@@ -461,7 +461,7 @@ export const exportDiagnosticsToPPT = async (
       report.bestSummary
     );
     
-    // ========== SLIDE 4+: Worst Performing Campaigns (all rows, no truncation) ==========
+    // ========== SLIDE 4+: Under-Performing Campaigns (all rows, no truncation) ==========
     addCampaignTableSlides(
       report.worstCampaigns,
       "Underperforming Campaigns",
