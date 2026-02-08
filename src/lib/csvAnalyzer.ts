@@ -943,7 +943,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
   // Report 1a: Provider Aggregates
   const providerMap: Record<string, ProviderAggregate> = {};
   
-  data.forEach(row => {
+  data.filter(row => row.totalSentUsers > 0).forEach(row => {
     const key = `${row.serviceProvider}|${row.providerName}`;
     if (!providerMap[key]) {
       providerMap[key] = {
@@ -999,7 +999,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
   const monthMap: Record<string, MonthlyOverview> = {};
   const monthParsingErrors: string[] = [];
   
-  data.forEach(row => {
+  data.filter(row => row.totalSentUsers > 0).forEach(row => {
     const monthResult = getMonthFromDate(row.startDate);
     
     // Use "Unknown Date" for invalid dates - NO EXCLUSION
