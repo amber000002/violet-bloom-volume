@@ -838,9 +838,10 @@ const parseDateDDMM = (dateStr: string): { date: Date | null; error: string | nu
   const trimmed = dateStr.trim();
   
   // Permissive patterns: accept 1-2 digit day, 1-2 digit month, 2 or 4 digit year
-  // Examples: 1/8/25, 01/08/25, 1/8/2025, 01/08/2025
-  const pattern2Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])\/([1-9]|0[1-9]|1[0-2])\/([0-9]{2})$/;
-  const pattern4Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])\/([1-9]|0[1-9]|1[0-2])\/([0-9]{4})$/;
+  // Separators: both / and - are accepted
+  // Examples: 1/8/25, 01/08/25, 1/8/2025, 01/08/2025, 27-11-2025, 1-8-25
+  const pattern4Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])[\/\-]([1-9]|0[1-9]|1[0-2])[\/\-]([0-9]{4})$/;
+  const pattern2Digit = /^([1-9]|0[1-9]|[12][0-9]|3[01])[\/\-]([1-9]|0[1-9]|1[0-2])[\/\-]([0-9]{2})$/;
   
   let match = trimmed.match(pattern4Digit);
   let is4Digit = true;
