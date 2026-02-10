@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, Palette } from "lucide-react";
+import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, Palette, CheckCircle2 } from "lucide-react";
 import { MagicSelect } from "./ui/MagicSelect";
 import { Sparkles } from "./Sparkles";
 import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
@@ -13,6 +13,9 @@ import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@
 import { exportToPPT } from "@/lib/pptExport";
 import { ResourceLibraryProvider } from "@/contexts/ResourceLibraryContext";
 import { ResourceLibrary } from "./resource-library";
+import { BrandInputsPanel } from "./BrandInputsPanel";
+import { BrandInputs, emptyBrandInputs, CoreBrandJSON } from "@/types/brandProfile";
+import { generateCoreBrandJSON } from "@/lib/brandExtractor";
 
 const industryOptions = Object.entries(industryConfigs).map(([key, config]) => ({
   value: key,
@@ -34,6 +37,9 @@ const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
   const [activeTab, setActiveTab] = useState<TabId>("inbox-potential");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
+  const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
+  const [brandProfile, setBrandProfile] = useState<CoreBrandJSON | null>(null);
+  const [isGeneratingBrand, setIsGeneratingBrand] = useState(false);
   
   const { viewMode, setViewMode, deckType, setDeckType, isExporting, setIsExporting } = usePresentationMode();
 
@@ -55,6 +61,17 @@ const InboxAlchemyContent: React.FC = () => {
   }, [industry]);
   
   const businessModelLabel = inferredBusinessModel ? getBusinessModelLabel(inferredBusinessModel) : "";
+
+  const handleGenerateBrandProfile = useCallback(() => {
+    if (!industry || !brandInputs.websiteUrl.trim() || !brandInputs.websiteText.trim()) return;
+    setIsGeneratingBrand(true);
+    // Simulate small delay for UX feedback
+    setTimeout(() => {
+      const profile = generateCoreBrandJSON(industry, brandInputs);
+      setBrandProfile(profile);
+      setIsGeneratingBrand(false);
+    }, 800);
+  }, [industry, brandInputs]);
 
   // Callback to collect export data from tabs
   const updateExportData = useCallback((tab: string, data: any) => {
@@ -157,29 +174,42 @@ const InboxAlchemyContent: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Industry selector - now single column, full width */}
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Industry Vertical <span className="text-secondary">*</span>
-              </label>
-              <MagicSelect
-                value={industry}
-                onValueChange={setIndustry}
-                placeholder="Choose your industry"
-                options={industryOptions}
-              />
-              <p className="text-xs text-muted-foreground mt-1.5">
-                {inferredBusinessModel ? (
-                  <>Your industry suggests a <span className="text-primary font-medium">{businessModelLabel}</span> model.</>
-                ) : (
-                  "Choose the industry closest to your core customer behavior."
-                )}
-              </p>
-            </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Industry selector */}
+              <div className="lg:w-72">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Industry Vertical <span className="text-secondary">*</span>
+                </label>
+                <MagicSelect
+                  value={industry}
+                  onValueChange={(v) => {
+                    setIndustry(v);
+                    setBrandProfile(null); // Reset brand profile on industry change
+                  }}
+                  placeholder="Choose your industry"
+                  options={industryOptions}
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {inferredBusinessModel ? (
+                    <>Your industry suggests a <span className="text-primary font-medium">{businessModelLabel}</span> model.</>
+                  ) : (
+                    "Choose the industry closest to your core customer behavior."
+                  )}
+                </p>
+              </div>
 
-            {/* Presentation Controls */}
-            <div className="flex flex-col gap-2 lg:border-l lg:border-border lg:pl-4">
+              {/* Brand Inputs */}
+              <BrandInputsPanel
+                inputs={brandInputs}
+                onChange={setBrandInputs}
+                onGenerate={handleGenerateBrandProfile}
+                isGenerating={isGeneratingBrand}
+                hasIndustry={!!industry}
+              />
+
+              {/* Presentation Controls */}
+              <div className="flex flex-col gap-2 lg:border-l lg:border-border lg:pl-4 lg:w-40 flex-shrink-0">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 View Mode
               </label>
@@ -272,6 +302,20 @@ const InboxAlchemyContent: React.FC = () => {
                 </AnimatePresence>
               </div>
             </div>
+            </div>
+
+            {/* Brand Profile Status */}
+            {brandProfile && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                <span className="text-xs font-medium text-primary">
+                  Brand Profile: {brandProfile.brand_identity.brand_name}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  — {brandProfile.industry_signal_layer.industry_vocabulary.length} signals detected
+                </span>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -321,6 +365,7 @@ const InboxAlchemyContent: React.FC = () => {
               <UseCaseStudioTab 
                 industry={industry} 
                 viewMode={viewMode}
+                brandProfile={brandProfile}
                 onDataChange={(data) => updateExportData("useCaseData", data)}
               />
             )}

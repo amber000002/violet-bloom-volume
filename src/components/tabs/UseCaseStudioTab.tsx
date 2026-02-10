@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Clock, Zap, Shield, Lightbulb, Target, Calendar, 
   UserMinus, Activity, TrendingUp, Workflow, Info,
-  ChevronDown, ChevronUp, Layers, Users, BookOpen, Sparkles
+  ChevronDown, ChevronUp, Layers, Users, BookOpen, Sparkles,
+  CheckCircle2
 } from "lucide-react";
 import {
   industryConfigs,
@@ -30,10 +31,12 @@ import { UseCaseStudioSlides } from "../presentation/UseCaseStudioSlides";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { ResourceCitations } from "@/components/resource-library/ResourceCitations";
 import { ResourceCitation, ResourceJourney, ResourceCampaign } from "@/types/resources";
+import { CoreBrandJSON } from "@/types/brandProfile";
 
 interface UseCaseStudioTabProps {
   industry: string;
   viewMode?: ViewMode;
+  brandProfile?: CoreBrandJSON | null;
   onDataChange?: (data: any) => void;
 }
 
@@ -201,6 +204,7 @@ const getRelevantSegments = (stage: string, industry: string): SegmentInfo[] => 
 export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   industry,
   viewMode = "app",
+  brandProfile,
   onDataChange,
 }) => {
   const [framework, setFramework] = useState<FrameworkType>("lifecycle");
@@ -547,6 +551,23 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   return (
     <div className="space-y-8">
+      {/* Read-only Industry Badge */}
+      {config && (
+        <div className="flex items-center justify-center gap-2">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+            <CheckCircle2 className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">
+              Industry: {config.name}
+            </span>
+            {brandProfile && (
+              <span className="text-xs text-muted-foreground">
+                • {brandProfile.brand_identity.brand_name}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Framework Selector */}
       <div className="space-y-3">
         <div className="flex items-center justify-center gap-2 mb-1">
