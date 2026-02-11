@@ -4,7 +4,8 @@ import {
   Clock, Zap, Shield, Lightbulb, Target, Calendar, 
   UserMinus, Activity, TrendingUp, Workflow, Info,
   ChevronDown, ChevronUp, Layers, Users, BookOpen, Sparkles,
-  CheckCircle2
+  CheckCircle2, Mail, Bell, MessageSquare, Smartphone, Globe,
+  Hash, BarChart3, Brain, Crosshair, AlertTriangle
 } from "lucide-react";
 import {
   industryConfigs,
@@ -32,6 +33,8 @@ import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { ResourceCitations } from "@/components/resource-library/ResourceCitations";
 import { ResourceCitation, ResourceJourney, ResourceCampaign } from "@/types/resources";
 import { CoreBrandJSON } from "@/types/brandProfile";
+import { calculateConfidence, getConfidenceColor, getConfidenceLabel, ConfidenceResult } from "@/lib/confidenceEngine";
+import { personalizeUseCase, PersonalizedUseCase } from "@/lib/useCasePersonalizer";
 
 interface UseCaseStudioTabProps {
   industry: string;
@@ -40,6 +43,16 @@ interface UseCaseStudioTabProps {
   onDataChange?: (data: any) => void;
 }
 
+// ===== CHANNEL DEFINITIONS =====
+const channelOptions = [
+  { id: "email", label: "Email", icon: Mail },
+  { id: "push", label: "Push", icon: Bell },
+  { id: "in-app", label: "In-App", icon: Smartphone },
+  { id: "sms", label: "SMS", icon: MessageSquare },
+  { id: "whatsapp", label: "WhatsApp", icon: Hash },
+  { id: "web-push", label: "Web Push", icon: Globe },
+];
+
 const triggerTypeIcons: Record<JourneyUseCase['triggerType'], typeof Clock> = {
   "past-behavior": Activity,
   "live-event": Zap,
@@ -47,160 +60,220 @@ const triggerTypeIcons: Record<JourneyUseCase['triggerType'], typeof Clock> = {
   "time-based": Clock,
 };
 
-// Events and segments data - now inline with use cases
-interface EventInfo {
-  name: string;
-  description: string;
-}
-
-interface SegmentInfo {
-  name: string;
-  description: string;
-}
-
-// Get relevant events for a journey or campaign
-const getRelevantEvents = (stage: string, industry: string): EventInfo[] => {
-  const eventsByStage: Record<string, EventInfo[]> = {
-    activation: [
-      { name: "User Registered", description: "Registration completed" },
-      { name: "App Opened", description: "First session started" },
-      { name: "Profile Completed", description: "User details filled" },
-    ],
-    usage: [
-      { name: "Feature Used", description: "Core feature interaction" },
-      { name: "Session Started", description: "App/web session" },
-      { name: "Content Viewed", description: "Page or item viewed" },
-    ],
-    retention: [
-      { name: "Last Active Date", description: "Days since activity" },
-      { name: "Session Count", description: "Engagement frequency" },
-      { name: "Notification Clicked", description: "Re-engagement action" },
-    ],
-    // AIDA stages
-    attention: [
-      { name: "Ad Clicked", description: "Campaign click-through" },
-      { name: "First Page View", description: "Initial landing" },
-      { name: "Email Opened", description: "Welcome email engagement" },
-    ],
-    interest: [
-      { name: "Content Viewed", description: "Browse behavior" },
-      { name: "Search Performed", description: "Active exploration" },
-      { name: "Time on Site", description: "Engagement depth" },
-    ],
-    desire: [
-      { name: "Added to Cart", description: "Purchase intent signal" },
-      { name: "Wishlist Added", description: "Saved for later" },
-      { name: "Price Alert Set", description: "Price sensitivity" },
-    ],
-    action: [
-      { name: "Checkout Started", description: "Conversion attempt" },
-      { name: "Purchase Completed", description: "Transaction success" },
-      { name: "Payment Failed", description: "Transaction failure" },
-    ],
-    // 4P/7P stages
-    product: [
-      { name: "Product Viewed", description: "Item detail page" },
-      { name: "Category Browsed", description: "Catalog exploration" },
-      { name: "Review Read", description: "Social proof consumed" },
-    ],
-    price: [
-      { name: "Price Compared", description: "Value evaluation" },
-      { name: "Coupon Applied", description: "Discount usage" },
-      { name: "Bundle Viewed", description: "Package consideration" },
-    ],
-    place: [
-      { name: "Channel Preference", description: "Email/Push/SMS" },
-      { name: "Store Located", description: "Geo interaction" },
-      { name: "App Downloaded", description: "Platform adoption" },
-    ],
-    promotion: [
-      { name: "Offer Clicked", description: "Promotion engagement" },
-      { name: "Referral Made", description: "Advocacy action" },
-      { name: "Loyalty Points", description: "Rewards earned" },
-    ],
-    people: [
-      { name: "Support Contacted", description: "Service interaction" },
-      { name: "Chat Started", description: "Live assistance" },
-      { name: "Feedback Submitted", description: "Voice of customer" },
-    ],
-    process: [
-      { name: "Onboarding Step", description: "Flow progression" },
-      { name: "Order Status Checked", description: "Tracking behavior" },
-      { name: "Self-Service Used", description: "Automation adoption" },
-    ],
-    "physical-evidence": [
-      { name: "Review Submitted", description: "Testimonial created" },
-      { name: "Photo Uploaded", description: "UGC contribution" },
-      { name: "Certificate Downloaded", description: "Proof obtained" },
-    ],
-  };
-  return eventsByStage[stage] || eventsByStage.activation;
+// ===== HELPER FUNCTIONS =====
+const normalizeStage = (stage: string): string => {
+  return stage.toLowerCase().trim().replace(/\s+/g, "-");
 };
 
-const getRelevantSegments = (stage: string, industry: string): SegmentInfo[] => {
-  const segmentsByStage: Record<string, SegmentInfo[]> = {
-    activation: [
-      { name: "New Users", description: "Registered < 7 days" },
-      { name: "Incomplete Onboarding", description: "Profile < 50% complete" },
-    ],
-    usage: [
-      { name: "Active Users", description: "Session in last 7 days" },
-      { name: "Power Users", description: "> 10 sessions/month" },
-    ],
-    retention: [
-      { name: "At-Risk Users", description: "Inactive 14-30 days" },
-      { name: "Dormant Users", description: "Inactive > 30 days" },
-    ],
-    // AIDA stages
-    attention: [
-      { name: "First-Time Visitors", description: "New to platform" },
-      { name: "Ad Responders", description: "Campaign-driven traffic" },
-    ],
-    interest: [
-      { name: "Browsers", description: "Multiple page views" },
-      { name: "Engaged Prospects", description: "High time on site" },
-    ],
-    desire: [
-      { name: "High-Intent Users", description: "Cart/wishlist activity" },
-      { name: "Comparison Shoppers", description: "Multiple item views" },
-    ],
-    action: [
-      { name: "Cart Abandoners", description: "Checkout not completed" },
-      { name: "Repeat Buyers", description: "Multiple purchases" },
-    ],
-    // 4P/7P stages
-    product: [
-      { name: "Category Enthusiasts", description: "Single category focus" },
-      { name: "New Product Viewers", description: "Launch interest" },
-    ],
-    price: [
-      { name: "Price-Sensitive", description: "Coupon users" },
-      { name: "Premium Buyers", description: "Full-price purchasers" },
-    ],
-    place: [
-      { name: "Multi-Channel", description: "Web + App users" },
-      { name: "Store Visitors", description: "Geo-fenced" },
-    ],
-    promotion: [
-      { name: "Offer Responders", description: "Promotion-driven" },
-      { name: "Loyal Members", description: "Active in program" },
-    ],
-    people: [
-      { name: "Support Seekers", description: "Ticket creators" },
-      { name: "Feedback Providers", description: "Survey completers" },
-    ],
-    process: [
-      { name: "Self-Servicers", description: "Prefer automation" },
-      { name: "Assisted Users", description: "Need hand-holding" },
-    ],
-    "physical-evidence": [
-      { name: "Brand Advocates", description: "Reviewers & sharers" },
-      { name: "Credential Earners", description: "Certificate holders" },
-    ],
-  };
-  return segmentsByStage[stage] || segmentsByStage.activation;
+const stageToLabel = (stage: string): string => {
+  return stage
+    .split("-")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };
 
+// ===== PERSONALIZED USE CASE CARD =====
+const UseCaseCard: React.FC<{
+  useCase: PersonalizedUseCase;
+  confidence: ConfidenceResult;
+  isExpanded: boolean;
+  onToggle: () => void;
+}> = ({ useCase, confidence, isExpanded, onToggle }) => {
+  const confidenceColorClass = getConfidenceColor(confidence.level);
+  const isInternal = useCase.source === "internal";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`magic-card rounded-xl p-5 space-y-3 ${isInternal ? "ring-1 ring-emerald-500/30" : ""}`}
+    >
+      {/* Header: Title + Badges */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-2 flex-1 min-w-0">
+          <h4 className="font-display font-semibold text-foreground">{useCase.title}</h4>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Stage badge */}
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
+              {stageToLabel(useCase.stage)}
+            </span>
+            {/* Confidence badge */}
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium ${confidenceColorClass}`}>
+              {confidence.level === "high" && <CheckCircle2 className="w-3 h-3" />}
+              {confidence.level === "medium" && <AlertTriangle className="w-3 h-3" />}
+              {confidence.level === "exploratory" && <Lightbulb className="w-3 h-3" />}
+              {getConfidenceLabel(confidence.level)}
+            </span>
+            {/* Source badge */}
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+              isInternal ? "bg-emerald-500/10 text-emerald-400" : "bg-muted text-muted-foreground"
+            }`}>
+              {isInternal ? <BookOpen className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+              {isInternal ? (useCase.sourceLabel || "Internal") : "Native"}
+            </span>
+            {/* Trigger type */}
+            {useCase.triggerType && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 text-xs text-muted-foreground">
+                <Zap className="w-3 h-3" />
+                {useCase.triggerType}
+              </span>
+            )}
+          </div>
+        </div>
+        <button onClick={onToggle} className="p-1 hover:bg-muted rounded flex-shrink-0">
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
+      </div>
+
+      {/* Objective */}
+      <p className="text-sm text-muted-foreground">{useCase.objective}</p>
+
+      {/* Channels Used */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {useCase.channelsUsed.map(ch => {
+          const opt = channelOptions.find(o => o.id === ch);
+          return opt ? (
+            <span key={ch} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/50 text-xs text-muted-foreground">
+              <opt.icon className="w-3 h-3" />
+              {opt.label}
+            </span>
+          ) : null;
+        })}
+      </div>
+
+      {/* Expandable Details */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-t border-border pt-4 mt-3 space-y-5"
+          >
+            {/* Why It Matters */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <Brain className="w-3.5 h-3.5 text-primary" />
+                Why It Matters
+              </div>
+              <p className="text-sm text-muted-foreground">{useCase.whyItMatters}</p>
+            </div>
+
+            {/* Execution Strategy */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <Crosshair className="w-3.5 h-3.5 text-secondary" />
+                Execution Strategy
+              </div>
+              <div className="space-y-2">
+                {useCase.executionStrategy.map((strategy, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-muted/20 border border-border">
+                    <span className="text-xs font-medium text-primary">{strategy.channel}</span>
+                    <p className="text-xs text-muted-foreground mt-1">{strategy.direction}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Personalization Layers */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <Layers className="w-3.5 h-3.5 text-accent" />
+                Personalization Layers Applied
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {useCase.personalizationLayers.map((layer, i) => (
+                  <div key={i} className="p-2 rounded bg-muted/30">
+                    <span className="text-xs font-medium text-foreground">{layer.layer}</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">{layer.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Campaign Logic Structure */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <Workflow className="w-3.5 h-3.5 text-primary" />
+                Campaign Logic
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="p-2 rounded bg-muted/20">
+                  <span className="text-muted-foreground">Trigger:</span>
+                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.triggerEvent}</p>
+                </div>
+                <div className="p-2 rounded bg-muted/20">
+                  <span className="text-muted-foreground">Segmentation:</span>
+                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.segmentationRule}</p>
+                </div>
+                <div className="p-2 rounded bg-muted/20">
+                  <span className="text-muted-foreground">Channel Flow:</span>
+                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.channelFlow}</p>
+                </div>
+                <div className="p-2 rounded bg-muted/20">
+                  <span className="text-muted-foreground">Content Theme:</span>
+                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.contentTheme}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Metrics to Impact */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <BarChart3 className="w-3.5 h-3.5 text-secondary" />
+                Metrics to Impact
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {useCase.metricsToImpact.map((metric, i) => (
+                  <span key={i} className="px-2 py-1 rounded-full bg-secondary/10 text-xs text-secondary">
+                    {metric}
+                  </span>
+                ))}
+                {useCase.businessKPIs.map((kpi, i) => (
+                  <span key={`kpi-${i}`} className="px-2 py-1 rounded-full bg-primary/10 text-xs text-primary">
+                    {kpi}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Why This Fits Your Brand */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <Target className="w-3.5 h-3.5 text-emerald-400" />
+                Why This Fits Your Brand
+              </div>
+              <p className="text-sm text-muted-foreground p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                {useCase.whyThisFitsYourBrand}
+              </p>
+            </div>
+
+            {/* Confidence Breakdown */}
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                Confidence Breakdown
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {confidence.reasons.map((reason, i) => (
+                  <span key={i} className="px-2 py-1 rounded bg-muted/30 text-muted-foreground">
+                    {reason}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+// ===== MAIN COMPONENT =====
 export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   industry,
   viewMode = "app",
@@ -209,15 +282,14 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 }) => {
   const [framework, setFramework] = useState<FrameworkType>("lifecycle");
   const [selectedStage, setSelectedStage] = useState<string>("");
-  const [expandedJourney, setExpandedJourney] = useState<string | null>(null);
-  const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(["email"]);
 
   // Resource Library integration
-  const { findMatchingResources, getConfidenceLevel, resources } = useResourceLibrary();
+  const { findMatchingResources, resources } = useResourceLibrary();
 
   const config = industry ? industryConfigs[industry] : null;
   
-  // Infer business model from industry
   const inferredBusinessModel = useMemo(() => {
     if (!industry) return null;
     return getInferredBusinessModel(industry);
@@ -225,63 +297,48 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   
   const businessModelLabel = inferredBusinessModel ? getBusinessModelLabel(inferredBusinessModel) : "";
 
-  // Helper to normalize stage strings (lowercase, trimmed)
-  const normalizeStage = (stage: string): string => {
-    return stage.toLowerCase().trim().replace(/\s+/g, "-");
+  // ===== CHANNEL TOGGLE =====
+  const toggleChannel = (channelId: string) => {
+    setSelectedChannels(prev => {
+      if (prev.includes(channelId)) {
+        if (prev.length === 1) return prev; // at least one channel
+        return prev.filter(c => c !== channelId);
+      }
+      return [...prev, channelId];
+    });
   };
 
-  // Helper to create display label from normalized stage
-  const stageToLabel = (stage: string): string => {
-    return stage
-      .split("-")
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+  const selectAllChannels = () => {
+    setSelectedChannels(channelOptions.map(c => c.id));
   };
 
-  // Extract unique stages from internal resources (document-driven)
+  // ===== STAGES =====
+  // Extract unique stages from internal resources
   const internalStages = useMemo(() => {
     const stagesSet = new Set<string>();
-    
     for (const resource of resources) {
       if (!resource.isEnabled) continue;
       if (!resource.tabs.includes("use-case-studio")) continue;
       if (!resource.industries.includes("all") && !resource.industries.includes(industry as any)) continue;
-      
-      // Extract stages from journeys
-      resource.journeys?.forEach(j => {
-        if (j.stage) stagesSet.add(normalizeStage(j.stage));
-      });
-      
-      // Extract stages from campaigns
-      resource.campaigns?.forEach(c => {
-        if (c.stage) stagesSet.add(normalizeStage(c.stage));
-      });
+      resource.journeys?.forEach(j => { if (j.stage) stagesSet.add(normalizeStage(j.stage)); });
+      resource.campaigns?.forEach(c => { if (c.stage) stagesSet.add(normalizeStage(c.stage)); });
     }
-    
     return Array.from(stagesSet);
   }, [resources, industry]);
 
-  // Get predefined stages based on framework and industry
   const predefinedStages = useMemo(() => {
     if (!industry) return [];
     return getFrameworkStages(framework, industry);
   }, [industry, framework]);
 
-  // Merge predefined stages with document-driven stages (internal stages added at the end if new)
   const availableStages = useMemo(() => {
     const predefinedIds = new Set(predefinedStages.map(s => normalizeStage(s.id)));
     const merged = [...predefinedStages];
-    
-    // Add any internal stages that don't exist in predefined
     for (const stage of internalStages) {
       if (!predefinedIds.has(stage)) {
-        merged.push({
-          id: stage,
-          label: stageToLabel(stage),
-        });
+        merged.push({ id: stage, label: stageToLabel(stage) });
       }
     }
-    
     return merged;
   }, [predefinedStages, internalStages]);
 
@@ -292,28 +349,22 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     } else {
       setSelectedStage("");
     }
-    // Reset expanded states
-    setExpandedJourney(null);
-    setExpandedCampaign(null);
+    setExpandedCard(null);
   }, [availableStages]);
 
-  // Resource Library: Find matching internal resources for current context
+  // ===== RESOURCE MATCHING =====
   const resourceMatches = useMemo(() => {
     if (!industry || !selectedStage) return [];
     return findMatchingResources("use-case-studio", industry);
   }, [industry, selectedStage, findMatchingResources]);
 
-  // Extract journeys FROM internal resources (these are the true "Internal" use cases)
-  // Uses normalized stage matching for document-driven flexibility
   const internalJourneys = useMemo((): Array<ResourceJourney & { sourceResource: string }> => {
     const result: Array<ResourceJourney & { sourceResource: string }> = [];
     const normalizedSelectedStage = normalizeStage(selectedStage);
-    
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.journeys && resource.journeys.length > 0) {
         for (const journey of resource.journeys) {
-          // Include if no stage specified, or if normalized stage matches
           const journeyStage = journey.stage ? normalizeStage(journey.stage) : "";
           if (!journeyStage || journeyStage === normalizedSelectedStage) {
             result.push({ ...journey, sourceResource: resource.title });
@@ -321,21 +372,16 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         }
       }
     }
-    
     return result;
   }, [resourceMatches, selectedStage]);
 
-  // Extract campaigns FROM internal resources
-  // Uses normalized stage matching for document-driven flexibility
   const internalCampaigns = useMemo((): Array<ResourceCampaign & { sourceResource: string }> => {
     const result: Array<ResourceCampaign & { sourceResource: string }> = [];
     const normalizedSelectedStage = normalizeStage(selectedStage);
-    
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.campaigns && resource.campaigns.length > 0) {
         for (const campaign of resource.campaigns) {
-          // Include if no stage specified, or if normalized stage matches
           const campaignStage = campaign.stage ? normalizeStage(campaign.stage) : "";
           if (!campaignStage || campaignStage === normalizedSelectedStage) {
             result.push({ ...campaign, sourceResource: resource.title });
@@ -343,134 +389,147 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         }
       }
     }
-    
     return result;
   }, [resourceMatches, selectedStage]);
 
-  // Get native intelligence journeys (fallback/supplement)
+  // ===== NATIVE INTELLIGENCE =====
   const nativeJourneys: (JourneyUseCase | JourneyMapping)[] = useMemo(() => {
     if (!selectedStage) return [];
-    
     if (framework === "aida" || framework === "4p" || framework === "7p") {
       return getFrameworkJourneys(framework, selectedStage);
     }
-    
     if (!config) return [];
     return config.journeys[selectedStage] || [];
   }, [config, selectedStage, framework]);
 
-  // Get native intelligence campaigns (fallback/supplement)
   const nativeCampaigns: (CampaignUseCase | CampaignMapping)[] = useMemo(() => {
     if (!selectedStage) return [];
-    
     if (framework === "aida" || framework === "4p" || framework === "7p") {
       return getFrameworkCampaigns(framework, selectedStage);
     }
-    
     if (!config) return [];
     return config.campaigns[selectedStage] || [];
   }, [config, selectedStage, framework]);
 
-  // Get events and segments for current stage
-  const stageEvents = useMemo(() => {
-    return getRelevantEvents(selectedStage, industry);
-  }, [selectedStage, industry]);
-
-  const stageSegments = useMemo(() => {
-    return getRelevantSegments(selectedStage, industry);
-  }, [selectedStage, industry]);
-
-  const stageInsight = useMemo(() => {
-    if (!industry || !selectedStage) return null;
-    return getStageInsight(industry, selectedStage, framework);
-  }, [industry, selectedStage, framework]);
-
-  // Determine what to show: Internal first, then native as supplement
   const hasInternalContent = internalJourneys.length > 0 || internalCampaigns.length > 0;
 
-  // Compute confidence level and citations
-  const confidenceLevel = useMemo(() => {
-    // High confidence if we have actual internal content
-    if (hasInternalContent) return "high";
-    // Medium if resources match but have no content
-    if (resourceMatches.length > 0) return "medium";
-    return "low";
-  }, [hasInternalContent, resourceMatches]);
+  // ===== GENERATE PERSONALIZED USE CASES =====
+  const personalizedUseCases = useMemo((): Array<{ useCase: PersonalizedUseCase; confidence: ConfidenceResult }> => {
+    const results: Array<{ useCase: PersonalizedUseCase; confidence: ConfidenceResult }> = [];
 
-  const citations: ResourceCitation[] = useMemo(() => {
-    return resourceMatches.map(match => ({
-      resourceId: match.resource.id,
-      resourceTitle: match.resource.title,
-      matchType: hasInternalContent ? "exact" : "partial",
-    }));
-  }, [resourceMatches, hasInternalContent]);
+    // Internal journeys
+    for (const journey of internalJourneys) {
+      const uc = personalizeUseCase({
+        name: journey.name,
+        stage: selectedStage,
+        triggerType: journey.triggerType,
+        description: journey.description,
+        source: "internal",
+        sourceLabel: journey.sourceResource,
+      }, brandProfile || null, selectedChannels);
 
-  // Native intelligence is used when internal resources don't have content
-  const usedNativeIntelligence = !hasInternalContent;
-  
-  // Count actual coverage
-  const coverageStats = useMemo(() => {
-    return {
-      journeysFromResource: internalJourneys.length,
-      journeysFromNative: nativeJourneys.length,
-      campaignsFromResource: internalCampaigns.length,
-      campaignsFromNative: nativeCampaigns.length,
-    };
-  }, [internalJourneys.length, nativeJourneys.length, internalCampaigns.length, nativeCampaigns.length]);
+      const confidence = calculateConfidence({
+        brandProfile: brandProfile || null,
+        stage: selectedStage,
+        hasInternalContent: true,
+        triggerType: journey.triggerType,
+        selectedChannels,
+      });
 
-  // Generate simplified diagnostics for each resource to explain why it matched or didn't
-  const resourceDiagnostics = useMemo(() => {
-    return resources.map(resource => {
-      const tabMatch = resource.tabs.includes("use-case-studio");
-      const industryMatch = resource.industries.includes("all") || 
-        resource.industries.includes(industry as any);
-
-      let reason = "";
-      if (!resource.isEnabled) {
-        reason = "Resource is disabled.";
-      } else if (!tabMatch) {
-        reason = "Resource is not tagged for the Use Case Studio tab.";
-      } else if (!industryMatch) {
-        reason = `Resource is not tagged for the "${industry}" industry.`;
-      } else {
-        reason = "✓ Resource is being referenced (matches tab + industry).";
-      }
-
-      return {
-        resourceTitle: resource.title,
-        industryMatch,
-        tabMatch,
-        isEnabled: resource.isEnabled,
-        isPrimary: resource.isPrimary,
-        reason,
-      };
-    });
-  }, [resources, industry]);
-
-  // Get all journeys and campaigns across all stages for export
-  const allJourneys = useMemo(() => {
-    if (framework === "aida" || framework === "4p" || framework === "7p") {
-      return getFrameworkJourneys(framework);
+      results.push({ useCase: uc, confidence });
     }
-    if (!config) return [];
-    return Object.values(config.journeys).flat();
-  }, [config, framework]);
 
-  const allCampaigns = useMemo(() => {
-    if (framework === "aida" || framework === "4p" || framework === "7p") {
-      return getFrameworkCampaigns(framework);
+    // Internal campaigns
+    for (const campaign of internalCampaigns) {
+      const uc = personalizeUseCase({
+        name: campaign.name,
+        stage: selectedStage,
+        description: campaign.purpose,
+        source: "internal",
+        sourceLabel: campaign.sourceResource,
+      }, brandProfile || null, selectedChannels);
+
+      const confidence = calculateConfidence({
+        brandProfile: brandProfile || null,
+        stage: selectedStage,
+        hasInternalContent: true,
+        selectedChannels,
+      });
+
+      results.push({ useCase: uc, confidence });
     }
-    if (!config) return [];
-    return Object.values(config.campaigns).flat();
-  }, [config, framework]);
 
-  // Get framework reason
+    // Native journeys
+    for (const journey of nativeJourneys) {
+      const isFramework = 'applicableStages' in journey;
+      const triggerType = isFramework 
+        ? (journey as JourneyMapping).triggerType 
+        : (journey as JourneyUseCase).triggerType;
+
+      const uc = personalizeUseCase({
+        name: journey.name,
+        stage: selectedStage,
+        triggerType,
+        description: isFramework ? (journey as JourneyMapping).description : (journey as JourneyUseCase).whyItWorks,
+        source: "native",
+      }, brandProfile || null, selectedChannels);
+
+      const confidence = calculateConfidence({
+        brandProfile: brandProfile || null,
+        stage: selectedStage,
+        hasInternalContent: false,
+        triggerType,
+        selectedChannels,
+      });
+
+      results.push({ useCase: uc, confidence });
+    }
+
+    // Native campaigns
+    for (const campaign of nativeCampaigns) {
+      const uc = personalizeUseCase({
+        name: campaign.name,
+        stage: selectedStage,
+        description: campaign.purpose,
+        source: "native",
+      }, brandProfile || null, selectedChannels);
+
+      const confidence = calculateConfidence({
+        brandProfile: brandProfile || null,
+        stage: selectedStage,
+        hasInternalContent: false,
+        selectedChannels,
+      });
+
+      results.push({ useCase: uc, confidence });
+    }
+
+    return results;
+  }, [internalJourneys, internalCampaigns, nativeJourneys, nativeCampaigns, selectedStage, brandProfile, selectedChannels]);
+
+  // Split by source for display
+  const internalUseCases = personalizedUseCases.filter(p => p.useCase.source === "internal");
+  const nativeUseCases = personalizedUseCases.filter(p => p.useCase.source === "native");
+
+  // ===== FRAMEWORK REASON =====
   const frameworkReason = useMemo(() => {
     if (!industry) return "Select an industry to see framework recommendations.";
     return getFrameworkReason(framework, industry);
   }, [industry, framework]);
 
-  // Report data changes for export
+  // ===== EXPORT DATA =====
+  const allJourneys = useMemo(() => {
+    if (framework === "aida" || framework === "4p" || framework === "7p") return getFrameworkJourneys(framework);
+    if (!config) return [];
+    return Object.values(config.journeys).flat();
+  }, [config, framework]);
+
+  const allCampaigns = useMemo(() => {
+    if (framework === "aida" || framework === "4p" || framework === "7p") return getFrameworkCampaigns(framework);
+    if (!config) return [];
+    return Object.values(config.campaigns).flat();
+  }, [config, framework]);
+
   useEffect(() => {
     if (onDataChange && config) {
       onDataChange({
@@ -483,15 +542,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     }
   }, [framework, frameworkReason, allJourneys, allCampaigns, businessModelLabel, config, onDataChange]);
 
-  // Helper to check if it's a framework mapping journey
-  const isFrameworkJourney = (j: JourneyUseCase | JourneyMapping): j is JourneyMapping => {
-    return 'description' in j && 'applicableStages' in j;
-  };
-
-  // Helper to check if it's a framework mapping campaign
-  const isFrameworkCampaign = (c: CampaignUseCase | CampaignMapping): c is CampaignMapping => {
-    return 'timing' in c && 'suppression' in c && 'applicableStages' in c;
-  };
+  // ===== RENDER =====
 
   if (!industry) {
     return (
@@ -500,7 +551,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           <span className="text-3xl">📧</span>
         </div>
         <p className="text-muted-foreground">
-          Select an industry and business model above to discover use cases.
+          Select an industry above to discover hyper-personalized use cases.
         </p>
       </div>
     );
@@ -508,10 +559,8 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   // Presentation view
   if (viewMode === "presentation") {
-    // Normalize journeys for presentation
     const normalizedJourneys = allJourneys.map((j: any) => {
       if ('description' in j) {
-        // Framework mapping
         return {
           name: j.name,
           triggerType: j.triggerType === 'schedule' ? 'time-based' : 
@@ -527,7 +576,6 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
     const normalizedCampaigns = allCampaigns.map((c: any) => {
       if ('suppression' in c && !('suppressionAdvice' in c)) {
-        // Framework mapping
         return {
           name: c.name,
           purpose: c.purpose,
@@ -567,6 +615,40 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Channel Multi-Select */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-sm font-medium text-foreground">Channels</span>
+          <button
+            onClick={selectAllChannels}
+            className="text-xs text-primary hover:underline"
+          >
+            Select All
+          </button>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2">
+          {channelOptions.map((ch) => {
+            const isSelected = selectedChannels.includes(ch.id);
+            return (
+              <motion.button
+                key={ch.id}
+                onClick={() => toggleChannel(ch.id)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                  isSelected
+                    ? "bg-primary/20 text-primary border border-primary/40"
+                    : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted/50"
+                }`}
+              >
+                <ch.icon className="w-3.5 h-3.5" />
+                {ch.label}
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Framework Selector */}
       <div className="space-y-3">
@@ -620,725 +702,89 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         ))}
       </div>
 
-      {/* Two Column Layout: Journeys and Campaigns */}
+      {/* Use Case Cards */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={`${framework}-${selectedStage}`}
+          key={`${framework}-${selectedStage}-${selectedChannels.join(",")}`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
-          className="grid lg:grid-cols-2 gap-8"
+          className="space-y-6"
         >
-          {/* Column 1: Journeys */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Workflow className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-display text-lg font-semibold text-foreground">
-                  Journeys
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Always-on, behavior-led
-                </p>
-              </div>
-            </div>
-
-            {/* Internal Journeys (from Resources) */}
-            {internalJourneys.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs text-emerald-400 mb-2">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>From Internal Resources</span>
-                </div>
-                {internalJourneys.map((journey, index) => {
-                  const isExpanded = expandedJourney === journey.name;
-                  return (
-                    <motion.div
-                      key={`internal-${journey.name}-${index}`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="magic-card rounded-xl p-5 space-y-3 ring-1 ring-emerald-500/30"
-                    >
-                      <div className="flex items-start justify-between">
-                        <h4 className="font-display font-semibold text-foreground">
-                          {journey.name}
-                        </h4>
-                        <button
-                          onClick={() => setExpandedJourney(isExpanded ? null : journey.name)}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
-                          <Zap className="w-3 h-3" />
-                          {journey.triggerType}
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${journey.sourceResource}`}>
-                          <BookOpen className="w-3 h-3" />
-                          {journey.sourceResource}
-                        </span>
-                      </div>
-
-                      <p className="text-sm text-muted-foreground">
-                        {journey.description}
-                      </p>
-
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="border-t border-border pt-3 mt-3 space-y-3"
-                          >
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                <Layers className="w-3.5 h-3.5 text-primary" />
-                                Key Events
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {stageEvents.map((event) => (
-                                  <span
-                                    key={event.name}
-                                    className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
-                                    title={event.description}
-                                  >
-                                    {event.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                <Users className="w-3.5 h-3.5 text-secondary" />
-                                Target Segments
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {stageSegments.map((segment) => (
-                                  <span
-                                    key={segment.name}
-                                    className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
-                                    title={segment.description}
-                                  >
-                                    {segment.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Native Journeys (Lovable Intelligence) */}
-            {nativeJourneys.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{internalJourneys.length > 0 ? "Supplemental (Native Intelligence)" : "Native Intelligence"}</span>
-                </div>
-                {nativeJourneys.map((journey, index) => {
-                  const journeyName = journey.name;
-                  const isExpanded = expandedJourney === journeyName;
-                  
-                  if (isFrameworkJourney(journey)) {
-                    return (
-                      <motion.div
-                        key={journey.name}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (internalJourneys.length + index) * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
-                      >
-                        <div className="flex items-start justify-between">
-                          <h4 className="font-display font-semibold text-foreground">
-                            {journey.name}
-                          </h4>
-                          <button
-                            onClick={() => setExpandedJourney(isExpanded ? null : journeyName)}
-                            className="p-1 hover:bg-muted rounded"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
-                            <Zap className="w-3 h-3" />
-                            {journey.triggerType}
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                            <Sparkles className="w-3 h-3" />
-                            Native
-                          </span>
-                        </div>
-
-                        <p className="text-sm text-muted-foreground">
-                          {journey.description}
-                        </p>
-
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="border-t border-border pt-3 mt-3 space-y-3"
-                            >
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Layers className="w-3.5 h-3.5 text-primary" />
-                                  Key Events
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageEvents.map((event) => (
-                                    <span
-                                      key={event.name}
-                                      className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
-                                      title={event.description}
-                                    >
-                                      {event.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Users className="w-3.5 h-3.5 text-secondary" />
-                                  Target Segments
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageSegments.map((segment) => (
-                                    <span
-                                      key={segment.name}
-                                      className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
-                                      title={segment.description}
-                                    >
-                                      {segment.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    );
-                  } else {
-                    const TriggerIcon = triggerTypeIcons[journey.triggerType];
-                    return (
-                      <motion.div
-                        key={journey.name}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (internalJourneys.length + index) * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
-                      >
-                        <div className="flex items-start justify-between">
-                          <h4 className="font-display font-semibold text-foreground">
-                            {journey.name}
-                          </h4>
-                          <button
-                            onClick={() => setExpandedJourney(isExpanded ? null : journeyName)}
-                            className="p-1 hover:bg-muted rounded"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
-                            <TriggerIcon className="w-3 h-3" />
-                            {getTriggerTypeLabel(journey.triggerType)}
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                            <Sparkles className="w-3 h-3" />
-                            Native
-                          </span>
-                        </div>
-
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-start gap-2">
-                            <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                            <span className="text-muted-foreground">{journey.trigger}</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Zap className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
-                            <span className="text-foreground">{journey.whyItWorks}</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Shield className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                            <span className="text-muted-foreground">{journey.frequencyGuardrail}</span>
-                          </div>
-                        </div>
-
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="border-t border-border pt-3 mt-3 space-y-3"
-                            >
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Layers className="w-3.5 h-3.5 text-primary" />
-                                  Key Events
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageEvents.map((event) => (
-                                    <span
-                                      key={event.name}
-                                      className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
-                                      title={event.description}
-                                    >
-                                      {event.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Users className="w-3.5 h-3.5 text-secondary" />
-                                  Target Segments
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageSegments.map((segment) => (
-                                    <span
-                                      key={segment.name}
-                                      className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
-                                      title={segment.description}
-                                    >
-                                      {segment.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    );
-                  }
-                })}
-              </div>
-            )}
-
-            {internalJourneys.length === 0 && nativeJourneys.length === 0 && (
-              <div className="p-6 rounded-xl bg-muted/30 border border-border text-center">
-                <p className="text-sm text-muted-foreground">
-                  No journeys defined for this stage.
-                </p>
-              </div>
-            )}
+          {/* Summary */}
+          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+            <span>{personalizedUseCases.length} use cases</span>
+            <span>•</span>
+            <span>{internalUseCases.length} from internal resources</span>
+            <span>•</span>
+            <span>{nativeUseCases.length} native intelligence</span>
           </div>
 
-          {/* Column 2: Campaigns */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-secondary/20 flex items-center justify-center">
-                <Target className="w-4 h-4 text-secondary" />
+          {/* Internal Use Cases */}
+          {internalUseCases.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-xs text-emerald-400">
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>From Internal Resources</span>
               </div>
-              <div>
-                <h3 className="font-display text-lg font-semibold text-foreground">
-                  Campaigns
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Contextual, one-time sends
-                </p>
-              </div>
+              {internalUseCases.map(({ useCase, confidence }) => (
+                <UseCaseCard
+                  key={useCase.id}
+                  useCase={useCase}
+                  confidence={confidence}
+                  isExpanded={expandedCard === useCase.id}
+                  onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                />
+              ))}
             </div>
+          )}
 
-            {/* Internal Campaigns (from Resources) */}
-            {internalCampaigns.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs text-emerald-400 mb-2">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>From Internal Resources</span>
-                </div>
-                {internalCampaigns.map((campaign, index) => {
-                  const isExpanded = expandedCampaign === campaign.name;
-                  return (
-                    <motion.div
-                      key={`internal-${campaign.name}-${index}`}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="magic-card rounded-xl p-5 space-y-3 ring-1 ring-emerald-500/30"
-                    >
-                      <div className="flex items-start justify-between">
-                        <h4 className="font-display font-semibold text-foreground">
-                          {campaign.name}
-                        </h4>
-                        <button
-                          onClick={() => setExpandedCampaign(isExpanded ? null : campaign.name)}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-xs text-emerald-400" title={`From: ${campaign.sourceResource}`}>
-                          <BookOpen className="w-3 h-3" />
-                          {campaign.sourceResource}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-start gap-2">
-                          <Target className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <span className="text-foreground">{campaign.purpose}</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Calendar className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
-                          <span className="text-muted-foreground">
-                            Timing: {campaign.timing}
-                          </span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <UserMinus className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                          <span className="text-muted-foreground">
-                            Suppression: {campaign.suppression}
-                          </span>
-                        </div>
-                      </div>
-
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="border-t border-border pt-3 mt-3 space-y-3"
-                          >
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                <Layers className="w-3.5 h-3.5 text-primary" />
-                                Key Events
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {stageEvents.map((event) => (
-                                  <span
-                                    key={event.name}
-                                    className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
-                                    title={event.description}
-                                  >
-                                    {event.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                <Users className="w-3.5 h-3.5 text-secondary" />
-                                Target Segments
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {stageSegments.map((segment) => (
-                                  <span
-                                    key={segment.name}
-                                    className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
-                                    title={segment.description}
-                                  >
-                                    {segment.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-                  );
-                })}
+          {/* Native Use Cases */}
+          {nativeUseCases.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}</span>
               </div>
-            )}
+              {nativeUseCases.map(({ useCase, confidence }) => (
+                <UseCaseCard
+                  key={useCase.id}
+                  useCase={useCase}
+                  confidence={confidence}
+                  isExpanded={expandedCard === useCase.id}
+                  onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                />
+              ))}
+            </div>
+          )}
 
-            {/* Native Campaigns (Lovable Intelligence) */}
-            {nativeCampaigns.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{internalCampaigns.length > 0 ? "Supplemental (Native Intelligence)" : "Native Intelligence"}</span>
-                </div>
-                {nativeCampaigns.map((campaign, index) => {
-                  const campaignName = campaign.name;
-                  const isExpanded = expandedCampaign === campaignName;
-                  
-                  if (isFrameworkCampaign(campaign)) {
-                    return (
-                      <motion.div
-                        key={campaign.name}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (internalCampaigns.length + index) * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
-                      >
-                        <div className="flex items-start justify-between">
-                          <h4 className="font-display font-semibold text-foreground">
-                            {campaign.name}
-                          </h4>
-                          <button
-                            onClick={() => setExpandedCampaign(isExpanded ? null : campaignName)}
-                            className="p-1 hover:bg-muted rounded"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        </div>
+          {/* No matches */}
+          {personalizedUseCases.length === 0 && (
+            <div className="p-8 rounded-xl bg-muted/30 border border-border text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                No direct lifecycle match found for the selected channels. Showing closest aligned use cases.
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                Try selecting more channels or changing the lifecycle stage.
+              </p>
+            </div>
+          )}
 
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                            <Sparkles className="w-3 h-3" />
-                            Native
-                          </span>
-                        </div>
-
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-start gap-2">
-                            <Target className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                            <span className="text-foreground">{campaign.purpose}</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Calendar className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
-                            <span className="text-muted-foreground">
-                              Timing: {campaign.timing}
-                            </span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <UserMinus className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                            <span className="text-muted-foreground">
-                              Suppression: {campaign.suppression}
-                            </span>
-                          </div>
-                        </div>
-
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="border-t border-border pt-3 mt-3 space-y-3"
-                            >
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Layers className="w-3.5 h-3.5 text-primary" />
-                                  Key Events
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageEvents.map((event) => (
-                                    <span
-                                      key={event.name}
-                                      className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
-                                      title={event.description}
-                                    >
-                                      {event.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Users className="w-3.5 h-3.5 text-secondary" />
-                                  Target Segments
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageSegments.map((segment) => (
-                                    <span
-                                      key={segment.name}
-                                      className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
-                                      title={segment.description}
-                                    >
-                                      {segment.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    );
-                  } else {
-                    return (
-                      <motion.div
-                        key={campaign.name}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (internalCampaigns.length + index) * 0.1 }}
-                        className="magic-card rounded-xl p-5 space-y-3"
-                      >
-                        <div className="flex items-start justify-between">
-                          <h4 className="font-display font-semibold text-foreground">
-                            {campaign.name}
-                          </h4>
-                          <button
-                            onClick={() => setExpandedCampaign(isExpanded ? null : campaignName)}
-                            className="p-1 hover:bg-muted rounded"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground" title="Generated by native intelligence">
-                            <Sparkles className="w-3 h-3" />
-                            Native
-                          </span>
-                        </div>
-
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-start gap-2">
-                            <Target className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                            <span className="text-foreground">{campaign.purpose}</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <Calendar className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
-                            <span className="text-muted-foreground">
-                              Best timing: {campaign.bestTiming}
-                            </span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <UserMinus className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                            <span className="text-muted-foreground">
-                              Suppression: {campaign.suppressionAdvice}
-                            </span>
-                          </div>
-                        </div>
-
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="border-t border-border pt-3 mt-3 space-y-3"
-                            >
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Layers className="w-3.5 h-3.5 text-primary" />
-                                  Key Events
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageEvents.map((event) => (
-                                    <span
-                                      key={event.name}
-                                      className="px-2 py-1 bg-muted/50 rounded text-xs text-muted-foreground"
-                                      title={event.description}
-                                    >
-                                      {event.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                                  <Users className="w-3.5 h-3.5 text-secondary" />
-                                  Target Segments
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {stageSegments.map((segment) => (
-                                    <span
-                                      key={segment.name}
-                                      className="px-2 py-1 bg-secondary/10 rounded text-xs text-secondary"
-                                      title={segment.description}
-                                    >
-                                      {segment.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    );
-                  }
-                })}
-              </div>
-            )}
-
-            {internalCampaigns.length === 0 && nativeCampaigns.length === 0 && (
-              <div className="p-6 rounded-xl bg-muted/30 border border-border text-center">
-                <p className="text-sm text-muted-foreground">
-                  No campaigns defined for this stage.
-                </p>
-              </div>
-            )}
-          </div>
+          {/* Resource Citations */}
+          {resourceMatches.length > 0 && (
+            <ResourceCitations
+              citations={resourceMatches.map(m => ({
+                resourceId: m.resource.id,
+                resourceTitle: m.resource.title,
+                matchType: hasInternalContent ? "exact" as const : "partial" as const,
+              }))}
+              confidenceLevel={hasInternalContent ? "high" : resourceMatches.length > 0 ? "medium" : "low"}
+              usedNativeIntelligence={!hasInternalContent}
+            />
+          )}
         </motion.div>
       </AnimatePresence>
-
-      {/* Insight Banner */}
-      {stageInsight && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20"
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-magic flex items-center justify-center">
-              <Lightbulb className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <p className="text-sm text-foreground italic">
-                "{stageInsight}"
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Mature programs rely more on journeys than campaigns.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Resource Library Citations */}
-      {resources.length > 0 && (
-        <ResourceCitations
-          citations={citations}
-          confidenceLevel={confidenceLevel}
-          usedNativeIntelligence={usedNativeIntelligence}
-          coverageStats={coverageStats}
-          diagnostics={resourceDiagnostics}
-        />
-      )}
     </div>
   );
 };
