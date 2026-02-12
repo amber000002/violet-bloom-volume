@@ -18,7 +18,7 @@ export interface SignalHealth {
   trendChange: string;
 }
 
-// Parse reputation date strictly as "MMM D, YYYY" (e.g., "Jan 9, 2026")
+// Unified date parsing: handles "MMM D, YYYY" (Postmaster) and "DD/MM/YY" or "DD-MM-YY" (Campaign CSV)
 const MONTH_MAP: Record<string, number> = {
   Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
   Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
@@ -26,17 +26,31 @@ const MONTH_MAP: Record<string, number> = {
 
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
-  const match = dateStr.trim().match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
-  if (!match) return null;
+  const trimmed = dateStr.trim();
 
-  const monthIndex = MONTH_MAP[match[1]];
-  if (monthIndex === undefined) return null;
+  // Try "MMM D, YYYY" format (Postmaster dates)
+  const mmmMatch = trimmed.match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
+  if (mmmMatch) {
+    const monthIndex = MONTH_MAP[mmmMatch[1]];
+    if (monthIndex === undefined) return null;
+    const day = parseInt(mmmMatch[2], 10);
+    const year = parseInt(mmmMatch[3], 10);
+    const date = new Date(year, monthIndex, day);
+    return isNaN(date.getTime()) ? null : date;
+  }
 
-  const day = parseInt(match[2], 10);
-  const year = parseInt(match[3], 10);
+  // Try "DD/MM/YY", "DD-MM-YY", "DD/MM/YYYY", "DD-MM-YYYY" format (Campaign CSV dates)
+  const csvMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (csvMatch) {
+    const day = parseInt(csvMatch[1], 10);
+    const month = parseInt(csvMatch[2], 10) - 1;
+    let year = parseInt(csvMatch[3], 10);
+    if (year < 100) year += 2000;
+    const date = new Date(year, month, day);
+    return isNaN(date.getTime()) ? null : date;
+  }
 
-  const date = new Date(year, monthIndex, day);
-  return isNaN(date.getTime()) ? null : date;
+  return null;
 };
 
 // Thresholds per PRD
