@@ -36,7 +36,7 @@ interface NegativeSignal {
   severity: "high" | "medium" | "low";
 }
 
-// Parse reputation date strictly as "MMM D, YYYY" (e.g., "Jan 9, 2026")
+// Unified date parsing: handles "MMM D, YYYY" (Postmaster) and "DD/MM/YY" or "DD-MM-YY" (Campaign CSV)
 const MONTH_MAP: Record<string, number> = {
   Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
   Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
@@ -44,20 +44,44 @@ const MONTH_MAP: Record<string, number> = {
 
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
-  const match = dateStr.trim().match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
-  if (!match) return null;
+  const trimmed = dateStr.trim();
 
-  const monthIndex = MONTH_MAP[match[1]];
-  if (monthIndex === undefined) return null;
+  // Try "MMM D, YYYY" format (Postmaster dates)
+  const mmmMatch = trimmed.match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
+  if (mmmMatch) {
+    const monthIndex = MONTH_MAP[mmmMatch[1]];
+    if (monthIndex === undefined) return null;
+    const day = parseInt(mmmMatch[2], 10);
+    const year = parseInt(mmmMatch[3], 10);
+    const date = new Date(year, monthIndex, day);
+    return isNaN(date.getTime()) ? null : date;
+  }
 
-  const day = parseInt(match[2], 10);
-  const year = parseInt(match[3], 10);
+  // Try "DD/MM/YY", "DD-MM-YY", "DD/MM/YYYY", "DD-MM-YYYY" format (Campaign CSV dates)
+  const csvMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (csvMatch) {
+    const day = parseInt(csvMatch[1], 10);
+    const month = parseInt(csvMatch[2], 10) - 1; // 0-indexed
+    let year = parseInt(csvMatch[3], 10);
+    if (year < 100) year += 2000; // 2-digit year: 25 → 2025
+    const date = new Date(year, month, day);
+    return isNaN(date.getTime()) ? null : date;
+  }
 
-  const date = new Date(year, monthIndex, day);
-  return isNaN(date.getTime()) ? null : date;
+  return null;
 };
 
-// Format date to "MMM D, YYYY" for comparison
+// Normalize any date string to ISO "YYYY-MM-DD" for consistent comparison
+const toISODateKey = (dateStr: string): string | null => {
+  const date = parseDate(dateStr);
+  if (!date) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+// Format date to "MMM D, YYYY" for display
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const formatDate = (date: Date): string => {
   const month = MONTH_NAMES[date.getMonth()];
@@ -87,42 +111,31 @@ export const analyzeRootCauses = (
   
   const baselines = getBaselines(campaignData);
   
-  // Group breaches by date
-  const breachesByDate = new Map<string, ThresholdBreach[]>();
+  // Group breaches by normalized ISO date
+  const breachesByISODate = new Map<string, ThresholdBreach[]>();
   breaches.forEach((b) => {
-    const existing = breachesByDate.get(b.date) || [];
+    const isoKey = toISODateKey(b.date) || b.date;
+    const existing = breachesByISODate.get(isoKey) || [];
     existing.push(b);
-    breachesByDate.set(b.date, existing);
+    breachesByISODate.set(isoKey, existing);
   });
   
-  // Prepare campaign lookup by date
-  const campaignsByDate = new Map<string, CampaignRow[]>();
+  // Prepare campaign lookup by normalized ISO date
+  const campaignsByISODate = new Map<string, CampaignRow[]>();
   campaignData.forEach((c) => {
-    const dateObj = parseDate(c.startDate);
-    if (dateObj) {
-      const dateKey = formatDate(dateObj);
-      const existing = campaignsByDate.get(dateKey) || [];
+    const isoKey = toISODateKey(c.startDate);
+    if (isoKey) {
+      const existing = campaignsByISODate.get(isoKey) || [];
       existing.push(c);
-      campaignsByDate.set(dateKey, existing);
-      
-      // Also check original format
-      const existing2 = campaignsByDate.get(c.startDate) || [];
-      if (existing2.length === 0) {
-        campaignsByDate.set(c.startDate, [c]);
-      } else {
-        existing2.push(c);
-      }
+      campaignsByISODate.set(isoKey, existing);
     }
   });
   
   const results: RootCauseEntry[] = [];
   
-  breachesByDate.forEach((dateBreaches, date) => {
-    const dateObj = parseDate(date);
-    
-    // Find campaigns on this date (try multiple date formats)
-    const formattedDate = dateObj ? formatDate(dateObj) : date;
-    const campaignsOnDate = campaignsByDate.get(date) || campaignsByDate.get(formattedDate) || [];
+  breachesByISODate.forEach((dateBreaches, isoDate) => {
+    // Find campaigns matching this ISO date
+    const campaignsOnDate = campaignsByISODate.get(isoDate) || [];
     
     // Analyze negative signals from campaigns
     const negativeSignals: NegativeSignal[] = [];
@@ -212,8 +225,10 @@ export const analyzeRootCauses = (
       confidence = "low";
     }
     
+    // Use the original display date from the first breach
+    const displayDate = dateBreaches[0].date;
     results.push({
-      date,
+      date: displayDate,
       signalBreached: dateBreaches.map((b) => b.metric).join(", "),
       breachValue: dateBreaches.map((b) => `${b.metric}: ${b.value}`).join("; "),
       campaignsSent,
