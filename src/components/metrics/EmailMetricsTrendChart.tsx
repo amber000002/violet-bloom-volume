@@ -17,6 +17,12 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface EmailMetricsTrendChartProps {
   campaignData: CampaignRow[];
+  grandTotalAverages?: {
+    openRate: number;
+    clickRate: number;
+    bounceRate: number;
+    unsubRate: number;
+  };
 }
 
 type TimeGranularity = "daily" | "weekly" | "monthly";
@@ -31,7 +37,6 @@ interface TrendDataPoint {
   hardBounces: number;
   softBounces: number;
   unsubscribes: number;
-  blocks: number;
 }
 
 interface AggregatedDataPoint {
@@ -44,15 +49,6 @@ interface AggregatedDataPoint {
   hardBounces: number;
   softBounces: number;
   unsubscribes: number;
-  blocks: number;
-  prevTotalSent?: number;
-  prevTotalDelivered?: number;
-  prevUniqueViewed?: number;
-  prevUniqueClicked?: number;
-  prevHardBounces?: number;
-  prevSoftBounces?: number;
-  prevUnsubscribes?: number;
-  prevBlocks?: number;
 }
 
 // Parse DD/MM/YY or DD/MM/YYYY date strictly
@@ -96,19 +92,19 @@ const getMonthKey = (date: Date): string => {
   return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
 };
 
+// No Blocks in toggle selection per PRD
 const METRIC_CONFIG = {
-  totalSent: { label: "Total Sent (users)", color: "hsl(var(--primary))", defaultVisible: true },
-  totalDelivered: { label: "Delivered (users)", color: "#06b6d4", defaultVisible: false },
+  totalSent: { label: "Sent", color: "hsl(var(--primary))", defaultVisible: true },
+  totalDelivered: { label: "Delivered", color: "#06b6d4", defaultVisible: false },
   uniqueViewed: { label: "Unique Opens", color: "hsl(var(--secondary))", defaultVisible: true },
   uniqueClicked: { label: "Unique Clicks", color: "#22c55e", defaultVisible: true },
-  hardBounces: { label: "Hard Bounces", color: "#ef4444", defaultVisible: false },
-  softBounces: { label: "Soft Bounces", color: "#f97316", defaultVisible: false },
+  hardBounces: { label: "Bounces", color: "#ef4444", defaultVisible: false },
   unsubscribes: { label: "Unsubscribes", color: "#8b5cf6", defaultVisible: false },
-  blocks: { label: "Blocks", color: "#a855f7", defaultVisible: false },
 };
 
 export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
   campaignData,
+  grandTotalAverages,
 }) => {
   const [granularity, setGranularity] = useState<TimeGranularity>("daily");
   const [visibleMetrics, setVisibleMetrics] = useState({
@@ -117,14 +113,28 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     uniqueViewed: true,
     uniqueClicked: true,
     hardBounces: false,
-    softBounces: false,
     unsubscribes: false,
-    blocks: false,
   });
+
+  // Compute Grand Total averages from campaign data if not provided
+  const avgRates = useMemo(() => {
+    if (grandTotalAverages) return grandTotalAverages;
+    // Calculate from raw campaign data
+    const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
+    const totalViewed = campaignData.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
+    const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
+    const totalBounces = campaignData.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
+    const totalUnsubs = campaignData.reduce((s, c) => s + c.totalUnsubscribes, 0);
+    return {
+      openRate: totalSent > 0 ? (totalViewed / totalSent) * 100 : 0,
+      clickRate: totalSent > 0 ? (totalClicked / totalSent) * 100 : 0,
+      bounceRate: totalSent > 0 ? (totalBounces / totalSent) * 100 : 0,
+      unsubRate: totalSent > 0 ? (totalUnsubs / totalSent) * 100 : 0,
+    };
+  }, [campaignData, grandTotalAverages]);
 
   // Parse and aggregate data
   const chartData = useMemo(() => {
-    // First, parse all valid dates
     const dataPoints: TrendDataPoint[] = campaignData
       .map((row) => {
         const dateObj = parseCampaignDate(row.startDate);
@@ -140,7 +150,6 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
           hardBounces: row.hardBounces,
           softBounces: row.softBounces,
           unsubscribes: row.totalUnsubscribes,
-          blocks: 0, // Will be added if available in future CSV versions
         };
       })
       .filter((p): p is TrendDataPoint => p !== null)
@@ -148,7 +157,6 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
 
     if (dataPoints.length === 0) return [];
 
-    // Aggregate based on granularity
     const aggregated = new Map<string, AggregatedDataPoint>();
 
     dataPoints.forEach((point) => {
@@ -180,7 +188,6 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
         hardBounces: 0,
         softBounces: 0,
         unsubscribes: 0,
-        blocks: 0,
       };
 
       existing.totalSent += point.totalSent;
@@ -190,27 +197,11 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
       existing.hardBounces += point.hardBounces;
       existing.softBounces += point.softBounces;
       existing.unsubscribes += point.unsubscribes;
-      existing.blocks += point.blocks;
 
       aggregated.set(key, existing);
     });
 
-    // Convert to array and sort
-    const result = Array.from(aggregated.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-
-    // Add previous values for change calculation
-    for (let i = 1; i < result.length; i++) {
-      result[i].prevTotalSent = result[i - 1].totalSent;
-      result[i].prevTotalDelivered = result[i - 1].totalDelivered;
-      result[i].prevUniqueViewed = result[i - 1].uniqueViewed;
-      result[i].prevUniqueClicked = result[i - 1].uniqueClicked;
-      result[i].prevHardBounces = result[i - 1].hardBounces;
-      result[i].prevSoftBounces = result[i - 1].softBounces;
-      result[i].prevUnsubscribes = result[i - 1].unsubscribes;
-      result[i].prevBlocks = result[i - 1].blocks;
-    }
-
-    return result;
+    return Array.from(aggregated.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [campaignData, granularity]);
 
   const toggleMetric = (metric: keyof typeof visibleMetrics) => {
@@ -225,69 +216,57 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     );
   }
 
-  // Calculate percent change
-  const calcChange = (current: number, prev?: number): { percent: number; trend: "up" | "down" | "stable" } => {
-    if (prev === undefined || prev === 0) return { percent: 0, trend: "stable" };
-    const percent = ((current - prev) / prev) * 100;
-    return {
-      percent,
-      trend: percent > 1 ? "up" : percent < -1 ? "down" : "stable",
-    };
-  };
-
-  // Calculate engagement rate
+  // Calculate rate for a data point
   const calcRate = (metric: number, denominator: number): number => {
     if (denominator === 0) return 0;
     return (metric / denominator) * 100;
   };
 
-  // Check if value is a spike (> 25% change from previous)
-  const isSpike = (current: number, prev?: number): boolean => {
-    if (prev === undefined || prev === 0) return false;
-    const percentChange = Math.abs(((current - prev) / prev) * 100);
-    return percentChange > 25;
+  // Calculate trend vs Grand Total Average
+  const calcTrendVsAvg = (
+    currentRate: number,
+    avgRate: number,
+    sent: number
+  ): { diff: number; direction: "above" | "below" | "equal"; suppressed: boolean } => {
+    if (sent === 0 || avgRate === 0) return { diff: 0, direction: "equal", suppressed: true };
+    const diff = currentRate - avgRate;
+    return {
+      diff,
+      direction: diff > 0.01 ? "above" : diff < -0.01 ? "below" : "equal",
+      suppressed: false,
+    };
   };
 
-  // Custom tooltip
+  // Custom tooltip with Grand Total Average comparison
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
 
     const point = chartData.find((d) => d.label === label);
     if (!point) return null;
 
-    // Format metric value with rate and trend for engagement metrics
-    const formatMetricValue = (
-      metricKey: string,
-      value: number,
-      denominator: number,
-      prevValue?: number
-    ): string => {
-      const rate = calcRate(value, denominator);
-      const change = calcChange(value, prevValue);
+    const openRate = calcRate(point.uniqueViewed, point.totalSent);
+    const clickRate = calcRate(point.uniqueClicked, point.totalSent);
+    const openTrend = calcTrendVsAvg(openRate, avgRates.openRate, point.totalSent);
+    const clickTrend = calcTrendVsAvg(clickRate, avgRates.clickRate, point.totalSent);
+    const bounceRate = calcRate(point.hardBounces + point.softBounces, point.totalSent);
+    const unsubRate = calcRate(point.unsubscribes, point.totalSent);
 
-      // Engagement metrics: show format "Absolute Number (Rate %) ± Trend %"
-      if ((metricKey === "uniqueViewed" || metricKey === "uniqueClicked") && denominator > 0) {
-        const trendStr =
-          prevValue === undefined || prevValue === 0
-            ? "N/A"
-            : `${change.trend === "up" ? "↑" : change.trend === "down" ? "↓" : "→"} ${change.percent > 0 ? "+" : ""}${change.percent.toFixed(1)}%`;
-        return `${value.toLocaleString()} (${rate.toFixed(1)}%) ${trendStr}`;
-      }
-
-      // Other metrics: show value with trend only
-      if (prevValue !== undefined && change.percent !== 0) {
-        const trendStr = `${change.trend === "up" ? "↑" : change.trend === "down" ? "↓" : "→"} ${change.percent > 0 ? "+" : ""}${change.percent.toFixed(1)}%`;
-        return `${value.toLocaleString()} ${trendStr}`;
-      }
-
-      return value.toLocaleString();
+    const TrendIndicator = ({ trend }: { trend: ReturnType<typeof calcTrendVsAvg> }) => {
+      if (trend.suppressed) return null;
+      const isAbove = trend.direction === "above";
+      const isBelow = trend.direction === "below";
+      return (
+        <span className={`text-xs font-medium ${isAbove ? "text-green-600" : isBelow ? "text-red-600" : "text-muted-foreground"}`}>
+          {isAbove ? "↑" : isBelow ? "↓" : "→"} {trend.diff > 0 ? "+" : ""}{trend.diff.toFixed(1)}% vs avg
+        </span>
+      );
     };
 
     return (
       <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-xs max-w-sm">
         <p className="font-medium mb-2 border-b border-border pb-1">{label}</p>
 
-        {/* Sent (always show) */}
+        {/* Sent */}
         <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.totalSent.color }} />
@@ -310,67 +289,53 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
           </div>
         )}
 
-        {/* Unique Opens */}
+        {/* Unique Opens with trend vs avg */}
         <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.uniqueViewed.color }} />
             <span className="text-muted-foreground">Unique Opens</span>
           </div>
-          <span className="font-mono text-xs font-medium">
-            {formatMetricValue("uniqueViewed", point.uniqueViewed, point.totalSent, point.prevUniqueViewed)}
-          </span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-medium">{point.uniqueViewed.toLocaleString()} ({openRate.toFixed(1)}%)</span>
+            <TrendIndicator trend={openTrend} />
+          </div>
         </div>
 
-        {/* Unique Clicks */}
+        {/* Unique Clicks with trend vs avg */}
         <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.uniqueClicked.color }} />
             <span className="text-muted-foreground">Unique Clicks</span>
           </div>
-          <span className="font-mono text-xs font-medium">
-            {formatMetricValue("uniqueClicked", point.uniqueClicked, point.totalSent, point.prevUniqueClicked)}
-          </span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-medium">{point.uniqueClicked.toLocaleString()} ({clickRate.toFixed(1)}%)</span>
+            <TrendIndicator trend={clickTrend} />
+          </div>
         </div>
 
-        {/* Hard Bounces */}
-        {point.hardBounces > 0 && (
+        {/* Bounce */}
+        {(point.hardBounces + point.softBounces) > 0 && (
           <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.hardBounces.color }} />
-              <span className="text-muted-foreground">Hard Bounces</span>
+              <span className="text-muted-foreground">Bounce</span>
             </div>
-            <div className="flex flex-col items-end gap-0.5">
-              <span className="font-medium">{point.hardBounces.toLocaleString()}</span>
-              <span className="text-muted-foreground text-xs">({calcRate(point.hardBounces, point.totalSent).toFixed(1)}%)</span>
-            </div>
+            <span className="font-medium">
+              {(point.hardBounces + point.softBounces).toLocaleString()} ({bounceRate.toFixed(2)}%)
+            </span>
           </div>
         )}
 
-        {/* Unsubscribes */}
+        {/* Unsub */}
         {point.unsubscribes > 0 && (
-          <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
+          <div className="flex items-center justify-between gap-4 py-1">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.unsubscribes.color }} />
               <span className="text-muted-foreground">Unsub</span>
             </div>
-            <div className="flex flex-col items-end gap-0.5">
-              <span className="font-medium">{point.unsubscribes.toLocaleString()}</span>
-              <span className="text-muted-foreground text-xs">({calcRate(point.unsubscribes, point.totalSent).toFixed(1)}%)</span>
-            </div>
-          </div>
-        )}
-
-        {/* Soft Bounces */}
-        {point.softBounces > 0 && (
-          <div className="flex items-center justify-between gap-4 py-1">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.softBounces.color }} />
-              <span className="text-muted-foreground">Soft Bounces</span>
-            </div>
-            <div className="flex flex-col items-end gap-0.5">
-              <span className="font-medium">{point.softBounces.toLocaleString()}</span>
-              <span className="text-muted-foreground text-xs">({calcRate(point.softBounces, point.totalSent).toFixed(1)}%)</span>
-            </div>
+            <span className="font-medium">
+              {point.unsubscribes.toLocaleString()} ({unsubRate.toFixed(2)}%)
+            </span>
           </div>
         )}
       </div>
@@ -381,7 +346,7 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
       {/* Controls Row */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        {/* Metric Toggles */}
+        {/* Metric Toggles - No Blocks */}
         <div className="flex flex-wrap gap-3">
           {Object.entries(METRIC_CONFIG).map(([key, config]) => (
             <div key={key} className="flex items-center gap-2">
@@ -405,16 +370,19 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
           onValueChange={(value) => value && setGranularity(value as TimeGranularity)}
           className="border border-border rounded-lg"
         >
-          <ToggleGroupItem value="daily" className="text-xs px-3">
-            Daily
-          </ToggleGroupItem>
-          <ToggleGroupItem value="weekly" className="text-xs px-3">
-            Weekly
-          </ToggleGroupItem>
-          <ToggleGroupItem value="monthly" className="text-xs px-3">
-            Monthly
-          </ToggleGroupItem>
+          <ToggleGroupItem value="daily" className="text-xs px-3">Daily</ToggleGroupItem>
+          <ToggleGroupItem value="weekly" className="text-xs px-3">Weekly</ToggleGroupItem>
+          <ToggleGroupItem value="monthly" className="text-xs px-3">Monthly</ToggleGroupItem>
         </ToggleGroup>
+      </div>
+
+      {/* Grand Total Average Reference */}
+      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground bg-muted/30 rounded-lg px-4 py-2">
+        <span>Grand Total Avg:</span>
+        <span>Open Rate: <strong className="text-foreground">{avgRates.openRate.toFixed(1)}%</strong></span>
+        <span>Click Rate: <strong className="text-foreground">{avgRates.clickRate.toFixed(1)}%</strong></span>
+        <span>Bounce Rate: <strong className="text-foreground">{avgRates.bounceRate.toFixed(2)}%</strong></span>
+        <span>Unsub Rate: <strong className="text-foreground">{avgRates.unsubRate.toFixed(2)}%</strong></span>
       </div>
 
       {/* Chart */}
@@ -440,94 +408,23 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
             />
             <Tooltip content={<CustomTooltip />} />
 
-            {/* Metric Lines */}
             {visibleMetrics.totalSent && (
-              <Line
-                type="monotone"
-                dataKey="totalSent"
-                name={METRIC_CONFIG.totalSent.label}
-                stroke={METRIC_CONFIG.totalSent.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
+              <Line type="monotone" dataKey="totalSent" name="Sent" stroke={METRIC_CONFIG.totalSent.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.totalDelivered && (
-              <Line
-                type="monotone"
-                dataKey="totalDelivered"
-                name={METRIC_CONFIG.totalDelivered.label}
-                stroke={METRIC_CONFIG.totalDelivered.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
+              <Line type="monotone" dataKey="totalDelivered" name="Delivered" stroke={METRIC_CONFIG.totalDelivered.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.uniqueViewed && (
-              <Line
-                type="monotone"
-                dataKey="uniqueViewed"
-                name={METRIC_CONFIG.uniqueViewed.label}
-                stroke={METRIC_CONFIG.uniqueViewed.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
+              <Line type="monotone" dataKey="uniqueViewed" name="Unique Opens" stroke={METRIC_CONFIG.uniqueViewed.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.uniqueClicked && (
-              <Line
-                type="monotone"
-                dataKey="uniqueClicked"
-                name={METRIC_CONFIG.uniqueClicked.label}
-                stroke={METRIC_CONFIG.uniqueClicked.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
+              <Line type="monotone" dataKey="uniqueClicked" name="Unique Clicks" stroke={METRIC_CONFIG.uniqueClicked.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.hardBounces && (
-              <Line
-                type="monotone"
-                dataKey="hardBounces"
-                name={METRIC_CONFIG.hardBounces.label}
-                stroke={METRIC_CONFIG.hardBounces.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-            )}
-            {visibleMetrics.softBounces && (
-              <Line
-                type="monotone"
-                dataKey="softBounces"
-                name={METRIC_CONFIG.softBounces.label}
-                stroke={METRIC_CONFIG.softBounces.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
+              <Line type="monotone" dataKey="hardBounces" name="Bounces" stroke={METRIC_CONFIG.hardBounces.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.unsubscribes && (
-              <Line
-                type="monotone"
-                dataKey="unsubscribes"
-                name={METRIC_CONFIG.unsubscribes.label}
-                stroke={METRIC_CONFIG.unsubscribes.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-            )}
-            {visibleMetrics.blocks && (
-              <Line
-                type="monotone"
-                dataKey="blocks"
-                name={METRIC_CONFIG.blocks.label}
-                stroke={METRIC_CONFIG.blocks.color}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
+              <Line type="monotone" dataKey="unsubscribes" name="Unsubscribes" stroke={METRIC_CONFIG.unsubscribes.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
           </LineChart>
         </ResponsiveContainer>
@@ -535,7 +432,7 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
 
       {/* Legend/Info */}
       <div className="text-xs text-muted-foreground text-center">
-        Showing {chartData.length} data points ({granularity} aggregation) • Engagement metrics show: Absolute (Rate %) vs Previous
+        Showing {chartData.length} data points ({granularity} aggregation) • Engagement metrics show: Absolute (Rate %) Trend vs Grand Total Average
       </div>
     </motion.div>
   );

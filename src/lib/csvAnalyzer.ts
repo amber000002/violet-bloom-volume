@@ -23,6 +23,7 @@ export interface CampaignRow {
   totalUnsubscribes: number;
   hardBounces: number;
   softBounces: number;
+  whoQuery: string;
   // Calculated rates
   openRate: number;
   clickRate: number;
@@ -402,6 +403,7 @@ const REQUIRED_HEADERS_MAP: Record<string, string> = {
   "total unsubscribes": "totalUnsubscribes",
   "error: email hard bounced": "hardBounces",
   "error: email soft bounced": "softBounces",
+  "who query": "whoQuery",
 };
 
 const POSTMASTER_HEADERS_MAP: Record<string, string> = {
@@ -741,6 +743,7 @@ export const parseCSV = (csvText: string): ValidationResult => {
       totalUnsubscribes: unsubscribes,
       hardBounces,
       softBounces,
+      whoQuery: getValue("who query"),
       openRate: baseForRates > 0 ? (uniqueViewed / baseForRates) * 100 : 0,
       clickRate: baseForRates > 0 ? (uniqueClicked / baseForRates) * 100 : 0,
       unsubscribeRate: baseForRates > 0 ? (unsubscribes / baseForRates) * 100 : 0,

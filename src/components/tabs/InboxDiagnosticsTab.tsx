@@ -210,7 +210,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     monthly: true,
     reputationTrends: true,
     signalHealth: true,
-    rootCause: true,
+    rootCause: false,
     repairActions: true,
     best: true,
     worst: true,
