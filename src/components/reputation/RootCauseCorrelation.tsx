@@ -4,10 +4,18 @@ import { AlertTriangle, Calendar, Mail, XCircle, HelpCircle, ChevronDown, Chevro
 import { PostmasterRow, CampaignRow } from "@/lib/csvAnalyzer";
 import { ThresholdBreach } from "./ReputationTrendChart";
 
+export interface TacticalFinding {
+  issue: string;
+  recommendation: string;
+  priority: "P0" | "P1" | "P2";
+  severity: number;
+}
+
 interface RootCauseCorrelationProps {
   postmasterData: PostmasterRow[] | null;
   campaignData: CampaignRow[];
   breaches: ThresholdBreach[];
+  tacticalFindings?: TacticalFinding[];
 }
 
 export interface RootCauseEntry {
@@ -380,6 +388,7 @@ export const RootCauseCorrelation: React.FC<RootCauseCorrelationProps> = ({
   postmasterData,
   campaignData,
   breaches,
+  tacticalFindings = [],
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -480,17 +489,11 @@ export const RootCauseCorrelation: React.FC<RootCauseCorrelationProps> = ({
                   </div>
                   <ConfidenceBadge confidence={cause.confidence} />
                 </div>
-
-                {/* Signal Breached */}
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
                   <span className="text-sm text-red-600 font-medium">{cause.signalBreached}</span>
                 </div>
-
-                {/* Breach Values */}
                 <p className="text-xs text-muted-foreground">{cause.breachValue}</p>
-
-                {/* Campaigns on this date */}
                 {cause.campaignsSent.length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
@@ -513,8 +516,6 @@ export const RootCauseCorrelation: React.FC<RootCauseCorrelationProps> = ({
                     </div>
                   </div>
                 )}
-
-                {/* Negative Signals */}
                 {cause.negativeSignals.length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1">Observed Signals:</p>
@@ -533,8 +534,6 @@ export const RootCauseCorrelation: React.FC<RootCauseCorrelationProps> = ({
                     </ul>
                   </div>
                 )}
-
-                {/* Segment Patterns */}
                 {cause.segmentPatterns.length > 0 && (
                   <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-3">
                     <p className="text-xs font-medium text-amber-700 mb-1">Segment/Who-Query Pattern Detected:</p>
@@ -545,14 +544,55 @@ export const RootCauseCorrelation: React.FC<RootCauseCorrelationProps> = ({
                     ))}
                   </div>
                 )}
-
-                {/* Likely Cause */}
                 <div className="border-t border-border/30 pt-2">
                   <p className="text-xs text-muted-foreground italic">{cause.likelyCause}</p>
                   <p className="text-[10px] text-muted-foreground/70 mt-1">No recommendation. Observation only.</p>
                 </div>
               </div>
             ))}
+
+            {/* Tactical Findings Table (Segment/Campaign-Specific) */}
+            {tacticalFindings.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-medium text-sm text-foreground mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  Tactical Findings — Campaign &amp; Segment-Specific Issues
+                </h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Issues tied to specific campaigns or audience segments (volume ≥1,000 sends). These require targeted operational action.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Issue Identified</th>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Recommendation</th>
+                        <th className="text-center py-3 px-4 font-medium text-muted-foreground">Priority</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tacticalFindings.map((tf, i) => (
+                        <tr key={i} className={`border-b border-border/50 hover:bg-muted/20 ${
+                          tf.priority === "P0" ? "bg-red-500/5" : ""
+                        }`}>
+                          <td className="py-3 px-4 whitespace-normal break-words max-w-[350px]">{tf.issue}</td>
+                          <td className="py-3 px-4 text-muted-foreground whitespace-normal break-words max-w-[400px]">{tf.recommendation}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              tf.priority === "P0" ? "bg-red-500/20 text-red-600" :
+                              tf.priority === "P1" ? "bg-amber-500/20 text-amber-600" :
+                              "bg-blue-500/20 text-blue-600"
+                            }`}>
+                              {tf.priority}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
