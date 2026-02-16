@@ -134,14 +134,24 @@
 
 @layer components {
   .magic-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    position: relative;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: var(--shadow-glass);
-    border-top: 2px solid transparent;
-    border-image: linear-gradient(to right, #A855F7, #FB7185) 1;
-    border-image-slice: 1 1 0 0;
+    box-shadow: 0 20px 50px rgba(99, 102, 241, 0.08);
+    overflow: hidden;
+  }
+
+  .magic-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(to right, #A855F7, #FB7185);
+    z-index: 1;
   }
 
   .magic-glow {
@@ -160,11 +170,28 @@
   }
 
   .glass-effect {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    position: relative;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: var(--shadow-glass);
+    box-shadow: 0 20px 50px rgba(99, 102, 241, 0.08);
+    overflow: hidden;
+  }
+
+  .glass-effect::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(to right, #A855F7, #FB7185);
+    z-index: 1;
+  }
+
+  .glass-thead {
+    background: rgba(255, 255, 255, 0.2);
   }
 
   .card-hover-lift {

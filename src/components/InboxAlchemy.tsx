@@ -170,7 +170,6 @@ const InboxAlchemyContent: React.FC = () => {
         {/* Global Controls - Sticky Header */}
         <motion.div
           className="sticky top-4 z-20 rounded-2xl p-4 md:p-6 mb-8 glass-effect"
-          style={{ borderTop: '2px solid transparent', borderImage: 'linear-gradient(to right, #A855F7, #FB7185) 1', borderImageSlice: '1 1 0 0' }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
