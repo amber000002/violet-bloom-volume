@@ -381,6 +381,8 @@ const InboxAlchemyContent: React.FC = () => {
                 industry={industry}
                 viewMode={viewMode}
                 onDataChange={(data) => updateExportData("diagnosticsData", data)}
+                brandProfile={brandProfile}
+                websiteUrl={brandInputs.websiteUrl}
               />
             )}
             {activeTab === "creative" && (
