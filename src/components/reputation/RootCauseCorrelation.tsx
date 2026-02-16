@@ -129,8 +129,7 @@ const extractSegmentPatterns = (campaigns: CampaignOnDate[], baselines: ReturnTy
     }
 
     if (observations.length > 0) {
-      // Truncate query for display
-      const shortQuery = query.length > 80 ? query.substring(0, 77) + "..." : query;
+      const shortQuery = query; // Full query - no truncation
       patterns.push({
         pattern: shortQuery,
         observation: observations.join("; "),
@@ -507,7 +506,7 @@ export const RootCauseCorrelation: React.FC<RootCauseCorrelationProps> = ({
                           <span>Bounce: {c.bounceRate.toFixed(2)}%</span>
                           <span>Unsub: {c.unsubRate.toFixed(2)}%</span>
                           {c.whoQuery && (
-                            <span className="text-muted-foreground italic">Segment: {c.whoQuery.length > 50 ? c.whoQuery.substring(0, 47) + "..." : c.whoQuery}</span>
+                            <span className="text-muted-foreground italic whitespace-normal break-words block w-full mt-1">Segment: {c.whoQuery}</span>
                           )}
                         </div>
                       ))}
