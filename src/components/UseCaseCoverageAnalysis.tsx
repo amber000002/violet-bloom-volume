@@ -233,7 +233,9 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
 
   // Map campaigns to use cases with strict resolution logic
   const mappedCampaigns = useMemo((): MappedCampaign[] => {
-    return campaignData.map(campaign => {
+    // Apply 1,000-send noise filter
+    const significantCampaigns = campaignData.filter(c => c.totalSentUsers >= 1000);
+    return significantCampaigns.map(campaign => {
       const subjectLower = cleanSubjectLine(campaign.title || campaign.subjectLine);
       const campaignNameLower = campaign.campaignName.toLowerCase();
       const combinedText = `${subjectLower} ${campaignNameLower}`;
@@ -444,15 +446,15 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
   };
 
   return (
-    <motion.div className="rounded-2xl overflow-hidden" style={{
-      background: 'rgba(255, 255, 255, 0.7)',
-      backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(255, 255, 255, 0.4)',
-      boxShadow: '0 20px 50px rgba(0, 0, 0, 0.04)',
-      borderTop: '2px solid transparent',
-      borderImage: 'linear-gradient(to right, #A855F7, #FB7185) 1',
-      borderImageSlice: '1 1 0 0',
+    <motion.div className="rounded-2xl overflow-hidden relative" style={{
+      background: 'rgba(255, 255, 255, 0.45)',
+      backdropFilter: 'blur(24px) saturate(1.8)',
+      WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+      border: '1px solid rgba(255, 255, 255, 0.5)',
+      boxShadow: '0 20px 50px rgba(99, 102, 241, 0.08)',
     }}>
+      {/* Top gradient accent */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] z-[1]" style={{ background: 'linear-gradient(to right, #A855F7, #FB7185)' }} />
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between p-6 hover:bg-muted/20 transition-colors"
@@ -618,8 +620,8 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
 
             {/* Footnote */}
             <p className="text-xs text-muted-foreground italic border-t border-border pt-3">
-              * Use case coverage is based on campaign count. Internal resource matches take precedence over Lovable inference. 
-              Percentages are calculated from {stats.total} total campaigns.
+              * Campaigns with fewer than 1,000 sends are excluded as noise. Use case coverage is based on campaign count. Internal resource matches take precedence over Lovable inference. 
+              Percentages are calculated from {stats.total} significant campaigns.
             </p>
           </motion.div>
         )}
