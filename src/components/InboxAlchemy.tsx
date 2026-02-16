@@ -143,8 +143,8 @@ const InboxAlchemyContent: React.FC = () => {
       <Sparkles count={viewMode === "presentation" ? 20 : 40} />
 
       {/* Background Glow Effects */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px]" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/20 rounded-full blur-[120px]" />
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full blur-[150px] opacity-30" style={{ background: '#F5F3FF' }} />
+      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full blur-[150px] opacity-30" style={{ background: '#FFF1F2' }} />
 
       <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
         {/* Header */}
@@ -159,7 +159,7 @@ const InboxAlchemyContent: React.FC = () => {
               <Mail className="w-6 h-6 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-display font-bold text-gradient-magic mb-3">
+          <h1 className="text-4xl md:text-5xl font-display font-extrabold text-gradient-magic mb-3">
             Inbox Alchemy
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -169,7 +169,8 @@ const InboxAlchemyContent: React.FC = () => {
 
         {/* Global Controls - Sticky Header */}
         <motion.div
-          className="sticky top-4 z-20 bg-background/80 backdrop-blur-xl rounded-2xl border border-border p-4 md:p-6 mb-8 shadow-lg"
+          className="sticky top-4 z-20 rounded-2xl p-4 md:p-6 mb-8 glass-effect"
+          style={{ borderTop: '2px solid transparent', borderImage: 'linear-gradient(to right, #A855F7, #FB7185) 1', borderImageSlice: '1 1 0 0' }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}

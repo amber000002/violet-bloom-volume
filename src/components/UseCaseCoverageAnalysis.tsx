@@ -444,7 +444,15 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
   };
 
   return (
-    <motion.div className="magic-card rounded-2xl overflow-hidden">
+    <motion.div className="rounded-2xl overflow-hidden" style={{
+      background: 'rgba(255, 255, 255, 0.7)',
+      backdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255, 255, 255, 0.4)',
+      boxShadow: '0 20px 50px rgba(0, 0, 0, 0.04)',
+      borderTop: '2px solid transparent',
+      borderImage: 'linear-gradient(to right, #A855F7, #FB7185) 1',
+      borderImageSlice: '1 1 0 0',
+    }}>
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between p-6 hover:bg-muted/20 transition-colors"

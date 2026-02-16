@@ -308,19 +308,19 @@ export const RepairActionsModule: React.FC<RepairActionsModuleProps> = ({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Issue Detected</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Recommended Action</th>
-              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Best Practice Ref</th>
-              <th className="text-center py-3 px-4 font-medium text-muted-foreground">Priority</th>
+            <tr className="border-b border-border/30">
+              <th className="text-left py-3 px-4 font-semibold text-foreground">Issue Detected</th>
+              <th className="text-left py-3 px-4 font-semibold text-foreground">Recommended Action</th>
+              <th className="text-left py-3 px-4 font-semibold text-foreground">Best Practice Ref</th>
+              <th className="text-center py-3 px-4 font-semibold text-foreground">Priority</th>
             </tr>
           </thead>
           <tbody>
             {actions.map((action, i) => (
               <tr
                 key={i}
-                className={`border-b border-border/50 hover:bg-muted/20 ${
-                  action.priority === "high" ? "bg-red-500/5" : ""
+                className={`border-b border-border/20 hover:bg-muted/10 ${
+                  action.priority === "high" ? "bg-destructive/5" : ""
                 }`}
               >
                 <td className="py-3 px-4 font-medium">{action.issue}</td>
