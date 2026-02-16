@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CoreBrandJSON } from "@/types/brandProfile";
-import { generateStrategicInsights, StrategicInsightsInput, StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
+import { StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
 import { StrategicInsights } from "../StrategicInsights";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { 
   Upload, 
   FileText, 
@@ -558,6 +560,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [isDraggingPostmaster, setIsDraggingPostmaster] = useState(false);
   const [activeReport, setActiveReport] = useState<"analysis" | "reputation" | "strategic" | null>(null);
   const [strategicInsights, setStrategicInsights] = useState<StrategicInsightsOutput | null>(null);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [strategicContext, setStrategicContext] = useState<string>("");
   const [diagnostics, setDiagnostics] = useState<DiagnosticsData | null>(null);
   const [thresholdBreaches, setThresholdBreaches] = useState<ThresholdBreach[]>([]);
@@ -681,21 +684,86 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     onDataChange?.(newDiagnostics);
   }, [campaignData, postmasterData, contextText, onDataChange]);
 
-  const runStrategicInsights = useCallback(() => {
+  const runStrategicInsights = useCallback(async () => {
     if (!industry) return;
-    const input: StrategicInsightsInput = {
-      industry,
-      brandProfile: brandProfile || null,
-      websiteUrl: websiteUrl || "",
-      campaignData: campaignData.length > 0 ? campaignData : null,
-      strategicContext,
-    };
+    setIsGeneratingInsights(true);
+    setActiveReport("strategic");
+    setStrategicInsights(null);
+
+    // Determine mode
+    const hasCSV = campaignData.length > 0;
+    const hasSegmentation = hasCSV && campaignData.some(c => c.whoQuery && c.whoQuery.trim().length > 0);
+    const mode = !hasCSV ? "website-only" : hasSegmentation ? "website-csv-segmentation" : "website-csv";
+
+    // Build campaign summary for AI (don't send raw CSV)
+    let campaignSummary = null;
+    if (hasCSV) {
+      const significantCampaigns = campaignData.filter(c => c.totalSentUsers >= 1000);
+      const totalVolume = significantCampaigns.reduce((s, c) => s + c.totalSentUsers, 0);
+      const totalViewed = significantCampaigns.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
+      const totalClicked = significantCampaigns.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
+      const totalBounce = significantCampaigns.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
+      const totalUnsub = significantCampaigns.reduce((s, c) => s + c.totalUnsubscribes, 0);
+      const channels = [...new Set(campaignData.map(c => c.channel))];
+      const dates = [...new Set(campaignData.map(c => c.startDate))].sort();
+      const triggerKeywords = ["triggered", "journey", "automation", "auto", "event", "behavior", "real-time", "drip"];
+      const triggerCount = campaignData.filter(c => triggerKeywords.some(kw => c.campaignName.toLowerCase().includes(kw))).length;
+
+      const segments = campaignData.filter(c => c.whoQuery?.trim()).map(c => c.whoQuery.trim());
+      const uniqueSegments = [...new Set(segments)];
+
+      campaignSummary = {
+        totalCampaigns: significantCampaigns.length,
+        totalVolume,
+        avgOpenRate: totalVolume > 0 ? ((totalViewed / totalVolume) * 100).toFixed(2) : "0",
+        avgClickRate: totalVolume > 0 ? ((totalClicked / totalVolume) * 100).toFixed(2) : "0",
+        avgBounceRate: totalVolume > 0 ? ((totalBounce / totalVolume) * 100).toFixed(2) : "0",
+        avgUnsubRate: totalVolume > 0 ? ((totalUnsub / totalVolume) * 100).toFixed(2) : "0",
+        channels,
+        dateRange: dates.length > 0 ? `${dates[0]} to ${dates[dates.length - 1]}` : undefined,
+        triggerRatio: `${Math.round((triggerCount / campaignData.length) * 100)}% trigger / ${Math.round(((campaignData.length - triggerCount) / campaignData.length) * 100)}% batch`,
+        hasSegmentation,
+        sampleCampaignNames: significantCampaigns.slice(0, 15).map(c => c.campaignName),
+        sampleSubjectLines: significantCampaigns.slice(0, 10).map(c => c.title || c.subjectLine).filter(Boolean),
+        segmentSummary: hasSegmentation ? `${uniqueSegments.length} unique segments across ${segments.length} campaigns` : undefined,
+      };
+    }
+
     try {
-      const insights = generateStrategicInsights(input);
-      setStrategicInsights(insights);
-      setActiveReport("strategic");
-    } catch (error) {
-      console.error("Strategic insights generation failed:", error);
+      const { data, error } = await supabase.functions.invoke("strategic-insights", {
+        body: {
+          brandProfile: brandProfile || null,
+          industry,
+          websiteUrl: websiteUrl || "",
+          strategicContext,
+          campaignSummary,
+          mode,
+        },
+      });
+
+      if (error) {
+        console.error("Strategic insights error:", error);
+        toast.error("Failed to generate strategic insights. Please try again.");
+        setIsGeneratingInsights(false);
+        return;
+      }
+
+      if (data?.error) {
+        toast.error(data.error);
+        setIsGeneratingInsights(false);
+        return;
+      }
+
+      if (data?.success && data?.data) {
+        setStrategicInsights(data.data as StrategicInsightsOutput);
+      } else {
+        toast.error("Unexpected response format. Please try again.");
+      }
+    } catch (err) {
+      console.error("Strategic insights generation failed:", err);
+      toast.error("Failed to generate strategic insights. Please try again.");
+    } finally {
+      setIsGeneratingInsights(false);
     }
   }, [industry, brandProfile, websiteUrl, campaignData, strategicContext]);
 
@@ -907,18 +975,27 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </Button>
             <Button
               onClick={runStrategicInsights}
-              disabled={!industry}
+              disabled={!industry || isGeneratingInsights}
               className="flex-1 h-14 text-base font-semibold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] text-primary-foreground hover:opacity-90"
             >
-              <Lightbulb className="w-5 h-5 mr-2" />
-              Strategic Insights
+              {isGeneratingInsights ? (
+                <>
+                  <div className="w-5 h-5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Generating AI Insights...
+                </>
+              ) : (
+                <>
+                  <Lightbulb className="w-5 h-5 mr-2" />
+                  Strategic Insights
+                </>
+              )}
             </Button>
           </div>
         </motion.div>
       )}
 
       {/* Strategic Insights View */}
-      {activeReport === "strategic" && strategicInsights && (
+      {activeReport === "strategic" && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -935,7 +1012,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               </Button>
             </div>
           </div>
-          <StrategicInsights data={strategicInsights} />
+          {isGeneratingInsights ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <p className="text-muted-foreground text-sm font-medium">AI is analyzing your brand and generating personalized strategic insights...</p>
+              <p className="text-muted-foreground/60 text-xs">This may take 15-30 seconds</p>
+            </div>
+          ) : strategicInsights ? (
+            <StrategicInsights data={strategicInsights} />
+          ) : null}
         </motion.div>
       )}
 

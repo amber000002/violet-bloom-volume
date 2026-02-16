@@ -1,1 +1,4 @@
 project_id = "nkhfmmnxlpcqhxdeftar"
+
+[functions.strategic-insights]
+verify_jwt = false
