@@ -39,6 +39,7 @@ import {
   ReputationSignalRow,
   ProcessingSummary,
   TopCampaign,
+  AnalysisReport,
 } from "@/lib/csvAnalyzer";
 import { InboxDiagnosticsSlides } from "../presentation/InboxDiagnosticsSlides";
 import { Button } from "../ui/button";
@@ -58,6 +59,8 @@ import {
   ThresholdBreach,
   calculateSignalHealth,
   analyzeRootCauses,
+  type SignalHealth,
+  type RootCauseEntry,
 } from "../reputation";
 
 interface InboxDiagnosticsTabProps {
@@ -135,6 +138,198 @@ const exportCampaignsToCSV = (campaigns: TopCampaign[], filename: string) => {
 };
 
 type MetricType = 'openRate' | 'clickRate' | 'bounceRate' | 'unsubscribeRate';
+
+// ============= INTELLIGENT KEY LEARNINGS ENGINE =============
+interface IntelligentRecommendation {
+  issue: string;
+  recommendation: string;
+  priority: "P0" | "P1" | "P2";
+  severity: number; // for sorting within priority
+}
+
+const generateIntelligentLearnings = (
+  campaignData: CampaignRow[],
+  analysisReport: AnalysisReport,
+  signalHealth: SignalHealth[],
+  rootCauses: RootCauseEntry[],
+  postmasterData: PostmasterRow[] | null
+): IntelligentRecommendation[] => {
+  const recs: IntelligentRecommendation[] = [];
+  const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
+  const totalViewed = campaignData.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
+  const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
+  const totalBounce = campaignData.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
+  const totalUnsub = campaignData.reduce((s, c) => s + c.totalUnsubscribes, 0);
+  const avgOpenRate = totalSent > 0 ? (totalViewed / totalSent) * 100 : 0;
+  const avgClickRate = totalSent > 0 ? (totalClicked / totalSent) * 100 : 0;
+  const avgBounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
+  const avgUnsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
+
+  // 1. Reputation signals (P0)
+  signalHealth.forEach((sig) => {
+    if (sig.signal === "Domain Reputation" && (sig.status === "critical" || sig.status === "breached" || sig.status === "risk")) {
+      recs.push({
+        issue: `Domain reputation degraded to ${sig.latestValue}. Inbox placement severely impacted.`,
+        recommendation: "Pause large promotional sends. Focus on highly engaged users only for 7-14 days. Follow CleverTap Email Best Practices: Sending Volume guidelines for gradual warm-up.",
+        priority: "P0", severity: 10,
+      });
+    }
+    if (sig.signal === "IP Reputation" && (sig.status === "critical" || sig.status === "breached" || sig.status === "risk")) {
+      recs.push({
+        issue: `IP reputation at ${sig.latestValue}. Delivery rates at risk.`,
+        recommendation: "Redistribute send volume across IP pools. Implement throttled sending strategy. Follow CleverTap Email Best Practices: Compliance for authentication checks (SPF/DKIM/DMARC).",
+        priority: "P0", severity: 9,
+      });
+    }
+    if (sig.signal === "Spam Rate" && (sig.status === "breached" || sig.status === "warning")) {
+      recs.push({
+        issue: `Spam rate at ${sig.latestValue}, exceeding acceptable threshold.`,
+        recommendation: "Review recent campaign content for spam trigger words. Implement double opt-in for new subscribers. Add prominent preference center per CleverTap Email Best Practices: Compliance.",
+        priority: "P0", severity: 8,
+      });
+    }
+  });
+
+  // 2. Segment-linked issues from Root Causes
+  const segmentIssueMap = new Map<string, { bounceSpikes: number; spamCorrelations: number; unsubSpikes: number; lowEngagement: number }>();
+  rootCauses.forEach((rc) => {
+    rc.segmentPatterns.forEach((sp) => {
+      const existing = segmentIssueMap.get(sp.pattern) || { bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0, lowEngagement: 0 };
+      if (sp.observation.includes("bounce")) existing.bounceSpikes++;
+      if (sp.observation.includes("unsub")) existing.unsubSpikes++;
+      if (sp.observation.includes("open rate")) existing.lowEngagement++;
+      existing.spamCorrelations += sp.frequency;
+      segmentIssueMap.set(sp.pattern, existing);
+    });
+  });
+
+  segmentIssueMap.forEach((data, segment) => {
+    const issues: string[] = [];
+    if (data.bounceSpikes > 0) issues.push("elevated bounce rates");
+    if (data.unsubSpikes > 0) issues.push("high unsubscribe signals");
+    if (data.lowEngagement > 0) issues.push("below-average engagement");
+
+    if (issues.length > 0) {
+      recs.push({
+        issue: `${issues.join(" and ")} consistently observed in segment: "${segment}"`,
+        recommendation: `Suppress segment "${segment.length > 60 ? segment.substring(0, 57) + "..." : segment}" after 3 non-engagement cycles. Implement progressive throttling before full send. Review audience freshness and re-engagement criteria.`,
+        priority: issues.includes("elevated bounce rates") ? "P0" : "P1",
+        severity: 7,
+      });
+    }
+  });
+
+  // 3. Bounce rate analysis (P0/P1)
+  if (avgBounceRate > 3) {
+    recs.push({
+      issue: `Average bounce rate at ${avgBounceRate.toFixed(2)}%, significantly above acceptable threshold of 1%.`,
+      recommendation: "Implement real-time email verification for new signups. Remove addresses with consecutive bounces. Follow CleverTap Email Best Practices: Email Data Collection for list hygiene.",
+      priority: "P0", severity: 6,
+    });
+  } else if (avgBounceRate > 1) {
+    recs.push({
+      issue: `Bounce rate at ${avgBounceRate.toFixed(2)}%, above optimal threshold.`,
+      recommendation: "Review list acquisition sources. Implement email validation at point of collection. Consider re-verification for addresses older than 6 months.",
+      priority: "P1", severity: 5,
+    });
+  }
+
+  // 4. Unsubscribe analysis
+  if (avgUnsubRate > 0.5) {
+    recs.push({
+      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}%, indicating content or frequency fatigue.`,
+      recommendation: "Reduce send frequency for high-frequency segments. Deploy preference center for content/frequency control per CleverTap Email Best Practices: Audience Selection.",
+      priority: "P0", severity: 7,
+    });
+  } else if (avgUnsubRate > 0.2) {
+    recs.push({
+      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}%, approaching warning threshold.`,
+      recommendation: "A/B test content personalization by lifecycle stage. Review send cadence for over-targeted segments.",
+      priority: "P1", severity: 4,
+    });
+  }
+
+  // 5. Engagement patterns (P1/P2)
+  if (avgOpenRate < 10) {
+    recs.push({
+      issue: `Average open rate at ${avgOpenRate.toFixed(1)}%, indicating systemic inbox placement issues.`,
+      recommendation: "Conduct inbox placement testing. Review sender authentication. Shift 30% promotional campaigns to behavior-triggered journeys per CleverTap Email Best Practices: Campaign Content.",
+      priority: "P1", severity: 6,
+    });
+  } else if (avgOpenRate < 15) {
+    recs.push({
+      issue: `Open rate at ${avgOpenRate.toFixed(1)}%, below industry benchmark.`,
+      recommendation: "A/B test subject lines systematically. Optimize send time per segment. Review content-to-audience alignment.",
+      priority: "P2", severity: 3,
+    });
+  }
+
+  if (avgClickRate < 1) {
+    recs.push({
+      issue: `Click rate at ${avgClickRate.toFixed(2)}%, indicating weak CTA performance or content mismatch.`,
+      recommendation: "Review CTA clarity and placement. Ensure mobile optimization. Test content relevance per lifecycle stage.",
+      priority: "P2", severity: 2,
+    });
+  }
+
+  // 6. Campaign structure patterns (P2)
+  // Check for lifecycle concentration
+  const channels = new Map<string, number>();
+  campaignData.forEach((c) => {
+    channels.set(c.channel, (channels.get(c.channel) || 0) + 1);
+  });
+  const totalCampaigns = campaignData.length;
+  channels.forEach((count, channel) => {
+    const pct = (count / totalCampaigns) * 100;
+    if (pct > 70) {
+      recs.push({
+        issue: `${channel} channel accounts for ${pct.toFixed(0)}% of all campaigns, indicating channel over-concentration.`,
+        recommendation: `Diversify campaign mix. Introduce trigger-based and lifecycle campaigns to reduce reliance on ${channel} channel.`,
+        priority: "P2", severity: 2,
+      });
+    }
+  });
+
+  // 7. Breach day patterns
+  if (rootCauses.length > 3) {
+    recs.push({
+      issue: `${rootCauses.length} reputation breach days detected in the analysis period, indicating persistent deliverability stress.`,
+      recommendation: "Implement daily Postmaster Tools monitoring. Establish automated breach alerting. Review sending patterns around breach clusters.",
+      priority: "P1", severity: 5,
+    });
+  }
+
+  // 8. Volume-related patterns from postmaster
+  if (postmasterData && postmasterData.length > 0) {
+    const errorRatios = postmasterData.map(p => p.errorRatio || 0).filter(e => e > 0);
+    if (errorRatios.length > postmasterData.length * 0.3) {
+      recs.push({
+        issue: `Delivery errors detected on ${errorRatios.length} of ${postmasterData.length} postmaster data points.`,
+        recommendation: "Check email authentication setup (SPF/DKIM/DMARC alignment). Monitor for blocklist inclusions. Follow CleverTap Email Best Practices: Compliance.",
+        priority: "P1", severity: 5,
+      });
+    }
+  }
+
+  // Sort: P0 first, then P1, then P2; within each, by severity desc
+  const priorityOrder = { P0: 0, P1: 1, P2: 2 };
+  recs.sort((a, b) => {
+    const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (pDiff !== 0) return pDiff;
+    return b.severity - a.severity;
+  });
+
+  // If no issues found, add a positive note
+  if (recs.length === 0) {
+    recs.push({
+      issue: "No critical deliverability or engagement issues detected in the analyzed period.",
+      recommendation: "Continue current practices. Maintain monitoring cadence for early detection of emerging patterns.",
+      priority: "P2", severity: 0,
+    });
+  }
+
+  return recs;
+};
 
 interface ColorResult {
   colorClass: string;
@@ -217,7 +412,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     trends: true,
     learnings: true,
     issues: true,
-    useCaseCoverage: true,
+    useCaseCoverage: false,
     lifecycleCoverage: true,
     infrastructure: true,
     emailMetricsTrend: true,
@@ -724,6 +919,19 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             />
           </CollapsibleSection>
 
+          {/* ============= REPUTATION SCORECARD ============= */}
+          <CollapsibleSection
+            title="Reputation Scorecard"
+            icon={<Shield className="w-5 h-5 text-primary" />}
+            isOpen={expandedSections.signalHealth}
+            onToggle={() => toggleSection("signalHealth")}
+          >
+            <SignalHealthTable
+              postmasterData={postmasterData}
+              campaignData={diagnostics.rawData}
+            />
+          </CollapsibleSection>
+
           {/* ============= REPUTATION TRENDS (SMALL MULTIPLES) ============= */}
           <CollapsibleSection
             title="Reputation Trends"
@@ -752,20 +960,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </CollapsibleSection>
           )}
 
-          {/* 2. Reputation Scorecard */}
-          <CollapsibleSection
-            title="Reputation Scorecard"
-            icon={<Shield className="w-5 h-5 text-primary" />}
-            isOpen={expandedSections.signalHealth}
-            onToggle={() => toggleSection("signalHealth")}
-          >
-            <SignalHealthTable
-              postmasterData={postmasterData}
-              campaignData={diagnostics.rawData}
-            />
-          </CollapsibleSection>
-
-          {/* 3. Root Cause Correlation Engine */}
+          {/* ============= ROOT CAUSE SUMMARY ============= */}
           {thresholdBreaches.length > 0 && (
             <CollapsibleSection
               title="Root Cause Summary"
@@ -781,113 +976,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </CollapsibleSection>
           )}
 
-          {/* 4. Reputation Repair Actions */}
-          <CollapsibleSection
-            title="Reputation Repair Actions"
-            icon={<Lightbulb className="w-5 h-5 text-primary" />}
-            isOpen={expandedSections.repairActions}
-            onToggle={() => toggleSection("repairActions")}
-          >
-            {(() => {
-              const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
-              const rootCauses = analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches);
-              return (
-                <RepairActionsModule
-                  signalHealth={signalHealth}
-                  rootCauses={rootCauses}
-                />
-              );
-            })()}
-          </CollapsibleSection>
-
-          {/* ============= END REPUTATION INTELLIGENCE ============= */}
-
-          {/* Legacy Reputation Snapshot (from Reputation Repair - kept for backward compatibility) */}
-          {diagnostics.reputationReport?.enhancedReport && (
-            <div className="magic-card rounded-2xl p-6 border-2 border-primary/20 bg-primary/5">
-              <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
-                <Shield className="w-5 h-5 text-primary" />
-                Reputation Snapshot (Executive View)
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection === 'improving' ? 'bg-green-500/20 text-green-600' :
-                    diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection === 'degrading' ? 'bg-red-500/20 text-red-600' :
-                    'bg-amber-500/20 text-amber-600'
-                  }`}>
-                    {diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationDirection.toUpperCase()}
-                  </span>
-                  <span className="text-sm">{diagnostics.reputationReport.enhancedReport.reputationSnapshot.reputationEvidence}</span>
-                </div>
-                <ul className="space-y-2 text-sm">
-                  <li><strong>Primary Stress Signal:</strong> {diagnostics.reputationReport.enhancedReport.reputationSnapshot.primaryStressSignal}</li>
-                  <li><strong>Timing Correlation:</strong> {diagnostics.reputationReport.enhancedReport.reputationSnapshot.timingCorrelation}</li>
-                  <li><strong>Damage Assessment:</strong> <span className={diagnostics.reputationReport.enhancedReport.reputationSnapshot.damageAssessment === 'structural' ? 'text-red-600 font-medium' : 'text-green-600'}>{diagnostics.reputationReport.enhancedReport.reputationSnapshot.damageAssessment}</span></li>
-                </ul>
-                <div className={`p-3 rounded-lg ${diagnostics.reputationReport.enhancedReport.reputationSnapshot.safeToScale ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
-                  <p className={`font-semibold ${diagnostics.reputationReport.enhancedReport.reputationSnapshot.safeToScale ? 'text-green-600' : 'text-red-600'}`}>
-                    {diagnostics.reputationReport.enhancedReport.reputationSnapshot.verdict}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Root Cause Summary (from Reputation Repair) */}
-          {diagnostics.reputationReport?.enhancedReport?.rootCauses && diagnostics.reputationReport.enhancedReport.rootCauses.length > 0 && (
-            <CollapsibleSection
-              title="Root Cause Summary"
-              icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
-              isOpen={expandedSections.issues}
-              onToggle={() => toggleSection("issues")}
-            >
-              <ul className="space-y-3">
-                {diagnostics.reputationReport.enhancedReport.rootCauses.map((rc, i) => (
-                  <li key={i} className="bg-muted/20 rounded-lg p-4">
-                    <p className="font-medium">{rc.cause}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Evidence: {rc.evidence}</p>
-                    <span className="text-xs px-2 py-0.5 bg-muted rounded mt-2 inline-block">{rc.evidenceType.replace('_', ' ')}</span>
-                  </li>
-                ))}
-              </ul>
-            </CollapsibleSection>
-          )}
-
-          {/* Reputation Repair Actions (from Reputation Repair) */}
-          {diagnostics.reputationReport?.enhancedReport?.repairActions && (
-            <CollapsibleSection
-              title="Reputation Repair Actions"
-              icon={<Lightbulb className="w-5 h-5 text-primary" />}
-              isOpen={expandedSections.learnings}
-              onToggle={() => toggleSection("learnings")}
-            >
-              <div className="space-y-3">
-                {diagnostics.reputationReport.enhancedReport.repairActions.map((action, i) => (
-                  <div key={i} className="bg-muted/20 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                        action.priority === 'immediate' ? 'bg-red-500/20 text-red-600' :
-                        action.priority === 'short-term' ? 'bg-amber-500/20 text-amber-600' :
-                        'bg-blue-500/20 text-blue-600'
-                      }`}>
-                        {action.priority === 'immediate' ? '0-7 days' : action.priority === 'short-term' ? '7-21 days' : 'Ongoing'}
-                      </span>
-                      <span className={`px-2 py-0.5 text-xs rounded ${action.confidence === 'high' ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>
-                        {action.confidence} confidence
-                      </span>
-                    </div>
-                    <p className="text-sm">{action.action}</p>
-                    {action.metricToWatch && (
-                      <p className="text-xs text-muted-foreground mt-2">Watch: {action.metricToWatch} | Abort if: {action.abortCondition}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CollapsibleSection>
-          )}
-
-          {/* Report 2: Best Performing */}
+          {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
           <CollapsibleSection
             title="Best Performing Campaigns"
             icon={<TrendingUp className="w-5 h-5 text-green-500" />}
@@ -947,13 +1036,19 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </tbody>
               </table>
             </div>
-            <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4">
-              <h4 className="font-medium text-sm text-green-600 mb-2">What Worked</h4>
-              <p className="text-sm text-muted-foreground">{diagnostics.analysisReport.bestSummary}</p>
-            </div>
+            {/* Single-line summary */}
+            <p className="text-sm text-muted-foreground italic">
+              {(() => {
+                const best = diagnostics.analysisReport.bestCampaigns;
+                if (best.length === 0) return "";
+                const avgOpen = best.reduce((s, c) => s + c.openRate, 0) / best.length;
+                const avgClick = best.reduce((s, c) => s + c.clickRate, 0) / best.length;
+                return `Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`;
+              })()}
+            </p>
           </CollapsibleSection>
 
-          {/* Report 3: Under-Performing */}
+          {/* ============= UNDER-PERFORMING CAMPAIGNS ============= */}
           <CollapsibleSection
             title="Under-Performing Campaigns"
             icon={<TrendingDown className="w-5 h-5 text-red-500" />}
@@ -1013,13 +1108,19 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </tbody>
               </table>
             </div>
-            <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
-              <h4 className="font-medium text-sm text-red-600 mb-2">What Didn't Work</h4>
-              <p className="text-sm text-muted-foreground">{diagnostics.analysisReport.worstSummary}</p>
-            </div>
+            {/* Single-line summary */}
+            <p className="text-sm text-muted-foreground italic">
+              {(() => {
+                const worst = diagnostics.analysisReport.worstCampaigns;
+                if (worst.length === 0) return "";
+                const avgOpen = worst.reduce((s, c) => s + c.openRate, 0) / worst.length;
+                const avgClick = worst.reduce((s, c) => s + c.clickRate, 0) / worst.length;
+                return `Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`;
+              })()}
+            </p>
           </CollapsibleSection>
 
-          {/* Send Mix & Use Case Coverage Analysis (Stage-Aware) */}
+          {/* ============= SEND MIX & USE CASE COVERAGE (collapsed by default) ============= */}
           <UseCaseCoverageAnalysis
             campaignData={diagnostics.rawData}
             industry={industry}
@@ -1027,7 +1128,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             onToggle={() => toggleSection("useCaseCoverage")}
           />
 
-          {/* Lifecycle Coverage Visualization & Insight Engine */}
+          {/* ============= LIFECYCLE COVERAGE ============= */}
           <LifecycleCoverageMatrix
             campaignData={diagnostics.rawData}
             industry={industry}
@@ -1035,26 +1136,59 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             onToggle={() => toggleSection("lifecycleCoverage")}
           />
 
-          {/* Report 5: Key Learnings */}
+          {/* ============= KEY LEARNINGS & RECOMMENDATIONS (Intelligent Table) ============= */}
           <CollapsibleSection
             title="Key Learnings & Recommendations"
             icon={<Lightbulb className="w-5 h-5 text-amber-500" />}
             isOpen={expandedSections.learnings}
             onToggle={() => toggleSection("learnings")}
           >
-            <ul className="space-y-3">
-              {diagnostics.analysisReport.keyLearnings.map((l, i) => (
-                <li key={i} className="flex items-start gap-3 bg-muted/20 rounded-xl p-4">
-                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                    {i + 1}
-                  </span>
-                  <div>
-                    <p className="font-medium text-foreground">{l.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{l.description}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {(() => {
+              const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
+              const rootCauses = thresholdBreaches.length > 0 
+                ? analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches) 
+                : [];
+              const recommendations = generateIntelligentLearnings(
+                diagnostics.rawData,
+                diagnostics.analysisReport,
+                signalHealth,
+                rootCauses,
+                postmasterData
+              );
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Issue Identified</th>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Recommendation</th>
+                        <th className="text-center py-3 px-4 font-medium text-muted-foreground">Priority</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recommendations.map((rec, i) => (
+                        <tr key={i} className={`border-b border-border/50 hover:bg-muted/20 ${
+                          rec.priority === "P0" ? "bg-red-500/5" : ""
+                        }`}>
+                          <td className="py-3 px-4 whitespace-normal break-words max-w-[350px]">{rec.issue}</td>
+                          <td className="py-3 px-4 text-muted-foreground whitespace-normal break-words max-w-[400px]">{rec.recommendation}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              rec.priority === "P0" ? "bg-red-500/20 text-red-600" :
+                              rec.priority === "P1" ? "bg-amber-500/20 text-amber-600" :
+                              "bg-blue-500/20 text-blue-600"
+                            }`}>
+                              {rec.priority}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </CollapsibleSection>
         </motion.div>
       )}

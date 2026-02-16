@@ -136,35 +136,25 @@ export const calculateSignalHealth = (
     const latest = sortedPM[sortedPM.length - 1];
     const latestPMDate = latest.date || "N/A";
     
-    // Spam Ratio
-    const spamValues = sortedPM.map((p) => p.spamRatio || 0);
-    const latestSpam = latest.spamRatio || 0;
-    const spamTrend = calcTrend(spamValues, false);
-    signals.push({
-      signal: "Spam Ratio",
-      latestValue: `${(latestSpam * 100).toFixed(2)}%`,
-      latestDate: latestPMDate,
-      threshold: THRESHOLDS.spamRatio.label,
-      status: latestSpam > 0.003 ? "breached" : latestSpam > 0.001 ? "warning" : "healthy",
-      trend: spamTrend.trend,
-      trendChange: spamTrend.change,
-    });
+    // Domain Reputation (FIRST)
+    const domainValues = sortedPM
+      .map((p) => reputationToNumber(p.domainReputation))
+      .filter((v): v is number => v !== null);
+    const domainTrend = calcTrend(domainValues, true);
+    const latestDomainStatus = reputationToStatus(latest.domainReputation);
+    if (latestDomainStatus !== null) {
+      signals.push({
+        signal: "Domain Reputation",
+        latestValue: latest.domainReputation?.trim() || "Unknown",
+        latestDate: latestPMDate,
+        threshold: THRESHOLDS.domainReputation.label,
+        status: latestDomainStatus === "healthy" ? "healthy" : latestDomainStatus === "warning" ? "warning" : latestDomainStatus === "risk" ? "risk" : "critical",
+        trend: domainTrend.trend,
+        trendChange: domainTrend.change,
+      });
+    }
     
-    // Error Ratio
-    const errorValues = sortedPM.map((p) => p.errorRatio || 0);
-    const latestError = latest.errorRatio || 0;
-    const errorTrend = calcTrend(errorValues, false);
-    signals.push({
-      signal: "Error Ratio",
-      latestValue: `${(latestError * 100).toFixed(2)}%`,
-      latestDate: latestPMDate,
-      threshold: THRESHOLDS.errorRatio.label,
-      status: latestError > 0.01 ? "breached" : latestError > 0 ? "warning" : "healthy",
-      trend: errorTrend.trend,
-      trendChange: errorTrend.change,
-    });
-    
-    // IP Reputation
+    // IP Reputation (SECOND)
     const ipValues = sortedPM
       .map((p) => reputationToNumber(p.ipReputation))
       .filter((v): v is number => v !== null);
@@ -182,45 +172,40 @@ export const calculateSignalHealth = (
       });
     }
     
-    // Domain Reputation
-    const domainValues = sortedPM
-      .map((p) => reputationToNumber(p.domainReputation))
-      .filter((v): v is number => v !== null);
-    const domainTrend = calcTrend(domainValues, true);
-    const latestDomainStatus = reputationToStatus(latest.domainReputation);
-    if (latestDomainStatus !== null) {
-      signals.push({
-        signal: "Domain Reputation",
-        latestValue: latest.domainReputation?.trim() || "Unknown",
-        latestDate: latestPMDate,
-        threshold: THRESHOLDS.domainReputation.label,
-        status: latestDomainStatus === "healthy" ? "healthy" : latestDomainStatus === "warning" ? "warning" : latestDomainStatus === "risk" ? "risk" : "critical",
-        trend: domainTrend.trend,
-        trendChange: domainTrend.change,
-      });
-    }
+    // Spam Ratio
+    const spamValues = sortedPM.map((p) => p.spamRatio || 0);
+    const latestSpam = latest.spamRatio || 0;
+    const spamTrend = calcTrend(spamValues, false);
+    signals.push({
+      signal: "Spam Rate",
+      latestValue: `${(latestSpam * 100).toFixed(2)}%`,
+      latestDate: latestPMDate,
+      threshold: THRESHOLDS.spamRatio.label,
+      status: latestSpam > 0.003 ? "breached" : latestSpam > 0.001 ? "warning" : "healthy",
+      trend: spamTrend.trend,
+      trendChange: spamTrend.change,
+    });
+    
+    // Delivery Errors
+    const errorValues = sortedPM.map((p) => p.errorRatio || 0);
+    const latestError = latest.errorRatio || 0;
+    const errorTrend = calcTrend(errorValues, false);
+    signals.push({
+      signal: "Delivery Errors",
+      latestValue: `${(latestError * 100).toFixed(2)}%`,
+      latestDate: latestPMDate,
+      threshold: THRESHOLDS.errorRatio.label,
+      status: latestError > 0.01 ? "breached" : latestError > 0 ? "warning" : "healthy",
+      trend: errorTrend.trend,
+      trendChange: errorTrend.change,
+    });
   }
   
   // Campaign-based signals
   if (sortedCampaigns.length > 0) {
     const latestCampaignDate = sortedCampaigns[sortedCampaigns.length - 1].startDate || "N/A";
     
-    // Open Rate
-    const openValues = sortedCampaigns.map((c) => c.openRate);
-    const latestOpen = sortedCampaigns[sortedCampaigns.length - 1].openRate;
-    const avgOpen = openValues.reduce((a, b) => a + b, 0) / openValues.length;
-    const openTrend = calcTrend(openValues, true);
-    signals.push({
-      signal: "Open Rate",
-      latestValue: `${latestOpen.toFixed(2)}%`,
-      latestDate: latestCampaignDate,
-      threshold: THRESHOLDS.openRate.label,
-      status: avgOpen < 10 ? "breached" : avgOpen < 15 ? "warning" : "healthy",
-      trend: openTrend.trend,
-      trendChange: openTrend.change,
-    });
-    
-    // Bounce Rate (Hard + Soft)
+    // Bounce Rate
     const bounceValues = sortedCampaigns.map((c) => c.hardBounceRate + c.softBounceRate);
     const avgBounce = bounceValues.reduce((a, b) => a + b, 0) / bounceValues.length;
     const bounceTrend = calcTrend(bounceValues, false);
@@ -246,6 +231,21 @@ export const calculateSignalHealth = (
       status: avgUnsub > 0.7 ? "breached" : avgUnsub > 0.2 ? "warning" : "healthy",
       trend: unsubTrend.trend,
       trendChange: unsubTrend.change,
+    });
+    
+    // Open Rate (moved after negative signals)
+    const openValues = sortedCampaigns.map((c) => c.openRate);
+    const latestOpen = sortedCampaigns[sortedCampaigns.length - 1].openRate;
+    const avgOpen = openValues.reduce((a, b) => a + b, 0) / openValues.length;
+    const openTrend = calcTrend(openValues, true);
+    signals.push({
+      signal: "Open Rate",
+      latestValue: `${latestOpen.toFixed(2)}%`,
+      latestDate: latestCampaignDate,
+      threshold: THRESHOLDS.openRate.label,
+      status: avgOpen < 10 ? "breached" : avgOpen < 15 ? "warning" : "healthy",
+      trend: openTrend.trend,
+      trendChange: openTrend.change,
     });
   }
   
@@ -303,12 +303,9 @@ export const SignalHealthTable: React.FC<SignalHealthTableProps> = ({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border">
-            <th className="text-left py-3 px-4 font-medium text-muted-foreground">Signal</th>
-            <th className="text-right py-3 px-4 font-medium text-muted-foreground">Latest Value</th>
-            <th className="text-right py-3 px-4 font-medium text-muted-foreground">Latest Date</th>
-            <th className="text-right py-3 px-4 font-medium text-muted-foreground">Threshold</th>
+            <th className="text-left py-3 px-4 font-medium text-muted-foreground">Metric</th>
+            <th className="text-right py-3 px-4 font-medium text-muted-foreground">Current Value</th>
             <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-            <th className="text-center py-3 px-4 font-medium text-muted-foreground">Trend</th>
           </tr>
         </thead>
         <tbody>
@@ -316,8 +313,6 @@ export const SignalHealthTable: React.FC<SignalHealthTableProps> = ({
             <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
               <td className="py-3 px-4 font-medium">{signal.signal}</td>
               <td className="text-right py-3 px-4 font-mono">{signal.latestValue}</td>
-              <td className="text-right py-3 px-4 text-muted-foreground text-xs">{signal.latestDate}</td>
-              <td className="text-right py-3 px-4 text-muted-foreground">{signal.threshold}</td>
               <td className="py-3 px-4">
                 <div className="flex items-center justify-center gap-2">
                   <StatusIcon status={signal.status} />
@@ -333,22 +328,6 @@ export const SignalHealthTable: React.FC<SignalHealthTableProps> = ({
                     }`}
                   >
                     {signal.status === "healthy" ? "✓ OK" : signal.status === "warning" ? "⚠ Watch" : signal.status === "risk" ? "⚠ Risk" : "🚨 Critical"}
-                  </span>
-                </div>
-              </td>
-              <td className="py-3 px-4">
-                <div className="flex items-center justify-center gap-2">
-                  <TrendIcon trend={signal.trend} />
-                  <span
-                    className={`text-xs ${
-                      signal.trend === "improving"
-                        ? "text-green-600"
-                        : signal.trend === "worsening"
-                        ? "text-red-600"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {signal.trend === "improving" ? "↓" : signal.trend === "worsening" ? "↑" : "→"} {signal.trendChange}
                   </span>
                 </div>
               </td>
