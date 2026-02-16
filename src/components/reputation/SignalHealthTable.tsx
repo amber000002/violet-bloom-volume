@@ -302,32 +302,38 @@ export const SignalHealthTable: React.FC<SignalHealthTableProps> = ({
     >
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border">
-            <th className="text-left py-3 px-4 font-medium text-muted-foreground">Metric</th>
-            <th className="text-right py-3 px-4 font-medium text-muted-foreground">Current Value</th>
-            <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
+          <tr className="border-b border-border/30">
+            <th className="text-left py-3 px-4 font-semibold text-foreground">Metric</th>
+            <th className="text-right py-3 px-4 font-semibold text-foreground">Current Value</th>
+            <th className="text-center py-3 px-4 font-semibold text-foreground">Status</th>
           </tr>
         </thead>
         <tbody>
           {signals.map((signal, i) => (
-            <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+            <tr key={i} className="border-b border-border/20 hover:bg-muted/10">
               <td className="py-3 px-4 font-medium">{signal.signal}</td>
               <td className="text-right py-3 px-4 font-mono">{signal.latestValue}</td>
               <td className="py-3 px-4">
                 <div className="flex items-center justify-center gap-2">
-                  <StatusIcon status={signal.status} />
-                  <span
-                    className={`text-xs font-medium ${
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                    signal.status === "healthy"
+                      ? "bg-emerald-500/10 text-emerald-600"
+                      : signal.status === "warning"
+                      ? "bg-amber-500/10 text-amber-600"
+                      : signal.status === "risk"
+                      ? "bg-orange-500/10 text-orange-600"
+                      : "bg-destructive/10 text-destructive"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
                       signal.status === "healthy"
-                        ? "text-green-600"
+                        ? "bg-emerald-500 shadow-[0_0_4px_rgba(52,211,153,0.6)]"
                         : signal.status === "warning"
-                        ? "text-amber-600"
+                        ? "bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.6)]"
                         : signal.status === "risk"
-                        ? "text-orange-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {signal.status === "healthy" ? "✓ OK" : signal.status === "warning" ? "⚠ Watch" : signal.status === "risk" ? "⚠ Risk" : "🚨 Critical"}
+                        ? "bg-orange-500 shadow-[0_0_4px_rgba(249,115,22,0.6)]"
+                        : "bg-destructive shadow-[0_0_4px_rgba(239,68,68,0.6)]"
+                    }`} />
+                    {signal.status === "healthy" ? "OK" : signal.status === "warning" ? "Watch" : signal.status === "risk" ? "Risk" : "Critical"}
                   </span>
                 </div>
               </td>

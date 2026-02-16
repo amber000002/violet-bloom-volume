@@ -874,7 +874,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
         >
           {/* Header */}
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-2xl font-semibold text-foreground">Analysis & Report</h2>
+            <h2 className="font-display text-2xl font-bold text-gradient-magic">Analysis & Report</h2>
             <div className="flex gap-2">
               <Button 
                 variant="default" 
@@ -1319,25 +1319,30 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Issue Identified</th>
-                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Recommendation</th>
-                        <th className="text-center py-3 px-4 font-medium text-muted-foreground">Priority</th>
+                      <tr className="border-b border-border/30">
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">Issue Identified</th>
+                        <th className="text-left py-3 px-4 font-semibold text-foreground">Recommendation</th>
+                        <th className="text-center py-3 px-4 font-semibold text-foreground">Priority</th>
                       </tr>
                     </thead>
                     <tbody>
                       {recommendations.map((rec, i) => (
-                        <tr key={i} className={`border-b border-border/50 hover:bg-muted/20 ${
-                          rec.priority === "P0" ? "bg-red-500/5" : ""
+                        <tr key={i} className={`border-b border-border/20 hover:bg-muted/10 ${
+                          rec.priority === "P0" ? "bg-destructive/5" : ""
                         }`}>
                           <td className="py-3 px-4 whitespace-normal break-words max-w-[350px]">{rec.issue}</td>
                           <td className="py-3 px-4 text-muted-foreground whitespace-normal break-words max-w-[400px]">{rec.recommendation}</td>
                           <td className="py-3 px-4 text-center">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                              rec.priority === "P0" ? "bg-red-500/20 text-red-600" :
-                              rec.priority === "P1" ? "bg-amber-500/20 text-amber-600" :
-                              "bg-blue-500/20 text-blue-600"
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                              rec.priority === "P0" ? "bg-destructive/10 text-destructive" :
+                              rec.priority === "P1" ? "bg-amber-500/10 text-amber-600" :
+                              "bg-primary/10 text-primary"
                             }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                rec.priority === "P0" ? "bg-destructive shadow-[0_0_4px_rgba(239,68,68,0.6)]" :
+                                rec.priority === "P1" ? "bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.6)]" :
+                                "bg-primary shadow-[0_0_4px_rgba(168,85,247,0.6)]"
+                              }`} />
                               {rec.priority}
                             </span>
                           </td>
@@ -1361,7 +1366,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
         >
           {/* Header */}
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-2xl font-semibold text-foreground">Reputation Repair Analysis</h2>
+            <h2 className="font-display text-2xl font-bold text-gradient-magic">Reputation Repair Analysis</h2>
             <div className="flex gap-2">
               <Button 
                 variant="default" 
@@ -1684,12 +1689,24 @@ const CollapsibleSection: React.FC<{
   onToggle: () => void;
   children: React.ReactNode;
 }> = ({ title, icon, isOpen, onToggle, children }) => (
-  <motion.div className="magic-card rounded-2xl overflow-hidden">
+  <motion.div 
+    className="rounded-2xl overflow-hidden"
+    style={{
+      background: 'rgba(255, 255, 255, 0.7)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255, 255, 255, 0.4)',
+      boxShadow: '0 20px 50px rgba(0, 0, 0, 0.04)',
+      borderTop: '2px solid transparent',
+      borderImage: 'linear-gradient(to right, #A855F7, #FB7185) 1',
+      borderImageSlice: '1 1 0 0',
+    }}
+  >
     <button
       onClick={onToggle}
-      className="w-full flex items-center justify-between p-6 hover:bg-muted/20 transition-colors"
+      className="w-full flex items-center justify-between p-6 hover:bg-muted/10 transition-colors"
     >
-      <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
+      <h3 className="font-display text-lg font-bold text-gradient-magic flex items-center gap-2">
         {icon}
         {title}
       </h3>

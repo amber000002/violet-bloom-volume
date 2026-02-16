@@ -14,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Playfair Display', 'serif'],
-        sans: ['Inter', 'sans-serif'],
+        display: ['Plus Jakarta Sans', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -66,6 +66,15 @@ export default {
         },
         pink: {
           glow: "hsl(var(--pink-glow))",
+        },
+        indigo: {
+          deep: "hsl(var(--deep-indigo))",
+        },
+        mint: {
+          glow: "hsl(var(--mint-glow))",
+        },
+        amber: {
+          soft: "hsl(var(--soft-amber))",
         },
         crystal: "hsl(var(--crystal))",
         stardust: "hsl(var(--stardust))",
