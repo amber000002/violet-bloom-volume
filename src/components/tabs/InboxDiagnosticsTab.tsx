@@ -139,7 +139,7 @@ const exportCampaignsToCSV = (campaigns: TopCampaign[], filename: string) => {
 
 type MetricType = 'openRate' | 'clickRate' | 'bounceRate' | 'unsubscribeRate';
 
-// ============= INTELLIGENT KEY LEARNINGS ENGINE =============
+// ============= STRATEGIC AUDITOR KEY LEARNINGS ENGINE =============
 interface IntelligentRecommendation {
   issue: string;
   recommendation: string;
@@ -165,117 +165,218 @@ const generateIntelligentLearnings = (
   const avgBounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
   const avgUnsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
 
-  // 1. Reputation signals (P0)
-  signalHealth.forEach((sig) => {
-    if (sig.signal === "Domain Reputation" && (sig.status === "critical" || sig.status === "breached" || sig.status === "risk")) {
+  // === DEDUCTIVE LAYER 1: Reputation Signal Analysis (P0) ===
+  const domainSig = signalHealth.find(s => s.signal === "Domain Reputation");
+  const ipSig = signalHealth.find(s => s.signal === "IP Reputation");
+  const spamSig = signalHealth.find(s => s.signal === "Spam Rate");
+
+  if (domainSig && (domainSig.status === "critical" || domainSig.status === "breached" || domainSig.status === "risk")) {
+    recs.push({
+      issue: `Domain reputation degraded to "${domainSig.latestValue}". This directly impacts inbox placement across all mailbox providers and suppresses visibility of all campaigns.`,
+      recommendation: "Immediately restrict sending to engaged-only segments (opened/clicked in last 30 days) for 7–14 days. Validate SPF/DKIM/DMARC alignment. Follow CleverTap Email Best Practices: Sending Volume guidelines for gradual warm-up post-recovery.",
+      priority: "P0", severity: 10,
+    });
+  }
+
+  if (ipSig && (ipSig.status === "critical" || ipSig.status === "breached" || ipSig.status === "risk")) {
+    // Check for batch & blast pattern correlation
+    const highVolumeDays = new Map<string, number>();
+    campaignData.forEach(c => {
+      const dateKey = c.startDate;
+      highVolumeDays.set(dateKey, (highVolumeDays.get(dateKey) || 0) + c.totalSentUsers);
+    });
+    const avgDailyVolume = totalSent / Math.max(highVolumeDays.size, 1);
+    const spikeDays = [...highVolumeDays.entries()].filter(([_, v]) => v > avgDailyVolume * 2);
+
+    if (spikeDays.length > 0) {
       recs.push({
-        issue: `Domain reputation degraded to ${sig.latestValue}. Inbox placement severely impacted.`,
-        recommendation: "Pause large promotional sends. Focus on highly engaged users only for 7-14 days. Follow CleverTap Email Best Practices: Sending Volume guidelines for gradual warm-up.",
-        priority: "P0", severity: 10,
+        issue: `IP reputation at "${ipSig.latestValue}" with ${spikeDays.length} high-volume spike day(s) detected (>2x daily average of ${Math.round(avgDailyVolume).toLocaleString()}). Batch-and-blast sending pattern correlates with IP degradation.`,
+        recommendation: `Redistribute send volume across IP pools. Implement throttled sending (max ${Math.round(avgDailyVolume * 1.3).toLocaleString()} per day per IP). Stagger campaign launches with minimum 2-hour intervals. Follow CleverTap Email Best Practices: Compliance for authentication checks.`,
+        priority: "P0", severity: 9,
       });
-    }
-    if (sig.signal === "IP Reputation" && (sig.status === "critical" || sig.status === "breached" || sig.status === "risk")) {
+    } else {
       recs.push({
-        issue: `IP reputation at ${sig.latestValue}. Delivery rates at risk.`,
-        recommendation: "Redistribute send volume across IP pools. Implement throttled sending strategy. Follow CleverTap Email Best Practices: Compliance for authentication checks (SPF/DKIM/DMARC).",
+        issue: `IP reputation at "${ipSig.latestValue}". Delivery rates at risk across shared infrastructure.`,
+        recommendation: "Audit IP allocation strategy. Consider dedicated IP for transactional vs. promotional streams. Implement throttled sending and monitor Postmaster Tools daily. Follow CleverTap Email Best Practices: Compliance.",
         priority: "P0", severity: 9,
       });
     }
-    if (sig.signal === "Spam Rate" && (sig.status === "breached" || sig.status === "warning")) {
-      recs.push({
-        issue: `Spam rate at ${sig.latestValue}, exceeding acceptable threshold.`,
-        recommendation: "Review recent campaign content for spam trigger words. Implement double opt-in for new subscribers. Add prominent preference center per CleverTap Email Best Practices: Compliance.",
-        priority: "P0", severity: 8,
-      });
-    }
-  });
+  }
 
-  // 2. Segment-linked issues from Root Causes
-  const segmentIssueMap = new Map<string, { bounceSpikes: number; spamCorrelations: number; unsubSpikes: number; lowEngagement: number }>();
+  if (spamSig && (spamSig.status === "breached" || spamSig.status === "warning")) {
+    recs.push({
+      issue: `Spam rate at ${spamSig.latestValue}, exceeding the 0.1% Google threshold. Continued elevation risks automatic throttling by mailbox providers.`,
+      recommendation: "Implement double opt-in for all new subscribers. Add one-click unsubscribe header (RFC 8058). Deploy a preference center per CleverTap Email Best Practices: Compliance. Audit recent promotional content for spam trigger patterns.",
+      priority: "P0", severity: 8,
+    });
+  }
+
+  // === DEDUCTIVE LAYER 2: Segment-Linked Correlation (P0/P1) ===
+  // Build comprehensive segment risk profile from root causes AND raw campaign data
+  const segmentRiskMap = new Map<string, {
+    bounceSpikes: number; spamCorrelations: number; unsubSpikes: number;
+    lowEngagement: number; blockSignals: number; totalCampaigns: number;
+    avgBounce: number; avgOpen: number; avgUnsub: number; totalSent: number;
+  }>();
+
+  // From root cause segment patterns
   rootCauses.forEach((rc) => {
     rc.segmentPatterns.forEach((sp) => {
-      const existing = segmentIssueMap.get(sp.pattern) || { bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0, lowEngagement: 0 };
-      if (sp.observation.includes("bounce")) existing.bounceSpikes++;
-      if (sp.observation.includes("unsub")) existing.unsubSpikes++;
-      if (sp.observation.includes("open rate")) existing.lowEngagement++;
+      const existing = segmentRiskMap.get(sp.pattern) || {
+        bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0,
+        lowEngagement: 0, blockSignals: 0, totalCampaigns: 0,
+        avgBounce: 0, avgOpen: 0, avgUnsub: 0, totalSent: 0,
+      };
+      if (sp.observation.toLowerCase().includes("bounce")) existing.bounceSpikes++;
+      if (sp.observation.toLowerCase().includes("unsub")) existing.unsubSpikes++;
+      if (sp.observation.toLowerCase().includes("open rate")) existing.lowEngagement++;
+      if (sp.observation.toLowerCase().includes("block")) existing.blockSignals++;
       existing.spamCorrelations += sp.frequency;
-      segmentIssueMap.set(sp.pattern, existing);
+      segmentRiskMap.set(sp.pattern, existing);
     });
   });
 
-  segmentIssueMap.forEach((data, segment) => {
+  // Enrich with raw campaign data for segment-level metrics
+  campaignData.forEach(c => {
+    if (!c.whoQuery || c.whoQuery.trim() === "") return;
+    const query = c.whoQuery.trim();
+    const existing = segmentRiskMap.get(query) || {
+      bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0,
+      lowEngagement: 0, blockSignals: 0, totalCampaigns: 0,
+      avgBounce: 0, avgOpen: 0, avgUnsub: 0, totalSent: 0,
+    };
+    existing.totalCampaigns++;
+    existing.totalSent += c.totalSentUsers;
+    existing.avgBounce += c.hardBounceRate + c.softBounceRate;
+    existing.avgOpen += c.totalSentUsers > 0 ? (c.uniqueViewedWithinConversion / c.totalSentUsers) * 100 : 0;
+    existing.avgUnsub += c.unsubscribeRate;
+    segmentRiskMap.set(query, existing);
+  });
+
+  segmentRiskMap.forEach((data, segment) => {
+    if (data.totalCampaigns === 0 && data.spamCorrelations === 0) return;
+
+    const segAvgBounce = data.totalCampaigns > 0 ? data.avgBounce / data.totalCampaigns : 0;
+    const segAvgOpen = data.totalCampaigns > 0 ? data.avgOpen / data.totalCampaigns : 0;
+    const segAvgUnsub = data.totalCampaigns > 0 ? data.avgUnsub / data.totalCampaigns : 0;
+
     const issues: string[] = [];
-    if (data.bounceSpikes > 0) issues.push("elevated bounce rates");
-    if (data.unsubSpikes > 0) issues.push("high unsubscribe signals");
-    if (data.lowEngagement > 0) issues.push("below-average engagement");
+    const metrics: string[] = [];
+
+    if (data.bounceSpikes > 0 || segAvgBounce > avgBounceRate * 2) {
+      issues.push("elevated bounce rates");
+      metrics.push(`bounce: ${segAvgBounce.toFixed(2)}% vs ${avgBounceRate.toFixed(2)}% avg`);
+    }
+    if (data.unsubSpikes > 0 || segAvgUnsub > avgUnsubRate * 2) {
+      issues.push("high unsubscribe signals");
+      metrics.push(`unsub: ${segAvgUnsub.toFixed(2)}% vs ${avgUnsubRate.toFixed(2)}% avg`);
+    }
+    if (data.lowEngagement > 0 || (segAvgOpen > 0 && segAvgOpen < avgOpenRate * 0.7)) {
+      issues.push("below-average engagement");
+      metrics.push(`open: ${segAvgOpen.toFixed(1)}% vs ${avgOpenRate.toFixed(1)}% avg`);
+    }
+    if (data.blockSignals > 0) {
+      issues.push("block signals");
+    }
 
     if (issues.length > 0) {
+      const isP0 = issues.includes("elevated bounce rates") || issues.includes("block signals") || data.spamCorrelations > 1;
       recs.push({
-        issue: `${issues.join(" and ")} consistently observed in segment: "${segment}"`,
-        recommendation: `Suppress segment "${segment.length > 60 ? segment.substring(0, 57) + "..." : segment}" after 3 non-engagement cycles. Implement progressive throttling before full send. Review audience freshness and re-engagement criteria.`,
-        priority: issues.includes("elevated bounce rates") ? "P0" : "P1",
-        severity: 7,
+        issue: `${issues.join(" and ")} consistently observed in segment: "${segment}" (${data.totalCampaigns} campaigns, ${data.totalSent.toLocaleString()} sends). ${metrics.join("; ")}.`,
+        recommendation: `Implement a 3-step sunset policy for segment "${segment.length > 80 ? segment.substring(0, 77) + "..." : segment}": (1) Reduce frequency by 50% for 2 weeks, (2) Suppress non-engagers after 3 consecutive non-opens, (3) Re-validate email addresses before re-inclusion. Review audience freshness criteria.`,
+        priority: isP0 ? "P0" : "P1",
+        severity: isP0 ? 7 : 5,
       });
     }
   });
 
-  // 3. Bounce rate analysis (P0/P1)
+  // === DEDUCTIVE LAYER 3: Bounce & List Hygiene (P0/P1) ===
   if (avgBounceRate > 3) {
     recs.push({
-      issue: `Average bounce rate at ${avgBounceRate.toFixed(2)}%, significantly above acceptable threshold of 1%.`,
-      recommendation: "Implement real-time email verification for new signups. Remove addresses with consecutive bounces. Follow CleverTap Email Best Practices: Email Data Collection for list hygiene.",
+      issue: `Average bounce rate at ${avgBounceRate.toFixed(2)}%, significantly above the 1% acceptable threshold. This degrades sender reputation and wastes IP capacity.`,
+      recommendation: "Implement real-time email verification at point of collection. Remove addresses with 2+ consecutive hard bounces. Deploy re-verification for addresses older than 6 months. Follow CleverTap Email Best Practices: Email Data Collection.",
       priority: "P0", severity: 6,
     });
   } else if (avgBounceRate > 1) {
     recs.push({
-      issue: `Bounce rate at ${avgBounceRate.toFixed(2)}%, above optimal threshold.`,
-      recommendation: "Review list acquisition sources. Implement email validation at point of collection. Consider re-verification for addresses older than 6 months.",
+      issue: `Bounce rate at ${avgBounceRate.toFixed(2)}%, above optimal threshold. Sustained levels will erode sender score over time.`,
+      recommendation: "Audit list acquisition sources for quality. Implement email validation API at signup. Consider monthly re-verification cycles for dormant addresses.",
       priority: "P1", severity: 5,
     });
   }
 
-  // 4. Unsubscribe analysis
+  // === DEDUCTIVE LAYER 4: Unsubscribe & Frequency Analysis ===
   if (avgUnsubRate > 0.5) {
+    // Identify if specific campaigns drove unsubscribes
+    const highUnsubCampaigns = campaignData
+      .filter(c => c.unsubscribeRate > avgUnsubRate * 3 && c.totalSentUsers > 100)
+      .sort((a, b) => b.unsubscribeRate - a.unsubscribeRate)
+      .slice(0, 3);
+
+    const campaignDetail = highUnsubCampaigns.length > 0
+      ? ` Top offenders: ${highUnsubCampaigns.map(c => `"${c.campaignName}" (${c.unsubscribeRate.toFixed(2)}%)`).join(", ")}.`
+      : "";
+
     recs.push({
-      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}%, indicating content or frequency fatigue.`,
-      recommendation: "Reduce send frequency for high-frequency segments. Deploy preference center for content/frequency control per CleverTap Email Best Practices: Audience Selection.",
+      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}%, indicating content-audience mismatch or frequency fatigue.${campaignDetail}`,
+      recommendation: "Deploy a preference center allowing frequency and content category control. Reduce send cadence for segments with >0.5% unsub rate. A/B test content personalization by lifecycle stage per CleverTap Email Best Practices: Audience Selection.",
       priority: "P0", severity: 7,
     });
   } else if (avgUnsubRate > 0.2) {
     recs.push({
-      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}%, approaching warning threshold.`,
-      recommendation: "A/B test content personalization by lifecycle stage. Review send cadence for over-targeted segments.",
+      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}%, approaching warning threshold. Early intervention prevents escalation.`,
+      recommendation: "Segment campaigns by content interest. Introduce send frequency caps per user (max 3 emails/week). A/B test subject line relevance per audience cohort.",
       priority: "P1", severity: 4,
     });
   }
 
-  // 5. Engagement patterns (P1/P2)
+  // === DEDUCTIVE LAYER 5: Engagement & Lifecycle Analysis (P1/P2) ===
   if (avgOpenRate < 10) {
     recs.push({
-      issue: `Average open rate at ${avgOpenRate.toFixed(1)}%, indicating systemic inbox placement issues.`,
-      recommendation: "Conduct inbox placement testing. Review sender authentication. Shift 30% promotional campaigns to behavior-triggered journeys per CleverTap Email Best Practices: Campaign Content.",
+      issue: `Average open rate at ${avgOpenRate.toFixed(1)}%, indicating systemic inbox placement issues or audience-content misalignment across the program.`,
+      recommendation: "Conduct seed-based inbox placement testing across Gmail, Yahoo, and Outlook. Review sender authentication chain (SPF/DKIM/DMARC). Shift 30% of promotional volume to behavior-triggered journeys. Follow CleverTap Email Best Practices: Campaign Content.",
       priority: "P1", severity: 6,
     });
   } else if (avgOpenRate < 15) {
     recs.push({
-      issue: `Open rate at ${avgOpenRate.toFixed(1)}%, below industry benchmark.`,
-      recommendation: "A/B test subject lines systematically. Optimize send time per segment. Review content-to-audience alignment.",
+      issue: `Open rate at ${avgOpenRate.toFixed(1)}%, below industry benchmark. This suggests either filtering or subject line fatigue.`,
+      recommendation: "Implement systematic subject line A/B testing (minimum 10% holdout). Optimize send-time per segment using engagement history. Review from-name consistency.",
       priority: "P2", severity: 3,
     });
   }
 
-  if (avgClickRate < 1) {
+  if (avgClickRate < 1 && avgOpenRate > 5) {
     recs.push({
-      issue: `Click rate at ${avgClickRate.toFixed(2)}%, indicating weak CTA performance or content mismatch.`,
-      recommendation: "Review CTA clarity and placement. Ensure mobile optimization. Test content relevance per lifecycle stage.",
+      issue: `Click rate at ${avgClickRate.toFixed(2)}% despite ${avgOpenRate.toFixed(1)}% open rate — significant open-to-click drop-off indicates CTA or content structure issues.`,
+      recommendation: "Audit CTA placement (above-the-fold primary CTA). Ensure mobile-responsive templates. Test single-CTA vs multi-CTA layouts. Align content promise in subject line with email body.",
+      priority: "P2", severity: 2,
+    });
+  } else if (avgClickRate < 1) {
+    recs.push({
+      issue: `Click rate at ${avgClickRate.toFixed(2)}%, indicating weak content engagement across the program.`,
+      recommendation: "Review content relevance per lifecycle stage. Test dynamic content blocks personalized by user behavior. Ensure mobile optimization of all templates.",
       priority: "P2", severity: 2,
     });
   }
 
-  // 6. Campaign structure patterns (P2)
-  // Check for lifecycle concentration
+  // === DEDUCTIVE LAYER 6: Lifecycle Gap Detection ===
+  // High-performing campaigns with low volume → recommend trigger-based expansion
+  const highPerformLowVolume = campaignData.filter(c =>
+    c.totalSentUsers > 0 && c.totalSentUsers < totalSent * 0.01 &&
+    (c.uniqueViewedWithinConversion / c.totalSentUsers) * 100 > avgOpenRate * 1.5
+  );
+  if (highPerformLowVolume.length >= 3) {
+    const examples = highPerformLowVolume.slice(0, 2).map(c => `"${c.campaignName}"`).join(", ");
+    recs.push({
+      issue: `${highPerformLowVolume.length} campaigns show strong engagement (>1.5x avg open rate) but account for <1% of total volume each. Examples: ${examples}. Lifecycle-triggered messaging is underutilized.`,
+      recommendation: "Expand trigger-based and lifecycle journey campaigns. Shift 20-30% of batch promotional volume to behavior-triggered journeys (e.g., browse abandonment, milestone-based). This improves engagement ratios and dilutes negative signals.",
+      priority: "P2", severity: 4,
+    });
+  }
+
+  // === DEDUCTIVE LAYER 7: Campaign Structure Patterns ===
   const channels = new Map<string, number>();
-  campaignData.forEach((c) => {
+  campaignData.forEach(c => {
     channels.set(c.channel, (channels.get(c.channel) || 0) + 1);
   });
   const totalCampaigns = campaignData.length;
@@ -283,29 +384,30 @@ const generateIntelligentLearnings = (
     const pct = (count / totalCampaigns) * 100;
     if (pct > 70) {
       recs.push({
-        issue: `${channel} channel accounts for ${pct.toFixed(0)}% of all campaigns, indicating channel over-concentration.`,
-        recommendation: `Diversify campaign mix. Introduce trigger-based and lifecycle campaigns to reduce reliance on ${channel} channel.`,
+        issue: `${channel} channel accounts for ${pct.toFixed(0)}% of all campaigns (${count}/${totalCampaigns}), indicating over-concentration on a single campaign type.`,
+        recommendation: `Diversify campaign mix by introducing transactional triggers, lifecycle journeys, and re-engagement automations alongside ${channel} campaigns. Target <50% concentration per channel type.`,
         priority: "P2", severity: 2,
       });
     }
   });
 
-  // 7. Breach day patterns
+  // === DEDUCTIVE LAYER 8: Breach Pattern Severity ===
   if (rootCauses.length > 3) {
+    const highConfidence = rootCauses.filter(r => r.confidence === "high" || r.confidence === "medium");
     recs.push({
-      issue: `${rootCauses.length} reputation breach days detected in the analysis period, indicating persistent deliverability stress.`,
-      recommendation: "Implement daily Postmaster Tools monitoring. Establish automated breach alerting. Review sending patterns around breach clusters.",
+      issue: `${rootCauses.length} reputation breach days detected in the analysis period (${highConfidence.length} with strong campaign correlation). This indicates persistent deliverability stress requiring structural intervention.`,
+      recommendation: "Establish automated Postmaster Tools monitoring with daily alerting. Implement a breach response protocol: pause promotional sends within 4 hours of detection, restrict to engaged-only segments for 48 hours.",
       priority: "P1", severity: 5,
     });
   }
 
-  // 8. Volume-related patterns from postmaster
+  // === DEDUCTIVE LAYER 9: Postmaster Delivery Error Patterns ===
   if (postmasterData && postmasterData.length > 0) {
-    const errorRatios = postmasterData.map(p => p.errorRatio || 0).filter(e => e > 0);
-    if (errorRatios.length > postmasterData.length * 0.3) {
+    const errorDays = postmasterData.filter(p => (p.errorRatio || 0) > 0);
+    if (errorDays.length > postmasterData.length * 0.3) {
       recs.push({
-        issue: `Delivery errors detected on ${errorRatios.length} of ${postmasterData.length} postmaster data points.`,
-        recommendation: "Check email authentication setup (SPF/DKIM/DMARC alignment). Monitor for blocklist inclusions. Follow CleverTap Email Best Practices: Compliance.",
+        issue: `Delivery errors detected on ${errorDays.length} of ${postmasterData.length} days (${((errorDays.length / postmasterData.length) * 100).toFixed(0)}%). Persistent errors indicate infrastructure or authentication issues.`,
+        recommendation: "Verify SPF/DKIM/DMARC alignment across all sending domains. Check for blocklist inclusions via MXToolbox or similar. Review DNS configuration for sending IPs. Follow CleverTap Email Best Practices: Compliance.",
         priority: "P1", severity: 5,
       });
     }
@@ -323,7 +425,7 @@ const generateIntelligentLearnings = (
   if (recs.length === 0) {
     recs.push({
       issue: "No critical deliverability or engagement issues detected in the analyzed period.",
-      recommendation: "Continue current practices. Maintain monitoring cadence for early detection of emerging patterns.",
+      recommendation: "Continue current practices. Maintain daily monitoring cadence via Postmaster Tools for early detection of emerging patterns.",
       priority: "P2", severity: 0,
     });
   }
