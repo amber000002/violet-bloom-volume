@@ -142,9 +142,9 @@ const InboxAlchemyContent: React.FC = () => {
     <div className="min-h-screen relative overflow-hidden">
       <Sparkles count={viewMode === "presentation" ? 20 : 40} />
 
-      {/* Background Glow Effects - CleverTap Ambient */}
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full blur-[200px] opacity-10 pointer-events-none" style={{ background: '#FB7185' }} />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full blur-[200px] opacity-10 pointer-events-none" style={{ background: '#A855F7' }} />
+      {/* Background Glow Effects - Premium Liquid AI */}
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: '#A855F7', filter: 'blur(150px)', opacity: 0.15 }} />
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: '#FB7185', filter: 'blur(150px)', opacity: 0.15 }} />
 
       <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
         {/* Header */}
