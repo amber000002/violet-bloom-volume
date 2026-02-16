@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FileText, 
@@ -10,6 +10,7 @@ import {
   HelpCircle,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { CampaignRow } from "@/lib/csvAnalyzer";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
@@ -52,6 +53,7 @@ interface UseCaseCoverage {
   objective: string;
   triggerType?: string;
   campaignsMapped: number;
+  campaignNames: string[];
   source: UseCaseSource;
   status: "active" | "missing" | "review-needed";
 }
@@ -111,6 +113,52 @@ const INFERRED_USE_CASE_PATTERNS: Array<{
   { pattern: /password|security|login|otp|2fa/i, useCaseName: "Security Alerts", stage: "retention", framework: "lifecycle", confidence: "high" },
   { pattern: /renew|expir|subscription/i, useCaseName: "Renewal Reminders", stage: "retention", framework: "lifecycle", confidence: "high" },
 ];
+
+// Collapsible row component for campaign list
+const UseCaseCoverageRow: React.FC<{ uc: UseCaseCoverage; pct: string }> = ({ uc, pct }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasCampaigns = uc.campaignNames.length > 0;
+
+  return (
+    <>
+      <TableRow>
+        <TableCell className="font-medium max-w-[250px]">
+          <span className="whitespace-normal break-words">{uc.useCaseName}</span>
+        </TableCell>
+        <TableCell className="text-center font-medium">
+          {uc.campaignsMapped} <span className="text-muted-foreground text-xs">({pct}%)</span>
+        </TableCell>
+        <TableCell>
+          {hasCampaigns ? (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="flex items-center gap-1 text-xs text-primary hover:underline transition-colors"
+            >
+              <ChevronRight className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+              View {uc.campaignNames.length} Campaign{uc.campaignNames.length !== 1 ? "s" : ""}
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground">No campaigns mapped</span>
+          )}
+        </TableCell>
+      </TableRow>
+      {isExpanded && hasCampaigns && (
+        <TableRow>
+          <TableCell colSpan={3} className="bg-muted/20 py-2 px-6">
+            <ul className="text-xs text-muted-foreground space-y-1 max-h-48 overflow-y-auto">
+              {uc.campaignNames.map((name, i) => (
+                <li key={i} className="flex items-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full bg-muted-foreground/50 shrink-0" />
+                  <span className="whitespace-normal break-words">{name}</span>
+                </li>
+              ))}
+            </ul>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+};
 
 export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = ({
   campaignData,
@@ -257,28 +305,31 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
         objective: uc.description,
         triggerType: uc.triggerType,
         campaignsMapped: 0,
+        campaignNames: [],
         source: "internal",
-        status: "missing", // Will update if campaigns found
+        status: "missing",
       });
     }
 
-    // Count campaigns per use case
+    // Count campaigns per use case and collect names
     for (const mapped of mappedCampaigns) {
       if (mapped.useCaseName) {
         const key = mapped.useCaseId || `inferred_${mapped.useCaseName}`;
+        const campName = mapped.campaign.campaignName || mapped.campaign.title || "Unnamed";
         
         if (useCaseMap.has(key)) {
           const existing = useCaseMap.get(key)!;
           existing.campaignsMapped++;
+          existing.campaignNames.push(campName);
           existing.status = "active";
         } else if (mapped.source === "lovable-inferred") {
-          // Add inferred use cases
           const existingInferred = Array.from(useCaseMap.values()).find(
             uc => uc.useCaseName === mapped.useCaseName && uc.source === "lovable-inferred"
           );
           
           if (existingInferred) {
             existingInferred.campaignsMapped++;
+            existingInferred.campaignNames.push(campName);
           } else {
             useCaseMap.set(key, {
               useCaseId: key,
@@ -287,6 +338,7 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
               stage: mapped.stage || "Unassigned",
               objective: "",
               campaignsMapped: 1,
+              campaignNames: [campName],
               source: "lovable-inferred",
               status: "review-needed",
             });
@@ -296,15 +348,16 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
     }
 
     // Add unclassified count
-    const unclassifiedCount = mappedCampaigns.filter(m => m.source === "unclassified").length;
-    if (unclassifiedCount > 0) {
+    const unclassifiedCampaigns = mappedCampaigns.filter(m => m.source === "unclassified");
+    if (unclassifiedCampaigns.length > 0) {
       useCaseMap.set("unclassified", {
         useCaseId: "unclassified",
         useCaseName: "Unclassified / Review Needed",
         framework: "—",
         stage: "Unassigned",
         objective: "Campaigns that could not be confidently mapped to any use case",
-        campaignsMapped: unclassifiedCount,
+        campaignsMapped: unclassifiedCampaigns.length,
+        campaignNames: unclassifiedCampaigns.map(m => m.campaign.campaignName || m.campaign.title || "Unnamed"),
         source: "unclassified",
         status: "review-needed",
       });
@@ -387,17 +440,6 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
             Review Needed
           </Badge>
         );
-    }
-  };
-
-  const getStatusBadge = (status: "active" | "missing" | "review-needed") => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-green-500/20 text-green-700 border-green-500/30">Active</Badge>;
-      case "missing":
-        return <Badge className="bg-red-500/20 text-red-700 border-red-500/30">Missing</Badge>;
-      case "review-needed":
-        return <Badge className="bg-amber-500/20 text-amber-700 border-amber-500/30">Review Needed</Badge>;
     }
   };
 
@@ -494,30 +536,18 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
                   <TableHeader>
                     <TableRow>
                       <TableHead>Use Case</TableHead>
-                      <TableHead>Framework</TableHead>
-                      <TableHead>Stage</TableHead>
-                      <TableHead className="text-center">Campaigns</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Volume / %</TableHead>
+                      <TableHead>Campaigns</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {coverageSummary.slice(0, 15).map((uc) => (
-                      <TableRow key={uc.useCaseId}>
-                        <TableCell className="font-medium max-w-[200px]">
-                          <span className="whitespace-normal break-words">{uc.useCaseName}</span>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground capitalize">
-                          {uc.framework}
-                        </TableCell>
-                        <TableCell className="capitalize">{uc.stage}</TableCell>
-                        <TableCell className="text-center font-medium">
-                          {uc.campaignsMapped}
-                        </TableCell>
-                        <TableCell>{getSourceBadge(uc.source)}</TableCell>
-                        <TableCell>{getStatusBadge(uc.status)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {coverageSummary.slice(0, 15).map((uc) => {
+                      const totalCampaigns = stats.total;
+                      const pct = totalCampaigns > 0 ? ((uc.campaignsMapped / totalCampaigns) * 100).toFixed(1) : "0";
+                      return (
+                        <UseCaseCoverageRow key={uc.useCaseId} uc={uc} pct={pct} />
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
