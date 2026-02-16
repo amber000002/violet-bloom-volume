@@ -167,6 +167,15 @@
     box-shadow: var(--shadow-glass);
   }
 
+  .card-hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .card-hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.06), var(--shadow-glow);
+  }
+
   .sparkle {
     animation: sparkle 2s ease-in-out infinite;
   }
