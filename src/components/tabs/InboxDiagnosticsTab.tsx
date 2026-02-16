@@ -1,5 +1,8 @@
 import React, { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { CoreBrandJSON } from "@/types/brandProfile";
+import { generateStrategicInsights, StrategicInsightsInput, StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
+import { StrategicInsights } from "../StrategicInsights";
 import { 
   Upload, 
   FileText, 
@@ -67,6 +70,8 @@ interface InboxDiagnosticsTabProps {
   industry: string;
   viewMode?: ViewMode;
   onDataChange?: (data: DiagnosticsData | null) => void;
+  brandProfile?: CoreBrandJSON | null;
+  websiteUrl?: string;
 }
 
 const REQUIRED_HEADERS = [
@@ -535,6 +540,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   industry,
   viewMode = "app",
   onDataChange,
+  brandProfile,
+  websiteUrl,
 }) => {
   // File states
   const [campaignValidation, setCampaignValidation] = useState<ValidationResult | null>(null);
@@ -549,7 +556,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
   const [isDraggingPostmaster, setIsDraggingPostmaster] = useState(false);
-  const [activeReport, setActiveReport] = useState<"analysis" | "reputation" | null>(null);
+  const [activeReport, setActiveReport] = useState<"analysis" | "reputation" | "strategic" | null>(null);
+  const [strategicInsights, setStrategicInsights] = useState<StrategicInsightsOutput | null>(null);
+  const [strategicContext, setStrategicContext] = useState<string>("");
   const [diagnostics, setDiagnostics] = useState<DiagnosticsData | null>(null);
   const [thresholdBreaches, setThresholdBreaches] = useState<ThresholdBreach[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -672,6 +681,24 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     onDataChange?.(newDiagnostics);
   }, [campaignData, postmasterData, contextText, onDataChange]);
 
+  const runStrategicInsights = useCallback(() => {
+    if (!industry) return;
+    const input: StrategicInsightsInput = {
+      industry,
+      brandProfile: brandProfile || null,
+      websiteUrl: websiteUrl || "",
+      campaignData: campaignData.length > 0 ? campaignData : null,
+      strategicContext,
+    };
+    try {
+      const insights = generateStrategicInsights(input);
+      setStrategicInsights(insights);
+      setActiveReport("strategic");
+    } catch (error) {
+      console.error("Strategic insights generation failed:", error);
+    }
+  }, [industry, brandProfile, websiteUrl, campaignData, strategicContext]);
+
   const clearAll = useCallback(() => {
     setCampaignValidation(null);
     setPostmasterValidation(null);
@@ -679,9 +706,11 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setPostmasterData(null);
     setProcessingSummary(null);
     setContextText("");
+    setStrategicContext("");
     setCampaignFileName("");
     setPostmasterFileName("");
     setDiagnostics(null);
+    setStrategicInsights(null);
     setActiveReport(null);
     onDataChange?.(null);
   }, [onDataChange]);
@@ -690,7 +719,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   if (viewMode === "presentation" && diagnostics) {
     return (
       <div className="flex flex-col items-center gap-8">
-        <InboxDiagnosticsSlides diagnostics={diagnostics} activeReport={activeReport} />
+        <InboxDiagnosticsSlides diagnostics={diagnostics} activeReport={activeReport === "strategic" ? "analysis" : activeReport} />
       </div>
     );
   }
@@ -841,6 +870,21 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             />
           </div>
 
+          {/* Strategic Priorities (Optional - for Strategic Insights) */}
+          <div className="magic-card rounded-2xl p-6">
+            <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+              <Lightbulb className="w-5 h-5 text-muted-foreground" />
+              Strategic Priorities
+              <span className="text-xs text-muted-foreground font-normal">(Optional — for Strategic Insights)</span>
+            </h3>
+            <textarea
+              value={strategicContext}
+              onChange={(e) => setStrategicContext(e.target.value)}
+              placeholder="Share current business focus areas such as revenue growth, retention improvement, competitive pressure, lifecycle automation, cross-sell expansion, or board mandates."
+              className="w-full h-24 px-4 py-3 rounded-xl bg-muted/30 border border-border focus:border-primary focus:outline-none resize-none text-sm"
+            />
+          </div>
+
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
@@ -861,7 +905,37 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <Shield className="w-5 h-5 mr-2" />
               Reputation Repair Recommendations
             </Button>
+            <Button
+              onClick={runStrategicInsights}
+              disabled={!industry}
+              className="flex-1 h-14 text-base font-semibold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] text-primary-foreground hover:opacity-90"
+            >
+              <Lightbulb className="w-5 h-5 mr-2" />
+              Strategic Insights
+            </Button>
           </div>
+        </motion.div>
+      )}
+
+      {/* Strategic Insights View */}
+      {activeReport === "strategic" && strategicInsights && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-2xl font-bold text-gradient-magic">Strategic Growth & Lifecycle Acceleration</h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setActiveReport(null)}>
+                ← Back
+              </Button>
+              <Button variant="ghost" size="sm" onClick={clearAll}>
+                Clear All
+              </Button>
+            </div>
+          </div>
+          <StrategicInsights data={strategicInsights} />
         </motion.div>
       )}
 
