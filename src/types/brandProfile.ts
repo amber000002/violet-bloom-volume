@@ -89,6 +89,15 @@ export interface CoreBrandJSON {
     volume_indicators_found: string[];
     monthly_active_users_band: string;
   };
+
+  extraction_metadata?: {
+    source_mode: "url_only" | "url_plus_text" | "text_only";
+    pages_crawled: string[];
+    confidence_by_section: Record<string, "high" | "medium" | "low">;
+    evidence_snippets: Array<{ section: string; snippet: string; confidence: string }>;
+    missing_sections: string[];
+    warnings: string[];
+  };
 }
 
 export interface BrandInputs {

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, Palette, CheckCircle2 } from "lucide-react";
 import { MagicSelect } from "./ui/MagicSelect";
@@ -16,6 +17,7 @@ import { ResourceLibrary } from "./resource-library";
 import { BrandInputsPanel } from "./BrandInputsPanel";
 import { BrandInputs, emptyBrandInputs, CoreBrandJSON } from "@/types/brandProfile";
 import { generateCoreBrandJSON } from "@/lib/brandExtractor";
+import { supabase } from "@/integrations/supabase/client";
 
 const industryOptions = Object.entries(industryConfigs).map(([key, config]) => ({
   value: key,
@@ -62,15 +64,44 @@ const InboxAlchemyContent: React.FC = () => {
   
   const businessModelLabel = inferredBusinessModel ? getBusinessModelLabel(inferredBusinessModel) : "";
 
-  const handleGenerateBrandProfile = useCallback(() => {
-    if (!industry || !brandInputs.websiteUrl.trim() || !brandInputs.websiteText.trim()) return;
+  const handleGenerateBrandProfile = useCallback(async () => {
+    if (!industry || !brandInputs.websiteUrl.trim()) return;
     setIsGeneratingBrand(true);
-    // Simulate small delay for UX feedback
-    setTimeout(() => {
-      const profile = generateCoreBrandJSON(industry, brandInputs);
-      setBrandProfile(profile);
+    try {
+      const { data, error } = await supabase.functions.invoke("brand-profile-generate", {
+        body: {
+          websiteUrl: brandInputs.websiteUrl,
+          websiteText: brandInputs.websiteText || "",
+          additionalContext: brandInputs.additionalContext,
+          industry,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.success && data.data) {
+        // Extract the core brand profile (without extraction_metadata at top level for compatibility)
+        const profile: CoreBrandJSON = data.data;
+        setBrandProfile(profile);
+
+        const meta = profile.extraction_metadata;
+        if (meta?.warnings && meta.warnings.length > 0) {
+          toast.warning(`Brand profile generated with warnings: ${meta.warnings[0]}`);
+        } else {
+          const sourceLabel = meta?.source_mode === "url_only" ? "URL crawl" : 
+                             meta?.source_mode === "url_plus_text" ? "URL + text" : "text analysis";
+          toast.success(`Brand profile generated via ${sourceLabel}`);
+        }
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (err: any) {
+      console.error("Brand profile generation error:", err);
+      toast.error(err.message || "Failed to generate brand profile. Try providing Website Text.");
+    } finally {
       setIsGeneratingBrand(false);
-    }, 800);
+    }
   }, [industry, brandInputs]);
 
   // Callback to collect export data from tabs

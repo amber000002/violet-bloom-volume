@@ -21,7 +21,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
 }) => {
   const [showAdditional, setShowAdditional] = useState(false);
 
-  const canGenerate = hasIndustry && inputs.websiteUrl.trim() && inputs.websiteText.trim();
+  const canGenerate = hasIndustry && inputs.websiteUrl.trim();
 
   return (
     <div className="flex-1 space-y-3">
@@ -44,7 +44,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
       <div>
         <label className="block text-sm font-medium text-foreground mb-1.5">
           <FileText className="w-3.5 h-3.5 inline mr-1.5 text-primary" />
-          Website Text <span className="text-secondary">*</span>
+          Website Text <span className="text-xs text-muted-foreground font-normal">(optional)</span>
         </label>
         <Textarea
           value={inputs.websiteText}
@@ -122,7 +122,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
             : "bg-muted/30 text-muted-foreground/50 cursor-not-allowed"
         }`}
       >
-        {isGenerating ? "Extracting Brand Signals..." : "Generate Brand Profile"}
+        {isGenerating ? "Extracting Brand Signals (this may take 30-60s)..." : "Generate Brand Profile"}
       </motion.button>
     </div>
   );
