@@ -225,7 +225,7 @@ Return ONLY the JSON object.`;
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 16000,
+      max_tokens: 32000,
     });
 
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -269,15 +269,46 @@ Return ONLY the JSON object.`;
       });
     }
 
-    let jsonStr = content;
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) jsonStr = jsonMatch[1].trim();
-
     let parsed;
     try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      console.error("Failed to parse AI response:", jsonStr.substring(0, 500));
+      // Remove markdown code blocks
+      let cleaned = content
+        .replace(/```json\s*/gi, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
+      // Find JSON boundaries
+      const jsonStart = cleaned.search(/[\{\[]/);
+      const jsonEnd = cleaned.lastIndexOf(jsonStart !== -1 && cleaned[jsonStart] === '[' ? ']' : '}');
+
+      if (jsonStart === -1 || jsonEnd === -1) throw new Error("No JSON object found");
+
+      cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        // Fix common issues: trailing commas, control chars
+        cleaned = cleaned
+          .replace(/,\s*}/g, "}")
+          .replace(/,\s*]/g, "]")
+          .replace(/[\x00-\x1F\x7F]/g, "");
+
+        // Repair unbalanced braces/brackets (truncated response)
+        let braces = 0, brackets = 0;
+        for (const char of cleaned) {
+          if (char === '{') braces++;
+          if (char === '}') braces--;
+          if (char === '[') brackets++;
+          if (char === ']') brackets--;
+        }
+        while (brackets > 0) { cleaned += ']'; brackets--; }
+        while (braces > 0) { cleaned += '}'; braces--; }
+
+        parsed = JSON.parse(cleaned);
+      }
+    } catch (parseErr) {
+      console.error("Failed to parse AI response:", content.substring(0, 500));
       return new Response(JSON.stringify({ error: "Failed to parse AI output." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
