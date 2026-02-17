@@ -59,7 +59,13 @@ export function validateLifecycleJSON(json: JSONResourceFile): { valid: boolean;
 }
 
 // ===== DETERMINE INDUSTRY =====
-function determineIndustry(useCases: JSONUseCase[]): string | null {
+function determineIndustry(useCases: JSONUseCase[], json?: JSONResourceFile): string | null {
+  // Check top-level industry fields first (common in playbook JSONs)
+  const topLevel = (json as any)?.industry || (json?.metadata as any)?.industry;
+  if (topLevel && typeof topLevel === "string") {
+    return topLevel.toLowerCase().trim();
+  }
+
   const industries = new Set<string>();
   for (const uc of useCases) {
     if (uc.industry) industries.add(uc.industry.toLowerCase().trim());
@@ -126,7 +132,7 @@ export async function uploadResourceJSON(
     log("resource_upload_storage_written", { filePath });
 
     // 5. Extract metadata
-    const industry = determineIndustry(json.use_cases);
+    const industry = determineIndustry(json.use_cases, json);
     const framework = determineFramework(json.use_cases);
     const displayName = json.metadata?.source || sanitizedSource;
 
