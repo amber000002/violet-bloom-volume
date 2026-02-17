@@ -5,8 +5,13 @@ import {
   UserMinus, Activity, TrendingUp, Workflow, Info,
   ChevronDown, ChevronUp, Layers, Users, BookOpen, Sparkles,
   CheckCircle2, Mail, Bell, MessageSquare, Smartphone, Globe,
-  Hash, BarChart3, Brain, Crosshair, AlertTriangle
+  Hash, BarChart3, Brain, Crosshair, AlertTriangle, Loader2, Wand2
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { AugmentedUseCase } from "@/types/augmentedUseCase";
+import { AugmentedUseCaseTable } from "@/components/AugmentedUseCaseTable";
+import { exportAugmentedCSV, exportAugmentedXLSX } from "@/lib/augmentedExport";
 import {
   industryConfigs,
   JourneyUseCase,
@@ -284,6 +289,8 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const [selectedStage, setSelectedStage] = useState<string>("");
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [selectedChannels, setSelectedChannels] = useState<string[]>(["email"]);
+  const [isAugmenting, setIsAugmenting] = useState(false);
+  const [augmentedUseCases, setAugmentedUseCases] = useState<AugmentedUseCase[] | null>(null);
 
   // Resource Library integration
   const { findMatchingResources, resources } = useResourceLibrary();
@@ -350,6 +357,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
       setSelectedStage("");
     }
     setExpandedCard(null);
+    setAugmentedUseCases(null); // Reset AI results on filter change
   }, [availableStages]);
 
   // ===== RESOURCE MATCHING =====
@@ -510,6 +518,51 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   // Split by source for display
   const internalUseCases = personalizedUseCases.filter(p => p.useCase.source === "internal");
   const nativeUseCases = personalizedUseCases.filter(p => p.useCase.source === "native");
+
+  // ===== AI AUGMENTATION HANDLER =====
+  const handleAugmentWithAI = async () => {
+    if (personalizedUseCases.length === 0) {
+      toast.error("No use cases to augment. Select a stage with use cases first.");
+      return;
+    }
+    setIsAugmenting(true);
+    setAugmentedUseCases(null);
+    try {
+      const filteredForAI = personalizedUseCases.map(p => ({
+        title: p.useCase.title,
+        stage: p.useCase.stage,
+        source: p.useCase.source,
+        triggerType: p.useCase.triggerType,
+        objective: p.useCase.objective,
+        channelsUsed: p.useCase.channelsUsed,
+      }));
+
+      const { data, error } = await supabase.functions.invoke("use-case-augment", {
+        body: {
+          industry,
+          channels: selectedChannels,
+          filteredUseCases: filteredForAI,
+          brandProfile: brandProfile || null,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const augmented = data?.data?.augmented_use_cases;
+      if (augmented && Array.isArray(augmented)) {
+        setAugmentedUseCases(augmented);
+        toast.success(`${augmented.length} use cases augmented with AI`);
+      } else {
+        throw new Error("Invalid AI response format");
+      }
+    } catch (err: any) {
+      console.error("AI augmentation error:", err);
+      toast.error(err.message || "AI augmentation failed. Please try again.");
+    } finally {
+      setIsAugmenting(false);
+    }
+  };
 
   // ===== FRAMEWORK REASON =====
   const frameworkReason = useMemo(() => {
@@ -768,6 +821,56 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
               <p className="text-xs text-muted-foreground/70">
                 Try selecting more channels or changing the lifecycle stage.
               </p>
+            </div>
+          )}
+
+          {/* AI Augmentation Section */}
+          {personalizedUseCases.length > 0 && (
+            <div className="pt-4 border-t border-border space-y-4">
+              <div className="flex items-center justify-center">
+                <motion.button
+                  onClick={handleAugmentWithAI}
+                  disabled={isAugmenting}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium bg-gradient-magic text-primary-foreground shadow-magic disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {isAugmenting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Augmenting with AI...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-4 h-4" />
+                      {augmentedUseCases ? "Re-Augment with AI" : "Augment with AI"}
+                    </>
+                  )}
+                </motion.button>
+              </div>
+
+              {isAugmenting && (
+                <div className="text-center space-y-2 py-4">
+                  <p className="text-xs text-muted-foreground">
+                    AI is personalizing use cases with brand vocabulary, triggers, and segmentation logic...
+                  </p>
+                  <p className="text-xs text-muted-foreground/50">This may take 15-30 seconds</p>
+                </div>
+              )}
+
+              {augmentedUseCases && augmentedUseCases.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Wand2 className="w-4 h-4 text-primary" />
+                    AI-Augmented Output
+                  </div>
+                  <AugmentedUseCaseTable
+                    useCases={augmentedUseCases}
+                    onExportCSV={() => exportAugmentedCSV(augmentedUseCases)}
+                    onExportXLSX={() => exportAugmentedXLSX(augmentedUseCases)}
+                  />
+                </div>
+              )}
             </div>
           )}
 
