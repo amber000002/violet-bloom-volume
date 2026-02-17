@@ -289,7 +289,7 @@ export const JSONResourceUpload: React.FC<JSONResourceUploadProps> = ({ onClose 
                   </div>
                 ) : (
                   <ul className="mt-2 space-y-1 text-xs text-destructive/80">
-                    {result.errors.map((err, i) => (
+                    {(result.errors ?? []).map((err, i) => (
                       <li key={i}>• {err}</li>
                     ))}
                   </ul>
