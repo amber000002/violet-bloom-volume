@@ -293,7 +293,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const [augmentedUseCases, setAugmentedUseCases] = useState<AugmentedUseCase[] | null>(null);
 
   // Resource Library integration
-  const { findMatchingResources, resources } = useResourceLibrary();
+  const { findMatchingResources, resources, noResourceForIndustry, isLoadingCloudResources } = useResourceLibrary();
 
   const config = industry ? industryConfigs[industry] : null;
   
@@ -824,8 +824,21 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
             </div>
           )}
 
+          {/* No internal resource found for industry */}
+          {noResourceForIndustry && internalUseCases.length === 0 && (
+            <div className="p-6 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto" />
+              <p className="text-sm font-medium text-foreground">
+                No internal resource JSON found for this industry in Resource Library.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Upload a JSON resource via the Resource Library to see internal use cases here.
+              </p>
+            </div>
+          )}
+
           {/* No matches */}
-          {personalizedUseCases.length === 0 && (
+          {personalizedUseCases.length === 0 && !noResourceForIndustry && (
             <div className="p-8 rounded-xl bg-muted/30 border border-border text-center space-y-2">
               <p className="text-sm text-muted-foreground">
                 No direct lifecycle match found for the selected channels. Showing closest aligned use cases.

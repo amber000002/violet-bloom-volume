@@ -59,6 +59,60 @@ export type Database = {
         }
         Relationships: []
       }
+      resource_library_items: {
+        Row: {
+          checksum_sha256: string
+          created_at: string
+          display_name: string
+          file_path: string
+          framework: string | null
+          id: string
+          industry: string | null
+          is_active: boolean
+          last_updated: string | null
+          org_id: string | null
+          resource_type: string
+          schema_version: string | null
+          source: string | null
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          checksum_sha256: string
+          created_at?: string
+          display_name: string
+          file_path: string
+          framework?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean
+          last_updated?: string | null
+          org_id?: string | null
+          resource_type?: string
+          schema_version?: string | null
+          source?: string | null
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          checksum_sha256?: string
+          created_at?: string
+          display_name?: string
+          file_path?: string
+          framework?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean
+          last_updated?: string | null
+          org_id?: string | null
+          resource_type?: string
+          schema_version?: string | null
+          source?: string | null
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
