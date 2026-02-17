@@ -2,3 +2,6 @@ project_id = "nkhfmmnxlpcqhxdeftar"
 
 [functions.strategic-insights]
 verify_jwt = false
+
+[functions.use-case-augment]
+verify_jwt = false
