@@ -205,7 +205,7 @@ export const ResourceLibrary: React.FC = () => {
               {/* Footer */}
               <div className="p-4 border-t border-border bg-muted/30">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Resources are processed at runtime • Session-based storage</span>
+                  <span>Resources persist in cloud • Auto-loaded by industry</span>
                   <a 
                     href="#" 
                     className="text-primary hover:underline flex items-center gap-1"

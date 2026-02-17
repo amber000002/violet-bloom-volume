@@ -369,36 +369,48 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const internalJourneys = useMemo((): Array<ResourceJourney & { sourceResource: string }> => {
     const result: Array<ResourceJourney & { sourceResource: string }> = [];
     const normalizedSelectedStage = normalizeStage(selectedStage);
+    const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.journeys && resource.journeys.length > 0) {
         for (const journey of resource.journeys) {
           const journeyStage = journey.stage ? normalizeStage(journey.stage) : "";
           if (!journeyStage || journeyStage === normalizedSelectedStage) {
+            // Channel filter: if journey has channels defined, require at least one overlap
+            if (journey.channels && journey.channels.length > 0) {
+              const journeyChannelsNorm = journey.channels.map(c => c.toLowerCase());
+              if (!normalizedChannels.some(c => journeyChannelsNorm.includes(c))) continue;
+            }
             result.push({ ...journey, sourceResource: resource.title });
           }
         }
       }
     }
     return result;
-  }, [resourceMatches, selectedStage]);
+  }, [resourceMatches, selectedStage, selectedChannels]);
 
   const internalCampaigns = useMemo((): Array<ResourceCampaign & { sourceResource: string }> => {
     const result: Array<ResourceCampaign & { sourceResource: string }> = [];
     const normalizedSelectedStage = normalizeStage(selectedStage);
+    const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.campaigns && resource.campaigns.length > 0) {
         for (const campaign of resource.campaigns) {
           const campaignStage = campaign.stage ? normalizeStage(campaign.stage) : "";
           if (!campaignStage || campaignStage === normalizedSelectedStage) {
+            // Channel filter: if campaign has channels defined, require at least one overlap
+            if (campaign.channels && campaign.channels.length > 0) {
+              const campaignChannelsNorm = campaign.channels.map(c => c.toLowerCase());
+              if (!normalizedChannels.some(c => campaignChannelsNorm.includes(c))) continue;
+            }
             result.push({ ...campaign, sourceResource: resource.title });
           }
         }
       }
     }
     return result;
-  }, [resourceMatches, selectedStage]);
+  }, [resourceMatches, selectedStage, selectedChannels]);
 
   // ===== NATIVE INTELLIGENCE =====
   const nativeJourneys: (JourneyUseCase | JourneyMapping)[] = useMemo(() => {

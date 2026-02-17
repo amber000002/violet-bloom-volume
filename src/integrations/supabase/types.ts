@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      resource_files: {
+        Row: {
+          channels: string[]
+          created_at: string
+          file_path: string
+          id: string
+          industries: string[]
+          raw_metadata: Json | null
+          resource_category: string
+          source_name: string
+          stages: string[]
+          updated_at: string
+          use_case_count: number
+          version: string | null
+        }
+        Insert: {
+          channels?: string[]
+          created_at?: string
+          file_path: string
+          id?: string
+          industries?: string[]
+          raw_metadata?: Json | null
+          resource_category?: string
+          source_name: string
+          stages?: string[]
+          updated_at?: string
+          use_case_count?: number
+          version?: string | null
+        }
+        Update: {
+          channels?: string[]
+          created_at?: string
+          file_path?: string
+          id?: string
+          industries?: string[]
+          raw_metadata?: Json | null
+          resource_category?: string
+          source_name?: string
+          stages?: string[]
+          updated_at?: string
+          use_case_count?: number
+          version?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
