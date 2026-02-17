@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { 
   Resource, 
   ResourceType, 
@@ -11,6 +11,7 @@ import {
   ResourceJourney,
   ResourceCampaign,
 } from "@/types/resources";
+import { uploadResourceJSON, resolveResourceForIndustry } from "@/lib/resourceCloudService";
 
 interface ResourceLibraryContextType {
   resources: Resource[];
@@ -28,6 +29,8 @@ interface ResourceLibraryContextType {
   getConfidenceLevel: (matches: ResourceMatch[]) => ConfidenceLevel;
   isLibraryOpen: boolean;
   setIsLibraryOpen: (open: boolean) => void;
+  loadResourcesForIndustry: (industry: string) => Promise<void>;
+  isLoadingCloudResources: boolean;
 }
 
 const ResourceLibraryContext = createContext<ResourceLibraryContextType | null>(null);
@@ -47,6 +50,8 @@ interface ResourceLibraryProviderProps {
 export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = ({ children }) => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isLoadingCloudResources, setIsLoadingCloudResources] = useState(false);
+  const lastLoadedIndustry = useRef<string>("");
 
   const generateId = () => `res_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -60,24 +65,27 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     setResources(prev => [...prev, newResource]);
   }, []);
 
-  // ===== JSON INGESTION LOGIC =====
-  // Follows PRD: merge by use_case_id, preserve version history, never overwrite unless ID matches
-  const addResourcesFromJSON = useCallback((json: JSONResourceFile): JSONValidationResult => {
+  // ===== PARSE JSON INTO RESOURCES (shared logic) =====
+  const parseJSONToResources = useCallback((json: JSONResourceFile, existingResources: Resource[]): {
+    newResources: Resource[];
+    result: JSONValidationResult;
+  } => {
     const errors: string[] = [];
     let parsedUseCases = 0;
     let duplicatesSkipped = 0;
     let updatedUseCases = 0;
 
-    // Validate metadata
     if (!json.metadata) {
       errors.push("Missing 'metadata' block in JSON");
     }
     if (!json.use_cases || !Array.isArray(json.use_cases)) {
       errors.push("Missing or invalid 'use_cases' array in JSON");
-      return { isValid: false, errors, parsedUseCases, duplicatesSkipped, updatedUseCases };
+      return { 
+        newResources: existingResources, 
+        result: { isValid: false, errors, parsedUseCases, duplicatesSkipped, updatedUseCases } 
+      };
     }
 
-    // Group use cases by their target resource (based on industry + source)
     const resourceMap = new Map<string, {
       journeys: ResourceJourney[];
       campaigns: ResourceCampaign[];
@@ -101,7 +109,6 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         continue;
       }
 
-      // Create resource key based on source/industry grouping
       const industry = useCase.industry || "all";
       const resourceKey = `${json.metadata.source}_${industry}`;
 
@@ -118,18 +125,16 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
 
       const resourceData = resourceMap.get(resourceKey)!;
 
-      // Check for duplicate use_case_id within this upload
       if (resourceData.useCaseIds.has(useCase.use_case_id)) {
         duplicatesSkipped++;
         continue;
       }
       resourceData.useCaseIds.add(useCase.use_case_id);
 
-      // Add tabs and industries
       if (useCase.tabs) {
         useCase.tabs.forEach(t => resourceData.tabs.add(t));
       } else {
-        resourceData.tabs.add("use-case-studio"); // Default
+        resourceData.tabs.add("use-case-studio");
       }
       resourceData.industries.add(industry as IndustryRelevance);
       
@@ -137,7 +142,6 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         resourceData.isPrimary = true;
       }
 
-      // Convert to journey or campaign
       if (useCase.type === "journey") {
         const journey: ResourceJourney = {
           id: useCase.use_case_id,
@@ -148,6 +152,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
           framework: useCase.framework,
           events: useCase.events,
           segments: useCase.segments,
+          channels: useCase.channels,
         };
         resourceData.journeys.push(journey);
       } else {
@@ -159,6 +164,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
           suppression: useCase.suppression || "",
           stage: useCase.stage,
           framework: useCase.framework,
+          channels: useCase.channels,
         };
         resourceData.campaigns.push(campaign);
       }
@@ -167,99 +173,148 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     }
 
     if (errors.length > 0 && parsedUseCases === 0) {
-      return { isValid: false, errors, parsedUseCases, duplicatesSkipped, updatedUseCases };
+      return { 
+        newResources: existingResources, 
+        result: { isValid: false, errors, parsedUseCases, duplicatesSkipped, updatedUseCases } 
+      };
     }
 
-    // Create or merge resources
-    setResources(prev => {
-      const newResources = [...prev];
+    const newResources = [...existingResources];
 
-      for (const [key, data] of resourceMap.entries()) {
-        const [source, industry] = key.split("_");
-        const title = `${source} (${industry.toUpperCase()})`;
+    for (const [key, data] of resourceMap.entries()) {
+      const [source, industry] = key.split("_");
+      const title = `${source} (${industry.toUpperCase()})`;
 
-        // Find existing resource by title
-        const existingIndex = newResources.findIndex(r => r.title === title);
+      const existingIndex = newResources.findIndex(r => r.title === title);
 
-        if (existingIndex >= 0) {
-          // MERGE: Update existing resource with new/updated use cases
-          const existing = newResources[existingIndex];
-          const existingJourneyIds = new Set(existing.journeys?.map(j => j.id) || []);
-          const existingCampaignIds = new Set(existing.campaigns?.map(c => c.id) || []);
+      if (existingIndex >= 0) {
+        const existing = newResources[existingIndex];
+        const existingJourneyIds = new Set(existing.journeys?.map(j => j.id) || []);
+        const existingCampaignIds = new Set(existing.campaigns?.map(c => c.id) || []);
 
-          const mergedJourneys = [...(existing.journeys || [])];
-          const mergedCampaigns = [...(existing.campaigns || [])];
+        const mergedJourneys = [...(existing.journeys || [])];
+        const mergedCampaigns = [...(existing.campaigns || [])];
 
-          for (const journey of data.journeys) {
-            if (journey.id && existingJourneyIds.has(journey.id)) {
-              // Update existing journey
-              const idx = mergedJourneys.findIndex(j => j.id === journey.id);
-              if (idx >= 0) {
-                mergedJourneys[idx] = journey;
-                updatedUseCases++;
-              }
-            } else {
-              mergedJourneys.push(journey);
+        for (const journey of data.journeys) {
+          if (journey.id && existingJourneyIds.has(journey.id)) {
+            const idx = mergedJourneys.findIndex(j => j.id === journey.id);
+            if (idx >= 0) {
+              mergedJourneys[idx] = journey;
+              updatedUseCases++;
             }
+          } else {
+            mergedJourneys.push(journey);
           }
-
-          for (const campaign of data.campaigns) {
-            if (campaign.id && existingCampaignIds.has(campaign.id)) {
-              // Update existing campaign
-              const idx = mergedCampaigns.findIndex(c => c.id === campaign.id);
-              if (idx >= 0) {
-                mergedCampaigns[idx] = campaign;
-                updatedUseCases++;
-              }
-            } else {
-              mergedCampaigns.push(campaign);
-            }
-          }
-
-          newResources[existingIndex] = {
-            ...existing,
-            journeys: mergedJourneys,
-            campaigns: mergedCampaigns,
-            tabs: [...new Set([...existing.tabs, ...data.tabs])],
-            industries: [...new Set([...existing.industries, ...data.industries])] as IndustryRelevance[],
-            isPrimary: existing.isPrimary || data.isPrimary,
-            version: (existing.version || 1) + 1,
-            lastUpdated: new Date(),
-            updatedAt: new Date(),
-          };
-        } else {
-          // CREATE: New resource
-          const newResource: Resource = {
-            id: generateId(),
-            title,
-            type: "json",
-            url: `json://${json.metadata.source}`,
-            tabs: [...data.tabs],
-            industries: [...data.industries] as IndustryRelevance[],
-            keywords: [],
-            journeys: data.journeys,
-            campaigns: data.campaigns,
-            isEnabled: true,
-            isPrimary: data.isPrimary,
-            version: 1,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-          newResources.push(newResource);
         }
-      }
 
+        for (const campaign of data.campaigns) {
+          if (campaign.id && existingCampaignIds.has(campaign.id)) {
+            const idx = mergedCampaigns.findIndex(c => c.id === campaign.id);
+            if (idx >= 0) {
+              mergedCampaigns[idx] = campaign;
+              updatedUseCases++;
+            }
+          } else {
+            mergedCampaigns.push(campaign);
+          }
+        }
+
+        newResources[existingIndex] = {
+          ...existing,
+          journeys: mergedJourneys,
+          campaigns: mergedCampaigns,
+          tabs: [...new Set([...existing.tabs, ...data.tabs])],
+          industries: [...new Set([...existing.industries, ...data.industries])] as IndustryRelevance[],
+          isPrimary: existing.isPrimary || data.isPrimary,
+          version: (existing.version || 1) + 1,
+          lastUpdated: new Date(),
+          updatedAt: new Date(),
+        };
+      } else {
+        const newResource: Resource = {
+          id: generateId(),
+          title,
+          type: "json",
+          url: `json://${json.metadata.source}`,
+          tabs: [...data.tabs],
+          industries: [...data.industries] as IndustryRelevance[],
+          keywords: [],
+          journeys: data.journeys,
+          campaigns: data.campaigns,
+          isEnabled: true,
+          isPrimary: data.isPrimary,
+          version: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        newResources.push(newResource);
+      }
+    }
+
+    return { 
+      newResources, 
+      result: { isValid: true, errors, parsedUseCases, duplicatesSkipped, updatedUseCases } 
+    };
+  }, []);
+
+  // ===== JSON INGESTION (with cloud persistence) =====
+  const addResourcesFromJSON = useCallback((json: JSONResourceFile): JSONValidationResult => {
+    let finalResult: JSONValidationResult = {
+      isValid: false,
+      errors: ["Unknown error"],
+      parsedUseCases: 0,
+      duplicatesSkipped: 0,
+      updatedUseCases: 0,
+    };
+
+    setResources(prev => {
+      const { newResources, result } = parseJSONToResources(json, prev);
+      finalResult = result;
       return newResources;
     });
 
-    return { 
-      isValid: true, 
-      errors, 
-      parsedUseCases, 
-      duplicatesSkipped, 
-      updatedUseCases 
-    };
-  }, []);
+    // Persist to cloud in background (no UI changes needed)
+    if (finalResult.isValid) {
+      uploadResourceJSON(json).then(({ success, error }) => {
+        if (!success) {
+          console.warn("Cloud persistence failed (resources still loaded locally):", error);
+        } else {
+          console.log("Resource JSON persisted to cloud storage");
+        }
+      });
+    }
+
+    return finalResult;
+  }, [parseJSONToResources]);
+
+  // ===== AUTO-LOAD RESOURCES FOR INDUSTRY =====
+  const loadResourcesForIndustry = useCallback(async (industry: string) => {
+    if (!industry || industry === lastLoadedIndustry.current) return;
+    lastLoadedIndustry.current = industry;
+
+    setIsLoadingCloudResources(true);
+    try {
+      const json = await resolveResourceForIndustry(industry);
+      if (json) {
+        setResources(prev => {
+          // Remove previously cloud-loaded resources (those with cloud:// url prefix)
+          const manualResources = prev.filter(r => !r.url.startsWith("cloud://"));
+          const { newResources } = parseJSONToResources(json, manualResources);
+          // Tag cloud-loaded resources
+          return newResources.map(r => 
+            r.url.startsWith("json://") && !prev.some(p => p.id === r.id)
+              ? { ...r, url: `cloud://${r.url.replace("json://", "")}` }
+              : r
+          );
+        });
+        console.log(`Auto-loaded cloud resource for industry: ${industry}`);
+      }
+    } catch (err) {
+      console.warn("Failed to auto-load cloud resources:", err);
+    } finally {
+      setIsLoadingCloudResources(false);
+    }
+  }, [parseJSONToResources]);
 
   const updateResource = useCallback((id: string, updates: Partial<Resource>) => {
     setResources(prev => prev.map(r => 
@@ -300,10 +355,6 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     });
   }, [resources]);
 
-  // INTELLIGENCE RESOLUTION LOGIC (per PRD):
-  // Priority 1: Internal Resource - Exact Match (industry + tab + framework match)
-  // Priority 2: Internal Resource - Partial Match (same tab or framework)
-  // Priority 3: Lovable Native Intelligence (only when no internal resource exists)
   const findMatchingResources = useCallback((
     tab: TabRelevance, 
     industry: string
@@ -311,12 +362,9 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     const tabResources = getResourcesForTab(tab, industry);
     const matches: ResourceMatch[] = [];
 
-    // Sort by primary first, then by whether they have actual content
     const sortedResources = [...tabResources].sort((a, b) => {
-      // Primary resources first
       if (a.isPrimary && !b.isPrimary) return -1;
       if (!a.isPrimary && b.isPrimary) return 1;
-      // Then resources with actual content
       const aHasContent = (a.journeys?.length || 0) + (a.campaigns?.length || 0);
       const bHasContent = (b.journeys?.length || 0) + (b.campaigns?.length || 0);
       return bHasContent - aHasContent;
@@ -326,7 +374,6 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
       const hasContent = (resource.journeys?.length || 0) + (resource.campaigns?.length || 0) > 0;
       const industryExact = resource.industries.includes(industry as IndustryRelevance);
       
-      // Determine match type based on content and alignment
       let matchType: "exact" | "partial" | "fallback" = "partial";
       let relevanceScore = 0.5;
 
@@ -358,7 +405,6 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   const getConfidenceLevel = useCallback((matches: ResourceMatch[]): ConfidenceLevel => {
     if (matches.length === 0) return "low";
     
-    // Check if any match has actual content
     const hasContentMatch = matches.some(m => 
       (m.resource.journeys?.length || 0) + (m.resource.campaigns?.length || 0) > 0
     );
@@ -387,6 +433,8 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         getConfidenceLevel,
         isLibraryOpen,
         setIsLibraryOpen,
+        loadResourcesForIndustry,
+        isLoadingCloudResources,
       }}
     >
       {children}

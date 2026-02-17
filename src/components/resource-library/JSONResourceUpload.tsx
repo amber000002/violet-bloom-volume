@@ -35,10 +35,11 @@ const sampleTemplate: JSONResourceFile = {
       type: "journey",
       trigger_type: "event",
       description: "Triggered when a new user completes registration. Guides them through content discovery.",
-      stage: "activation", // Free-text stage - any string accepted
-      framework: "lifecycle", // Always "lifecycle"
+      stage: "activation",
+      framework: "lifecycle",
       industry: "ott",
       tabs: ["use-case-studio"],
+      channels: ["Email", "Push", "In-App"],
       is_primary: true,
       events: ["User Registered", "Profile Completed"],
       segments: ["New Users"],
@@ -50,10 +51,11 @@ const sampleTemplate: JSONResourceFile = {
       purpose: "Drive repeat content consumption using trending titles",
       timing: "Weekly on Fridays",
       suppression: "Skip if user watched in last 24 hours",
-      stage: "engagement", // Document-driven stage - auto-creates UI tab
+      stage: "engagement",
       framework: "lifecycle",
       industry: "ott",
       tabs: ["use-case-studio"],
+      channels: ["Email", "Push"],
     },
     {
       use_case_id: "ott_monetization_001",
@@ -62,10 +64,11 @@ const sampleTemplate: JSONResourceFile = {
       purpose: "Convert free or basic users to premium plans",
       timing: "After 7 days of active usage",
       suppression: "Skip if already premium subscriber",
-      stage: "monetization", // Custom stage - will appear as new tab
+      stage: "monetization",
       framework: "lifecycle",
       industry: "ott",
       tabs: ["use-case-studio"],
+      channels: ["Email", "In-App", "WhatsApp"],
     },
     {
       use_case_id: "ott_winback_001",
@@ -73,10 +76,11 @@ const sampleTemplate: JSONResourceFile = {
       type: "journey",
       trigger_type: "segment",
       description: "Re-engage users who have stopped watching content for 30+ days",
-      stage: "winback", // Custom stage from internal docs
+      stage: "winback",
       framework: "lifecycle",
       industry: "ott",
       tabs: ["use-case-studio"],
+      channels: ["Email", "SMS", "Push"],
     },
   ],
 };

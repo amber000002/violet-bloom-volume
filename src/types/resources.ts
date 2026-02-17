@@ -64,6 +64,7 @@ export interface ResourceJourney {
   framework?: string; // lifecycle, aida, 4p, 7p
   events?: string[]; // Key events for this journey
   segments?: string[]; // Target segments
+  channels?: string[]; // e.g. ["Email", "WhatsApp", "Push"]
 }
 
 export interface ResourceCampaign {
@@ -74,6 +75,7 @@ export interface ResourceCampaign {
   suppression: string;
   stage?: string;
   framework?: string;
+  channels?: string[]; // e.g. ["Email", "WhatsApp", "Push"]
 }
 
 export interface Resource {
@@ -126,6 +128,7 @@ export interface JSONUseCase {
   framework?: string;
   industry?: IndustryRelevance;
   tabs?: TabRelevance[];
+  channels?: string[]; // e.g. ["Email", "WhatsApp", "Push"]
   is_primary?: boolean;
 }
 

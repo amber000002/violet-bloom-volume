@@ -12,7 +12,7 @@ import { CreativeAnalyzerTab } from "./tabs/CreativeAnalyzerTab";
 import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
-import { ResourceLibraryProvider } from "@/contexts/ResourceLibraryContext";
+import { ResourceLibraryProvider, useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { ResourceLibrary } from "./resource-library";
 import { BrandInputsPanel } from "./BrandInputsPanel";
 import { BrandInputs, emptyBrandInputs, CoreBrandJSON } from "@/types/brandProfile";
@@ -37,6 +37,7 @@ type TabId = typeof tabs[number]["id"];
 // Separate component to use the context
 const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
+  const { loadResourcesForIndustry } = useResourceLibrary();
   const [activeTab, setActiveTab] = useState<TabId>("inbox-potential");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
@@ -217,6 +218,7 @@ const InboxAlchemyContent: React.FC = () => {
                   onValueChange={(v) => {
                     setIndustry(v);
                     setBrandProfile(null); // Reset brand profile on industry change
+                    loadResourcesForIndustry(v); // Auto-load cloud resources for this industry
                   }}
                   placeholder="Choose your industry"
                   options={industryOptions}
