@@ -142,7 +142,7 @@ export const JSONResourceUpload: React.FC<JSONResourceUploadProps> = ({ onClose 
       const json = JSON.parse(text) as JSONResourceFile;
       
       // Validate and add to library
-      const validationResult = addResourcesFromJSON(json);
+      const validationResult = await addResourcesFromJSON(json);
       setResult(validationResult);
     } catch (error) {
       setResult({

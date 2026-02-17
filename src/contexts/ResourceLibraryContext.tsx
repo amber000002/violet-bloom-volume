@@ -11,12 +11,19 @@ import {
   ResourceJourney,
   ResourceCampaign,
 } from "@/types/resources";
-import { uploadResourceJSON, resolveResourceForIndustry } from "@/lib/resourceCloudService";
+import { 
+  uploadResourceJSON, 
+  resolveResourceForIndustry, 
+  fetchResourceLibraryItems,
+  softDeleteResourceItem,
+  downloadResourceJSON,
+  ResourceLibraryItem,
+} from "@/lib/resourceCloudService";
 
 interface ResourceLibraryContextType {
   resources: Resource[];
   addResource: (resource: Omit<Resource, "id" | "createdAt" | "updatedAt">) => void;
-  addResourcesFromJSON: (json: JSONResourceFile) => JSONValidationResult;
+  addResourcesFromJSON: (json: JSONResourceFile) => Promise<JSONValidationResult>;
   updateResource: (id: string, updates: Partial<Resource>) => void;
   removeResource: (id: string) => void;
   toggleResourceEnabled: (id: string) => void;
@@ -31,6 +38,8 @@ interface ResourceLibraryContextType {
   setIsLibraryOpen: (open: boolean) => void;
   loadResourcesForIndustry: (industry: string) => Promise<void>;
   isLoadingCloudResources: boolean;
+  cloudItems: ResourceLibraryItem[];
+  noResourceForIndustry: boolean;
 }
 
 const ResourceLibraryContext = createContext<ResourceLibraryContextType | null>(null);
@@ -51,9 +60,38 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isLoadingCloudResources, setIsLoadingCloudResources] = useState(false);
+  const [cloudItems, setCloudItems] = useState<ResourceLibraryItem[]>([]);
+  const [noResourceForIndustry, setNoResourceForIndustry] = useState(false);
   const lastLoadedIndustry = useRef<string>("");
+  const initialLoadDone = useRef(false);
 
   const generateId = () => `res_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // ===== LOAD PERSISTED ITEMS ON MOUNT =====
+  useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
+    (async () => {
+      try {
+        const items = await fetchResourceLibraryItems();
+        setCloudItems(items);
+
+        // Load all active items into resources
+        for (const item of items) {
+          const json = await downloadResourceJSON(item.file_path);
+          if (json) {
+            setResources(prev => {
+              const { newResources } = parseJSONToResources(json, prev);
+              return newResources;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load persisted resources:", err);
+      }
+    })();
+  }, []);
 
   const addResource = useCallback((resource: Omit<Resource, "id" | "createdAt" | "updatedAt">) => {
     const newResource: Resource = {
@@ -258,7 +296,8 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   }, []);
 
   // ===== JSON INGESTION (with cloud persistence) =====
-  const addResourcesFromJSON = useCallback((json: JSONResourceFile): JSONValidationResult => {
+  const addResourcesFromJSON = useCallback(async (json: JSONResourceFile): Promise<JSONValidationResult> => {
+    // Parse locally first
     let finalResult: JSONValidationResult = {
       isValid: false,
       errors: ["Unknown error"],
@@ -273,15 +312,25 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
       return newResources;
     });
 
-    // Persist to cloud in background (no UI changes needed)
+    // Persist to cloud
     if (finalResult.isValid) {
-      uploadResourceJSON(json).then(({ success, error }) => {
-        if (!success) {
-          console.warn("Cloud persistence failed (resources still loaded locally):", error);
-        } else {
-          console.log("Resource JSON persisted to cloud storage");
+      const { success, error, alreadyExists, item } = await uploadResourceJSON(json);
+      if (!success) {
+        console.warn("Cloud persistence failed (resources still loaded locally):", error);
+      } else if (alreadyExists) {
+        console.log("Resource JSON already exists in cloud (checksum match)");
+        // Override result to signal duplicate
+        finalResult = {
+          ...finalResult,
+          duplicatesSkipped: finalResult.duplicatesSkipped,
+        };
+      } else {
+        console.log("Resource JSON persisted to cloud storage");
+        // Refresh cloud items list
+        if (item) {
+          setCloudItems(prev => [item, ...prev]);
         }
-      });
+      }
     }
 
     return finalResult;
@@ -291,13 +340,14 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   const loadResourcesForIndustry = useCallback(async (industry: string) => {
     if (!industry || industry === lastLoadedIndustry.current) return;
     lastLoadedIndustry.current = industry;
+    setNoResourceForIndustry(false);
 
     setIsLoadingCloudResources(true);
     try {
       const json = await resolveResourceForIndustry(industry);
       if (json) {
         setResources(prev => {
-          // Remove previously cloud-loaded resources (those with cloud:// url prefix)
+          // Remove previously cloud-loaded resources
           const manualResources = prev.filter(r => !r.url.startsWith("cloud://"));
           const { newResources } = parseJSONToResources(json, manualResources);
           // Tag cloud-loaded resources
@@ -307,10 +357,14 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
               : r
           );
         });
+        setNoResourceForIndustry(false);
         console.log(`Auto-loaded cloud resource for industry: ${industry}`);
+      } else {
+        setNoResourceForIndustry(true);
       }
     } catch (err) {
       console.warn("Failed to auto-load cloud resources:", err);
+      setNoResourceForIndustry(true);
     } finally {
       setIsLoadingCloudResources(false);
     }
@@ -435,6 +489,8 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         setIsLibraryOpen,
         loadResourcesForIndustry,
         isLoadingCloudResources,
+        cloudItems,
+        noResourceForIndustry,
       }}
     >
       {children}
