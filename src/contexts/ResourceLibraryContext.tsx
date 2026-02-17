@@ -191,6 +191,12 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
           events: useCase.events,
           segments: useCase.segments,
           channels: useCase.channels,
+          // Preserve extended fields for AI augmentation
+          business_goal: (useCase as any).business_goal,
+          business_challenge: (useCase as any).business_challenge,
+          clevertap_solution: (useCase as any).clevertap_solution,
+          metrics_impacted: (useCase as any).metrics_impacted,
+          business_impact: (useCase as any).business_impact,
         };
         resourceData.journeys.push(journey);
       } else {
@@ -203,6 +209,12 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
           stage: useCase.stage,
           framework: useCase.framework,
           channels: useCase.channels,
+          // Preserve extended fields for AI augmentation
+          business_goal: (useCase as any).business_goal,
+          business_challenge: (useCase as any).business_challenge,
+          clevertap_solution: (useCase as any).clevertap_solution,
+          metrics_impacted: (useCase as any).metrics_impacted,
+          business_impact: (useCase as any).business_impact,
         };
         resourceData.campaigns.push(campaign);
       }

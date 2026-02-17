@@ -65,6 +65,12 @@ export interface ResourceJourney {
   events?: string[]; // Key events for this journey
   segments?: string[]; // Target segments
   channels?: string[]; // e.g. ["Email", "WhatsApp", "Push"]
+  // Extended fields from JSON for AI augmentation
+  business_goal?: string;
+  business_challenge?: string;
+  clevertap_solution?: string;
+  metrics_impacted?: string[];
+  business_impact?: string;
 }
 
 export interface ResourceCampaign {
@@ -76,6 +82,12 @@ export interface ResourceCampaign {
   stage?: string;
   framework?: string;
   channels?: string[]; // e.g. ["Email", "WhatsApp", "Push"]
+  // Extended fields from JSON for AI augmentation
+  business_goal?: string;
+  business_challenge?: string;
+  clevertap_solution?: string;
+  metrics_impacted?: string[];
+  business_impact?: string;
 }
 
 export interface Resource {

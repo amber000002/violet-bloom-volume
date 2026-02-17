@@ -531,29 +531,86 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const internalUseCases = personalizedUseCases.filter(p => p.useCase.source === "internal");
   const nativeUseCases = personalizedUseCases.filter(p => p.useCase.source === "native");
 
+  // ===== COLLECT ALL INTERNAL USE CASES ACROSS ALL STAGES =====
+  const allInternalUseCasesForAI = useMemo(() => {
+    const result: any[] = [];
+    for (const match of resourceMatches) {
+      const resource = match.resource;
+      // Collect journeys across all stages
+      if (resource.journeys) {
+        for (const journey of resource.journeys) {
+          // Channel filter
+          const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
+          if (journey.channels && journey.channels.length > 0) {
+            const journeyChannelsNorm = journey.channels.map(c => c.toLowerCase());
+            if (!normalizedChannels.some(c => journeyChannelsNorm.includes(c))) continue;
+          }
+          result.push({
+            name: journey.name,
+            type: "journey",
+            stage: journey.stage ? normalizeStage(journey.stage) : "unknown",
+            triggerType: journey.triggerType,
+            description: journey.description,
+            channels: journey.channels,
+            events: journey.events,
+            segments: journey.segments,
+            // Pass through any extra fields from the JSON
+            ...(journey as any).business_goal && { business_goal: (journey as any).business_goal },
+            ...(journey as any).business_challenge && { business_challenge: (journey as any).business_challenge },
+            ...(journey as any).clevertap_solution && { clevertap_solution: (journey as any).clevertap_solution },
+            ...(journey as any).metrics_impacted && { metrics_impacted: (journey as any).metrics_impacted },
+            ...(journey as any).business_impact && { business_impact: (journey as any).business_impact },
+          });
+        }
+      }
+      // Collect campaigns across all stages
+      if (resource.campaigns) {
+        for (const campaign of resource.campaigns) {
+          const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
+          if (campaign.channels && campaign.channels.length > 0) {
+            const campaignChannelsNorm = campaign.channels.map(c => c.toLowerCase());
+            if (!normalizedChannels.some(c => campaignChannelsNorm.includes(c))) continue;
+          }
+          result.push({
+            name: campaign.name,
+            type: "campaign",
+            stage: campaign.stage ? normalizeStage(campaign.stage) : "unknown",
+            description: campaign.purpose,
+            channels: campaign.channels,
+            ...(campaign as any).business_goal && { business_goal: (campaign as any).business_goal },
+            ...(campaign as any).business_challenge && { business_challenge: (campaign as any).business_challenge },
+            ...(campaign as any).clevertap_solution && { clevertap_solution: (campaign as any).clevertap_solution },
+            ...(campaign as any).metrics_impacted && { metrics_impacted: (campaign as any).metrics_impacted },
+            ...(campaign as any).business_impact && { business_impact: (campaign as any).business_impact },
+          });
+        }
+      }
+    }
+    return result;
+  }, [resourceMatches, selectedChannels]);
+
   // ===== AI AUGMENTATION HANDLER =====
   const handleAugmentWithAI = async () => {
-    if (personalizedUseCases.length === 0) {
-      toast.error("No use cases to augment. Select a stage with use cases first.");
+    if (allInternalUseCasesForAI.length === 0 && personalizedUseCases.length === 0) {
+      toast.error("No use cases to augment. Upload an internal resource JSON first.");
       return;
     }
     setIsAugmenting(true);
     setAugmentedUseCases(null);
     try {
-      const filteredForAI = personalizedUseCases.map(p => ({
-        title: p.useCase.title,
-        stage: p.useCase.stage,
-        source: p.useCase.source,
-        triggerType: p.useCase.triggerType,
-        objective: p.useCase.objective,
-        channelsUsed: p.useCase.channelsUsed,
-      }));
+      // Collect unique lifecycle stages from internal use cases
+      const stagesSet = new Set<string>();
+      for (const uc of allInternalUseCasesForAI) {
+        if (uc.stage) stagesSet.add(uc.stage);
+      }
+      const lifecycleStages = Array.from(stagesSet);
 
       const { data, error } = await supabase.functions.invoke("use-case-augment", {
         body: {
           industry,
           channels: selectedChannels,
-          filteredUseCases: filteredForAI,
+          allInternalUseCases: allInternalUseCasesForAI,
+          lifecycleStages,
           brandProfile: brandProfile || null,
         },
       });
@@ -564,7 +621,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
       const augmented = data?.data?.augmented_use_cases;
       if (augmented && Array.isArray(augmented)) {
         setAugmentedUseCases(augmented);
-        toast.success(`${augmented.length} use cases augmented with AI`);
+        const internalCount = augmented.filter((uc: any) => uc.source === "Internal Resource (AI Augmented)").length;
+        const nativeCount = augmented.filter((uc: any) => uc.source === "AI-Native Expansion").length;
+        toast.success(`${internalCount} use cases augmented + ${nativeCount} AI-native expansions generated`);
       } else {
         throw new Error("Invalid AI response format");
       }
@@ -863,12 +922,12 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   {isAugmenting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Augmenting with AI...
+                      Augmenting All Use Cases with AI...
                     </>
                   ) : (
                     <>
                       <Wand2 className="w-4 h-4" />
-                      {augmentedUseCases ? "Re-Augment with AI" : "Augment with AI"}
+                      {augmentedUseCases ? "Re-Augment All with AI" : `Augment All ${allInternalUseCasesForAI.length} Use Cases with AI`}
                     </>
                   )}
                 </motion.button>
@@ -877,9 +936,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
               {isAugmenting && (
                 <div className="text-center space-y-2 py-4">
                   <p className="text-xs text-muted-foreground">
-                    AI is personalizing use cases with brand vocabulary, triggers, and segmentation logic...
+                    AI is augmenting all {allInternalUseCasesForAI.length} internal use cases across {internalStages.length} lifecycle stages + generating {internalStages.length * 2} AI-native expansions...
                   </p>
-                  <p className="text-xs text-muted-foreground/50">This may take 15-30 seconds</p>
+                  <p className="text-xs text-muted-foreground/50">This may take 30-60 seconds for comprehensive coverage</p>
                 </div>
               )}
 
@@ -887,7 +946,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Wand2 className="w-4 h-4 text-primary" />
-                    AI-Augmented Output
+                    AI-Augmented Output — Full Coverage
                   </div>
                   <AugmentedUseCaseTable
                     useCases={augmentedUseCases}

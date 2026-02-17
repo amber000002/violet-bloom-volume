@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { industry, channels, filteredUseCases, brandProfile } = await req.json();
+    const { industry, channels, allInternalUseCases, lifecycleStages, brandProfile } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -25,6 +25,7 @@ serve(async (req) => {
       const lsm = brandProfile.lifecycle_signal_map || {};
       const rcl = brandProfile.risk_compliance_layer || {};
       const kpi = brandProfile.kpi_framework || {};
+      const isl = brandProfile.industry_signal_layer || {};
 
       brandContext = `BRAND PROFILE:
 Brand: ${bi.brand_name || "Unknown"}
@@ -34,32 +35,114 @@ Positioning: ${bi.positioning || "N/A"}
 Tone of Voice: ${bi.tone_of_voice || "Professional"}
 Business Model: ${bm.business_model_description || "N/A"}
 Monetization: ${bm.monetization_model || "N/A"}
+Pricing Tiers: ${bm.pricing_tiers?.join(", ") || "N/A"}
 Core Products: ${pe.core_products?.join(", ") || "N/A"}
 Product Modules: ${pe.product_modules?.join(", ") || "N/A"}
+Feature Modules: ${pe.feature_modules?.join(", ") || "N/A"}
 Primary Segments: ${ai_intel.primary_segments?.join(", ") || "N/A"}
 Personas: ${ai_intel.personas_detected?.join(", ") || "N/A"}
+Value Propositions: ${brandProfile.value_framework?.value_propositions?.join(", ") || "N/A"}
+Differentiators: ${brandProfile.value_framework?.differentiators?.join(", ") || "N/A"}
 Engagement Drivers: ${ea.engagement_drivers?.join(", ") || "N/A"}
 Event Triggers: ${ea.event_based_triggers?.join(", ") || "N/A"}
 Seasonal Triggers: ${ea.seasonal_triggers?.join(", ") || "N/A"}
 Urgency Patterns: ${ea.urgency_patterns?.join(", ") || "N/A"}
+Key User Actions: ${lsm.key_user_actions?.join(", ") || "N/A"}
 Key User Events: ${lsm.key_user_events?.join(", ") || "N/A"}
 Activation Events: ${lsm.activation_events?.join(", ") || "N/A"}
 Monetization Events: ${lsm.monetization_events?.join(", ") || "N/A"}
 Churn Signals: ${lsm.churn_signals?.join(", ") || "N/A"}
+Inactivity Markers: ${lsm.inactivity_markers?.join(", ") || "N/A"}
 Primary KPIs: ${kpi.primary_kpis?.join(", ") || "N/A"}
+Secondary KPIs: ${kpi.secondary_kpis?.join(", ") || "N/A"}
+Industry KPIs: ${isl.industry_kpis?.join(", ") || "N/A"}
+Industry Vocabulary: ${isl.industry_vocabulary?.join(", ") || "N/A"}
 Regulatory Environment: ${rcl.regulatory_environment?.join(", ") || "N/A"}
-Compliance Intensity: ${rcl.compliance_intensity || "Low"}`;
+Compliance Intensity: ${rcl.compliance_intensity || "Low"}
+Risk Signals: ${rcl.risk_signals?.join(", ") || "N/A"}`;
     }
 
-    const systemPrompt = `You are a lifecycle marketing intelligence engine. You augment internal use cases with brand-specific personalization.
+    // Build channel-specific execution format instructions
+    const channelFormatInstructions = channels.map((ch: string) => {
+      const norm = ch.toLowerCase();
+      if (norm === "email") return `Email Format:
+  execution_detail block:
+  • trigger: "Email Triggered When <Brand Event>"
+  • subject: Subject line
+  • preheader: Preheader text
+  • content: Email body description
+  • visual: Visual element description
+  • cta: Call-to-action text`;
+      if (norm === "push") return `Push Format:
+  execution_detail block:
+  • trigger: "Push Triggered When <Condition>"
+  • title: Push title
+  • message: Push message
+  • deep_link: Deep link target`;
+      if (norm === "in-app" || norm === "in_app") return `In-App Format:
+  execution_detail block:
+  • trigger: "In-App Triggered When <Condition>"
+  • headline: Headline text
+  • body: Body text
+  • cta: Call-to-action
+  • placement: Placement location`;
+      if (norm === "whatsapp") return `WhatsApp Format:
+  execution_detail block:
+  • trigger: "WhatsApp Triggered When <Condition>"
+  • opening: Opening line
+  • core_message: Core message
+  • dynamic_variable: Dynamic variable
+  • cta: Call-to-action
+  • compliance_note: Compliance note`;
+      if (norm === "sms") return `SMS Format:
+  execution_detail block:
+  • trigger: "SMS Triggered When <Condition>"
+  • message: SMS message text
+  • dynamic_variable: Dynamic variable
+  • short_cta: Short CTA`;
+      return "";
+    }).filter(Boolean).join("\n\n");
 
-STRICT GOVERNANCE RULES:
-1. You MUST preserve the lifecycle_stage EXACTLY as provided. Never rename, invent, or modify lifecycle stages.
-2. You MUST only output use cases that match the selected channels: [${channels.join(", ")}].
-3. You MUST NOT contradict the internal resource objectives.
-4. You MUST differentiate each use case meaningfully — no two should differ only in wording. They must vary by lifecycle signal, trigger timing, monetization logic, risk pattern, channel flow, or user depth.
-5. You MAY create up to 3 "AI-Augmented Extension" use cases that respect lifecycle stages and channel filters.
-6. For each use case, rewrite titles using brand vocabulary, replace generic triggers with brand event logic, replace product placeholders with real products, adjust KPIs to industry + brand model, apply tone_of_voice, and apply regulatory overlay if applicable.
+    const systemPrompt = `You are a lifecycle marketing intelligence engine. You perform TWO tasks:
+
+TASK A — AUGMENT ALL INTERNAL USE CASES (100% Coverage)
+For EVERY internal use case provided, you MUST:
+1. Rewrite the title using brand vocabulary
+2. Rewrite execution_strategy with deep brand personalization
+3. Rewrite trigger_logic using brand-specific event logic
+4. Rewrite segmentation_logic using brand segments and behavioral criteria
+5. Rewrite metrics_to_impact with brand + industry KPIs
+6. Apply risk_overlay (regulatory/compliance considerations)
+7. Apply tone alignment (use brand tone_of_voice)
+8. Apply business model logic (monetization model, pricing tiers)
+9. Apply product mapping (core products, product modules, feature modules)
+10. Apply industry KPI logic
+
+NO internal use case should remain static. Every single one must be deeply augmented.
+Source label: "Internal Resource (AI Augmented)"
+Confidence: "High"
+
+TASK B — GENERATE 2 AI-NATIVE USE CASES PER LIFECYCLE STAGE
+After augmenting all internal use cases:
+- For EACH lifecycle stage present, generate EXACTLY 2 new use cases that:
+  • Are NOT present in the internal resource
+  • Follow the same structured format
+  • Use the EXACT same lifecycle stage name (no hallucinated stages)
+  • Respect the selected channel filter
+  • Apply deep brand context
+  • Address strategic gaps not covered in internal resources
+Source label: "AI-Native Expansion"
+Confidence: "Medium"
+
+STRICT RULES:
+1. Lifecycle stage MUST be preserved EXACTLY as provided. NEVER rename, invent, or modify lifecycle stage names.
+2. ONLY use channels from: [${channels.join(", ")}]
+3. AI-Native use cases MUST differ from internal ones by at least ONE of: trigger depth, monetization logic, user behavior intensity, risk scenario, channel orchestration, lifecycle timing, engagement driver, KPI target
+4. No duplication allowed — no two use cases should differ only in wording.
+5. For EACH channel used, provide a structured execution_detail block following the channel format below.
+
+CHANNEL-SPECIFIC EXECUTION FORMATS:
+${channelFormatInstructions}
 
 OUTPUT FORMAT: Return a JSON object with this structure:
 {
@@ -67,42 +150,69 @@ OUTPUT FORMAT: Return a JSON object with this structure:
     {
       "use_case_title": "Brand-personalized title",
       "lifecycle_stage": "EXACT stage from input — DO NOT MODIFY",
-      "confidence_level": "High|Medium|Low",
-      "source": "Internal|AI-Augmented Extension",
+      "confidence_level": "High" or "Medium",
+      "source": "Internal Resource (AI Augmented)" or "AI-Native Expansion",
       "channels": ["channels used"],
       "why_it_matters": "Strategic rationale tied to brand",
       "execution_strategy": "Step-by-step execution approach",
+      "execution_details": [
+        {
+          "channel": "email|push|in-app|whatsapp|sms",
+          "trigger": "Triggered When <condition>",
+          "fields": { ... channel-specific fields ... }
+        }
+      ],
       "trigger_logic": "Specific trigger events using brand signals",
       "segmentation_logic": "Target segments with behavioral criteria",
       "metrics_to_impact": ["specific KPIs"],
       "risk_overlay": "Regulatory/compliance considerations if any",
       "why_this_fits_brand": "Brand-specific justification",
-      "personalization_layers": ["layers applied e.g. Product Module, Audience Segment, Trigger Event"]
+      "personalization_layers": ["layers applied"]
     }
   ]
 }`;
 
-    const useCaseSummary = filteredUseCases.map((uc: any) => 
-      `- Title: ${uc.title}, Stage: ${uc.stage}, Source: ${uc.source}, TriggerType: ${uc.triggerType || "N/A"}, Objective: ${uc.objective || "N/A"}, Channels: ${uc.channelsUsed?.join(", ") || channels.join(", ")}`
-    ).join("\n");
+    // Build use case summary grouped by stage
+    const useCasesByStage: Record<string, any[]> = {};
+    for (const uc of (allInternalUseCases || [])) {
+      const stage = uc.stage || "unknown";
+      if (!useCasesByStage[stage]) useCasesByStage[stage] = [];
+      useCasesByStage[stage].push(uc);
+    }
+
+    let useCaseSummary = "";
+    for (const [stage, ucs] of Object.entries(useCasesByStage)) {
+      useCaseSummary += `\n=== STAGE: ${stage} (${ucs.length} internal use cases) ===\n`;
+      for (const uc of ucs) {
+        useCaseSummary += `- Title: ${uc.name}, Type: ${uc.type || "N/A"}, TriggerType: ${uc.triggerType || "N/A"}, Description: ${uc.description || "N/A"}, Channels: ${uc.channels?.join(", ") || channels.join(", ")}, BusinessGoal: ${uc.business_goal || "N/A"}, BusinessChallenge: ${uc.business_challenge || "N/A"}, Solution: ${uc.clevertap_solution || "N/A"}, MetricsImpacted: ${uc.metrics_impacted?.join(", ") || "N/A"}, BusinessImpact: ${uc.business_impact || "N/A"}\n`;
+      }
+    }
+
+    const stagesStr = (lifecycleStages || []).join(", ");
 
     const userPrompt = `Augment these lifecycle use cases for the ${industry} industry.
 
 Selected Channels: ${channels.join(", ")}
+Lifecycle Stages Present: ${stagesStr}
 
 ${brandContext}
 
-INTERNAL USE CASES TO AUGMENT:
+INTERNAL USE CASES TO AUGMENT (ALL must be augmented — 100% coverage):
 ${useCaseSummary}
 
-Rules reminder:
+REQUIRED OUTPUT:
+1. Augmented versions of ALL ${allInternalUseCases?.length || 0} internal use cases above (Source: "Internal Resource (AI Augmented)", Confidence: "High")
+2. EXACTLY 2 AI-Native Expansion use cases for EACH lifecycle stage: ${stagesStr} (Source: "AI-Native Expansion", Confidence: "Medium")
+
+Total expected: ${(allInternalUseCases?.length || 0)} augmented + ${(lifecycleStages?.length || 0) * 2} AI-native = ${(allInternalUseCases?.length || 0) + (lifecycleStages?.length || 0) * 2} use cases
+
+Rules:
 - Preserve lifecycle_stage EXACTLY
 - Only use channels from: [${channels.join(", ")}]
-- Make each use case meaningfully unique
-- Use brand vocabulary, products, segments, and events
-- Apply tone: ${brandProfile?.brand_identity?.tone_of_voice || "Professional"}
-- You may add up to 3 AI-Augmented Extension use cases that fit the lifecycle stages present
-- Confidence: High = strong brand+industry+lifecycle alignment, Medium = industry aligned but weak brand signal, Low = generic or extension
+- Every internal use case MUST be augmented (no static pass-through)
+- AI-Native must be meaningfully different from internal ones
+- Apply brand tone: ${brandProfile?.brand_identity?.tone_of_voice || "Professional"}
+- Include execution_details array with channel-specific structured blocks
 
 Return ONLY the JSON object.`;
 
@@ -115,7 +225,7 @@ Return ONLY the JSON object.`;
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 8000,
+      max_tokens: 16000,
     });
 
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -133,18 +243,18 @@ Return ONLY the JSON object.`;
     }
 
     if (!response || !response.ok) {
-      if (response.status === 429) {
+      if (response?.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
+      if (response?.status === 402) {
         return new Response(JSON.stringify({ error: "AI usage limit reached. Please add credits." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      const errorText = await response!.text();
+      console.error("AI gateway error:", response!.status, errorText);
       return new Response(JSON.stringify({ error: "AI augmentation failed." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
