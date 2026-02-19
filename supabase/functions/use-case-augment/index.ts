@@ -218,6 +218,10 @@ Return ONLY the JSON object.`;
 
     // Retry up to 3 times on 500 errors
     let response: Response | null = null;
+    // Scale max_tokens based on use case count
+    const ucCount = allInternalUseCases?.length || 0;
+    const maxTokens = Math.min(64000, Math.max(8000, ucCount * 3000));
+
     const requestBody = JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
@@ -225,7 +229,7 @@ Return ONLY the JSON object.`;
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 32000,
+      max_tokens: maxTokens,
     });
 
     for (let attempt = 0; attempt < 3; attempt++) {
