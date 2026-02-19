@@ -323,17 +323,49 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   // ===== STAGES =====
   // Extract unique stages from internal resources
+  // Strict industry-filtered resources (case-insensitive, no "all" fallback for stages)
+  const industryFilteredResources = useMemo(() => {
+    const normalizedIndustry = industry?.toLowerCase().trim();
+    if (!normalizedIndustry) return [];
+    return resources.filter(r => {
+      if (!r.isEnabled) return false;
+      if (!r.tabs.includes("use-case-studio")) return false;
+      const resourceIndustries = r.industries.map(i => (i as string).toLowerCase().trim());
+      // Only match exact industry — never "all" to prevent cross-industry leakage
+      return resourceIndustries.includes(normalizedIndustry);
+    });
+  }, [resources, industry]);
+
   const internalStages = useMemo(() => {
     const stagesSet = new Set<string>();
-    for (const resource of resources) {
-      if (!resource.isEnabled) continue;
-      if (!resource.tabs.includes("use-case-studio")) continue;
-      if (!resource.industries.includes("all") && !resource.industries.includes(industry as any)) continue;
+    for (const resource of industryFilteredResources) {
       resource.journeys?.forEach(j => { if (j.stage) stagesSet.add(normalizeStage(j.stage)); });
       resource.campaigns?.forEach(c => { if (c.stage) stagesSet.add(normalizeStage(c.stage)); });
     }
     return Array.from(stagesSet);
-  }, [resources, industry]);
+  }, [industryFilteredResources]);
+
+  // Debug data for Data Integrity panel
+  const debugData = useMemo(() => {
+    const allIndustriesInResources = new Set<string>();
+    let totalUseCases = 0;
+    let afterIndustryFilter = 0;
+    for (const r of resources) {
+      r.industries.forEach(i => allIndustriesInResources.add((i as string).toLowerCase().trim()));
+      totalUseCases += (r.journeys?.length || 0) + (r.campaigns?.length || 0);
+    }
+    for (const r of industryFilteredResources) {
+      afterIndustryFilter += (r.journeys?.length || 0) + (r.campaigns?.length || 0);
+    }
+    return {
+      selectedIndustry: industry?.toLowerCase().trim() || "none",
+      totalLoaded: totalUseCases,
+      afterFilter: afterIndustryFilter,
+      industriesFound: Array.from(allIndustriesInResources),
+      resourceCount: resources.length,
+      filteredResourceCount: industryFilteredResources.length,
+    };
+  }, [resources, industryFilteredResources, industry]);
 
   const predefinedStages = useMemo(() => {
     if (!industry) return [];
@@ -365,8 +397,14 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   // ===== RESOURCE MATCHING =====
   const resourceMatches = useMemo(() => {
     if (!industry || !selectedStage) return [];
-    return findMatchingResources("use-case-studio", industry);
-  }, [industry, selectedStage, findMatchingResources]);
+    // Use strictly industry-filtered resources instead of findMatchingResources
+    return industryFilteredResources.map(resource => ({
+      resource,
+      relevanceScore: resource.isPrimary ? 1.0 : 0.9,
+      matchedKeywords: [] as string[],
+      matchType: "exact" as const,
+    }));
+  }, [industry, selectedStage, industryFilteredResources]);
 
   const internalJourneys = useMemo((): Array<ResourceJourney & { sourceResource: string }> => {
     const result: Array<ResourceJourney & { sourceResource: string }> = [];
@@ -758,7 +796,25 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         </div>
       </div>
 
-      {/* Framework Selector */}
+      {/* Data Integrity Panel (collapsible debug) */}
+      <details className="mx-auto max-w-xl">
+        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
+          <Shield className="w-3 h-3" />
+          Data Integrity
+        </summary>
+        <div className="mt-2 p-3 rounded-lg bg-muted/20 border border-border text-xs text-muted-foreground space-y-1">
+          <div><span className="font-medium text-foreground">Selected Industry:</span> {debugData.selectedIndustry}</div>
+          <div><span className="font-medium text-foreground">Total resources loaded:</span> {debugData.resourceCount} ({debugData.totalLoaded} use cases)</div>
+          <div><span className="font-medium text-foreground">After industry filter:</span> {debugData.filteredResourceCount} resources ({debugData.afterFilter} use cases)</div>
+          <div><span className="font-medium text-foreground">Industries in loaded resources:</span> [{debugData.industriesFound.join(", ")}]</div>
+          {debugData.afterFilter === 0 && debugData.totalLoaded > 0 && (
+            <div className="text-yellow-500 mt-1">
+              ⚠ No use cases match "{debugData.selectedIndustry}". Available: [{debugData.industriesFound.join(", ")}]
+            </div>
+          )}
+        </div>
+      </details>
+
       <div className="space-y-3">
         <div className="flex items-center justify-center gap-2 mb-1">
           <span className="text-sm font-medium text-foreground">Insight Framework</span>
