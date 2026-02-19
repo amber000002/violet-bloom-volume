@@ -40,6 +40,7 @@ import { ResourceCitation, ResourceJourney, ResourceCampaign } from "@/types/res
 import { CoreBrandJSON } from "@/types/brandProfile";
 import { calculateConfidence, getConfidenceColor, getConfidenceLabel, ConfidenceResult } from "@/lib/confidenceEngine";
 import { personalizeUseCase, PersonalizedUseCase } from "@/lib/useCasePersonalizer";
+import { CHANNEL_OPTIONS, channelsOverlap, normalizeChannels, CHANNEL_DISPLAY_LABELS } from "@/lib/channelNormalization";
 
 interface UseCaseStudioTabProps {
   industry: string;
@@ -48,15 +49,15 @@ interface UseCaseStudioTabProps {
   onDataChange?: (data: any) => void;
 }
 
-// ===== CHANNEL DEFINITIONS =====
-const channelOptions = [
-  { id: "email", label: "Email", icon: Mail },
-  { id: "push", label: "Push", icon: Bell },
-  { id: "in-app", label: "In-App", icon: Smartphone },
-  { id: "sms", label: "SMS", icon: MessageSquare },
-  { id: "whatsapp", label: "WhatsApp", icon: Hash },
-  { id: "web-push", label: "Web Push", icon: Globe },
-];
+// ===== CHANNEL ICON MAP =====
+const channelIcons: Record<string, typeof Mail> = {
+  email: Mail,
+  push: Bell,
+  in_app: Smartphone,
+  sms: MessageSquare,
+  whatsapp: Hash,
+  app_inbox: Globe,
+};
 
 const triggerTypeIcons: Record<JourneyUseCase['triggerType'], typeof Clock> = {
   "past-behavior": Activity,
@@ -140,13 +141,14 @@ const UseCaseCard: React.FC<{
       {/* Channels Used */}
       <div className="flex items-center gap-1.5 flex-wrap">
         {useCase.channelsUsed.map(ch => {
-          const opt = channelOptions.find(o => o.id === ch);
-          return opt ? (
+          const Icon = channelIcons[ch];
+          const label = CHANNEL_DISPLAY_LABELS[ch] || ch;
+          return (
             <span key={ch} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/50 text-xs text-muted-foreground">
-              <opt.icon className="w-3 h-3" />
-              {opt.label}
+              {Icon && <Icon className="w-3 h-3" />}
+              {label}
             </span>
-          ) : null;
+          );
         })}
       </div>
 
@@ -316,7 +318,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   };
 
   const selectAllChannels = () => {
-    setSelectedChannels(channelOptions.map(c => c.id));
+    setSelectedChannels(CHANNEL_OPTIONS.map(c => c.id));
   };
 
   // ===== STAGES =====
@@ -369,18 +371,13 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const internalJourneys = useMemo((): Array<ResourceJourney & { sourceResource: string }> => {
     const result: Array<ResourceJourney & { sourceResource: string }> = [];
     const normalizedSelectedStage = normalizeStage(selectedStage);
-    const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.journeys && resource.journeys.length > 0) {
         for (const journey of resource.journeys) {
           const journeyStage = journey.stage ? normalizeStage(journey.stage) : "";
           if (!journeyStage || journeyStage === normalizedSelectedStage) {
-            // Channel filter: if journey has channels defined, require at least one overlap
-            if (journey.channels && journey.channels.length > 0) {
-              const journeyChannelsNorm = journey.channels.map(c => c.toLowerCase());
-              if (!normalizedChannels.some(c => journeyChannelsNorm.includes(c))) continue;
-            }
+            if (!channelsOverlap(journey.channels || [], selectedChannels)) continue;
             result.push({ ...journey, sourceResource: resource.title });
           }
         }
@@ -392,18 +389,13 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const internalCampaigns = useMemo((): Array<ResourceCampaign & { sourceResource: string }> => {
     const result: Array<ResourceCampaign & { sourceResource: string }> = [];
     const normalizedSelectedStage = normalizeStage(selectedStage);
-    const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
     for (const match of resourceMatches) {
       const resource = match.resource;
       if (resource.campaigns && resource.campaigns.length > 0) {
         for (const campaign of resource.campaigns) {
           const campaignStage = campaign.stage ? normalizeStage(campaign.stage) : "";
           if (!campaignStage || campaignStage === normalizedSelectedStage) {
-            // Channel filter: if campaign has channels defined, require at least one overlap
-            if (campaign.channels && campaign.channels.length > 0) {
-              const campaignChannelsNorm = campaign.channels.map(c => c.toLowerCase());
-              if (!normalizedChannels.some(c => campaignChannelsNorm.includes(c))) continue;
-            }
+            if (!channelsOverlap(campaign.channels || [], selectedChannels)) continue;
             result.push({ ...campaign, sourceResource: resource.title });
           }
         }
@@ -539,12 +531,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
       // Collect journeys across all stages
       if (resource.journeys) {
         for (const journey of resource.journeys) {
-          // Channel filter
-          const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
-          if (journey.channels && journey.channels.length > 0) {
-            const journeyChannelsNorm = journey.channels.map(c => c.toLowerCase());
-            if (!normalizedChannels.some(c => journeyChannelsNorm.includes(c))) continue;
-          }
+          if (!channelsOverlap(journey.channels || [], selectedChannels)) continue;
           result.push({
             name: journey.name,
             type: "journey",
@@ -566,11 +553,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
       // Collect campaigns across all stages
       if (resource.campaigns) {
         for (const campaign of resource.campaigns) {
-          const normalizedChannels = selectedChannels.map(c => c.toLowerCase());
-          if (campaign.channels && campaign.channels.length > 0) {
-            const campaignChannelsNorm = campaign.channels.map(c => c.toLowerCase());
-            if (!normalizedChannels.some(c => campaignChannelsNorm.includes(c))) continue;
-          }
+          if (!channelsOverlap(campaign.channels || [], selectedChannels)) continue;
           result.push({
             name: campaign.name,
             type: "campaign",
@@ -752,8 +735,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           </button>
         </div>
         <div className="flex flex-wrap justify-center gap-2">
-          {channelOptions.map((ch) => {
+          {CHANNEL_OPTIONS.map((ch) => {
             const isSelected = selectedChannels.includes(ch.id);
+            const Icon = channelIcons[ch.id] || Globe;
             return (
               <motion.button
                 key={ch.id}
@@ -766,7 +750,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                     : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted/50"
                 }`}
               >
-                <ch.icon className="w-3.5 h-3.5" />
+                <Icon className="w-3.5 h-3.5" />
                 {ch.label}
               </motion.button>
             );
@@ -844,6 +828,31 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
             <span>•</span>
             <span>{nativeUseCases.length} native intelligence</span>
           </div>
+
+          {/* Channel Debug Info */}
+          {personalizedUseCases.length === 0 && internalUseCases.length === 0 && resourceMatches.length > 0 && (
+            <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto" />
+              <p className="text-sm font-medium text-foreground">
+                No use cases support selected channel(s).
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Selected: {selectedChannels.map(c => CHANNEL_DISPLAY_LABELS[c] || c).join(", ")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Available channels in this industry:{" "}
+                {(() => {
+                  const allCh = new Set<string>();
+                  for (const match of resourceMatches) {
+                    match.resource.journeys?.forEach(j => j.channels?.forEach(c => allCh.add(c)));
+                    match.resource.campaigns?.forEach(ca => ca.channels?.forEach(c => allCh.add(c)));
+                  }
+                  const normalized = normalizeChannels(Array.from(allCh));
+                  return normalized.map(c => CHANNEL_DISPLAY_LABELS[c] || c).join(", ") || "None detected";
+                })()}
+              </p>
+            </div>
+          )}
 
           {/* Internal Use Cases */}
           {internalUseCases.length > 0 && (
