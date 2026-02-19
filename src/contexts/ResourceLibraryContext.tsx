@@ -108,6 +108,9 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     newResources: Resource[];
     result: JSONValidationResult;
   } => {
+    // Determine top-level industry from JSON (source of truth for all use cases in this file)
+    const topLevelIndustry = ((json as any)?.industry || (json?.metadata as any)?.industry || "").toLowerCase().trim();
+
     const errors: string[] = [];
     let parsedUseCases = 0;
     let duplicatesSkipped = 0;
@@ -147,7 +150,8 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         continue;
       }
 
-      const industry = useCase.industry || "all";
+      // Use case-level industry → top-level JSON industry → "all" as last resort
+      const industry = useCase.industry || topLevelIndustry || "all";
       const resourceKey = `${json.metadata.source}_${industry}`;
 
       if (!resourceMap.has(resourceKey)) {
@@ -411,11 +415,15 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   }, []);
 
   const getResourcesForTab = useCallback((tab: TabRelevance, industry?: string): Resource[] => {
+    const normalizedIndustry = industry?.toLowerCase().trim();
     return resources.filter(r => {
       if (!r.isEnabled) return false;
       if (!r.tabs.includes(tab)) return false;
-      if (industry && !r.industries.includes("all") && !r.industries.includes(industry as IndustryRelevance)) {
-        return false;
+      if (normalizedIndustry && !r.industries.includes("all")) {
+        const resourceIndustries = r.industries.map(i => (i as string).toLowerCase().trim());
+        if (!resourceIndustries.includes(normalizedIndustry)) {
+          return false;
+        }
       }
       return true;
     });
@@ -438,7 +446,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
 
     for (const resource of sortedResources) {
       const hasContent = (resource.journeys?.length || 0) + (resource.campaigns?.length || 0) > 0;
-      const industryExact = resource.industries.includes(industry as IndustryRelevance);
+      const industryExact = resource.industries.map(i => (i as string).toLowerCase().trim()).includes(industry.toLowerCase().trim());
       
       let matchType: "exact" | "partial" | "fallback" = "partial";
       let relevanceScore = 0.5;
