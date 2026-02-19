@@ -5,6 +5,122 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/**
+ * Robustly extract JSON from potentially truncated AI responses.
+ * Handles: markdown wrappers, truncated strings, unbalanced braces/brackets.
+ */
+function robustJsonExtract(raw: string): any {
+  // Step 1: Strip markdown code blocks
+  let cleaned = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+
+  // Step 2: Find JSON start
+  const jsonStart = cleaned.search(/[\{\[]/);
+  if (jsonStart === -1) throw new Error("No JSON object found in response");
+  cleaned = cleaned.substring(jsonStart);
+
+  // Step 3: Try direct parse first
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // continue to repair
+  }
+
+  // Step 4: Fix common issues
+  cleaned = cleaned
+    .replace(/[\x00-\x1F\x7F]/g, (ch) => ch === '\n' || ch === '\t' ? ch : '') // keep newlines/tabs
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]");
+
+  // Step 5: Handle truncation — close any open JSON string first
+  // Count unescaped quotes to detect if we're inside a string
+  let inString = false;
+  let lastCharWasEscape = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (lastCharWasEscape) {
+      lastCharWasEscape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      lastCharWasEscape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+    }
+  }
+
+  // If we ended inside a string, close it
+  if (inString) {
+    // Remove any trailing incomplete escape sequence
+    cleaned = cleaned.replace(/\\+$/, '');
+    cleaned += '"';
+  }
+
+  // Step 6: Remove any trailing comma after closing the string
+  cleaned = cleaned.replace(/,\s*$/, '');
+
+  // Step 7: Balance braces and brackets
+  let braces = 0, brackets = 0;
+  inString = false;
+  lastCharWasEscape = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (lastCharWasEscape) { lastCharWasEscape = false; continue; }
+    if (ch === '\\') { lastCharWasEscape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') braces++;
+    else if (ch === '}') braces--;
+    else if (ch === '[') brackets++;
+    else if (ch === ']') brackets--;
+  }
+
+  // Close brackets before braces (inner structures first)
+  while (brackets > 0) { cleaned += ']'; brackets--; }
+  while (braces > 0) { cleaned += '}'; braces--; }
+
+  // Step 8: Try parse again
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // Step 9: Last resort — find the last complete use case object and truncate there
+    const lastCompleteObj = cleaned.lastIndexOf('},');
+    if (lastCompleteObj > 0) {
+      let truncated = cleaned.substring(0, lastCompleteObj + 1);
+      // Re-balance after truncation
+      braces = 0; brackets = 0;
+      inString = false; lastCharWasEscape = false;
+      for (let i = 0; i < truncated.length; i++) {
+        const ch = truncated[i];
+        if (lastCharWasEscape) { lastCharWasEscape = false; continue; }
+        if (ch === '\\') { lastCharWasEscape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') braces++;
+        else if (ch === '}') braces--;
+        else if (ch === '[') brackets++;
+        else if (ch === ']') brackets--;
+      }
+      while (brackets > 0) { truncated += ']'; brackets--; }
+      while (braces > 0) { truncated += '}'; braces--; }
+
+      try {
+        const result = JSON.parse(truncated);
+        console.warn("Recovered partial JSON by truncating incomplete last object");
+        return result;
+      } catch {
+        // fall through
+      }
+    }
+
+    throw new Error("Could not extract valid JSON after all repair attempts");
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -266,6 +382,7 @@ Return ONLY the JSON object.`;
 
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content;
+    const finishReason = aiResponse.choices?.[0]?.finish_reason;
 
     if (!content) {
       return new Response(JSON.stringify({ error: "No AI response." }), {
@@ -273,47 +390,17 @@ Return ONLY the JSON object.`;
       });
     }
 
+    const isTruncated = finishReason === "length" || finishReason === "max_tokens";
+    if (isTruncated) {
+      console.warn("AI response was truncated (finish_reason:", finishReason, "). Attempting recovery...");
+    }
+
     let parsed;
     try {
-      // Remove markdown code blocks
-      let cleaned = content
-        .replace(/```json\s*/gi, "")
-        .replace(/```\s*/g, "")
-        .trim();
-
-      // Find JSON boundaries
-      const jsonStart = cleaned.search(/[\{\[]/);
-      const jsonEnd = cleaned.lastIndexOf(jsonStart !== -1 && cleaned[jsonStart] === '[' ? ']' : '}');
-
-      if (jsonStart === -1 || jsonEnd === -1) throw new Error("No JSON object found");
-
-      cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
-        // Fix common issues: trailing commas, control chars
-        cleaned = cleaned
-          .replace(/,\s*}/g, "}")
-          .replace(/,\s*]/g, "]")
-          .replace(/[\x00-\x1F\x7F]/g, "");
-
-        // Repair unbalanced braces/brackets (truncated response)
-        let braces = 0, brackets = 0;
-        for (const char of cleaned) {
-          if (char === '{') braces++;
-          if (char === '}') braces--;
-          if (char === '[') brackets++;
-          if (char === ']') brackets--;
-        }
-        while (brackets > 0) { cleaned += ']'; brackets--; }
-        while (braces > 0) { cleaned += '}'; braces--; }
-
-        parsed = JSON.parse(cleaned);
-      }
+      parsed = robustJsonExtract(content);
     } catch (parseErr) {
       console.error("Failed to parse AI response:", content.substring(0, 500));
-      return new Response(JSON.stringify({ error: "Failed to parse AI output." }), {
+      return new Response(JSON.stringify({ error: "Failed to parse AI output. The response was likely too large. Try selecting fewer channels or reducing use case count." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
