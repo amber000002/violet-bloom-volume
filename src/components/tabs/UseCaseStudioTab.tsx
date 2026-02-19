@@ -610,7 +610,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     return result;
   }, [resourceMatches, selectedChannels]);
 
-  // ===== AI AUGMENTATION HANDLER =====
+  // ===== AI AUGMENTATION HANDLER (BATCHED) =====
+  const BATCH_SIZE = 8; // Max use cases per AI call to avoid truncation
+
   const handleAugmentWithAI = async () => {
     if (allInternalUseCasesForAI.length === 0 && personalizedUseCases.length === 0) {
       toast.error("No use cases to augment. Upload an internal resource JSON first.");
@@ -619,34 +621,77 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     setIsAugmenting(true);
     setAugmentedUseCases(null);
     try {
-      // Collect unique lifecycle stages from internal use cases
-      const stagesSet = new Set<string>();
+      // Group use cases by stage
+      const ucsByStage: Record<string, any[]> = {};
       for (const uc of allInternalUseCasesForAI) {
-        if (uc.stage) stagesSet.add(uc.stage);
+        const stage = uc.stage || "unknown";
+        if (!ucsByStage[stage]) ucsByStage[stage] = [];
+        ucsByStage[stage].push(uc);
       }
-      const lifecycleStages = Array.from(stagesSet);
 
-      const { data, error } = await supabase.functions.invoke("use-case-augment", {
-        body: {
-          industry,
-          channels: selectedChannels,
-          allInternalUseCases: allInternalUseCasesForAI,
-          lifecycleStages,
-          brandProfile: brandProfile || null,
-        },
-      });
+      // Create batches: each batch gets a subset of use cases + their stages
+      const batches: { useCases: any[]; stages: string[] }[] = [];
+      let currentBatch: any[] = [];
+      let currentStages = new Set<string>();
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      for (const [stage, ucs] of Object.entries(ucsByStage)) {
+        for (const uc of ucs) {
+          currentBatch.push(uc);
+          currentStages.add(stage);
+          if (currentBatch.length >= BATCH_SIZE) {
+            batches.push({ useCases: [...currentBatch], stages: Array.from(currentStages) });
+            currentBatch = [];
+            currentStages = new Set<string>();
+          }
+        }
+      }
+      if (currentBatch.length > 0) {
+        batches.push({ useCases: currentBatch, stages: Array.from(currentStages) });
+      }
 
-      const augmented = data?.data?.augmented_use_cases;
-      if (augmented && Array.isArray(augmented)) {
-        setAugmentedUseCases(augmented);
-        const internalCount = augmented.filter((uc: any) => uc.source === "Internal Resource (AI Augmented)").length;
-        const nativeCount = augmented.filter((uc: any) => uc.source === "AI-Native Expansion").length;
+      toast.info(`Processing ${allInternalUseCasesForAI.length} use cases in ${batches.length} batch(es)...`);
+
+      const allAugmented: AugmentedUseCase[] = [];
+      const seenNativeKeys = new Set<string>(); // deduplicate AI-native across batches
+
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        toast.info(`Batch ${i + 1}/${batches.length}: augmenting ${batch.useCases.length} use cases...`);
+
+        const { data, error } = await supabase.functions.invoke("use-case-augment", {
+          body: {
+            industry,
+            channels: selectedChannels,
+            allInternalUseCases: batch.useCases,
+            lifecycleStages: batch.stages,
+            brandProfile: brandProfile || null,
+          },
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        const augmented = data?.data?.augmented_use_cases;
+        if (augmented && Array.isArray(augmented)) {
+          for (const uc of augmented) {
+            // Deduplicate AI-Native expansions across batches
+            if (uc.source === "AI-Native Expansion") {
+              const key = `${uc.lifecycle_stage}__${uc.use_case_title}`;
+              if (seenNativeKeys.has(key)) continue;
+              seenNativeKeys.add(key);
+            }
+            allAugmented.push(uc);
+          }
+        }
+      }
+
+      if (allAugmented.length > 0) {
+        setAugmentedUseCases(allAugmented);
+        const internalCount = allAugmented.filter(uc => uc.source === "Internal Resource (AI Augmented)").length;
+        const nativeCount = allAugmented.filter(uc => uc.source === "AI-Native Expansion").length;
         toast.success(`${internalCount} use cases augmented + ${nativeCount} AI-native expansions generated`);
       } else {
-        throw new Error("Invalid AI response format");
+        throw new Error("No augmented use cases returned from AI");
       }
     } catch (err: any) {
       console.error("AI augmentation error:", err);
