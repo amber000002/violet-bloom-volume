@@ -1,17 +1,27 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Clock, Zap, Shield, Lightbulb, Target, Calendar, 
   UserMinus, Activity, TrendingUp, Workflow, Info,
   ChevronDown, ChevronUp, Layers, Users, BookOpen, Sparkles,
   CheckCircle2, Mail, Bell, MessageSquare, Smartphone, Globe,
-  Hash, BarChart3, Brain, Crosshair, AlertTriangle, Loader2, Wand2
+  Hash, BarChart3, Brain, Crosshair, AlertTriangle, Loader2, Wand2,
+  RefreshCw, History, CloudOff, Cloud, Check
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AugmentedUseCase } from "@/types/augmentedUseCase";
 import { AugmentedUseCaseTable } from "@/components/AugmentedUseCaseTable";
 import { exportAugmentedCSV, exportAugmentedXLSX } from "@/lib/augmentedExport";
+import {
+  upsertBrandProfile,
+  saveAIUseCaseRun,
+  loadLatestCachedRun,
+  loadRunHistory,
+  loadRunById,
+  CachedRun,
+  RunHistoryItem,
+} from "@/lib/useCaseCacheService";
 import {
   industryConfigs,
   JourneyUseCase,
@@ -293,11 +303,54 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const [selectedChannels, setSelectedChannels] = useState<string[]>(["email"]);
   const [isAugmenting, setIsAugmenting] = useState(false);
   const [augmentedUseCases, setAugmentedUseCases] = useState<AugmentedUseCase[] | null>(null);
-
-  // Resource Library integration
+  const [cachedRunMeta, setCachedRunMeta] = useState<{ runId: string; generatedAt: string; status: string } | null>(null);
+  const [runHistory, setRunHistory] = useState<RunHistoryItem[]>([]);
+  const [isLoadingCache, setIsLoadingCache] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [cacheSource, setCacheSource] = useState<"saved" | "new" | null>(null);
   const { findMatchingResources, resources, noResourceForIndustry, isLoadingCloudResources } = useResourceLibrary();
 
   const config = industry ? industryConfigs[industry] : null;
+
+  // ===== AUTO-LOAD CACHED RESULTS =====
+  const websiteHost = useMemo(() => {
+    if (!brandProfile) return "";
+    const url = (brandProfile as any)?.brand_identity?.website_url || brandProfile?.brand_identity?.brand_name || "";
+    try {
+      return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase().trim();
+    } catch { return url.toLowerCase().trim(); }
+  }, [brandProfile]);
+
+  const loadCachedResults = useCallback(async () => {
+    if (!websiteHost || !industry || selectedChannels.length === 0) return;
+    setIsLoadingCache(true);
+    try {
+      const cached = await loadLatestCachedRun({
+        websiteUrl: websiteHost,
+        industry,
+        channelsSelected: selectedChannels,
+      });
+      if (cached && cached.augmentedUseCases.length > 0) {
+        setAugmentedUseCases(cached.augmentedUseCases);
+        setCachedRunMeta({ runId: cached.runId, generatedAt: cached.generatedAt, status: cached.status });
+        setCacheSource("saved");
+      } else {
+        setAugmentedUseCases(null);
+        setCachedRunMeta(null);
+        setCacheSource(null);
+      }
+      const history = await loadRunHistory({ websiteUrl: websiteHost, industry });
+      setRunHistory(history);
+    } catch (err) {
+      console.error("Failed to load cached results:", err);
+    } finally {
+      setIsLoadingCache(false);
+    }
+  }, [websiteHost, industry, selectedChannels]);
+
+  useEffect(() => {
+    loadCachedResults();
+  }, [loadCachedResults]);
   
   const inferredBusinessModel = useMemo(() => {
     if (!industry) return null;
@@ -391,7 +444,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
       setSelectedStage("");
     }
     setExpandedCard(null);
-    setAugmentedUseCases(null); // Reset AI results on filter change
+    // Don't clear augmentedUseCases here — cache loading handles it
   }, [availableStages]);
 
   // ===== RESOURCE MATCHING =====
@@ -687,9 +740,37 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
       if (allAugmented.length > 0) {
         setAugmentedUseCases(allAugmented);
+        setCacheSource("new");
         const internalCount = allAugmented.filter(uc => uc.source === "Internal Resource (AI Augmented)").length;
         const nativeCount = allAugmented.filter(uc => uc.source === "AI-Native Expansion").length;
         toast.success(`${internalCount} use cases augmented + ${nativeCount} AI-native expansions generated`);
+
+        // Save to cloud
+        try {
+          if (websiteHost) {
+            const brandId = await upsertBrandProfile({
+              websiteUrl: websiteHost,
+              industry,
+              brandName: brandProfile?.brand_identity?.brand_name,
+              brandProfileJson: brandProfile,
+            });
+            const runId = await saveAIUseCaseRun({
+              brandId,
+              websiteUrl: websiteHost,
+              industry,
+              channelsSelected: selectedChannels,
+              augmentedUseCases: allAugmented,
+            });
+            setCachedRunMeta({ runId, generatedAt: new Date().toISOString(), status: "success" });
+            toast.success("Results saved to cloud — will persist across sessions");
+            // Refresh history
+            const history = await loadRunHistory({ websiteUrl: websiteHost, industry });
+            setRunHistory(history);
+          }
+        } catch (saveErr: any) {
+          console.error("Failed to save AI results:", saveErr);
+          toast.warning("Results generated but failed to save to cloud");
+        }
       } else {
         throw new Error("No augmented use cases returned from AI");
       }
@@ -698,6 +779,22 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
       toast.error(err.message || "AI augmentation failed. Please try again.");
     } finally {
       setIsAugmenting(false);
+    }
+  };
+
+  // ===== LOAD HISTORICAL RUN =====
+  const handleLoadHistoricalRun = async (runId: string) => {
+    try {
+      const run = await loadRunById(runId);
+      if (run && run.augmentedUseCases.length > 0) {
+        setAugmentedUseCases(run.augmentedUseCases);
+        setCachedRunMeta({ runId: run.runId, generatedAt: run.generatedAt, status: run.status });
+        setCacheSource("saved");
+        toast.success("Historical results loaded");
+      }
+    } catch (err) {
+      console.error("Failed to load historical run:", err);
+      toast.error("Failed to load historical results");
     }
   };
 
@@ -1021,7 +1118,89 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           {/* AI Augmentation Section */}
           {personalizedUseCases.length > 0 && (
             <div className="pt-4 border-t border-border space-y-4">
-              <div className="flex items-center justify-center">
+              {/* Status Header */}
+              {cachedRunMeta && augmentedUseCases && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border">
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      cacheSource === "saved"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-emerald-500/10 text-emerald-400"
+                    }`}>
+                      {cacheSource === "saved" ? <Cloud className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                      {cacheSource === "saved" ? "Saved" : "Newly Generated"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Generated on: {new Date(cachedRunMeta.generatedAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Staleness warning */}
+                    {cachedRunMeta && (() => {
+                      const daysOld = (Date.now() - new Date(cachedRunMeta.generatedAt).getTime()) / (1000 * 60 * 60 * 24);
+                      if (daysOld > 30) return (
+                        <span className="text-xs text-amber-400 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Consider regenerating
+                        </span>
+                      );
+                      return null;
+                    })()}
+                    <button
+                      onClick={() => setShowHistory(!showHistory)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <History className="w-3 h-3" />
+                      History
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Run History Accordion */}
+              {showHistory && runHistory.length > 0 && (
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <div className="p-2 bg-muted/20 text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <History className="w-3 h-3 text-primary" />
+                    Previous Runs
+                  </div>
+                  <div className="divide-y divide-border">
+                    {runHistory.map((item) => (
+                      <div key={item.runId} className="flex items-center justify-between p-2 text-xs hover:bg-muted/10">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-1.5 h-1.5 rounded-full ${item.status === "success" ? "bg-emerald-400" : "bg-destructive"}`} />
+                          <span className="text-muted-foreground">
+                            {new Date(item.generatedAt).toLocaleString()}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {item.useCaseCount} use cases
+                          </span>
+                          <span className="text-muted-foreground">
+                            [{item.channelsSelected.join(", ")}]
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleLoadHistoricalRun(item.runId)}
+                          className="px-2 py-0.5 rounded text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          Load
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Loading cache indicator */}
+              {isLoadingCache && (
+                <div className="text-center py-2">
+                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Loading saved results...
+                  </span>
+                </div>
+              )}
+
+              {/* Augment / Regenerate buttons */}
+              <div className="flex items-center justify-center gap-3">
                 <motion.button
                   onClick={handleAugmentWithAI}
                   disabled={isAugmenting}
@@ -1034,10 +1213,15 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Augmenting All Use Cases with AI...
                     </>
+                  ) : augmentedUseCases ? (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Regenerate AI Results
+                    </>
                   ) : (
                     <>
                       <Wand2 className="w-4 h-4" />
-                      {augmentedUseCases ? "Re-Augment All with AI" : `Augment All ${allInternalUseCasesForAI.length} Use Cases with AI`}
+                      Augment All {allInternalUseCasesForAI.length} Use Cases with AI
                     </>
                   )}
                 </motion.button>
