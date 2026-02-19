@@ -14,6 +14,140 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_use_case_latest: {
+        Row: {
+          brand_id: string
+          channels_selected_key: string
+          id: string
+          industry_normalized: string
+          latest_run_id: string
+          updated_at: string
+        }
+        Insert: {
+          brand_id: string
+          channels_selected_key: string
+          id?: string
+          industry_normalized: string
+          latest_run_id: string
+          updated_at?: string
+        }
+        Update: {
+          brand_id?: string
+          channels_selected_key?: string
+          id?: string
+          industry_normalized?: string
+          latest_run_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_use_case_latest_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brand_profiles"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "ai_use_case_latest_latest_run_id_fkey"
+            columns: ["latest_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_use_case_runs"
+            referencedColumns: ["run_id"]
+          },
+        ]
+      }
+      ai_use_case_runs: {
+        Row: {
+          ai_output_payload: Json
+          brand_id: string
+          channels_selected: string[]
+          created_at: string
+          generated_at: string
+          hash_key: string
+          industry_normalized: string
+          internal_resource_version: string | null
+          notes: string | null
+          output_format: string
+          prompt_version: string | null
+          run_id: string
+          status: string
+          website_host_normalized: string
+        }
+        Insert: {
+          ai_output_payload: Json
+          brand_id: string
+          channels_selected?: string[]
+          created_at?: string
+          generated_at?: string
+          hash_key: string
+          industry_normalized: string
+          internal_resource_version?: string | null
+          notes?: string | null
+          output_format?: string
+          prompt_version?: string | null
+          run_id?: string
+          status?: string
+          website_host_normalized: string
+        }
+        Update: {
+          ai_output_payload?: Json
+          brand_id?: string
+          channels_selected?: string[]
+          created_at?: string
+          generated_at?: string
+          hash_key?: string
+          industry_normalized?: string
+          internal_resource_version?: string | null
+          notes?: string | null
+          output_format?: string
+          prompt_version?: string | null
+          run_id?: string
+          status?: string
+          website_host_normalized?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_use_case_runs_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brand_profiles"
+            referencedColumns: ["brand_id"]
+          },
+        ]
+      }
+      brand_profiles: {
+        Row: {
+          brand_id: string
+          brand_name: string | null
+          brand_profile_json: Json | null
+          created_at: string
+          industry_selected: string
+          updated_at: string
+          website_host_normalized: string
+          website_url: string | null
+        }
+        Insert: {
+          brand_id?: string
+          brand_name?: string | null
+          brand_profile_json?: Json | null
+          created_at?: string
+          industry_selected: string
+          updated_at?: string
+          website_host_normalized: string
+          website_url?: string | null
+        }
+        Update: {
+          brand_id?: string
+          brand_name?: string | null
+          brand_profile_json?: Json | null
+          created_at?: string
+          industry_selected?: string
+          updated_at?: string
+          website_host_normalized?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       resource_files: {
         Row: {
           channels: string[]
