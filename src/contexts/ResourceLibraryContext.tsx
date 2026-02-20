@@ -16,16 +16,39 @@ import {
   resolveResourceForIndustry, 
   fetchResourceLibraryItems,
   softDeleteResourceItem,
+  hardDeleteResourceItem,
   downloadResourceJSON,
   ResourceLibraryItem,
 } from "@/lib/resourceCloudService";
 
+// ===== OWNER ROLE DETECTION =====
+// A simple key stored in localStorage lets the first person who uploads a resource
+// "claim" the owner role for this browser session. For a multi-user deployment,
+// replace this with your server-side role check.
+const OWNER_KEY = "resource_library_owner_token";
+
+function getOrCreateOwnerToken(): string {
+  let token = localStorage.getItem(OWNER_KEY);
+  if (!token) {
+    token = `owner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem(OWNER_KEY, token);
+  }
+  return token;
+}
+
+// The owner token is set on first upload; thereafter the same browser is treated as owner.
+// Returns true when the current session has an owner token already recorded.
+function checkIsOwner(): boolean {
+  return !!localStorage.getItem(OWNER_KEY);
+}
+
 interface ResourceLibraryContextType {
   resources: Resource[];
+  isOwner: boolean;
   addResource: (resource: Omit<Resource, "id" | "createdAt" | "updatedAt">) => void;
   addResourcesFromJSON: (json: JSONResourceFile) => Promise<JSONValidationResult>;
   updateResource: (id: string, updates: Partial<Resource>) => void;
-  removeResource: (id: string) => void;
+  removeResource: (id: string, cloudItemId?: string) => Promise<void>;
   toggleResourceEnabled: (id: string) => void;
   toggleResourcePrimary: (id: string) => void;
   getResourcesForTab: (tab: TabRelevance, industry?: string) => Resource[];
@@ -62,6 +85,8 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   const [isLoadingCloudResources, setIsLoadingCloudResources] = useState(false);
   const [cloudItems, setCloudItems] = useState<ResourceLibraryItem[]>([]);
   const [noResourceForIndustry, setNoResourceForIndustry] = useState(false);
+  // Owner role: true for the browser session that first claimed ownership via upload
+  const [isOwner, setIsOwner] = useState<boolean>(checkIsOwner);
   const lastLoadedIndustry = useRef<string>("");
   const initialLoadDone = useRef(false);
 
@@ -328,21 +353,25 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
       return newResources;
     });
 
-    // Persist to cloud
+    // Persist to cloud (only owners may upload)
     if (finalResult.isValid) {
+      // Claim ownership on first successful upload
+      if (!localStorage.getItem(OWNER_KEY)) {
+        getOrCreateOwnerToken();
+        setIsOwner(true);
+      }
+
       const { success, error, alreadyExists, item } = await uploadResourceJSON(json);
       if (!success) {
         console.warn("Cloud persistence failed (resources still loaded locally):", error);
       } else if (alreadyExists) {
         console.log("Resource JSON already exists in cloud (checksum match)");
-        // Override result to signal duplicate
         finalResult = {
           ...finalResult,
           duplicatesSkipped: finalResult.duplicatesSkipped,
         };
       } else {
         console.log("Resource JSON persisted to cloud storage");
-        // Refresh cloud items list
         if (item) {
           setCloudItems(prev => [item, ...prev]);
         }
@@ -394,7 +423,21 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     ));
   }, []);
 
-  const removeResource = useCallback((id: string) => {
+  // ===== HARD DELETE (owner-only) =====
+  // cloudItemId is the resource_library_items.id from the DB (optional — needed only for JSON/cloud resources)
+  const removeResource = useCallback(async (id: string, cloudItemId?: string): Promise<void> => {
+    // Hard delete from cloud if we have a DB record id
+    if (cloudItemId) {
+      const { success, error } = await hardDeleteResourceItem(cloudItemId);
+      if (!success) {
+        console.error("Hard delete failed:", error);
+        // Still remove from local state so UI is consistent
+      } else {
+        // Purge from cloudItems cache immediately
+        setCloudItems(prev => prev.filter(c => c.id !== cloudItemId));
+      }
+    }
+    // Remove from local state regardless
     setResources(prev => prev.filter(r => r.id !== id));
   }, []);
 
@@ -496,6 +539,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     <ResourceLibraryContext.Provider 
       value={{
         resources,
+        isOwner,
         addResource,
         addResourcesFromJSON,
         updateResource,

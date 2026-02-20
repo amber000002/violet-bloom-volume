@@ -191,7 +191,7 @@ export async function fetchResourceLibraryItems(
   return (data || []) as ResourceLibraryItem[];
 }
 
-// ===== SOFT DELETE =====
+// ===== SOFT DELETE (kept for legacy compatibility) =====
 export async function softDeleteResourceItem(id: string): Promise<boolean> {
   const { error } = await supabase
     .from("resource_library_items")
@@ -203,6 +203,52 @@ export async function softDeleteResourceItem(id: string): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+// ===== HARD DELETE (owner-only) =====
+// Deletes both the storage object and the DB record permanently.
+export async function hardDeleteResourceItem(id: string, orgId: string = DEFAULT_ORG_ID): Promise<{ success: boolean; error?: string }> {
+  try {
+    // 1. Fetch the record to get the file path
+    const { data: item, error: fetchError } = await supabase
+      .from("resource_library_items")
+      .select("id, file_path, org_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchError || !item) {
+      return { success: false, error: "Resource not found." };
+    }
+
+    // 2. Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from(BUCKET)
+      .remove([item.file_path]);
+
+    if (storageError) {
+      log("resource_hard_delete_storage_failed", { id, error: storageError.message });
+      // Proceed to DB delete anyway — storage may already be gone
+    } else {
+      log("resource_hard_delete_storage_removed", { id, filePath: item.file_path });
+    }
+
+    // 3. Delete the DB record permanently
+    const { error: deleteError } = await supabase
+      .from("resource_library_items")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      log("resource_hard_delete_db_failed", { id, error: deleteError.message });
+      return { success: false, error: `DB delete failed: ${deleteError.message}` };
+    }
+
+    log("resource_hard_delete_complete", { id });
+    return { success: true };
+  } catch (err: any) {
+    log("resource_hard_delete_error", { id, error: err.message });
+    return { success: false, error: err.message };
+  }
 }
 
 // ===== DOWNLOAD JSON FROM STORAGE =====
