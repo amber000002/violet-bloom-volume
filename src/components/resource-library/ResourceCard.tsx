@@ -18,6 +18,7 @@ import { Resource, ResourceType, TabRelevance } from "@/types/resources";
 
 interface ResourceCardProps {
   resource: Resource;
+  cloudItemId?: string; // resource_library_items.id — used for hard delete
 }
 
 const typeIcons: Record<ResourceType, typeof LinkIcon> = {
@@ -38,8 +39,8 @@ const tabLabels: Record<TabRelevance, string> = {
   "creative": "Creative",
 };
 
-export const ResourceCard: React.FC<ResourceCardProps> = ({ resource }) => {
-  const { toggleResourceEnabled, toggleResourcePrimary, removeResource } = useResourceLibrary();
+export const ResourceCard: React.FC<ResourceCardProps> = ({ resource, cloudItemId }) => {
+  const { toggleResourceEnabled, toggleResourcePrimary, removeResource, isOwner } = useResourceLibrary();
   
   const TypeIcon = typeIcons[resource.type];
 
@@ -89,38 +90,40 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({ resource }) => {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => toggleResourcePrimary(resource.id)}
-            title={resource.isPrimary ? "Remove primary status" : "Mark as primary"}
-            className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
-          >
-            {resource.isPrimary ? (
-              <Star className="w-4 h-4 text-primary fill-primary" />
-            ) : (
-              <StarOff className="w-4 h-4 text-muted-foreground" />
-            )}
-          </button>
-          <button
-            onClick={() => toggleResourceEnabled(resource.id)}
-            title={resource.isEnabled ? "Disable" : "Enable"}
-            className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
-          >
-            {resource.isEnabled ? (
-              <ToggleRight className="w-4 h-4 text-primary" />
-            ) : (
-              <ToggleLeft className="w-4 h-4 text-muted-foreground" />
-            )}
-          </button>
-          <button
-            onClick={() => removeResource(resource.id)}
-            title="Delete"
-            className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
-          >
-            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-          </button>
-        </div>
+        {/* Actions — Owner only */}
+        {isOwner && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => toggleResourcePrimary(resource.id)}
+              title={resource.isPrimary ? "Remove primary status" : "Mark as primary"}
+              className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              {resource.isPrimary ? (
+                <Star className="w-4 h-4 text-primary fill-primary" />
+              ) : (
+                <StarOff className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+            <button
+              onClick={() => toggleResourceEnabled(resource.id)}
+              title={resource.isEnabled ? "Disable" : "Enable"}
+              className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              {resource.isEnabled ? (
+                <ToggleRight className="w-4 h-4 text-primary" />
+              ) : (
+                <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+            <button
+              onClick={() => removeResource(resource.id, cloudItemId)}
+              title="Delete permanently"
+              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tags */}

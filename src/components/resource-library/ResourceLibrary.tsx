@@ -26,7 +26,7 @@ const tabLabels: Record<TabRelevance, string> = {
 type ViewMode = "list" | "add-form" | "add-json";
 
 export const ResourceLibrary: React.FC = () => {
-  const { resources, isLibraryOpen, setIsLibraryOpen } = useResourceLibrary();
+  const { resources, isLibraryOpen, setIsLibraryOpen, isOwner, cloudItems } = useResourceLibrary();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filterTab, setFilterTab] = useState<TabRelevance | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -137,30 +137,39 @@ export const ResourceLibrary: React.FC = () => {
                   <JSONResourceUpload onClose={() => setViewMode("list")} />
                 ) : (
                   <div className="space-y-4">
-                    {/* Add Buttons */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <motion.button
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        onClick={() => setViewMode("add-form")}
-                        className="p-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors flex flex-col items-center justify-center gap-2"
-                      >
-                        <Plus className="w-5 h-5" />
-                        <span className="text-sm font-medium">Add Resource</span>
-                        <span className="text-xs text-muted-foreground">Form-based entry</span>
-                      </motion.button>
-                      
-                      <motion.button
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        onClick={() => setViewMode("add-json")}
-                        className="p-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-emerald-500 hover:text-emerald-500 transition-colors flex flex-col items-center justify-center gap-2"
-                      >
-                        <FileJson className="w-5 h-5" />
-                        <span className="text-sm font-medium">Upload JSON</span>
-                        <span className="text-xs text-muted-foreground">Bulk import</span>
-                      </motion.button>
-                    </div>
+                    {/* Add Buttons — Owner only */}
+                    {isOwner && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <motion.button
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => setViewMode("add-form")}
+                          className="p-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors flex flex-col items-center justify-center gap-2"
+                        >
+                          <Plus className="w-5 h-5" />
+                          <span className="text-sm font-medium">Add Resource</span>
+                          <span className="text-xs text-muted-foreground">Form-based entry</span>
+                        </motion.button>
+                        
+                        <motion.button
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => setViewMode("add-json")}
+                          className="p-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-emerald-500 hover:text-emerald-500 transition-colors flex flex-col items-center justify-center gap-2"
+                        >
+                          <FileJson className="w-5 h-5" />
+                          <span className="text-sm font-medium">Upload JSON</span>
+                          <span className="text-xs text-muted-foreground">Bulk import</span>
+                        </motion.button>
+                      </div>
+                    )}
+
+                    {/* Member read-only notice */}
+                    {!isOwner && resources.length > 0 && (
+                      <div className="p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground flex items-center gap-2">
+                        <span>📖 Read-only — contact your workspace owner to add or update resources.</span>
+                      </div>
+                    )}
 
                     {/* Stats Banner */}
                     {jsonCount > 0 && (
@@ -193,9 +202,17 @@ export const ResourceLibrary: React.FC = () => {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {filteredResources.map(resource => (
-                          <ResourceCard key={resource.id} resource={resource} />
-                        ))}
+                        {filteredResources.map(resource => {
+                          const source = resource.url.replace(/^(json|cloud):\/\//, "");
+                          const matchedCloudItem = cloudItems.find(c => c.source === source || c.display_name === source);
+                          return (
+                            <ResourceCard 
+                              key={resource.id} 
+                              resource={resource}
+                              cloudItemId={matchedCloudItem?.id}
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </div>
