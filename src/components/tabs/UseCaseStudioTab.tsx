@@ -6,7 +6,8 @@ import {
   ChevronDown, ChevronUp, Layers, Users, BookOpen, Sparkles,
   CheckCircle2, Mail, Bell, MessageSquare, Smartphone, Globe,
   Hash, BarChart3, Brain, Crosshair, AlertTriangle, Loader2, Wand2,
-  RefreshCw, History, CloudOff, Cloud, Check
+  RefreshCw, History, CloudOff, Cloud, Check, Download, FileText,
+  FileSpreadsheet, Package
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ import {
   loadLatestCachedRun,
   loadRunHistory,
   loadRunById,
+  loadAllRecentRuns,
   CachedRun,
   RunHistoryItem,
 } from "@/lib/useCaseCacheService";
@@ -305,8 +307,10 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const [augmentedUseCases, setAugmentedUseCases] = useState<AugmentedUseCase[] | null>(null);
   const [cachedRunMeta, setCachedRunMeta] = useState<{ runId: string; generatedAt: string; status: string } | null>(null);
   const [runHistory, setRunHistory] = useState<RunHistoryItem[]>([]);
+  const [allRecentRuns, setAllRecentRuns] = useState<RunHistoryItem[]>([]);
   const [isLoadingCache, setIsLoadingCache] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [isLoadingAllRuns, setIsLoadingAllRuns] = useState(false);
+  const [showHistory, setShowHistory] = useState(true); // Always visible, default expanded on desktop
   const [cacheSource, setCacheSource] = useState<"saved" | "new" | null>(null);
   const { findMatchingResources, resources, noResourceForIndustry, isLoadingCloudResources } = useResourceLibrary();
 
@@ -351,6 +355,21 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   useEffect(() => {
     loadCachedResults();
   }, [loadCachedResults]);
+
+  // ===== LOAD ALL RECENT RUNS (global, no brand filter) =====
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingAllRuns(true);
+    loadAllRecentRuns(20).then(runs => {
+      if (!cancelled) {
+        setAllRecentRuns(runs);
+        setIsLoadingAllRuns(false);
+      }
+    }).catch(() => {
+      if (!cancelled) setIsLoadingAllRuns(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
   
   const inferredBusinessModel = useMemo(() => {
     if (!industry) return null;
@@ -763,9 +782,11 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
             });
             setCachedRunMeta({ runId, generatedAt: new Date().toISOString(), status: "success" });
             toast.success("Results saved to cloud — will persist across sessions");
-            // Refresh history
+            // Refresh both filtered history and global all-runs list
             const history = await loadRunHistory({ websiteUrl: websiteHost, industry });
             setRunHistory(history);
+            const allRuns = await loadAllRecentRuns(20);
+            setAllRecentRuns(allRuns);
           }
         } catch (saveErr: any) {
           console.error("Failed to save AI results:", saveErr);
@@ -795,6 +816,25 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     } catch (err) {
       console.error("Failed to load historical run:", err);
       toast.error("Failed to load historical results");
+    }
+  };
+
+  // ===== SNAPSHOT-BASED EXPORT FOR A SPECIFIC RUN =====
+  const handleExportRun = async (runId: string, format: "csv" | "xlsx") => {
+    try {
+      const run = await loadRunById(runId);
+      if (!run || run.augmentedUseCases.length === 0) {
+        toast.error("No data found for this run");
+        return;
+      }
+      const label = `${run.industry}_${new Date(run.generatedAt).toISOString().slice(0, 10)}`;
+      if (format === "csv") {
+        exportAugmentedCSV(run.augmentedUseCases, `use-cases-${label}.csv`);
+      } else {
+        exportAugmentedXLSX(run.augmentedUseCases, `use-cases-${label}.xlsx`);
+      }
+    } catch {
+      toast.error("Failed to export run");
     }
   };
 
@@ -831,15 +871,132 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   // ===== RENDER =====
 
+  // Always-visible history panel (used in both no-industry and main view)
+  const historyRunsToShow = industry && websiteHost ? runHistory : allRecentRuns;
+  const isLoadingHistory = industry && websiteHost ? isLoadingCache : isLoadingAllRuns;
+
+  const renderHistoryPanel = () => (
+    <div className="rounded-xl border border-border overflow-hidden">
+      <button
+        onClick={() => setShowHistory(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <History className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium text-foreground">Saved Runs / History</span>
+          {historyRunsToShow.length > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
+              {historyRunsToShow.length}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showHistory ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {showHistory && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            className="overflow-hidden"
+          >
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading saved results...
+              </div>
+            ) : historyRunsToShow.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <Package className="w-8 h-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">No saved AI results found yet.</p>
+                <p className="text-xs text-muted-foreground/60">
+                  Select an industry, configure channels, and run "Augment with AI" to generate results.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {historyRunsToShow.map((item) => (
+                  <div key={item.runId} className="p-3 hover:bg-muted/10 transition-colors">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {item.websiteHostNormalized || "—"}
+                          </span>
+                          {item.brandName && (
+                            <span className="text-xs text-muted-foreground">({item.brandName})</span>
+                          )}
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                            item.status === "success"
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : "bg-destructive/10 text-destructive"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.status === "success" ? "bg-emerald-400" : "bg-destructive"}`} />
+                            {item.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                          <span className="capitalize">{item.industryNormalized}</span>
+                          <span>•</span>
+                          <span>{item.useCaseCount} use cases</span>
+                          <span>•</span>
+                          <span>{new Date(item.generatedAt).toLocaleString()}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {item.channelsSelected.map(ch => (
+                            <span key={ch} className="px-1.5 py-0.5 rounded bg-muted/50 text-xs text-muted-foreground">
+                              {CHANNEL_DISPLAY_LABELS[ch] || ch}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => handleLoadHistoricalRun(item.runId)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
+                        >
+                          <Cloud className="w-3 h-3" /> Load
+                        </button>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleExportRun(item.runId, "csv")}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
+                            title="Export CSV"
+                          >
+                            <FileText className="w-3 h-3" /> CSV
+                          </button>
+                          <button
+                            onClick={() => handleExportRun(item.runId, "xlsx")}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
+                            title="Export XLSX"
+                          >
+                            <FileSpreadsheet className="w-3 h-3" /> XLSX
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
   if (!industry) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-          <span className="text-3xl">📧</span>
+      <div className="space-y-6">
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+            <span className="text-2xl">📧</span>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Select an industry above to discover hyper-personalized use cases.
+          </p>
         </div>
-        <p className="text-muted-foreground">
-          Select an industry above to discover hyper-personalized use cases.
-        </p>
+        {renderHistoryPanel()}
       </div>
     );
   }
@@ -902,6 +1059,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Always-visible History Panel */}
+      {renderHistoryPanel()}
 
       {/* Channel Multi-Select */}
       <div className="space-y-2">
@@ -1118,10 +1278,10 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
           {/* AI Augmentation Section */}
           {personalizedUseCases.length > 0 && (
             <div className="pt-4 border-t border-border space-y-4">
-              {/* Status Header */}
+              {/* Status Header — shown when a run is loaded */}
               {cachedRunMeta && augmentedUseCases && (
                 <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                       cacheSource === "saved"
                         ? "bg-primary/10 text-primary"
@@ -1133,10 +1293,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                     <span className="text-xs text-muted-foreground">
                       Generated on: {new Date(cachedRunMeta.generatedAt).toLocaleString()}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Staleness warning */}
-                    {cachedRunMeta && (() => {
+                    {(() => {
                       const daysOld = (Date.now() - new Date(cachedRunMeta.generatedAt).getTime()) / (1000 * 60 * 60 * 24);
                       if (daysOld > 30) return (
                         <span className="text-xs text-amber-400 flex items-center gap-1">
@@ -1145,57 +1302,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                       );
                       return null;
                     })()}
-                    <button
-                      onClick={() => setShowHistory(!showHistory)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                    >
-                      <History className="w-3 h-3" />
-                      History
-                    </button>
                   </div>
-                </div>
-              )}
-
-              {/* Run History Accordion */}
-              {showHistory && runHistory.length > 0 && (
-                <div className="rounded-lg border border-border overflow-hidden">
-                  <div className="p-2 bg-muted/20 text-xs font-medium text-foreground flex items-center gap-1.5">
-                    <History className="w-3 h-3 text-primary" />
-                    Previous Runs
-                  </div>
-                  <div className="divide-y divide-border">
-                    {runHistory.map((item) => (
-                      <div key={item.runId} className="flex items-center justify-between p-2 text-xs hover:bg-muted/10">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-1.5 h-1.5 rounded-full ${item.status === "success" ? "bg-emerald-400" : "bg-destructive"}`} />
-                          <span className="text-muted-foreground">
-                            {new Date(item.generatedAt).toLocaleString()}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {item.useCaseCount} use cases
-                          </span>
-                          <span className="text-muted-foreground">
-                            [{item.channelsSelected.join(", ")}]
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleLoadHistoricalRun(item.runId)}
-                          className="px-2 py-0.5 rounded text-primary hover:bg-primary/10 transition-colors"
-                        >
-                          Load
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Loading cache indicator */}
-              {isLoadingCache && (
-                <div className="text-center py-2">
-                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Loading saved results...
-                  </span>
                 </div>
               )}
 

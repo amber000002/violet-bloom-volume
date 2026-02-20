@@ -225,6 +225,11 @@ export interface RunHistoryItem {
   status: string;
   channelsSelected: string[];
   useCaseCount: number;
+  websiteHostNormalized: string;
+  brandName?: string | null;
+  industryNormalized: string;
+  promptVersion?: string | null;
+  resourceVersion?: string | null;
 }
 
 export async function loadRunHistory(params: {
@@ -236,7 +241,7 @@ export async function loadRunHistory(params: {
 
   const { data, error } = await supabase
     .from("ai_use_case_runs")
-    .select("run_id, generated_at, status, channels_selected, ai_output_payload")
+    .select("run_id, generated_at, status, channels_selected, ai_output_payload, website_host_normalized, industry_normalized, prompt_version, internal_resource_version, brand_id")
     .eq("website_host_normalized", host)
     .eq("industry_normalized", industryNorm)
     .order("generated_at", { ascending: false })
@@ -252,6 +257,53 @@ export async function loadRunHistory(params: {
       status: run.status,
       channelsSelected: run.channels_selected,
       useCaseCount: payload?.rows?.length || 0,
+      websiteHostNormalized: run.website_host_normalized,
+      industryNormalized: run.industry_normalized,
+      promptVersion: run.prompt_version,
+      resourceVersion: run.internal_resource_version,
+    };
+  });
+}
+
+// ===== LOAD ALL RECENT RUNS (no brand filter) =====
+
+export async function loadAllRecentRuns(limit = 20): Promise<RunHistoryItem[]> {
+  const { data, error } = await supabase
+    .from("ai_use_case_runs")
+    .select("run_id, generated_at, status, channels_selected, ai_output_payload, website_host_normalized, industry_normalized, prompt_version, internal_resource_version, brand_id")
+    .order("generated_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  // Fetch brand names for all brand_ids
+  const brandIds = [...new Set(data.map(r => r.brand_id).filter(Boolean))];
+  let brandNameMap: Record<string, string | null> = {};
+  if (brandIds.length > 0) {
+    const { data: brands } = await supabase
+      .from("brand_profiles")
+      .select("brand_id, brand_name")
+      .in("brand_id", brandIds);
+    if (brands) {
+      for (const b of brands) {
+        brandNameMap[b.brand_id] = b.brand_name;
+      }
+    }
+  }
+
+  return data.map(run => {
+    const payload = run.ai_output_payload as any;
+    return {
+      runId: run.run_id,
+      generatedAt: run.generated_at,
+      status: run.status,
+      channelsSelected: run.channels_selected,
+      useCaseCount: payload?.rows?.length || 0,
+      websiteHostNormalized: run.website_host_normalized,
+      brandName: brandNameMap[run.brand_id] ?? null,
+      industryNormalized: run.industry_normalized,
+      promptVersion: run.prompt_version,
+      resourceVersion: run.internal_resource_version,
     };
   });
 }
