@@ -22,24 +22,10 @@ import {
 } from "@/lib/resourceCloudService";
 
 // ===== OWNER ROLE DETECTION =====
-// A simple key stored in localStorage lets the first person who uploads a resource
-// "claim" the owner role for this browser session. For a multi-user deployment,
-// replace this with your server-side role check.
-const OWNER_KEY = "resource_library_owner_token";
-
-function getOrCreateOwnerToken(): string {
-  let token = localStorage.getItem(OWNER_KEY);
-  if (!token) {
-    token = `owner_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem(OWNER_KEY, token);
-  }
-  return token;
-}
-
-// The owner token is set on first upload; thereafter the same browser is treated as owner.
-// Returns true when the current session has an owner token already recorded.
+// This is a single-tenant workspace app — all users in the workspace are treated as owners.
+// No localStorage gating: every session has full management access.
 function checkIsOwner(): boolean {
-  return !!localStorage.getItem(OWNER_KEY);
+  return true;
 }
 
 interface ResourceLibraryContextType {
@@ -353,14 +339,8 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
       return newResources;
     });
 
-    // Persist to cloud (only owners may upload)
+    // Persist to cloud
     if (finalResult.isValid) {
-      // Claim ownership on first successful upload
-      if (!localStorage.getItem(OWNER_KEY)) {
-        getOrCreateOwnerToken();
-        setIsOwner(true);
-      }
-
       const { success, error, alreadyExists, item } = await uploadResourceJSON(json);
       if (!success) {
         console.warn("Cloud persistence failed (resources still loaded locally):", error);
