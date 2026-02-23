@@ -113,6 +113,7 @@ const InboxAlchemyContent: React.FC = () => {
             extractionMethod: sourceMode === "url_only" ? "url_crawl" : sourceMode === "text_only" ? "user_paste" : "url_crawl",
             confidence,
             status: "success",
+            websiteTextBlocks: data.website_text_blocks || null,
           });
 
           setActiveBrandVersionId(versionId);
