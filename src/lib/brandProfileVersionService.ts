@@ -27,7 +27,6 @@ export interface BrandProfileVersion {
   status: string;
   generatedAt: string;
   notes: string | null;
-  websiteTextBlocks: Record<string, any> | null;
 }
 
 // ===== ENSURE BRAND EXISTS =====
@@ -76,7 +75,6 @@ export async function createBrandProfileVersion(params: {
   confidence?: string;
   status?: string;
   notes?: string;
-  websiteTextBlocks?: Record<string, any> | null;
 }): Promise<string> {
   const host = normalizeHost(params.websiteUrl);
 
@@ -93,7 +91,6 @@ export async function createBrandProfileVersion(params: {
       confidence: params.confidence || "medium",
       status: params.status || "success",
       notes: params.notes || null,
-      website_text_blocks: params.websiteTextBlocks || null,
     })
     .select("brand_profile_version_id")
     .single();
@@ -147,7 +144,6 @@ export async function loadBrandProfileVersions(params: {
     status: row.status,
     generatedAt: row.generated_at,
     notes: row.notes,
-    websiteTextBlocks: row.website_text_blocks || null,
   }));
 }
 
@@ -175,7 +171,6 @@ export async function loadAllRecentBrandVersions(limit = 20): Promise<BrandProfi
     status: row.status,
     generatedAt: row.generated_at,
     notes: row.notes,
-    websiteTextBlocks: row.website_text_blocks || null,
   }));
 }
 
@@ -204,6 +199,5 @@ export async function loadBrandProfileVersionById(versionId: string): Promise<Br
     status: row.status,
     generatedAt: row.generated_at,
     notes: row.notes,
-    websiteTextBlocks: row.website_text_blocks || null,
   };
 }

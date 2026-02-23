@@ -133,7 +133,6 @@ export type Database = {
           source_fingerprint: string | null
           status: string
           website_host_normalized: string
-          website_text_blocks: Json | null
           website_url_original: string | null
         }
         Insert: {
@@ -150,7 +149,6 @@ export type Database = {
           source_fingerprint?: string | null
           status?: string
           website_host_normalized: string
-          website_text_blocks?: Json | null
           website_url_original?: string | null
         }
         Update: {
@@ -167,7 +165,6 @@ export type Database = {
           source_fingerprint?: string | null
           status?: string
           website_host_normalized?: string
-          website_text_blocks?: Json | null
           website_url_original?: string | null
         }
         Relationships: []
