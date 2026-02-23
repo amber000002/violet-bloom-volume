@@ -251,9 +251,20 @@ ${combinedText}`,
     let parsed;
     try {
       parsed = JSON.parse(jsonStr);
-    } catch {
-      console.error("JSON parse failed, first 300 chars:", jsonStr.substring(0, 300));
-      throw new Error("Failed to parse brand profile JSON");
+    } catch (firstErr) {
+      // Clean common LLM JSON issues: trailing commas, control chars
+      try {
+        const cleaned = jsonStr
+          .replace(/,\s*}/g, "}")
+          .replace(/,\s*]/g, "]")
+          .replace(/[\x00-\x1F\x7F]/g, (ch) => ch === '\n' || ch === '\r' || ch === '\t' ? ' ' : '')
+          .replace(/\s+/g, " ");
+        parsed = JSON.parse(cleaned);
+        console.log("JSON parsed after cleaning");
+      } catch {
+        console.error("JSON parse failed even after cleaning, first 500 chars:", jsonStr.substring(0, 500));
+        throw new Error("Failed to parse brand profile JSON");
+      }
     }
 
     return new Response(JSON.stringify({ 
