@@ -59,16 +59,21 @@ export function validateLifecycleJSON(json: JSONResourceFile): { valid: boolean;
 }
 
 // ===== DETERMINE INDUSTRY =====
+// Normalize industry string to canonical hyphenated-lowercase format
+function normalizeIndustryKey(raw: string): string {
+  return raw.toLowerCase().trim().replace(/[\s_]+/g, "-");
+}
+
 function determineIndustry(useCases: JSONUseCase[], json?: JSONResourceFile): string | null {
   // Check top-level industry fields first (common in playbook JSONs)
   const topLevel = (json as any)?.industry || (json?.metadata as any)?.industry;
   if (topLevel && typeof topLevel === "string") {
-    return topLevel.toLowerCase().trim();
+    return normalizeIndustryKey(topLevel);
   }
 
   const industries = new Set<string>();
   for (const uc of useCases) {
-    if (uc.industry) industries.add(uc.industry.toLowerCase().trim());
+    if (uc.industry) industries.add(normalizeIndustryKey(uc.industry));
   }
   if (industries.size === 0) return null;
   if (industries.size === 1) return [...industries][0];
