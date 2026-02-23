@@ -60,6 +60,7 @@ export type Database = {
         Row: {
           ai_output_payload: Json
           brand_id: string
+          brand_profile_version_id: string | null
           channels_selected: string[]
           created_at: string
           generated_at: string
@@ -76,6 +77,7 @@ export type Database = {
         Insert: {
           ai_output_payload: Json
           brand_id: string
+          brand_profile_version_id?: string | null
           channels_selected?: string[]
           created_at?: string
           generated_at?: string
@@ -92,6 +94,7 @@ export type Database = {
         Update: {
           ai_output_payload?: Json
           brand_id?: string
+          brand_profile_version_id?: string | null
           channels_selected?: string[]
           created_at?: string
           generated_at?: string
@@ -115,6 +118,57 @@ export type Database = {
           },
         ]
       }
+      brand_profile_versions: {
+        Row: {
+          brand_id: string
+          brand_profile_json: Json
+          brand_profile_version_id: string
+          confidence: string
+          created_at: string
+          extraction_method: string
+          extraction_version: string | null
+          generated_at: string
+          generated_by_user_id: string | null
+          notes: string | null
+          source_fingerprint: string | null
+          status: string
+          website_host_normalized: string
+          website_url_original: string | null
+        }
+        Insert: {
+          brand_id: string
+          brand_profile_json: Json
+          brand_profile_version_id?: string
+          confidence?: string
+          created_at?: string
+          extraction_method?: string
+          extraction_version?: string | null
+          generated_at?: string
+          generated_by_user_id?: string | null
+          notes?: string | null
+          source_fingerprint?: string | null
+          status?: string
+          website_host_normalized: string
+          website_url_original?: string | null
+        }
+        Update: {
+          brand_id?: string
+          brand_profile_json?: Json
+          brand_profile_version_id?: string
+          confidence?: string
+          created_at?: string
+          extraction_method?: string
+          extraction_version?: string | null
+          generated_at?: string
+          generated_by_user_id?: string | null
+          notes?: string | null
+          source_fingerprint?: string | null
+          status?: string
+          website_host_normalized?: string
+          website_url_original?: string | null
+        }
+        Relationships: []
+      }
       brand_profiles: {
         Row: {
           brand_id: string
@@ -122,6 +176,7 @@ export type Database = {
           brand_profile_json: Json | null
           created_at: string
           industry_selected: string
+          latest_brand_profile_version_id: string | null
           updated_at: string
           website_host_normalized: string
           website_url: string | null
@@ -132,6 +187,7 @@ export type Database = {
           brand_profile_json?: Json | null
           created_at?: string
           industry_selected: string
+          latest_brand_profile_version_id?: string | null
           updated_at?: string
           website_host_normalized: string
           website_url?: string | null
@@ -142,6 +198,7 @@ export type Database = {
           brand_profile_json?: Json | null
           created_at?: string
           industry_selected?: string
+          latest_brand_profile_version_id?: string | null
           updated_at?: string
           website_host_normalized?: string
           website_url?: string | null

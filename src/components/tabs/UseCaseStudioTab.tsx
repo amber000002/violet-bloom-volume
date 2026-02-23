@@ -7,7 +7,7 @@ import {
   CheckCircle2, Mail, Bell, MessageSquare, Smartphone, Globe,
   Hash, BarChart3, Brain, Crosshair, AlertTriangle, Loader2, Wand2,
   RefreshCw, History, CloudOff, Cloud, Check, Download, FileText,
-  FileSpreadsheet, Package
+  FileSpreadsheet, Package, Eye, X, User
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,6 +24,10 @@ import {
   CachedRun,
   RunHistoryItem,
 } from "@/lib/useCaseCacheService";
+import {
+  loadAllRecentBrandVersions,
+  BrandProfileVersion,
+} from "@/lib/brandProfileVersionService";
 import {
   industryConfigs,
   JourneyUseCase,
@@ -58,6 +62,11 @@ interface UseCaseStudioTabProps {
   industry: string;
   viewMode?: ViewMode;
   brandProfile?: CoreBrandJSON | null;
+  activeBrandVersionId?: string | null;
+  brandVersions?: BrandProfileVersion[];
+  onBrandVersionSelect?: (version: BrandProfileVersion) => void;
+  onBrandVersionsRefresh?: () => Promise<void>;
+  websiteUrl?: string;
   onDataChange?: (data: any) => void;
 }
 
@@ -297,6 +306,11 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   industry,
   viewMode = "app",
   brandProfile,
+  activeBrandVersionId,
+  brandVersions = [],
+  onBrandVersionSelect,
+  onBrandVersionsRefresh,
+  websiteUrl: websiteUrlProp,
   onDataChange,
 }) => {
   const [framework, setFramework] = useState<FrameworkType>("lifecycle");
@@ -308,10 +322,13 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const [cachedRunMeta, setCachedRunMeta] = useState<{ runId: string; generatedAt: string; status: string } | null>(null);
   const [runHistory, setRunHistory] = useState<RunHistoryItem[]>([]);
   const [allRecentRuns, setAllRecentRuns] = useState<RunHistoryItem[]>([]);
+  const [allRecentBrandVersions, setAllRecentBrandVersions] = useState<BrandProfileVersion[]>([]);
   const [isLoadingCache, setIsLoadingCache] = useState(false);
   const [isLoadingAllRuns, setIsLoadingAllRuns] = useState(false);
-  const [showHistory, setShowHistory] = useState(true); // Always visible, default expanded on desktop
+  const [showHistory, setShowHistory] = useState(true);
+  const [showBrandHistory, setShowBrandHistory] = useState(true);
   const [cacheSource, setCacheSource] = useState<"saved" | "new" | null>(null);
+  const [viewingProfileJson, setViewingProfileJson] = useState<CoreBrandJSON | null>(null);
   const { findMatchingResources, resources, noResourceForIndustry, isLoadingCloudResources } = useResourceLibrary();
 
   const config = industry ? industryConfigs[industry] : null;
@@ -356,13 +373,17 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     loadCachedResults();
   }, [loadCachedResults]);
 
-  // ===== LOAD ALL RECENT RUNS (global, no brand filter) =====
+  // ===== LOAD ALL RECENT RUNS + BRAND VERSIONS (global, no brand filter) =====
   useEffect(() => {
     let cancelled = false;
     setIsLoadingAllRuns(true);
-    loadAllRecentRuns(20).then(runs => {
+    Promise.all([
+      loadAllRecentRuns(20),
+      loadAllRecentBrandVersions(20),
+    ]).then(([runs, versions]) => {
       if (!cancelled) {
         setAllRecentRuns(runs);
+        setAllRecentBrandVersions(versions);
         setIsLoadingAllRuns(false);
       }
     }).catch(() => {
@@ -779,6 +800,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
               industry,
               channelsSelected: selectedChannels,
               augmentedUseCases: allAugmented,
+              brandProfileVersionId: activeBrandVersionId || undefined,
             });
             setCachedRunMeta({ runId, generatedAt: new Date().toISOString(), status: "success" });
             toast.success("Results saved to cloud — will persist across sessions");
@@ -875,113 +897,249 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   const historyRunsToShow = industry && websiteHost ? runHistory : allRecentRuns;
   const isLoadingHistory = industry && websiteHost ? isLoadingCache : isLoadingAllRuns;
 
-  const renderHistoryPanel = () => (
-    <div className="rounded-xl border border-border overflow-hidden">
-      <button
-        onClick={() => setShowHistory(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/30 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <History className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium text-foreground">Saved Runs / History</span>
-          {historyRunsToShow.length > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
-              {historyRunsToShow.length}
-            </span>
-          )}
-        </div>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showHistory ? "rotate-180" : ""}`} />
-      </button>
+  // Brand versions to show: from parent (filtered) or global
+  const brandVersionsToShow = brandVersions.length > 0 ? brandVersions : allRecentBrandVersions;
 
-      <AnimatePresence initial={false}>
-        {showHistory && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: "auto" }}
-            exit={{ height: 0 }}
-            className="overflow-hidden"
-          >
-            {isLoadingHistory ? (
-              <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading saved results...
-              </div>
-            ) : historyRunsToShow.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <Package className="w-8 h-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">No saved AI results found yet.</p>
-                <p className="text-xs text-muted-foreground/60">
-                  Select an industry, configure channels, and run "Augment with AI" to generate results.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {historyRunsToShow.map((item) => (
-                  <div key={item.runId} className="p-3 hover:bg-muted/10 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {item.websiteHostNormalized || "—"}
-                          </span>
-                          {item.brandName && (
-                            <span className="text-xs text-muted-foreground">({item.brandName})</span>
-                          )}
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                            item.status === "success"
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : "bg-destructive/10 text-destructive"
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${item.status === "success" ? "bg-emerald-400" : "bg-destructive"}`} />
-                            {item.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                          <span className="capitalize">{item.industryNormalized}</span>
-                          <span>•</span>
-                          <span>{item.useCaseCount} use cases</span>
-                          <span>•</span>
-                          <span>{new Date(item.generatedAt).toLocaleString()}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {item.channelsSelected.map(ch => (
-                            <span key={ch} className="px-1.5 py-0.5 rounded bg-muted/50 text-xs text-muted-foreground">
-                              {CHANNEL_DISPLAY_LABELS[ch] || ch}
+  const renderHistoryPanel = () => (
+    <div className="space-y-3">
+      {/* Section A: Saved Brand Profiles */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <button
+          onClick={() => setShowBrandHistory(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-secondary" />
+            <span className="text-sm font-medium text-foreground">Saved Brand Profiles</span>
+            {brandVersionsToShow.length > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary font-medium">
+                {brandVersionsToShow.length}
+              </span>
+            )}
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showBrandHistory ? "rotate-180" : ""}`} />
+        </button>
+
+        <AnimatePresence initial={false}>
+          {showBrandHistory && (
+            <motion.div
+              initial={{ height: 0 }}
+              animate={{ height: "auto" }}
+              exit={{ height: 0 }}
+              className="overflow-hidden"
+            >
+              {isLoadingAllRuns ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading brand profiles...
+                </div>
+              ) : brandVersionsToShow.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <User className="w-6 h-6 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No saved brand profiles yet.</p>
+                  <p className="text-xs text-muted-foreground/60">
+                    Enter a website URL and generate a brand profile to get started.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {brandVersionsToShow.map((v) => (
+                    <div key={v.brandProfileVersionId} className={`p-3 hover:bg-muted/10 transition-colors ${activeBrandVersionId === v.brandProfileVersionId ? "bg-primary/5" : ""}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-foreground truncate">
+                              {v.websiteHostNormalized}
                             </span>
-                          ))}
+                            {v.brandProfileJson?.brand_identity?.brand_name && (
+                              <span className="text-xs text-muted-foreground">
+                                ({v.brandProfileJson.brand_identity.brand_name})
+                              </span>
+                            )}
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                              v.confidence === "high"
+                                ? "bg-emerald-500/10 text-emerald-400"
+                                : v.confidence === "medium"
+                                ? "bg-amber-500/10 text-amber-400"
+                                : "bg-muted text-muted-foreground"
+                            }`}>
+                              {v.confidence}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                              v.status === "success"
+                                ? "bg-emerald-500/10 text-emerald-400"
+                                : "bg-destructive/10 text-destructive"
+                            }`}>
+                              {v.status}
+                            </span>
+                            {activeBrandVersionId === v.brandProfileVersionId && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                <Check className="w-3 h-3" /> Active
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="capitalize">{v.extractionMethod?.replace(/_/g, " ")}</span>
+                            <span>•</span>
+                            <span>{new Date(v.generatedAt).toLocaleString()}</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-col gap-1.5 flex-shrink-0">
-                        <button
-                          onClick={() => handleLoadHistoricalRun(item.runId)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
-                        >
-                          <Cloud className="w-3 h-3" /> Load
-                        </button>
-                        <div className="flex gap-1">
+                        <div className="flex flex-col gap-1.5 flex-shrink-0">
                           <button
-                            onClick={() => handleExportRun(item.runId, "csv")}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
-                            title="Export CSV"
+                            onClick={() => onBrandVersionSelect?.(v)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
                           >
-                            <FileText className="w-3 h-3" /> CSV
+                            <Check className="w-3 h-3" /> Use
                           </button>
                           <button
-                            onClick={() => handleExportRun(item.runId, "xlsx")}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
-                            title="Export XLSX"
+                            onClick={() => setViewingProfileJson(v.brandProfileJson)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
                           >
-                            <FileSpreadsheet className="w-3 h-3" /> XLSX
+                            <Eye className="w-3 h-3" /> View
                           </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Section B: Saved AI Use Case Runs */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <button
+          onClick={() => setShowHistory(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-muted/20 hover:bg-muted/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">AI Use Case Runs</span>
+            {historyRunsToShow.length > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
+                {historyRunsToShow.length}
+              </span>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showHistory ? "rotate-180" : ""}`} />
+        </button>
+
+        <AnimatePresence initial={false}>
+          {showHistory && (
+            <motion.div
+              initial={{ height: 0 }}
+              animate={{ height: "auto" }}
+              exit={{ height: 0 }}
+              className="overflow-hidden"
+            >
+              {isLoadingHistory ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading saved results...
+                </div>
+              ) : historyRunsToShow.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <Package className="w-8 h-8 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No saved AI results found yet.</p>
+                  <p className="text-xs text-muted-foreground/60">
+                    Run "Augment with AI" to generate results.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {historyRunsToShow.map((item) => (
+                    <div key={item.runId} className="p-3 hover:bg-muted/10 transition-colors">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-foreground truncate">
+                              {item.websiteHostNormalized || "—"}
+                            </span>
+                            {item.brandName && (
+                              <span className="text-xs text-muted-foreground">({item.brandName})</span>
+                            )}
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                              item.status === "success"
+                                ? "bg-emerald-500/10 text-emerald-400"
+                                : "bg-destructive/10 text-destructive"
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${item.status === "success" ? "bg-emerald-400" : "bg-destructive"}`} />
+                              {item.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                            <span className="capitalize">{item.industryNormalized}</span>
+                            <span>•</span>
+                            <span>{item.useCaseCount} use cases</span>
+                            <span>•</span>
+                            <span>{new Date(item.generatedAt).toLocaleString()}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {item.channelsSelected.map(ch => (
+                              <span key={ch} className="px-1.5 py-0.5 rounded bg-muted/50 text-xs text-muted-foreground">
+                                {CHANNEL_DISPLAY_LABELS[ch] || ch}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => handleLoadHistoricalRun(item.runId)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
+                          >
+                            <Cloud className="w-3 h-3" /> Load
+                          </button>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleExportRun(item.runId, "csv")}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
+                              title="Export CSV"
+                            >
+                              <FileText className="w-3 h-3" /> CSV
+                            </button>
+                            <button
+                              onClick={() => handleExportRun(item.runId, "xlsx")}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
+                              title="Export XLSX"
+                            >
+                              <FileSpreadsheet className="w-3 h-3" /> XLSX
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Brand Profile JSON Viewer Modal */}
+      {viewingProfileJson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setViewingProfileJson(null)}>
+          <div className="bg-background border border-border rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden m-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-foreground">Brand Profile JSON</span>
+                {viewingProfileJson.brand_identity?.brand_name && (
+                  <span className="text-xs text-muted-foreground">— {viewingProfileJson.brand_identity.brand_name}</span>
+                )}
+              </div>
+              <button onClick={() => setViewingProfileJson(null)} className="p-1 hover:bg-muted rounded">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto max-h-[70vh]">
+              <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                {JSON.stringify(viewingProfileJson, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

@@ -18,6 +18,12 @@ import { BrandInputsPanel } from "./BrandInputsPanel";
 import { BrandInputs, emptyBrandInputs, CoreBrandJSON } from "@/types/brandProfile";
 import { generateCoreBrandJSON } from "@/lib/brandExtractor";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ensureBrandProfile,
+  createBrandProfileVersion,
+  loadBrandProfileVersions,
+  BrandProfileVersion,
+} from "@/lib/brandProfileVersionService";
 
 const industryOptions = Object.entries(industryConfigs).map(([key, config]) => ({
   value: key,
@@ -43,6 +49,8 @@ const InboxAlchemyContent: React.FC = () => {
   const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
   const [brandProfile, setBrandProfile] = useState<CoreBrandJSON | null>(null);
   const [isGeneratingBrand, setIsGeneratingBrand] = useState(false);
+  const [activeBrandVersionId, setActiveBrandVersionId] = useState<string | null>(null);
+  const [brandVersions, setBrandVersions] = useState<BrandProfileVersion[]>([]);
   
   const { viewMode, setViewMode, deckType, setDeckType, isExporting, setIsExporting } = usePresentationMode();
 
@@ -82,9 +90,42 @@ const InboxAlchemyContent: React.FC = () => {
       if (data?.error) throw new Error(data.error);
 
       if (data?.success && data.data) {
-        // Extract the core brand profile (without extraction_metadata at top level for compatibility)
         const profile: CoreBrandJSON = data.data;
         setBrandProfile(profile);
+
+        // Persist version to cloud
+        try {
+          const brandId = await ensureBrandProfile({
+            websiteUrl: brandInputs.websiteUrl,
+            industry,
+            brandName: profile.brand_identity?.brand_name,
+          });
+
+          const sourceMode = profile.extraction_metadata?.source_mode || "url_crawl";
+          const confidence = profile.extraction_metadata?.confidence_by_section
+            ? (Object.values(profile.extraction_metadata.confidence_by_section).filter(v => v === "high").length > 3 ? "high" : "medium")
+            : "medium";
+
+          const versionId = await createBrandProfileVersion({
+            brandId,
+            websiteUrl: brandInputs.websiteUrl,
+            brandProfileJson: profile,
+            extractionMethod: sourceMode === "url_only" ? "url_crawl" : sourceMode === "text_only" ? "user_paste" : "url_crawl",
+            confidence,
+            status: "success",
+          });
+
+          setActiveBrandVersionId(versionId);
+
+          // Refresh versions list
+          const versions = await loadBrandProfileVersions({ websiteUrl: brandInputs.websiteUrl, industry });
+          setBrandVersions(versions);
+
+          toast.success(`Brand profile saved (version ${versions.length})`);
+        } catch (saveErr: any) {
+          console.error("Failed to persist brand profile version:", saveErr);
+          toast.warning("Brand profile generated but failed to save version to cloud");
+        }
 
         const meta = profile.extraction_metadata;
         if (meta?.warnings && meta.warnings.length > 0) {
@@ -399,6 +440,19 @@ const InboxAlchemyContent: React.FC = () => {
                 industry={industry} 
                 viewMode={viewMode}
                 brandProfile={brandProfile}
+                activeBrandVersionId={activeBrandVersionId}
+                brandVersions={brandVersions}
+                onBrandVersionSelect={(v) => {
+                  setActiveBrandVersionId(v.brandProfileVersionId);
+                  setBrandProfile(v.brandProfileJson);
+                }}
+                onBrandVersionsRefresh={async () => {
+                  if (brandInputs.websiteUrl) {
+                    const versions = await loadBrandProfileVersions({ websiteUrl: brandInputs.websiteUrl, industry });
+                    setBrandVersions(versions);
+                  }
+                }}
+                websiteUrl={brandInputs.websiteUrl}
                 onDataChange={(data) => updateExportData("useCaseData", data)}
               />
             )}
