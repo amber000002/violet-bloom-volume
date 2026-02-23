@@ -281,7 +281,7 @@ export async function resolveResourceForIndustry(
   industry: string,
   orgId: string = DEFAULT_ORG_ID
 ): Promise<JSONResourceFile | null> {
-  const normalizedIndustry = industry.toLowerCase().trim();
+  const normalizedIndustry = normalizeIndustryKey(industry);
 
   // Query items matching industry or "multi"
   const { data, error } = await supabase
