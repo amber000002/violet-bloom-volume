@@ -200,12 +200,14 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a brand intelligence extraction engine. Analyze website content to produce a structured Brand JSON. Extract ONLY what is evidenced in the provided text. Use empty arrays for missing data. Preserve the brand's authentic language — do not rewrite into generic marketing copy. Industry context: ${industry}. Return ONLY valid JSON, no markdown fences.`,
+            content: `You are a brand intelligence extraction engine. Analyze website content to produce a structured Brand JSON. Extract ONLY what is evidenced in the provided text. Use empty arrays for missing data. Preserve the brand's authentic language — do not rewrite into generic marketing copy. Industry context: ${industry}. Return ONLY valid compact JSON on a single line, no markdown fences, no pretty-printing, no newlines inside the JSON. Keep string values concise (under 150 chars each). For pricing_tiers use simple string names like "Free", "Pro", not full objects.`,
           },
           {
             role: "user",
             content: `Extract a Brand JSON from this content for industry "${industry}", website "${websiteUrl}".
 ${groundingBlock}
+
+CRITICAL: Output MUST be compact single-line JSON. Keep all string values SHORT (under 150 chars). Use simple strings for pricing_tiers (e.g. ["Free","Pro","Enterprise"]), not objects. Use simple strings for segments (not objects). This ensures the output fits within token limits.
 
 Return this exact JSON structure:
 {"brand_identity":{"brand_name":"","website":"","industry":"","geography_focus":"","tagline":"","positioning":"","tone_of_voice":""},"business_model":{"business_model_description":"","monetization_model":"","pricing_tiers":[]},"product_ecosystem":{"core_products":[],"product_modules":[],"feature_modules":[],"feature_clusters":[],"platforms":[],"primary_platforms":[],"has_mobile_app":false,"has_web_platform":false},"audience_intelligence":{"primary_segments":[],"secondary_segments":[],"experience_levels":[],"risk_profiles":[],"personas_detected":[]},"value_framework":{"value_propositions":[],"differentiators":[]},"engagement_architecture":{"engagement_drivers":[],"seasonal_triggers":[],"event_based_triggers":[],"urgency_patterns":[]},"lifecycle_signal_map":{"key_user_actions":[],"key_user_events":[],"activation_events":[],"monetization_events":[],"churn_signals":[],"inactivity_markers":[],"lifecycle_markers":[]},"risk_compliance_layer":{"regulatory_environment":[],"regulatory_flags":[],"compliance_intensity":"Low","risk_signals":[],"high_risk_behaviors":[]},"industry_signal_layer":{"industry_kpis":[],"industry_vocabulary":[],"industry_signal_vocabulary":[]},"kpi_framework":{"primary_kpis":[],"secondary_kpis":[],"risk_kpis":[]},"tech_scale_layer":{"has_cdp":false,"has_crm":false,"supports_real_time_triggers":false,"has_mobile_app":false,"supports_primary_channels":false,"supported_channels":[],"volume_indicators_found":[],"monthly_active_users_band":""},"extraction_metadata":{"source_mode":"${sourceMode}","pages_crawled":${JSON.stringify(crawledPages)},"confidence_by_section":{},"evidence_snippets":[],"missing_sections":[],"warnings":${JSON.stringify(crawlWarnings)}}}
@@ -215,7 +217,7 @@ ${combinedText}`,
           },
         ],
         temperature: 0.2,
-        max_tokens: 6000,
+        max_tokens: 8000,
       }),
     });
 
