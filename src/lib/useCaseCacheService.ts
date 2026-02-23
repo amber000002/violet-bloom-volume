@@ -102,6 +102,7 @@ export interface SaveRunParams {
   augmentedUseCases: AugmentedUseCase[];
   resourceVersion?: string;
   promptVersion?: string;
+  brandProfileVersionId?: string;
 }
 
 export async function saveAIUseCaseRun(params: SaveRunParams): Promise<string> {
@@ -132,7 +133,8 @@ export async function saveAIUseCaseRun(params: SaveRunParams): Promise<string> {
       ai_output_payload: payload as any,
       status: "success",
       hash_key: hashKey,
-    })
+      brand_profile_version_id: params.brandProfileVersionId || null,
+    } as any)
     .select("run_id")
     .single();
 
