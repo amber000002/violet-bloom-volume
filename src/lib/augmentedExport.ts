@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import { AugmentedUseCase } from "@/types/augmentedUseCase";
 
 const HEADERS = [
@@ -49,30 +50,11 @@ export function exportAugmentedCSV(useCases: AugmentedUseCase[], filename = "use
 }
 
 export function exportAugmentedXLSX(useCases: AugmentedUseCase[], filename = "use-cases-augmented.xlsx") {
-  // Build a simple XLSX-compatible XML (SpreadsheetML)
   const rows = [HEADERS, ...useCases.map(useCaseToRow)];
-  
-  const xmlRows = rows.map((row, ri) => {
-    const cells = row.map((cell) => {
-      const escaped = cell.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      return `<Cell><Data ss:Type="String">${escaped}</Data></Cell>`;
-    }).join("");
-    return `<Row>${cells}</Row>`;
-  }).join("\n");
-
-  const xml = `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-<Worksheet ss:Name="Augmented Use Cases">
-<Table>
-${xmlRows}
-</Table>
-</Worksheet>
-</Workbook>`;
-
-  const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
-  downloadBlob(blob, filename);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Augmented Use Cases");
+  XLSX.writeFile(wb, filename);
 }
 
 function downloadBlob(blob: Blob, filename: string) {
