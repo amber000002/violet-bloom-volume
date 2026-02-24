@@ -24,6 +24,10 @@ export interface CampaignRow {
   hardBounces: number;
   softBounces: number;
   whoQuery: string;
+  // New metadata fields for enhanced classification
+  deliveryType: string;
+  conversionEvent: string;
+  labels: string;
   // Calculated rates
   openRate: number;
   clickRate: number;
@@ -404,6 +408,9 @@ const REQUIRED_HEADERS_MAP: Record<string, string> = {
   "error: email hard bounced": "hardBounces",
   "error: email soft bounced": "softBounces",
   "who query": "whoQuery",
+  "delivery type": "deliveryType",
+  "conversion event": "conversionEvent",
+  "labels": "labels",
 };
 
 const POSTMASTER_HEADERS_MAP: Record<string, string> = {
@@ -744,6 +751,9 @@ export const parseCSV = (csvText: string): ValidationResult => {
       hardBounces,
       softBounces,
       whoQuery: getValue("who query"),
+      deliveryType: getValue("delivery type"),
+      conversionEvent: getValue("conversion event"),
+      labels: getValue("labels"),
       openRate: baseForRates > 0 ? (uniqueViewed / baseForRates) * 100 : 0,
       clickRate: baseForRates > 0 ? (uniqueClicked / baseForRates) * 100 : 0,
       unsubscribeRate: baseForRates > 0 ? (unsubscribes / baseForRates) * 100 : 0,
