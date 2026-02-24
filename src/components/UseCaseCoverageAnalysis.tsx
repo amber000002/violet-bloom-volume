@@ -11,7 +11,9 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronRight,
+  Download,
 } from "lucide-react";
+import { exportCoverageCSV, exportCoverageXLSX } from "@/lib/coverageExport";
 import { CampaignRow } from "@/lib/csvAnalyzer";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { ResourceJourney, ResourceCampaign, IndustryRelevance } from "@/types/resources";
@@ -668,7 +670,25 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
 
             {/* Use Case Coverage Table */}
             <div className="space-y-3">
-              <h4 className="font-semibold text-sm text-foreground">Use Case Coverage Summary</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-sm text-foreground">Use Case Coverage Summary</h4>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => exportCoverageCSV(mappedCampaigns)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => exportCoverageXLSX(mappedCampaigns)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export XLSX
+                  </button>
+                </div>
+              </div>
               <div className="overflow-x-auto rounded-lg border border-border">
                 <Table>
                   <TableHeader>
