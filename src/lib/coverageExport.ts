@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import { MatchTrace } from "@/lib/coverageNormalization";
 import { CampaignRow } from "@/lib/csvAnalyzer";
 
@@ -81,25 +82,8 @@ export function exportCoverageCSV(mapped: MappedCampaignExport[], filename = "us
 
 export function exportCoverageXLSX(mapped: MappedCampaignExport[], filename = "use-case-coverage-analysis.xlsx") {
   const rows = [HEADERS, ...mapped.map(campaignToRow)];
-
-  const xmlRows = rows.map((row) => {
-    const cells = row.map((cell) => {
-      const escaped = cell.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      return `<Cell><Data ss:Type="String">${escaped}</Data></Cell>`;
-    }).join("");
-    return `<Row>${cells}</Row>`;
-  }).join("\n");
-
-  const xml = `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-<Worksheet ss:Name="Use Case Coverage">
-<Table>
-${xmlRows}
-</Table>
-</Worksheet>
-</Workbook>`;
-
-  downloadBlob(new Blob([xml], { type: "application/vnd.ms-excel" }), filename);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Use Case Coverage");
+  XLSX.writeFile(wb, filename);
 }
