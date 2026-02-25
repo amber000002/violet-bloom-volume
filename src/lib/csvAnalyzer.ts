@@ -659,18 +659,8 @@ export const parseCSV = (csvText: string): ValidationResult => {
     const startDate = getValue("start date");
     const channel = getValue("channel").toLowerCase().trim();
 
-    // Check channel mismatch - ONLY exclusion reason
-    if (channel !== "email") {
-      exclusionBreakdown.channelMismatch++;
-      excludedCampaigns.push({
-        campaignName,
-        campaignId,
-        startDate: startDate || "—",
-        reason: "Channel not equal to Email",
-        reasonCode: "channel_mismatch",
-      });
-      continue;
-    }
+    // All channels are now included in strategic insights analysis
+    // Channel value is preserved on each row for filtering/grouping downstream
 
     // Validate start date - campaigns with date issues are INCLUDED in analysis
     // but tracked separately for transparency and excluded from time-based views
@@ -772,7 +762,7 @@ export const parseCSV = (csvText: string): ValidationResult => {
   };
 
   if (data.length === 0) {
-    errors.push("No valid Email campaigns found in the CSV");
+    errors.push("No valid campaigns found in the CSV");
     return { isValid: false, errors, warnings, data: [], processingSummary };
   }
 
