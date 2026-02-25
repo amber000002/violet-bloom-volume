@@ -121,20 +121,56 @@ function isExcluded(campaignName: string, ctx: ExclusionContext): boolean {
   return overlap >= 2;
 }
 
+// ===== BRAND CONTEXT HELPER =====
+
+interface BrandContext {
+  name: string;
+  products: string[];
+  tiers: string[];
+  positioning: string;
+  tone: string;
+  industry: string;
+  tagline: string;
+}
+
+function extractBrandContext(brandProfile: CoreBrandJSON | null): BrandContext {
+  return {
+    name: brandProfile?.brand_identity?.brand_name || "",
+    products: brandProfile?.product_ecosystem?.core_products || [],
+    tiers: brandProfile?.business_model?.pricing_tiers || [],
+    positioning: brandProfile?.brand_identity?.positioning || "",
+    tone: brandProfile?.brand_identity?.tone_of_voice || "",
+    industry: brandProfile?.brand_identity?.industry || "",
+    tagline: brandProfile?.brand_identity?.tagline || "",
+  };
+}
+
+/** Build a credible campaign name using brand vocabulary */
+function brandedName(template: string, ctx: BrandContext): string {
+  let name = template;
+  name = name.replace(/\{brand\}/g, ctx.name || "Your");
+  name = name.replace(/\{product1\}/g, ctx.products[0] || "Core Product");
+  name = name.replace(/\{product2\}/g, ctx.products[1] || "Add-On");
+  name = name.replace(/\{topTier\}/g, ctx.tiers[ctx.tiers.length - 1] || "Premium");
+  name = name.replace(/\{industry\}/g, ctx.industry || "Industry");
+  return name;
+}
+
 // ===== SECTION B — OPPORTUNITY DISCOVERY =====
 
 // B1: Drop-Off Recovery
-function detectDropOffs(events: EventSchemaRow[] | null): OpportunityCampaign[] {
+function detectDropOffs(events: EventSchemaRow[] | null, brandProfile: CoreBrandJSON | null): OpportunityCampaign[] {
   if (!events || events.length === 0) return [];
   const campaigns: OpportunityCampaign[] = [];
+  const ctx = extractBrandContext(brandProfile);
 
   const eventNames = events.map(e => e.eventName.toLowerCase());
-  const dropOffPatterns: Array<{ start: RegExp; success: RegExp; label: string }> = [
-    { start: /pageload|page_load|page_view/, success: /success|complete|submit/, label: "Page View" },
-    { start: /start|begin|initiate/, success: /complete|success|done|finish/, label: "Flow Start" },
-    { start: /click|tap/, success: /submit|confirm|complete/, label: "Click Intent" },
-    { start: /add_to_cart|cart_add/, success: /purchase|checkout_complete|order/, label: "Cart" },
-    { start: /search/, success: /purchase|book|apply|select/, label: "Search" },
+  const dropOffPatterns: Array<{ start: RegExp; success: RegExp; label: string; nameTemplate: string }> = [
+    { start: /pageload|page_load|page_view/, success: /success|complete|submit/, label: "Page View", nameTemplate: "Resume {brand} Exploration — Convert Browsers to Buyers" },
+    { start: /start|begin|initiate/, success: /complete|success|done|finish/, label: "Flow Start", nameTemplate: "{brand} Application Recovery — Complete Your Submission" },
+    { start: /click|tap/, success: /submit|confirm|complete/, label: "Click Intent", nameTemplate: "Abandoned Intent Rescue — Re-Engage High-Signal Users" },
+    { start: /add_to_cart|cart_add/, success: /purchase|checkout_complete|order/, label: "Cart", nameTemplate: "{brand} Cart Recovery — Secure Your Selection" },
+    { start: /search/, success: /purchase|book|apply|select/, label: "Search", nameTemplate: "Search-to-{industry} Conversion — Turn Discovery Into Action" },
   ];
 
   for (const pattern of dropOffPatterns) {
@@ -144,7 +180,7 @@ function detectDropOffs(events: EventSchemaRow[] | null): OpportunityCampaign[] 
     if (startEvents.length > 0 && successEvents.length === 0) {
       const startSample = startEvents[0].replace(/_/g, " ");
       campaigns.push({
-        campaignName: `Complete Your ${capitalize(pattern.label)} Journey`,
+        campaignName: brandedName(pattern.nameTemplate, ctx),
         channel: "Push",
         targetSegment: `Users with ${startSample} but no completion`,
         trigger: `${startEvents[0]} without corresponding success event`,
@@ -157,7 +193,7 @@ function detectDropOffs(events: EventSchemaRow[] | null): OpportunityCampaign[] 
           readinessStatus: "Ready",
         },
       });
-      break; // One drop-off campaign
+      break;
     }
   }
 
@@ -168,9 +204,11 @@ function detectDropOffs(events: EventSchemaRow[] | null): OpportunityCampaign[] 
 function detectUnderutilizedEvents(
   events: EventSchemaRow[] | null,
   activeCoverage: ActiveUseCaseInfo[],
+  brandProfile: CoreBrandJSON | null,
 ): OpportunityCampaign[] {
   if (!events || events.length === 0) return [];
   const campaigns: OpportunityCampaign[] = [];
+  const ctx = extractBrandContext(brandProfile);
 
   const activeEventKeywords = new Set<string>();
   for (const uc of activeCoverage) {
@@ -188,12 +226,14 @@ function detectUnderutilizedEvents(
       const nameWords = ev.eventName.toLowerCase().split(/[_\-\s]+/);
       const isUsed = nameWords.some(w => w.length > 3 && activeEventKeywords.has(w));
       if (!isUsed) {
+        const readableEvent = ev.eventName.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        const prefix = ctx.name ? `${ctx.name} ` : "";
         campaigns.push({
-          campaignName: `Monetize "${ev.eventName.replace(/_/g, " ")}" Activity`,
+          campaignName: `${prefix}${readableEvent} Monetization Accelerator`,
           channel: "Email",
           targetSegment: `Users performing ${ev.eventName} frequently`,
           trigger: `${ev.eventName} count > threshold`,
-          messageTheme: "Turn engagement into value — personalized upgrade path",
+          messageTheme: `Turn ${readableEvent.toLowerCase()} engagement into ${ctx.products[0] || "product"} value`,
           successMetric: "Conversion Rate",
           _meta: {
             sourceType: "underutilized_event",
@@ -202,7 +242,7 @@ function detectUnderutilizedEvents(
             readinessStatus: "Ready",
           },
         });
-        break; // One underutilized event campaign
+        break;
       }
     }
   }
@@ -234,12 +274,15 @@ function detectContentPrograms(
 
   if (hasContentSignal || websiteUrl) {
     const brandName = brandProfile?.brand_identity?.brand_name || "Brand";
+    const industry = brandProfile?.brand_identity?.industry || "";
+    const contentType = contentSignals.find(s => brandText.includes(s)) || "insights";
+    const topicFlavor = industry ? `${industry} ` : "";
     campaigns.push({
-      campaignName: `${brandName} Weekly Insights & Tips`,
+      campaignName: `${brandName} ${topicFlavor}${capitalize(contentType)} Digest`,
       channel: "Email",
       targetSegment: "Active Digital Users",
       trigger: "Weekly recurring schedule",
-      messageTheme: "Curated insights, product tips, and market updates",
+      messageTheme: `Curated ${topicFlavor.toLowerCase()}${contentType}, product tips & expert perspectives`,
       successMetric: "Engagement Rate & Click-to-Read Rate",
       _meta: {
         sourceType: "content_program",
@@ -269,12 +312,18 @@ function detectPredictiveOpportunities(
   const hasHighDensity = events && events.length > 30;
 
   if (hasAISignal || hasHighDensity) {
+    const ctx = extractBrandContext(brandProfile);
+    const actionVerb = ctx.industry.match(/finance|bank|insurance/i) ? "Pre-Approved" 
+      : ctx.industry.match(/ecommerce|retail|shop/i) ? "Personalized Pick"
+      : ctx.industry.match(/saas|software|tech/i) ? "Smart Recommendation"
+      : "Pre-Qualified";
+    const noun = ctx.products[0] ? `${ctx.products[0]} ` : "";
     campaigns.push({
-      campaignName: "Pre-Qualified Opportunity Alert",
+      campaignName: `${actionVerb} ${noun}Opportunity Alert`,
       channel: "Push",
       targetSegment: "Likely to Convert (Predictive Score > Threshold)",
       trigger: "Predictive model score crosses activation threshold",
-      messageTheme: "Personalized offer based on behavioral prediction",
+      messageTheme: `Personalized ${noun.toLowerCase()}offer based on behavioral prediction`,
       successMetric: "Application / Conversion Rate",
       _meta: {
         sourceType: "predictive_segment",
@@ -305,11 +354,11 @@ function detectRevenueExpansion(
     const tierText = tiers.length > 0 ? tiers[tiers.length - 1] : "Premium Tier";
 
     campaigns.push({
-      campaignName: `${tierText} Invitation — Unlock Exclusive Benefits`,
+      campaignName: `${brandName} ${tierText} Upgrade — Unlock Exclusive Benefits`,
       channel: "In-App",
       targetSegment: "High-Value Users with consistent engagement",
       trigger: "Transaction frequency or engagement score threshold",
-      messageTheme: `Exclusive ${brandName} benefits — upgrade your experience`,
+      messageTheme: `Exclusive ${brandName} ${tierText} benefits — elevate your experience`,
       successMetric: "Upgrade Rate / ARPU Lift",
       _meta: {
         sourceType: "revenue_expansion",
@@ -323,12 +372,14 @@ function detectRevenueExpansion(
   // Cross-product bundling
   const products = brandProfile?.product_ecosystem?.core_products || [];
   if (products.length >= 2) {
+    const brandName = brandProfile?.brand_identity?.brand_name || "";
+    const prefix = brandName ? `${brandName} ` : "";
     campaigns.push({
-      campaignName: `Cross-Product Discovery: ${products[0]} + ${products[1]}`,
+      campaignName: `${prefix}${products[0]} × ${products[1]} Bundle Discovery`,
       channel: "Email",
       targetSegment: `Users active on ${products[0]} but not ${products[1]}`,
       trigger: "Segment-based: Single-product active users",
-      messageTheme: "Discover how these products work better together",
+      messageTheme: `See how ${products[0]} and ${products[1]} work better together`,
       successMetric: "Cross-Product Adoption Rate",
       _meta: {
         sourceType: "revenue_expansion",
@@ -346,8 +397,10 @@ function detectRevenueExpansion(
 function detectFrequencyOptimization(
   campaignData: CampaignRow[],
   sendMix: SendMixEntry[],
+  brandProfile: CoreBrandJSON | null,
 ): OpportunityCampaign[] {
   const campaigns: OpportunityCampaign[] = [];
+  const ctx = extractBrandContext(brandProfile);
 
   const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
   const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
@@ -355,18 +408,18 @@ function detectFrequencyOptimization(
   const highVolume = totalSent > 500000;
   const lowCTR = avgCTR < 1.5;
 
-  // Check if batch-heavy
   const batchHeavy = sendMix.some(s =>
     s.deliveryType.toLowerCase().includes("one time") && s.percentShare > 60
   );
 
   if ((highVolume && lowCTR) || batchHeavy) {
+    const prefix = ctx.name ? `${ctx.name} ` : "";
     campaigns.push({
-      campaignName: "Smart Frequency & Send-Time Optimization",
+      campaignName: `${prefix}Intelligent Send-Time & Frequency Calibration`,
       channel: "Push",
       targetSegment: "High Message Exposure Users (≥5 messages/week)",
       trigger: "Engagement-based frequency cap breach",
-      messageTheme: "Personalized alert control — right message, right time",
+      messageTheme: "Right message, right moment — personalized cadence",
       successMetric: "CTR Improvement & Unsubscribe Rate Reduction",
       _meta: {
         sourceType: "frequency_optimization",
@@ -399,45 +452,50 @@ function detectLifecycleGaps(
     }
   }
 
+  const brandName = brandProfile?.brand_identity?.brand_name || "";
+  const products = brandProfile?.product_ecosystem?.core_products || [];
+  const topProduct = products[0] || "";
+  const prefix = brandName ? `${brandName} ` : "";
+
   const gapStageTemplates: Record<string, Omit<OpportunityCampaign, "_meta">> = {
     onboarding: {
-      campaignName: "First 7-Day Activation Sprint",
+      campaignName: `${prefix}First 7-Day ${topProduct || "Product"} Activation Sprint`,
       channel: "Email",
       targetSegment: "New signups within 7 days",
       trigger: "Account created + no key action completed",
-      messageTheme: "Guided setup to unlock core value",
+      messageTheme: `Get started with ${topProduct || brandName || "your account"} — guided setup`,
       successMetric: "Activation Rate",
     },
     referral: {
-      campaignName: "Refer & Earn Program Launch",
+      campaignName: `${prefix}Refer & Earn — Grow the ${brandName || "Community"} Network`,
       channel: "Push",
       targetSegment: "High Engagement Users",
       trigger: "Referral layer activation — engaged user segment",
-      messageTheme: "Invite friends, earn rewards together",
+      messageTheme: `Invite peers to ${brandName || "the platform"}, earn rewards together`,
       successMetric: "Referral Conversion Rate",
     },
     winback: {
-      campaignName: "We Miss You — Personalized Return Offer",
+      campaignName: `${prefix}Return to ${topProduct || brandName || "Your Account"} — Exclusive Offer`,
       channel: "Email",
       targetSegment: "Dormant users (30+ days inactive)",
       trigger: "Inactivity threshold crossed",
-      messageTheme: "Personalized win-back with exclusive incentive",
+      messageTheme: `We've missed you — here's what's new in ${brandName || "your account"}`,
       successMetric: "Reactivation Rate",
     },
     retention: {
-      campaignName: "Loyalty Milestone & Streak Reward",
+      campaignName: `${prefix}Loyalty Milestone Celebration & Reward`,
       channel: "In-App",
       targetSegment: "Users approaching loyalty milestones",
       trigger: "Usage streak or transaction milestone",
-      messageTheme: "Celebrate your progress — unlock next tier",
+      messageTheme: `Celebrate your ${brandName || "journey"} milestones — unlock next tier`,
       successMetric: "Retention Rate & NPS Improvement",
     },
     advocacy: {
-      campaignName: "NPS & Product Feedback Loop",
+      campaignName: `${prefix}Product Experience Feedback Loop`,
       channel: "Email",
       targetSegment: "Post-transaction satisfied users",
       trigger: "Transaction completion + positive signal",
-      messageTheme: "Share your experience — help us improve",
+      messageTheme: `Help shape the future of ${brandName || "the product"}`,
       successMetric: "NPS Score & Response Rate",
     },
   };
@@ -445,12 +503,8 @@ function detectLifecycleGaps(
   for (const stage of lifecycleStages) {
     if (!coveredStages.has(stage) && gapStageTemplates[stage]) {
       const template = gapStageTemplates[stage];
-      const brandName = brandProfile?.brand_identity?.brand_name || "";
       campaigns.push({
         ...template,
-        campaignName: brandName
-          ? template.campaignName.replace(/^/, `${brandName} `)
-          : template.campaignName,
         _meta: {
           sourceType: "lifecycle_gap",
           implementedAlready: false,
@@ -472,12 +526,12 @@ export function generateOpportunities(input: OpportunityEngineInput): Opportunit
 
   // Collect all opportunity candidates
   const allCandidates: OpportunityCampaign[] = [
-    ...detectDropOffs(input.eventSchemaData),
-    ...detectUnderutilizedEvents(input.eventSchemaData, input.activeCoverage),
+    ...detectDropOffs(input.eventSchemaData, input.brandProfile),
+    ...detectUnderutilizedEvents(input.eventSchemaData, input.activeCoverage, input.brandProfile),
     ...detectContentPrograms(input.websiteUrl, input.brandProfile),
     ...detectPredictiveOpportunities(input.brandProfile, input.eventSchemaData),
     ...detectRevenueExpansion(input.brandProfile, input.activeCoverage),
-    ...detectFrequencyOptimization(input.campaignData, input.sendMix),
+    ...detectFrequencyOptimization(input.campaignData, input.sendMix, input.brandProfile),
     ...detectLifecycleGaps(input.activeCoverage, input.brandProfile),
   ];
 
@@ -538,50 +592,52 @@ function generateFallback(
   brandProfile: CoreBrandJSON | null,
 ): OpportunityCampaign | null {
   const brandName = brandProfile?.brand_identity?.brand_name || "Brand";
+  const topProduct = brandProfile?.product_ecosystem?.core_products?.[0] || "";
+  const prefix = brandName !== "Brand" ? `${brandName} ` : "";
 
   const fallbacks: Record<string, OpportunityCampaign> = {
     drop_off: {
-      campaignName: "Incomplete Journey Recovery",
+      campaignName: `${prefix}Incomplete Journey Recovery — Resume & Convert`,
       channel: "Push",
       targetSegment: "Users who started but didn't complete key actions",
       trigger: "Intent event without success event within 24h",
-      messageTheme: "Pick up where you left off — one step away",
+      messageTheme: `Pick up where you left off on ${brandName} — one step away`,
       successMetric: "Completion Rate",
       _meta: { sourceType: "drop_off", implementedAlready: false, revenueImpactLevel: "High", readinessStatus: "Requires Event" },
     },
     underutilized_event: {
-      campaignName: "Engagement-to-Revenue Accelerator",
+      campaignName: `${prefix}Engagement-to-Revenue Accelerator`,
       channel: "Email",
       targetSegment: "High-engagement users not yet converted",
       trigger: "Engagement score above threshold, no revenue event",
-      messageTheme: "Your activity unlocks exclusive opportunities",
+      messageTheme: `Your ${brandName} activity unlocks exclusive opportunities`,
       successMetric: "First Conversion Rate",
       _meta: { sourceType: "underutilized_event", implementedAlready: false, revenueImpactLevel: "Medium", readinessStatus: "Requires Event" },
     },
     content_program: {
-      campaignName: `${brandName} Monthly Product Deep Dive`,
+      campaignName: `${brandName} Monthly ${topProduct || "Product"} Deep Dive`,
       channel: "Email",
       targetSegment: "All active users",
       trigger: "Monthly recurring schedule",
-      messageTheme: "Expert insights and product mastery tips",
+      messageTheme: `Expert ${topProduct || brandName} insights and mastery tips`,
       successMetric: "Engagement Rate",
       _meta: { sourceType: "content_program", implementedAlready: false, revenueImpactLevel: "Low", readinessStatus: "Ready" },
     },
     predictive_segment: {
-      campaignName: "Churn Risk Intervention",
+      campaignName: `${prefix}Churn Risk Intervention — Proactive Save`,
       channel: "Email",
       targetSegment: "Likely to Churn (Predictive)",
       trigger: "Churn prediction model score > threshold",
-      messageTheme: "Personalized re-engagement with exclusive value",
+      messageTheme: `Personalized re-engagement with exclusive ${brandName} value`,
       successMetric: "Retention Save Rate",
       _meta: { sourceType: "predictive_segment", implementedAlready: false, revenueImpactLevel: "High", readinessStatus: "Requires Predictive Layer" },
     },
     revenue_expansion: {
-      campaignName: `${brandName} Premium Tier Invitation`,
+      campaignName: `${brandName} Premium Upgrade — Unlock Next-Level Benefits`,
       channel: "In-App",
       targetSegment: "High transaction frequency users",
       trigger: "Revenue threshold or usage milestone",
-      messageTheme: "Exclusive benefits await — upgrade your experience",
+      messageTheme: `Exclusive ${brandName} benefits await — elevate your experience`,
       successMetric: "Upgrade Rate",
       _meta: { sourceType: "revenue_expansion", implementedAlready: false, revenueImpactLevel: "High", readinessStatus: "Ready" },
     },

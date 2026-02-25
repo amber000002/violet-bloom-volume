@@ -38,10 +38,14 @@ RULES:
 - Focus on revenue-expansion, behavioral monetization, predictive segments, or content-driven engagement.
 - DO NOT duplicate any campaign that already exists (provided below).
 - Campaigns must be actionable and tied to measurable KPIs.
+- CRITICAL: Campaign names MUST be brand-personalized and descriptive. Use the brand name, product names, industry vocabulary, or positioning language directly in the campaign name. 
+  - Good examples: "Spotify Discover Weekly Engagement Boost", "Robinhood Pre-Approved Stock Alert", "Notion Workspace Adoption Sprint"
+  - Bad examples: "Re-Engagement Campaign", "Upsell Flow", "Newsletter Program"
+- Each campaign name should clearly communicate what the campaign does and feel like it was written by someone who deeply understands the brand.
 - Return ONLY valid JSON — no markdown, no explanation.
 
 Return a JSON array of exactly 4 objects with these fields:
-- campaignName (string)
+- campaignName (string — must include brand name or product name and be descriptive of the campaign's goal)
 - channel (string: "Email", "Push", "In-App", "SMS", or "WhatsApp")
 - targetSegment (string)
 - trigger (string)
