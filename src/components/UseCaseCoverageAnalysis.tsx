@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FileText, 
@@ -11,10 +11,14 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronRight,
+  Search,
+  ShieldCheck,
+  Eye,
 } from "lucide-react";
 import { CampaignRow } from "@/lib/csvAnalyzer";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { ResourceJourney, ResourceCampaign, IndustryRelevance } from "@/types/resources";
+import { resolveUnderReviewCampaigns, persistResolutions, ReviewResolution } from "@/lib/reviewResolver";
 import {
   Table,
   TableBody,
@@ -157,6 +161,85 @@ const UseCaseCoverageRow: React.FC<{ uc: UseCaseCoverage; pct: string }> = ({ uc
         </TableRow>
       )}
     </>
+  );
+};
+
+// ── Review Resolver sub-components ──────────────────────────────────────
+
+const ResolvedSuggestionRow: React.FC<{ resolution: ReviewResolution }> = ({ resolution }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="bg-green-500/5 border border-green-500/15 rounded-lg p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium truncate">{resolution.campaignName}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            → <span className="text-green-700 font-medium">{resolution.matchedUseCaseName}</span>
+            {resolution.matchedStage && (
+              <span className="ml-1.5 text-muted-foreground">({resolution.matchedStage})</span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          <Badge className="bg-green-500/20 text-green-700 border-green-500/30 text-[10px]">
+            {((resolution.confidence || 0) * 100).toFixed(0)}% conf
+          </Badge>
+          <button onClick={() => setExpanded(!expanded)} className="text-muted-foreground hover:text-foreground">
+            <ChevronRight className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </button>
+        </div>
+      </div>
+      {expanded && resolution.evidenceUsed && (
+        <div className="mt-2 pt-2 border-t border-green-500/10 text-[11px] text-muted-foreground space-y-1">
+          <p className="font-medium text-foreground">Evidence:</p>
+          {Object.entries(resolution.evidenceUsed).map(([key, val]) => (
+            <p key={key}><span className="text-green-700">{key}:</span> {val}</p>
+          ))}
+          {resolution.reasonCodes && (
+            <p><span className="text-green-700">Reason codes:</span> {resolution.reasonCodes.join(", ")}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const UnderReviewRow: React.FC<{ resolution: ReviewResolution }> = ({ resolution }) => {
+  const [expanded, setExpanded] = useState(false);
+  const reasonLabel: Record<string, string> = {
+    insufficient_evidence: "Insufficient Evidence",
+    ambiguous: "Ambiguous — Multiple Candidates",
+    out_of_taxonomy: "Out of Taxonomy",
+  };
+
+  return (
+    <div className="bg-muted/30 border border-border rounded-lg p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium truncate">{resolution.campaignName}</p>
+          <p className="text-[11px] text-amber-600 mt-0.5">
+            {reasonLabel[resolution.reasonForReview || ""] || resolution.reasonForReview}
+          </p>
+        </div>
+        {(resolution.topCandidates?.length || 0) > 0 && (
+          <button onClick={() => setExpanded(!expanded)} className="text-muted-foreground hover:text-foreground shrink-0 ml-2">
+            <ChevronRight className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </button>
+        )}
+      </div>
+      {expanded && resolution.topCandidates && resolution.topCandidates.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-border text-[11px] text-muted-foreground space-y-1">
+          <p className="font-medium text-foreground">Top Candidates:</p>
+          {resolution.topCandidates.map((c, i) => (
+            <p key={i}>
+              #{i + 1} <span className="font-medium">{c.useCaseName}</span>{" "}
+              <span className="text-primary">({(c.confidence * 100).toFixed(0)}%)</span>
+              {c.reasonCodes.length > 0 && <span className="text-muted-foreground"> — {c.reasonCodes.join(", ")}</span>}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -419,6 +502,36 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
     };
   }, [mappedCampaigns, coverageSummary, missingUseCases]);
 
+  // ── Review Resolver Layer ──────────────────────────────────────────────
+  const unclassifiedCampaigns = useMemo(() => {
+    return mappedCampaigns.filter(m => m.source === "unclassified").map(m => m.campaign);
+  }, [mappedCampaigns]);
+
+  const reviewResolutions = useMemo((): ReviewResolution[] => {
+    if (unclassifiedCampaigns.length === 0 || internalUseCases.length === 0) return [];
+    return resolveUnderReviewCampaigns(
+      unclassifiedCampaigns,
+      internalUseCases.map(uc => ({
+        ...uc,
+        events: uc.keywords.filter(k => k.includes("event") || k.includes("_")),
+        segments: uc.keywords.filter(k => k.includes("segment") || k.includes("user")),
+      })),
+      industry
+    );
+  }, [unclassifiedCampaigns, internalUseCases, industry]);
+
+  const resolvedFromReview = useMemo(() => reviewResolutions.filter(r => r.status === "resolved"), [reviewResolutions]);
+  const stillUnderReview = useMemo(() => reviewResolutions.filter(r => r.status === "under_review"), [reviewResolutions]);
+
+  // Persist resolutions on change (fire-and-forget)
+  useEffect(() => {
+    if (reviewResolutions.length > 0) {
+      persistResolutions(reviewResolutions, industry).catch(() => {});
+    }
+  }, [reviewResolutions, industry]);
+
+  const [showResolverDetails, setShowResolverDetails] = useState(false);
+
   const getSourceBadge = (source: UseCaseSource) => {
     switch (source) {
       case "internal":
@@ -567,6 +680,79 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
                 </p>
               )}
             </div>
+
+            {/* ── Review Resolver Results ────────────────────────────── */}
+            {reviewResolutions.length > 0 && (
+              <div className="border border-border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setShowResolverDetails(!showResolverDetails)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-muted/20 transition-colors"
+                >
+                  <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
+                    <Search className="w-4 h-4 text-primary" />
+                    Review Resolver
+                    <Badge className="bg-primary/10 text-primary border-primary/20 ml-1">
+                      {resolvedFromReview.length} resolved
+                    </Badge>
+                    <Badge variant="outline" className="text-muted-foreground ml-1">
+                      {stillUnderReview.length} still under review
+                    </Badge>
+                  </h4>
+                  {showResolverDetails ? (
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {showResolverDetails && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="px-4 pb-4 space-y-4"
+                    >
+                      <p className="text-xs text-muted-foreground">
+                        The Review Resolver applies enhanced multi-field matching to campaigns that were unclassified by the primary engine.
+                        Only suggestions with confidence ≥ 0.85 and margin ≥ 0.08 over the next candidate are auto-resolved.
+                        <strong> These are suggestions only — they do not modify the main coverage summary.</strong>
+                      </p>
+
+                      {/* Resolved Suggestions */}
+                      {resolvedFromReview.length > 0 && (
+                        <div className="space-y-2">
+                          <h5 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
+                            Resolved Suggestions ({resolvedFromReview.length})
+                          </h5>
+                          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                            {resolvedFromReview.map((r, i) => (
+                              <ResolvedSuggestionRow key={i} resolution={r} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Still Under Review */}
+                      {stillUnderReview.length > 0 && (
+                        <div className="space-y-2">
+                          <h5 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <Eye className="w-3.5 h-3.5 text-amber-600" />
+                            Still Under Review ({stillUnderReview.length})
+                          </h5>
+                          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                            {stillUnderReview.map((r, i) => (
+                              <UnderReviewRow key={i} resolution={r} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Missing Use Cases Section */}
             {missingUseCases.length > 0 && (
