@@ -24,6 +24,9 @@ export interface CampaignRow {
   hardBounces: number;
   softBounces: number;
   whoQuery: string;
+  deliveryType: string;
+  conversionEvent: string;
+  labels: string;
   // Calculated rates
   openRate: number;
   clickRate: number;
@@ -744,6 +747,9 @@ export const parseCSV = (csvText: string): ValidationResult => {
       hardBounces,
       softBounces,
       whoQuery: getValue("who query"),
+      deliveryType: getValue("delivery") || getValue("delivery type") || "",
+      conversionEvent: getValue("conversion event") || getValue("conversion_event") || "",
+      labels: getValue("labels") || "",
       openRate: baseForRates > 0 ? (uniqueViewed / baseForRates) * 100 : 0,
       clickRate: baseForRates > 0 ? (uniqueClicked / baseForRates) * 100 : 0,
       unsubscribeRate: baseForRates > 0 ? (unsubscribes / baseForRates) * 100 : 0,

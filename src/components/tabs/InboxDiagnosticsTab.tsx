@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CoreBrandJSON } from "@/types/brandProfile";
 import { StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
 import { StrategicInsights } from "../StrategicInsights";
+import { StrategicInsightsExtended } from "../StrategicInsightsExtended";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -51,6 +52,9 @@ import { Button } from "../ui/button";
 import { DataIntegrityPanel } from "../DataIntegrityPanel";
 import { UseCaseCoverageAnalysis } from "../UseCaseCoverageAnalysis";
 import { LifecycleCoverageMatrix } from "../LifecycleCoverageMatrix";
+import { parseEventSchemaCSV, parseUserPropertyCSV, EventSchemaRow, UserPropertyRow } from "@/lib/schemaAnalyzer";
+import { generateExtendedInsights, ExtendedInsightsData, CoverageDataForRevenue } from "@/lib/strategicInsightsExtendedEngine";
+import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import {
   EmailMetricsTrendChart,
   InfrastructureDetailsTable,
@@ -538,6 +542,54 @@ const ColoredPercent: React.FC<{ value: number; metricType: MetricType }> = ({ v
   );
 };
 
+// Wrapper component for extended insights that computes coverage data
+const StrategicInsightsExtendedWrapper: React.FC<{
+  campaignData: CampaignRow[];
+  eventSchemaData: EventSchemaRow[] | null;
+  userPropertyData: UserPropertyRow[] | null;
+  industry: string;
+  brandName: string;
+}> = ({ campaignData, eventSchemaData, userPropertyData, industry, brandName }) => {
+  const { resources, getResourcesForTab } = useResourceLibrary();
+  
+  const extendedData = useMemo(() => {
+    // Build coverage data from internal resources
+    const tabResources = getResourcesForTab("inbox-potential");
+    const coverageData: CoverageDataForRevenue[] = [];
+    
+    tabResources.forEach(r => {
+      const journeys = r.journeys || [];
+      const campaigns = r.campaigns || [];
+      [...journeys, ...campaigns].forEach(uc => {
+        const name = 'name' in uc ? uc.name : '';
+        const stage = uc.stage || "Unknown";
+        // Check if any campaign matches this use case (simplified)
+        const matchCount = campaignData.filter(c => 
+          c.campaignName.toLowerCase().includes(name.toLowerCase().split(" ")[0]) ||
+          (c.title || "").toLowerCase().includes(name.toLowerCase().split(" ")[0])
+        ).length;
+        
+        coverageData.push({
+          useCaseName: name,
+          stage,
+          status: matchCount > 0 ? "active" : "missing",
+          campaignCount: matchCount,
+        });
+      });
+    });
+
+    // If no internal resources, create minimal coverage data
+    if (coverageData.length === 0) {
+      const stages = ["Onboarding", "Engagement", "Monetization", "Retention", "Churn Prevention"];
+      stages.forEach(s => coverageData.push({ useCaseName: `${s} Journey`, stage: s, status: "missing", campaignCount: 0 }));
+    }
+
+    return generateExtendedInsights(campaignData, coverageData, eventSchemaData, userPropertyData, brandName);
+  }, [campaignData, eventSchemaData, userPropertyData, brandName, getResourcesForTab]);
+
+  return <StrategicInsightsExtended data={extendedData} />;
+};
+
 export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   industry,
   viewMode = "app",
@@ -554,6 +606,10 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [contextText, setContextText] = useState<string>("");
   const [campaignFileName, setCampaignFileName] = useState<string>("");
   const [postmasterFileName, setPostmasterFileName] = useState<string>("");
+  const [eventSchemaFileName, setEventSchemaFileName] = useState<string>("");
+  const [userPropertyFileName, setUserPropertyFileName] = useState<string>("");
+  const [eventSchemaData, setEventSchemaData] = useState<EventSchemaRow[] | null>(null);
+  const [userPropertyData, setUserPropertyData] = useState<UserPropertyRow[] | null>(null);
   
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
@@ -633,6 +689,40 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       handlePostmasterUpload(file);
     }
   }, [handlePostmasterUpload]);
+
+  const handleEventSchemaUpload = useCallback((file: File) => {
+    setEventSchemaFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const result = parseEventSchemaCSV(text);
+      if (result.isValid) {
+        setEventSchemaData(result.data);
+        toast.success(`Event schema loaded: ${result.totalEvents} events`);
+      } else {
+        toast.error(result.errors[0] || "Failed to parse event schema");
+        setEventSchemaFileName("");
+      }
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const handleUserPropertyUpload = useCallback((file: File) => {
+    setUserPropertyFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const result = parseUserPropertyCSV(text);
+      if (result.isValid) {
+        setUserPropertyData(result.data);
+        toast.success(`User properties loaded: ${result.totalProperties} properties`);
+      } else {
+        toast.error(result.errors[0] || "Failed to parse user properties");
+        setUserPropertyFileName("");
+      }
+    };
+    reader.readAsText(file);
+  }, []);
 
   const runAnalysisReport = useCallback(() => {
     if (campaignData.length === 0) return;
@@ -777,6 +867,10 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setStrategicContext("");
     setCampaignFileName("");
     setPostmasterFileName("");
+    setEventSchemaFileName("");
+    setUserPropertyFileName("");
+    setEventSchemaData(null);
+    setUserPropertyData(null);
     setDiagnostics(null);
     setStrategicInsights(null);
     setActiveReport(null);
@@ -923,6 +1017,69 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </div>
 
+          {/* Event Schema & User Property Schema Uploads (1x2 layout) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Event Schema Upload */}
+            <div className="magic-card rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary" />
+                  Event Schema
+                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </h3>
+                {eventSchemaFileName && (
+                  <button onClick={() => { setEventSchemaData(null); setEventSchemaFileName(""); }} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              {!eventSchemaFileName ? (
+                <div className="relative border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer border-border hover:border-primary/50">
+                  <input type="file" accept=".csv" onChange={(e) => e.target.files?.[0] && handleEventSchemaUpload(e.target.files[0])} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">Upload events_schema.csv</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">Analyze lifecycle instrumentation & funnel health</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-xs">{eventSchemaFileName}</span>
+                  <span className="text-[10px] text-muted-foreground">• {eventSchemaData?.length || 0} events</span>
+                </div>
+              )}
+            </div>
+
+            {/* User Property Schema Upload */}
+            <div className="magic-card rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-primary" />
+                  User Property Schema
+                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </h3>
+                {userPropertyFileName && (
+                  <button onClick={() => { setUserPropertyData(null); setUserPropertyFileName(""); }} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              {!userPropertyFileName ? (
+                <div className="relative border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer border-border hover:border-primary/50">
+                  <input type="file" accept=".csv" onChange={(e) => e.target.files?.[0] && handleUserPropertyUpload(e.target.files[0])} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">Upload user_properties_schema.csv</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">Analyze segmentation & personalization readiness</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-xs">{userPropertyFileName}</span>
+                  <span className="text-[10px] text-muted-foreground">• {userPropertyData?.length || 0} properties</span>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Context Text (Optional) */}
           <div className="magic-card rounded-2xl p-6">
             <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
@@ -1019,7 +1176,19 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <p className="text-muted-foreground/60 text-xs">This may take 15-30 seconds</p>
             </div>
           ) : strategicInsights ? (
-            <StrategicInsights data={strategicInsights} />
+            <>
+              <StrategicInsights data={strategicInsights} />
+              {/* Extended Revenue Intelligence — appended after existing tables */}
+              {campaignData.length > 0 && (
+                <StrategicInsightsExtendedWrapper
+                  campaignData={campaignData}
+                  eventSchemaData={eventSchemaData}
+                  userPropertyData={userPropertyData}
+                  industry={industry}
+                  brandName={brandProfile?.brand_identity?.brand_name || ""}
+                />
+              )}
+            </>
           ) : null}
         </motion.div>
       )}
