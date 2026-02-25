@@ -174,14 +174,10 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
     fetchAI();
   }, [brandProfile, campaignData, activeCoverage, eventSchemaData, deterministicResult.campaigns, aiFetched]);
 
-  // Merge: AI first, then deterministic, cap at 7
+  // Use only AI campaigns (all 7)
   const mergedCampaigns = useMemo(() => {
-    const all: (OpportunityCampaign & { _aiGenerated?: boolean })[] = [
-      ...aiCampaigns,
-      ...deterministicResult.campaigns.map(c => ({ ...c, _aiGenerated: false })),
-    ];
-    return all.slice(0, 7);
-  }, [aiCampaigns, deterministicResult.campaigns]);
+    return aiCampaigns.slice(0, 7);
+  }, [aiCampaigns]);
 
   // Compute source distribution from merged
   const opportunitySources = useMemo(() => {
