@@ -55,6 +55,8 @@ import { LifecycleCoverageMatrix } from "../LifecycleCoverageMatrix";
 import { parseEventSchemaCSV, parseUserPropertyCSV, EventSchemaRow, UserPropertyRow } from "@/lib/schemaAnalyzer";
 import { generateExtendedInsights, ExtendedInsightsData, CoverageDataForRevenue } from "@/lib/strategicInsightsExtendedEngine";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
+import { OpportunityRefreshEngine } from "../OpportunityRefreshEngine";
+import { ActiveUseCaseInfo } from "@/lib/opportunityEngine";
 import {
   EmailMetricsTrendChart,
   InfrastructureDetailsTable,
@@ -549,10 +551,12 @@ const StrategicInsightsExtendedWrapper: React.FC<{
   userPropertyData: UserPropertyRow[] | null;
   industry: string;
   brandName: string;
-}> = ({ campaignData, eventSchemaData, userPropertyData, industry, brandName }) => {
+  brandProfile?: CoreBrandJSON | null;
+  websiteUrl?: string;
+}> = ({ campaignData, eventSchemaData, userPropertyData, industry, brandName, brandProfile, websiteUrl }) => {
   const { resources, getResourcesForTab } = useResourceLibrary();
   
-  const extendedData = useMemo(() => {
+  const { extendedData, activeCoverage, coverageData } = useMemo(() => {
     // Build coverage data from internal resources
     const tabResources = getResourcesForTab("inbox-potential");
     const coverageData: CoverageDataForRevenue[] = [];
@@ -563,7 +567,6 @@ const StrategicInsightsExtendedWrapper: React.FC<{
       [...journeys, ...campaigns].forEach(uc => {
         const name = 'name' in uc ? uc.name : '';
         const stage = uc.stage || "Unknown";
-        // Check if any campaign matches this use case (simplified)
         const matchCount = campaignData.filter(c => 
           c.campaignName.toLowerCase().includes(name.toLowerCase().split(" ")[0]) ||
           (c.title || "").toLowerCase().includes(name.toLowerCase().split(" ")[0])
@@ -578,16 +581,38 @@ const StrategicInsightsExtendedWrapper: React.FC<{
       });
     });
 
-    // If no internal resources, create minimal coverage data
     if (coverageData.length === 0) {
       const stages = ["Onboarding", "Engagement", "Monetization", "Retention", "Churn Prevention"];
       stages.forEach(s => coverageData.push({ useCaseName: `${s} Journey`, stage: s, status: "missing", campaignCount: 0 }));
     }
 
-    return generateExtendedInsights(campaignData, coverageData, eventSchemaData, userPropertyData, brandName);
+    // Build activeCoverage for opportunity engine
+    const activeCoverage: ActiveUseCaseInfo[] = coverageData.map(cd => ({
+      name: cd.useCaseName,
+      stage: cd.stage,
+      status: cd.status,
+    }));
+
+    const extendedData = generateExtendedInsights(campaignData, coverageData, eventSchemaData, userPropertyData, brandName);
+
+    return { extendedData, activeCoverage, coverageData };
   }, [campaignData, eventSchemaData, userPropertyData, brandName, getResourcesForTab]);
 
-  return <StrategicInsightsExtended data={extendedData} />;
+  return (
+    <>
+      <StrategicInsightsExtended data={extendedData} />
+      {/* Opportunity Refresh Engine */}
+      <OpportunityRefreshEngine
+        campaignData={campaignData}
+        activeCoverage={activeCoverage}
+        sendMix={extendedData.sendMix}
+        eventSchemaData={eventSchemaData}
+        userPropertyData={userPropertyData}
+        brandProfile={brandProfile || null}
+        websiteUrl={websiteUrl || ""}
+      />
+    </>
+  );
 };
 
 export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
@@ -1186,6 +1211,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   userPropertyData={userPropertyData}
                   industry={industry}
                   brandName={brandProfile?.brand_identity?.brand_name || ""}
+                  brandProfile={brandProfile}
+                  websiteUrl={websiteUrl}
                 />
               )}
             </>
