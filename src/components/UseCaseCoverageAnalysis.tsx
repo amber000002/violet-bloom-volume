@@ -563,11 +563,9 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
       background: 'rgba(255, 255, 255, 0.45)',
       backdropFilter: 'blur(24px) saturate(1.8)',
       WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-      border: '1px solid rgba(255, 255, 255, 0.5)',
+      border: '1px solid rgba(255, 255, 255, 0.15)',
       boxShadow: '0 20px 50px rgba(99, 102, 241, 0.08)',
     }}>
-      {/* Top gradient accent */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] z-[1]" style={{ background: 'linear-gradient(to right, #A855F7, #FB7185)' }} />
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between p-6 hover:bg-muted/20 transition-colors"

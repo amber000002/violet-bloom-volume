@@ -33,11 +33,8 @@ const StrategySection: React.FC<{
         background: "rgba(255, 255, 255, 0.7)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid rgba(255, 255, 255, 0.4)",
+        border: "1px solid rgba(255, 255, 255, 0.15)",
         boxShadow: "0 20px 50px rgba(0, 0, 0, 0.04)",
-        borderTop: "2px solid transparent",
-        borderImage: "linear-gradient(to right, #A855F7, #FB7185) 1",
-        borderImageSlice: "1 1 0 0",
       }}
     >
       <button
