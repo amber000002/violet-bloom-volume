@@ -11,20 +11,10 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronRight,
-  Download,
 } from "lucide-react";
-import { exportCoverageCSV, exportCoverageXLSX } from "@/lib/coverageExport";
 import { CampaignRow } from "@/lib/csvAnalyzer";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { ResourceJourney, ResourceCampaign, IndustryRelevance } from "@/types/resources";
-import {
-  normalizeForMatching,
-  extractSignalTokens,
-  countTokenOverlap,
-  getDeliveryTypeStageBias,
-  MatchTrace,
-  MatchReasonCode,
-} from "@/lib/coverageNormalization";
 import {
   Table,
   TableBody,
@@ -53,7 +43,6 @@ interface MappedCampaign {
   framework: string | null;
   source: UseCaseSource;
   matchConfidence: "high" | "medium" | "low";
-  matchTrace: MatchTrace;
 }
 
 interface UseCaseCoverage {
@@ -69,13 +58,13 @@ interface UseCaseCoverage {
   status: "active" | "missing" | "review-needed";
 }
 
-// Normalize text for matching using PRD v2 pipeline
+// Clean subject line by removing "{Subject:" prefix and preheader text
 const cleanSubjectLine = (subject: string): string => {
   if (!subject) return '';
   let cleaned = subject.replace(/^\{Subject:\s*/i, '').replace(/\}$/, '').trim();
   cleaned = cleaned.split('|')[0].trim();
   cleaned = cleaned.split(',Preheader:')[0].trim();
-  return normalizeForMatching(cleaned);
+  return cleaned.toLowerCase();
 };
 
 // Lovable-inferred use case patterns with stage assignments
@@ -242,169 +231,56 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
     return useCases;
   }, [resources, industry, findMatchingResources]);
 
-  // Map campaigns to use cases with enhanced v2 resolution logic
+  // Map campaigns to use cases with strict resolution logic
   const mappedCampaigns = useMemo((): MappedCampaign[] => {
     // Apply 1,000-send noise filter
     const significantCampaigns = campaignData.filter(c => c.totalSentUsers >= 1000);
     return significantCampaigns.map(campaign => {
-      // ===== PRD v2: Normalize all evidence fields =====
-      const normTitle = cleanSubjectLine(campaign.title || campaign.subjectLine);
-      const normCampaignName = normalizeForMatching(campaign.campaignName);
-      const normWhoQuery = normalizeForMatching(campaign.whoQuery || "");
-      const normConversionEvent = normalizeForMatching(campaign.conversionEvent || "");
-      const normLabels = normalizeForMatching(campaign.labels || "");
-      const normDeliveryType = normalizeForMatching(campaign.deliveryType || "");
+      const subjectLower = cleanSubjectLine(campaign.title || campaign.subjectLine);
+      const campaignNameLower = campaign.campaignName.toLowerCase();
+      const combinedText = `${subjectLower} ${campaignNameLower}`;
 
-      // Combined text for broad matching (all evidence fields)
-      const allEvidenceText = [normTitle, normCampaignName, normWhoQuery, normConversionEvent, normLabels].filter(Boolean).join(" ");
-
-      // Delivery type stage bias (narrows possible stages, does NOT assign use case)
-      const stageBias = getDeliveryTypeStageBias(campaign.deliveryType || "");
-
-      // ===== Priority 1: Internal Resource Match (Enhanced Multi-Field) =====
-      let bestInternalMatch: { useCase: typeof internalUseCases[0]; confidence: "high" | "medium"; reasonCodes: MatchReasonCode[]; evidenceFields: string[] } | null = null;
-
+      // Priority 1: Internal Resource Match (Authoritative)
       for (const useCase of internalUseCases) {
-        const reasonCodes: MatchReasonCode[] = [];
-        const evidenceFields: string[] = [];
+        const matchesKeyword = useCase.keywords.some(keyword => 
+          combinedText.includes(keyword) || keyword.includes(subjectLower.slice(0, 20))
+        );
+        
+        // Also check if use case name appears in campaign
+        const matchesName = combinedText.includes(useCase.name.toLowerCase()) ||
+          useCase.name.toLowerCase().split(' ').some(word => 
+            word.length > 3 && combinedText.includes(word)
+          );
 
-        // A) Direct Keyword Match across all fields
-        for (const keyword of useCase.keywords) {
-          if (!keyword || keyword.length < 3) continue;
-          const normKeyword = normalizeForMatching(keyword);
-          if (normCampaignName.includes(normKeyword)) {
-            reasonCodes.push("keyword_hit_campaign_name");
-            evidenceFields.push("campaign_name");
-          }
-          if (normTitle.includes(normKeyword)) {
-            reasonCodes.push("keyword_hit_title");
-            evidenceFields.push("title");
-          }
-          if (normWhoQuery.includes(normKeyword)) {
-            reasonCodes.push("keyword_hit_who_query");
-            evidenceFields.push("who_query");
-          }
-          if (normConversionEvent.includes(normKeyword)) {
-            reasonCodes.push("keyword_hit_conversion_event");
-            evidenceFields.push("conversion_event");
-          }
-          if (normLabels.includes(normKeyword)) {
-            reasonCodes.push("keyword_hit_labels");
-            evidenceFields.push("labels");
-          }
-        }
-
-        // Also check use case name tokens
-        const ucNameNorm = normalizeForMatching(useCase.name);
-        if (allEvidenceText.includes(ucNameNorm)) {
-          reasonCodes.push("keyword_hit_campaign_name");
-          evidenceFields.push("use_case_name_in_evidence");
-        }
-
-        // B) Token Overlap Match (≥2 high-signal tokens)
-        if (reasonCodes.length === 0) {
-          const ucDescription = normalizeForMatching(useCase.description || "");
-          const ucFullText = `${ucNameNorm} ${ucDescription}`;
-
-          // Check token overlap with conversion_event and who_query
-          if (normConversionEvent) {
-            const overlap = countTokenOverlap(normConversionEvent, ucFullText);
-            if (overlap.count >= 2) {
-              reasonCodes.push("token_overlap_threshold_met");
-              evidenceFields.push("conversion_event");
-            }
-          }
-          if (normWhoQuery && reasonCodes.length === 0) {
-            const overlap = countTokenOverlap(normWhoQuery, ucFullText);
-            if (overlap.count >= 2) {
-              reasonCodes.push("token_overlap_threshold_met");
-              evidenceFields.push("who_query");
-            }
-          }
-        }
-
-        // C) Delivery Type Stage Narrowing (boost confidence if stage aligns)
-        if (reasonCodes.length > 0 && stageBias.length > 0) {
-          const ucStageNorm = normalizeForMatching(useCase.stage);
-          if (stageBias.some(s => normalizeForMatching(s) === ucStageNorm)) {
-            reasonCodes.push("delivery_type_narrowed_stage");
-            evidenceFields.push("delivery_type");
-          }
-        }
-
-        // D) Conversion Event Override (High Signal Rule)
-        if (reasonCodes.length === 0 && normConversionEvent) {
-          // Direct match: conversion event matches use case name or key events
-          const ucNameTokens = extractSignalTokens(useCase.name);
-          const convTokens = extractSignalTokens(normConversionEvent);
-          const directOverlap = convTokens.filter(t => ucNameTokens.includes(t));
-          if (directOverlap.length >= 2 || normConversionEvent.includes(ucNameNorm)) {
-            reasonCodes.push("conversion_event_direct_match");
-            evidenceFields.push("conversion_event");
-          }
-        }
-
-        if (reasonCodes.length > 0) {
-          const confidence = reasonCodes.includes("keyword_hit_conversion_event") || 
-                            reasonCodes.includes("conversion_event_direct_match") ||
-                            reasonCodes.filter(r => r.startsWith("keyword_hit_")).length >= 2 
-                            ? "high" : "medium";
-          
-          // Pick best match (most reason codes)
-          if (!bestInternalMatch || reasonCodes.length > bestInternalMatch.reasonCodes.length) {
-            bestInternalMatch = { useCase, confidence, reasonCodes: [...new Set(reasonCodes)], evidenceFields: [...new Set(evidenceFields)] };
-          }
-        }
-      }
-
-      if (bestInternalMatch) {
-        return {
-          campaign,
-          useCaseName: bestInternalMatch.useCase.name,
-          useCaseId: bestInternalMatch.useCase.id,
-          stage: bestInternalMatch.useCase.stage,
-          framework: bestInternalMatch.useCase.framework,
-          source: "internal" as UseCaseSource,
-          matchConfidence: bestInternalMatch.confidence,
-          matchTrace: {
-            matchSource: "internal",
-            matchedUseCaseId: bestInternalMatch.useCase.id,
-            evidenceFieldsUsed: bestInternalMatch.evidenceFields,
-            matchReasonCodes: bestInternalMatch.reasonCodes,
-          },
-        };
-      }
-
-      // ===== Priority 2: Lovable-Inferred Regex (now checks all evidence fields) =====
-      for (const pattern of INFERRED_USE_CASE_PATTERNS) {
-        if (pattern.pattern.test(allEvidenceText)) {
-          // Determine which field triggered the match
-          const triggeredFields: string[] = [];
-          if (pattern.pattern.test(normTitle)) triggeredFields.push("title");
-          if (pattern.pattern.test(normCampaignName)) triggeredFields.push("campaign_name");
-          if (pattern.pattern.test(normWhoQuery)) triggeredFields.push("who_query");
-          if (pattern.pattern.test(normConversionEvent)) triggeredFields.push("conversion_event");
-          if (pattern.pattern.test(normLabels)) triggeredFields.push("labels");
-
+        if (matchesKeyword || matchesName) {
           return {
             campaign,
-            useCaseName: pattern.useCaseName,
-            useCaseId: null,
-            stage: pattern.stage,
-            framework: pattern.framework,
-            source: "lovable-inferred" as UseCaseSource,
-            matchConfidence: pattern.confidence,
-            matchTrace: {
-              matchSource: "inferred",
-              matchedUseCaseId: null,
-              evidenceFieldsUsed: triggeredFields.length > 0 ? triggeredFields : ["combined_text"],
-              matchReasonCodes: ["regex_rule_hit"],
-            },
+            useCaseName: useCase.name,
+            useCaseId: useCase.id,
+            stage: useCase.stage, // Stage MUST come from internal resource
+            framework: useCase.framework,
+            source: "internal" as UseCaseSource,
+            matchConfidence: matchesKeyword ? "high" : "medium",
           };
         }
       }
 
-      // ===== Priority 3: Unclassified =====
+      // Priority 2: Lovable-Inferred Match
+      for (const pattern of INFERRED_USE_CASE_PATTERNS) {
+        if (pattern.pattern.test(combinedText)) {
+          return {
+            campaign,
+            useCaseName: pattern.useCaseName,
+            useCaseId: null,
+            stage: pattern.stage, // Labeled as inferred
+            framework: pattern.framework,
+            source: "lovable-inferred" as UseCaseSource,
+            matchConfidence: pattern.confidence,
+          };
+        }
+      }
+
+      // Priority 3: Unclassified
       return {
         campaign,
         useCaseName: null,
@@ -413,12 +289,6 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
         framework: null,
         source: "unclassified" as UseCaseSource,
         matchConfidence: "low",
-        matchTrace: {
-          matchSource: "unclassified",
-          matchedUseCaseId: null,
-          evidenceFieldsUsed: [],
-          matchReasonCodes: [],
-        },
       };
     });
   }, [campaignData, internalUseCases]);
@@ -670,25 +540,7 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
 
             {/* Use Case Coverage Table */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-sm text-foreground">Use Case Coverage Summary</h4>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => exportCoverageCSV(mappedCampaigns)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Export CSV
-                  </button>
-                  <button
-                    onClick={() => exportCoverageXLSX(mappedCampaigns)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Export XLSX
-                  </button>
-                </div>
-              </div>
+              <h4 className="font-semibold text-sm text-foreground">Use Case Coverage Summary</h4>
               <div className="overflow-x-auto rounded-lg border border-border">
                 <Table>
                   <TableHeader>
@@ -768,8 +620,7 @@ export const UseCaseCoverageAnalysis: React.FC<UseCaseCoverageAnalysisProps> = (
 
             {/* Footnote */}
             <p className="text-xs text-muted-foreground italic border-t border-border pt-3">
-              * Campaigns with fewer than 1,000 sends are excluded as noise. Enhanced v2 matching evaluates campaign_name, title, who_query, conversion_event, labels, and delivery_type. 
-              Internal resource matches take precedence. Token overlap (≥2 tokens) and conversion event overrides are deterministic. 
+              * Campaigns with fewer than 1,000 sends are excluded as noise. Use case coverage is based on campaign count. Internal resource matches take precedence over Lovable inference. 
               Percentages are calculated from {stats.total} significant campaigns.
             </p>
           </motion.div>
