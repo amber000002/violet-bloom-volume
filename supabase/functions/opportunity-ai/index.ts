@@ -31,7 +31,7 @@ serve(async (req) => {
     const products = (brandProfile?.product_ecosystem?.core_products || []).join(", ");
     const positioning = brandProfile?.brand_identity?.positioning || "";
 
-    const systemPrompt = `You are a senior lifecycle marketing strategist. Generate exactly 4 highly creative, non-obvious campaign suggestions for a brand.
+    const systemPrompt = `You are a senior lifecycle marketing strategist. Generate exactly 7 highly creative, non-obvious campaign suggestions for a brand.
 
 RULES:
 - Each campaign must be genuinely novel — NOT a rehash of standard welcome/cart-abandon/winback flows.
@@ -44,7 +44,7 @@ RULES:
 - Each campaign name should clearly communicate what the campaign does and feel like it was written by someone who deeply understands the brand.
 - Return ONLY valid JSON — no markdown, no explanation.
 
-Return a JSON array of exactly 4 objects with these fields:
+Return a JSON array of exactly 7 objects with these fields:
 - campaignName (string — must include brand name or product name and be descriptive of the campaign's goal)
 - channel (string: "Email", "Push", "In-App", "SMS", or "WhatsApp")
 - targetSegment (string)
@@ -70,7 +70,7 @@ Event schema snippet: ${eventSnippet || "No schema uploaded"}
 Existing campaign names to AVOID duplicating:
 ${(existingCampaignNames || []).join("\n")}
 
-Generate 4 creative, high-impact campaigns this brand should launch.`;
+Generate 7 creative, high-impact campaigns this brand should launch. Cover a diverse mix of source types: drop-off recovery, event monetization, content programs, AI/predictive segments, revenue expansion, lifecycle gaps, frequency optimization, loyalty programs, and referral growth.`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
