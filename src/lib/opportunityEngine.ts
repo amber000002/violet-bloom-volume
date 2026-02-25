@@ -156,10 +156,81 @@ function brandedName(template: string, ctx: BrandContext): string {
   return name;
 }
 
+// ===== EVENT CONTEXT HELPER =====
+// Extracts categorized event names from schema for use in campaign personalization
+
+interface EventContext {
+  /** All event names lowercased */
+  allEvents: string[];
+  /** Events by lifecycle stage */
+  byStage: Record<string, string[]>;
+  /** Intent/start events (e.g. cart_add, search, signup_start) */
+  intentEvents: string[];
+  /** Conversion/success events (e.g. purchase, order_complete) */
+  conversionEvents: string[];
+  /** Engagement events (e.g. view, click, browse) */
+  engagementEvents: string[];
+  /** Monetization events */
+  monetizationEvents: string[];
+  /** Retention events */
+  retentionEvents: string[];
+}
+
+function buildEventContext(events: EventSchemaRow[] | null): EventContext {
+  const empty: EventContext = {
+    allEvents: [], byStage: {}, intentEvents: [], conversionEvents: [],
+    engagementEvents: [], monetizationEvents: [], retentionEvents: [],
+  };
+  if (!events || events.length === 0) return empty;
+
+  const ctx: EventContext = { ...empty, allEvents: events.map(e => e.eventName) };
+
+  const intentPatterns = /start|begin|initiate|add_to_cart|cart_add|search|click|tap|view_item|browse/;
+  const conversionPatterns = /purchase|order|checkout_complete|payment|subscribe|complete|success|confirm|book|deposit|transaction/;
+  const engagementPatterns = /open|view|click|search|browse|create|upload|watch|listen|use_feature|interaction|share/;
+  const monetizationPatterns = /purchase|payment|checkout|subscribe|plan_upgrade|transaction|billing|deposit|booking|order|revenue/;
+  const retentionPatterns = /renew|reactivate|return|reopen|streak|loyalty|repeat|login/;
+
+  for (const ev of events) {
+    const n = ev.eventName.toLowerCase();
+    const stage = classifyEventToStage(ev.eventName);
+    if (!ctx.byStage[stage]) ctx.byStage[stage] = [];
+    ctx.byStage[stage].push(ev.eventName);
+
+    if (intentPatterns.test(n)) ctx.intentEvents.push(ev.eventName);
+    if (conversionPatterns.test(n)) ctx.conversionEvents.push(ev.eventName);
+    if (engagementPatterns.test(n)) ctx.engagementEvents.push(ev.eventName);
+    if (monetizationPatterns.test(n)) ctx.monetizationEvents.push(ev.eventName);
+    if (retentionPatterns.test(n)) ctx.retentionEvents.push(ev.eventName);
+  }
+
+  return ctx;
+}
+
+/** Format event names for display in campaign fields, or return blank */
+function eventList(events: string[], max = 3): string {
+  if (events.length === 0) return "";
+  return events.slice(0, max).join(", ");
+}
+
+/** Build a trigger string from actual events, or return fallback */
+function eventTrigger(events: string[], fallback: string): string {
+  if (events.length === 0) return fallback;
+  if (events.length === 1) return `Event: ${events[0]}`;
+  return `Events: ${events.slice(0, 3).join(", ")}`;
+}
+
+/** Build success metric with conversion event info appended */
+function metricWithConversion(baseMetric: string, conversionEvents: string[]): string {
+  if (conversionEvents.length === 0) return baseMetric;
+  const evStr = conversionEvents.slice(0, 2).join(", ");
+  return `${baseMetric} (track via ${evStr})`;
+}
+
 // ===== SECTION B — OPPORTUNITY DISCOVERY =====
 
 // B1: Drop-Off Recovery
-function detectDropOffs(events: EventSchemaRow[] | null, brandProfile: CoreBrandJSON | null): OpportunityCampaign[] {
+function detectDropOffs(events: EventSchemaRow[] | null, brandProfile: CoreBrandJSON | null, evCtx: EventContext): OpportunityCampaign[] {
   if (!events || events.length === 0) return [];
   const campaigns: OpportunityCampaign[] = [];
   const ctx = extractBrandContext(brandProfile);
@@ -178,14 +249,17 @@ function detectDropOffs(events: EventSchemaRow[] | null, brandProfile: CoreBrand
     const successEvents = eventNames.filter(e => pattern.success.test(e));
 
     if (startEvents.length > 0 && successEvents.length === 0) {
-      const startSample = startEvents[0].replace(/_/g, " ");
+      // Use actual event names from schema
+      const matchedStartOriginal = events.filter(e => pattern.start.test(e.eventName.toLowerCase())).map(e => e.eventName);
       campaigns.push({
         campaignName: brandedName(pattern.nameTemplate, ctx),
         channel: "Push",
-        targetSegment: `Users with ${startSample} but no completion`,
-        trigger: `${startEvents[0]} without corresponding success event`,
+        targetSegment: matchedStartOriginal.length > 0
+          ? `Users who triggered ${eventList(matchedStartOriginal)} but no conversion event`
+          : `Users with intent signal but no completion`,
+        trigger: eventTrigger(matchedStartOriginal, "Intent event without success event"),
         messageTheme: "Resume where you left off — complete securely",
-        successMetric: "Completion Rate",
+        successMetric: metricWithConversion("Completion Rate", evCtx.conversionEvents),
         _meta: {
           sourceType: "drop_off",
           implementedAlready: false,
@@ -205,6 +279,7 @@ function detectUnderutilizedEvents(
   events: EventSchemaRow[] | null,
   activeCoverage: ActiveUseCaseInfo[],
   brandProfile: CoreBrandJSON | null,
+  evCtx: EventContext,
 ): OpportunityCampaign[] {
   if (!events || events.length === 0) return [];
   const campaigns: OpportunityCampaign[] = [];
@@ -232,9 +307,9 @@ function detectUnderutilizedEvents(
           campaignName: `${prefix}${readableEvent} Monetization Accelerator`,
           channel: "Email",
           targetSegment: `Users performing ${ev.eventName} frequently`,
-          trigger: `${ev.eventName} count > threshold`,
+          trigger: `Event: ${ev.eventName} count > threshold`,
           messageTheme: `Turn ${readableEvent.toLowerCase()} engagement into ${ctx.products[0] || "product"} value`,
-          successMetric: "Conversion Rate",
+          successMetric: metricWithConversion("Conversion Rate", evCtx.conversionEvents),
           _meta: {
             sourceType: "underutilized_event",
             implementedAlready: false,
@@ -254,6 +329,7 @@ function detectUnderutilizedEvents(
 function detectContentPrograms(
   websiteUrl: string,
   brandProfile: CoreBrandJSON | null,
+  evCtx: EventContext,
 ): OpportunityCampaign[] {
   const campaigns: OpportunityCampaign[] = [];
 
@@ -277,13 +353,15 @@ function detectContentPrograms(
     const industry = brandProfile?.brand_identity?.industry || "";
     const contentType = contentSignals.find(s => brandText.includes(s)) || "insights";
     const topicFlavor = industry ? `${industry} ` : "";
+    // Use engagement events for segment/trigger if available
+    const engagementEvStr = eventList(evCtx.engagementEvents);
     campaigns.push({
       campaignName: `${brandName} ${topicFlavor}${capitalize(contentType)} Digest`,
       channel: "Email",
-      targetSegment: "Active Digital Users",
-      trigger: "Weekly recurring schedule",
+      targetSegment: engagementEvStr ? `Users active on ${engagementEvStr}` : "Active Digital Users",
+      trigger: engagementEvStr ? `Event: ${evCtx.engagementEvents[0]} within last 7 days` : "Weekly recurring schedule",
       messageTheme: `Curated ${topicFlavor.toLowerCase()}${contentType}, product tips & expert perspectives`,
-      successMetric: "Engagement Rate & Click-to-Read Rate",
+      successMetric: metricWithConversion("Engagement Rate & Click-to-Read Rate", evCtx.conversionEvents),
       _meta: {
         sourceType: "content_program",
         implementedAlready: false,
@@ -300,6 +378,7 @@ function detectContentPrograms(
 function detectPredictiveOpportunities(
   brandProfile: CoreBrandJSON | null,
   events: EventSchemaRow[] | null,
+  evCtx: EventContext,
 ): OpportunityCampaign[] {
   const campaigns: OpportunityCampaign[] = [];
 
@@ -318,13 +397,22 @@ function detectPredictiveOpportunities(
       : ctx.industry.match(/saas|software|tech/i) ? "Smart Recommendation"
       : "Pre-Qualified";
     const noun = ctx.products[0] ? `${ctx.products[0]} ` : "";
+    
+    // Use intent + engagement events for segment if available
+    const segmentEvents = [...evCtx.intentEvents, ...evCtx.engagementEvents];
+    const triggerEvents = evCtx.monetizationEvents.length > 0 ? evCtx.monetizationEvents : evCtx.conversionEvents;
+    
     campaigns.push({
       campaignName: `${actionVerb} ${noun}Opportunity Alert`,
       channel: "Push",
-      targetSegment: "Likely to Convert (Predictive Score > Threshold)",
-      trigger: "Predictive model score crosses activation threshold",
+      targetSegment: segmentEvents.length > 0
+        ? `Users with high activity on ${eventList(segmentEvents)} (Predictive Score > Threshold)`
+        : "Likely to Convert (Predictive Score > Threshold)",
+      trigger: triggerEvents.length > 0
+        ? `Predictive model score + signals from ${eventList(triggerEvents, 2)}`
+        : "Predictive model score crosses activation threshold",
       messageTheme: `Personalized ${noun.toLowerCase()}offer based on behavioral prediction`,
-      successMetric: "Application / Conversion Rate",
+      successMetric: metricWithConversion("Application / Conversion Rate", evCtx.conversionEvents),
       _meta: {
         sourceType: "predictive_segment",
         implementedAlready: false,
@@ -341,6 +429,7 @@ function detectPredictiveOpportunities(
 function detectRevenueExpansion(
   brandProfile: CoreBrandJSON | null,
   activeCoverage: ActiveUseCaseInfo[],
+  evCtx: EventContext,
 ): OpportunityCampaign[] {
   const campaigns: OpportunityCampaign[] = [];
 
@@ -353,13 +442,20 @@ function detectRevenueExpansion(
     const tiers = brandProfile?.business_model?.pricing_tiers || [];
     const tierText = tiers.length > 0 ? tiers[tiers.length - 1] : "Premium Tier";
 
+    const monEvents = evCtx.monetizationEvents;
+    const engEvents = evCtx.engagementEvents;
+    
     campaigns.push({
       campaignName: `${brandName} ${tierText} Upgrade — Unlock Exclusive Benefits`,
       channel: "In-App",
-      targetSegment: "High-Value Users with consistent engagement",
-      trigger: "Transaction frequency or engagement score threshold",
+      targetSegment: engEvents.length > 0
+        ? `High-Value Users active on ${eventList(engEvents)}`
+        : "High-Value Users with consistent engagement",
+      trigger: monEvents.length > 0
+        ? `Event: ${monEvents[0]} frequency or engagement score threshold`
+        : "Transaction frequency or engagement score threshold",
       messageTheme: `Exclusive ${brandName} ${tierText} benefits — elevate your experience`,
-      successMetric: "Upgrade Rate / ARPU Lift",
+      successMetric: metricWithConversion("Upgrade Rate / ARPU Lift", evCtx.conversionEvents),
       _meta: {
         sourceType: "revenue_expansion",
         implementedAlready: false,
@@ -380,7 +476,7 @@ function detectRevenueExpansion(
       targetSegment: `Users active on ${products[0]} but not ${products[1]}`,
       trigger: "Segment-based: Single-product active users",
       messageTheme: `See how ${products[0]} and ${products[1]} work better together`,
-      successMetric: "Cross-Product Adoption Rate",
+      successMetric: metricWithConversion("Cross-Product Adoption Rate", evCtx.conversionEvents),
       _meta: {
         sourceType: "revenue_expansion",
         implementedAlready: false,
@@ -398,6 +494,7 @@ function detectFrequencyOptimization(
   campaignData: CampaignRow[],
   sendMix: SendMixEntry[],
   brandProfile: CoreBrandJSON | null,
+  evCtx: EventContext,
 ): OpportunityCampaign[] {
   const campaigns: OpportunityCampaign[] = [];
   const ctx = extractBrandContext(brandProfile);
@@ -414,11 +511,16 @@ function detectFrequencyOptimization(
 
   if ((highVolume && lowCTR) || batchHeavy) {
     const prefix = ctx.name ? `${ctx.name} ` : "";
+    const engEvents = evCtx.engagementEvents;
     campaigns.push({
       campaignName: `${prefix}Intelligent Send-Time & Frequency Calibration`,
       channel: "Push",
-      targetSegment: "High Message Exposure Users (≥5 messages/week)",
-      trigger: "Engagement-based frequency cap breach",
+      targetSegment: engEvents.length > 0
+        ? `Users with high exposure + activity on ${eventList(engEvents)}`
+        : "High Message Exposure Users (≥5 messages/week)",
+      trigger: engEvents.length > 0
+        ? `Engagement-based cap breach + signals from ${eventList(engEvents, 2)}`
+        : "Engagement-based frequency cap breach",
       messageTheme: "Right message, right moment — personalized cadence",
       successMetric: "CTR Improvement & Unsubscribe Rate Reduction",
       _meta: {
@@ -437,6 +539,7 @@ function detectFrequencyOptimization(
 function detectLifecycleGaps(
   activeCoverage: ActiveUseCaseInfo[],
   brandProfile: CoreBrandJSON | null,
+  evCtx: EventContext,
 ): OpportunityCampaign[] {
   const campaigns: OpportunityCampaign[] = [];
 
@@ -457,44 +560,76 @@ function detectLifecycleGaps(
   const topProduct = products[0] || "";
   const prefix = brandName ? `${brandName} ` : "";
 
+  // Map lifecycle stages to event context categories
+  const stageEventMap: Record<string, string[]> = {
+    onboarding: evCtx.byStage["Activation"] || [],
+    activation: evCtx.byStage["Activation"] || [],
+    engagement: evCtx.engagementEvents,
+    monetization: evCtx.monetizationEvents,
+    retention: evCtx.retentionEvents,
+    winback: evCtx.retentionEvents,
+    referral: evCtx.byStage["Referral"] || [],
+    advocacy: evCtx.conversionEvents,
+  };
+
   const gapStageTemplates: Record<string, Omit<OpportunityCampaign, "_meta">> = {
     onboarding: {
       campaignName: `${prefix}First 7-Day ${topProduct || "Product"} Activation Sprint`,
       channel: "Email",
-      targetSegment: "New signups within 7 days",
-      trigger: "Account created + no key action completed",
+      targetSegment: stageEventMap.onboarding.length > 0
+        ? `New signups — track via ${eventList(stageEventMap.onboarding)}`
+        : "New signups within 7 days",
+      trigger: stageEventMap.onboarding.length > 0
+        ? `Event: ${stageEventMap.onboarding[0]} not fired within 7 days of signup`
+        : "Account created + no key action completed",
       messageTheme: `Get started with ${topProduct || brandName || "your account"} — guided setup`,
-      successMetric: "Activation Rate",
+      successMetric: metricWithConversion("Activation Rate", stageEventMap.onboarding),
     },
     referral: {
       campaignName: `${prefix}Refer & Earn — Grow the ${brandName || "Community"} Network`,
       channel: "Push",
-      targetSegment: "High Engagement Users",
-      trigger: "Referral layer activation — engaged user segment",
+      targetSegment: stageEventMap.referral.length > 0
+        ? `Users active on ${eventList(stageEventMap.engagement)} with referral potential`
+        : "High Engagement Users",
+      trigger: stageEventMap.referral.length > 0
+        ? `Event: ${stageEventMap.referral[0]} eligible segment`
+        : "Referral layer activation — engaged user segment",
       messageTheme: `Invite peers to ${brandName || "the platform"}, earn rewards together`,
-      successMetric: "Referral Conversion Rate",
+      successMetric: metricWithConversion("Referral Conversion Rate", stageEventMap.referral),
     },
     winback: {
       campaignName: `${prefix}Return to ${topProduct || brandName || "Your Account"} — Exclusive Offer`,
       channel: "Email",
-      targetSegment: "Dormant users (30+ days inactive)",
-      trigger: "Inactivity threshold crossed",
+      targetSegment: stageEventMap.winback.length > 0
+        ? `Dormant users (no ${eventList(stageEventMap.winback)} in 30+ days)`
+        : "Dormant users (30+ days inactive)",
+      trigger: stageEventMap.winback.length > 0
+        ? `No ${stageEventMap.winback[0]} event for 30 days`
+        : "Inactivity threshold crossed",
       messageTheme: `We've missed you — here's what's new in ${brandName || "your account"}`,
-      successMetric: "Reactivation Rate",
+      successMetric: metricWithConversion("Reactivation Rate", evCtx.conversionEvents),
     },
     retention: {
       campaignName: `${prefix}Loyalty Milestone Celebration & Reward`,
       channel: "In-App",
-      targetSegment: "Users approaching loyalty milestones",
-      trigger: "Usage streak or transaction milestone",
+      targetSegment: stageEventMap.retention.length > 0
+        ? `Users approaching milestones on ${eventList(stageEventMap.retention)}`
+        : "Users approaching loyalty milestones",
+      trigger: stageEventMap.retention.length > 0
+        ? `Event: ${stageEventMap.retention[0]} streak or count milestone`
+        : "Usage streak or transaction milestone",
       messageTheme: `Celebrate your ${brandName || "journey"} milestones — unlock next tier`,
-      successMetric: "Retention Rate & NPS Improvement",
+      successMetric: metricWithConversion("Retention Rate & NPS Improvement", stageEventMap.retention),
     },
     advocacy: {
       campaignName: `${prefix}Product Experience Feedback Loop`,
       channel: "Email",
-      targetSegment: "Post-transaction satisfied users",
-      trigger: "Transaction completion + positive signal",
+      targetSegment: stageEventMap.advocacy.length > 0
+        ? `Post-transaction users (completed ${eventList(stageEventMap.advocacy)})`
+        : "Post-transaction satisfied users",
+      trigger: stageEventMap.advocacy.length > 0
+        ? `Event: ${stageEventMap.advocacy[0]} + positive signal`
+        : "Transaction completion + positive signal",
       messageTheme: `Help shape the future of ${brandName || "the product"}`,
       successMetric: "NPS Score & Response Rate",
     },
@@ -523,16 +658,17 @@ function detectLifecycleGaps(
 export function generateOpportunities(input: OpportunityEngineInput): OpportunityEngineOutput {
   const exclusionCtx = buildExclusionContext(input.activeCoverage, input.campaignData);
   const exclusionLog: string[] = [];
+  const evCtx = buildEventContext(input.eventSchemaData);
 
   // Collect all opportunity candidates
   const allCandidates: OpportunityCampaign[] = [
-    ...detectDropOffs(input.eventSchemaData, input.brandProfile),
-    ...detectUnderutilizedEvents(input.eventSchemaData, input.activeCoverage, input.brandProfile),
-    ...detectContentPrograms(input.websiteUrl, input.brandProfile),
-    ...detectPredictiveOpportunities(input.brandProfile, input.eventSchemaData),
-    ...detectRevenueExpansion(input.brandProfile, input.activeCoverage),
-    ...detectFrequencyOptimization(input.campaignData, input.sendMix, input.brandProfile),
-    ...detectLifecycleGaps(input.activeCoverage, input.brandProfile),
+    ...detectDropOffs(input.eventSchemaData, input.brandProfile, evCtx),
+    ...detectUnderutilizedEvents(input.eventSchemaData, input.activeCoverage, input.brandProfile, evCtx),
+    ...detectContentPrograms(input.websiteUrl, input.brandProfile, evCtx),
+    ...detectPredictiveOpportunities(input.brandProfile, input.eventSchemaData, evCtx),
+    ...detectRevenueExpansion(input.brandProfile, input.activeCoverage, evCtx),
+    ...detectFrequencyOptimization(input.campaignData, input.sendMix, input.brandProfile, evCtx),
+    ...detectLifecycleGaps(input.activeCoverage, input.brandProfile, evCtx),
   ];
 
   // Apply exclusion engine
