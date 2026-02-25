@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronUp, ChevronDown, Rocket, Zap, TrendingUp,
   AlertTriangle, Sparkles, Target, Shield, BarChart3,
+  Loader2, BrainCircuit,
 } from "lucide-react";
 import {
   generateOpportunities,
@@ -17,6 +18,7 @@ import { EventSchemaRow, UserPropertyRow } from "@/lib/schemaAnalyzer";
 import { SendMixEntry } from "@/lib/strategicInsightsExtendedEngine";
 import { CoreBrandJSON } from "@/types/brandProfile";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
   TableBody,
@@ -67,6 +69,30 @@ const ReadinessBadge: React.FC<{ status: string }> = ({ status }) => {
   return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || "bg-muted text-muted-foreground"}`}>{status}</span>;
 };
 
+// Convert AI response to OpportunityCampaign format
+function aiResponseToCampaign(raw: any): OpportunityCampaign & { _aiGenerated: boolean } {
+  const validSources: OpportunitySourceType[] = [
+    "drop_off", "underutilized_event", "content_program", "predictive_segment",
+    "revenue_expansion", "lifecycle_gap", "frequency_optimization", "loyalty_program", "referral_growth",
+  ];
+  const sourceType = validSources.includes(raw.sourceType) ? raw.sourceType : "revenue_expansion";
+  return {
+    campaignName: raw.campaignName || "AI Campaign Suggestion",
+    channel: raw.channel || "Email",
+    targetSegment: raw.targetSegment || "High-value users",
+    trigger: raw.trigger || "Behavioral signal",
+    messageTheme: raw.messageTheme || "Personalized engagement",
+    successMetric: raw.successMetric || "Conversion Rate",
+    _meta: {
+      sourceType,
+      implementedAlready: false,
+      revenueImpactLevel: (["High", "Medium", "Low"].includes(raw.revenueImpactLevel) ? raw.revenueImpactLevel : "Medium") as any,
+      readinessStatus: (["Ready", "Requires Event", "Requires Property", "Requires Predictive Layer"].includes(raw.readinessStatus) ? raw.readinessStatus : "Ready") as any,
+    },
+    _aiGenerated: true,
+  };
+}
+
 export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> = ({
   campaignData,
   activeCoverage,
@@ -78,8 +104,12 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [showExclusionLog, setShowExclusionLog] = useState(false);
+  const [aiCampaigns, setAiCampaigns] = useState<(OpportunityCampaign & { _aiGenerated: boolean })[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiFetched, setAiFetched] = useState(false);
 
-  const result: OpportunityEngineOutput = useMemo(() => {
+  // Deterministic engine result
+  const deterministicResult: OpportunityEngineOutput = useMemo(() => {
     return generateOpportunities({
       campaignData,
       activeCoverage,
@@ -91,7 +121,82 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
     });
   }, [campaignData, activeCoverage, sendMix, eventSchemaData, userPropertyData, brandProfile, websiteUrl]);
 
-  const activeSourceTypes = Object.entries(result.opportunitySources).filter(([, count]) => count > 0);
+  // Fetch AI suggestions once
+  useEffect(() => {
+    if (aiFetched) return;
+    if (!brandProfile && campaignData.length === 0) return;
+
+    const fetchAI = async () => {
+      setAiLoading(true);
+      try {
+        // Build concise summaries
+        const activeCoverageSnippet = activeCoverage
+          .filter(u => u.status === "active")
+          .map(u => `${u.stage}: ${u.name}`)
+          .slice(0, 15)
+          .join("; ");
+
+        const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
+        const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
+        const avgCTR = totalSent > 0 ? ((totalClicked / totalSent) * 100).toFixed(2) : "N/A";
+        const campaignSummary = `${campaignData.length} campaigns, ${totalSent.toLocaleString()} total sent, avg CTR ${avgCTR}%`;
+
+        const eventSnippet = eventSchemaData
+          ? eventSchemaData.slice(0, 10).map(e => e.eventName).join(", ")
+          : null;
+
+        const existingCampaignNames = deterministicResult.campaigns.map(c => c.campaignName);
+
+        const { data, error } = await supabase.functions.invoke("opportunity-ai", {
+          body: {
+            brandProfile,
+            websiteUrl,
+            activeCoverageSnippet,
+            campaignSummary,
+            eventSnippet,
+            existingCampaignNames,
+          },
+        });
+
+        if (error) {
+          console.warn("AI opportunity fetch failed:", error);
+        } else if (data?.campaigns && Array.isArray(data.campaigns)) {
+          setAiCampaigns(data.campaigns.map(aiResponseToCampaign));
+        }
+      } catch (e) {
+        console.warn("AI opportunity fetch error:", e);
+      } finally {
+        setAiLoading(false);
+        setAiFetched(true);
+      }
+    };
+
+    fetchAI();
+  }, [brandProfile, campaignData, activeCoverage, eventSchemaData, deterministicResult.campaigns, aiFetched]);
+
+  // Merge: AI first, then deterministic, cap at 7
+  const mergedCampaigns = useMemo(() => {
+    const all: (OpportunityCampaign & { _aiGenerated?: boolean })[] = [
+      ...aiCampaigns,
+      ...deterministicResult.campaigns.map(c => ({ ...c, _aiGenerated: false })),
+    ];
+    return all.slice(0, 7);
+  }, [aiCampaigns, deterministicResult.campaigns]);
+
+  // Compute source distribution from merged
+  const opportunitySources = useMemo(() => {
+    const sources: Record<OpportunitySourceType, number> = {
+      drop_off: 0, underutilized_event: 0, content_program: 0,
+      predictive_segment: 0, revenue_expansion: 0, lifecycle_gap: 0,
+      frequency_optimization: 0, loyalty_program: 0, referral_growth: 0,
+    };
+    for (const c of mergedCampaigns) {
+      sources[c._meta.sourceType]++;
+    }
+    return sources;
+  }, [mergedCampaigns]);
+
+  const activeSourceTypes = Object.entries(opportunitySources).filter(([, count]) => count > 0);
 
   return (
     <motion.div
@@ -113,8 +218,14 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
           <Rocket className="w-5 h-5" />
           Strategic Opportunity Engine
           <Badge variant="outline" className="ml-2 text-xs font-normal">
-            {result.campaigns.length} Campaigns
+            {mergedCampaigns.length} Campaigns
           </Badge>
+          {aiLoading && (
+            <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground ml-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              AI generating…
+            </span>
+          )}
         </h3>
         {isOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
       </button>
@@ -140,7 +251,7 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
               })}
             </div>
 
-            {/* Campaign Table (Section D format) */}
+            {/* Campaign Table */}
             <div className="overflow-x-auto rounded-lg border border-border">
               <Table>
                 <TableHeader>
@@ -157,12 +268,16 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {result.campaigns.map((campaign, i) => {
+                  {mergedCampaigns.map((campaign, i) => {
                     const sourceInfo = SOURCE_LABELS[campaign._meta.sourceType];
+                    const isAI = (campaign as any)._aiGenerated === true;
                     return (
-                      <TableRow key={i} className="hover:bg-muted/10">
+                      <TableRow key={i} className={`hover:bg-muted/10 ${isAI ? "bg-purple-50/40" : ""}`}>
                         <TableCell className="font-medium text-foreground max-w-[200px]">
-                          {campaign.campaignName}
+                          <span className="flex items-center gap-1.5">
+                            {isAI && <BrainCircuit className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
+                            {campaign.campaignName}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">{campaign.channel}</Badge>
@@ -198,15 +313,23 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
               </Table>
             </div>
 
+            {/* AI legend */}
+            {aiCampaigns.length > 0 && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <BrainCircuit className="w-3.5 h-3.5 text-purple-500" />
+                <span>AI-generated suggestions are shown first with a purple accent</span>
+              </div>
+            )}
+
             {/* Exclusion Log */}
-            {result.exclusionLog.length > 0 && (
+            {deterministicResult.exclusionLog.length > 0 && (
               <div className="mt-4">
                 <button
                   onClick={() => setShowExclusionLog(!showExclusionLog)}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                 >
                   {showExclusionLog ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  {result.exclusionLog.length} campaigns excluded by Exclusion Engine
+                  {deterministicResult.exclusionLog.length} campaigns excluded by Exclusion Engine
                 </button>
                 <AnimatePresence>
                   {showExclusionLog && (
@@ -216,7 +339,7 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
                       exit={{ height: 0, opacity: 0 }}
                       className="mt-2 space-y-1"
                     >
-                      {result.exclusionLog.map((log, i) => (
+                      {deterministicResult.exclusionLog.map((log, i) => (
                         <p key={i} className="text-xs text-muted-foreground font-mono bg-muted/30 px-3 py-1.5 rounded">
                           {log}
                         </p>

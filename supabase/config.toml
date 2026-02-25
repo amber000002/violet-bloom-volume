@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.brand-profile-generate]
 verify_jwt = false
+
+[functions.opportunity-ai]
+verify_jwt = false
