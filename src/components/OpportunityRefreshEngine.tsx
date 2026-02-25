@@ -145,14 +145,6 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
           ? eventSchemaData.slice(0, 10).map(e => e.eventName).join(", ")
           : null;
 
-        // Pass full event schema for AI personalization (cap at 80 events to stay within token limits)
-        const eventSchemaFull = eventSchemaData
-          ? eventSchemaData.slice(0, 80).map(e => ({
-              eventName: e.eventName,
-              description: e.description || "",
-            }))
-          : null;
-
         const existingCampaignNames = deterministicResult.campaigns.map(c => c.campaignName);
 
         const { data, error } = await supabase.functions.invoke("opportunity-ai", {
@@ -162,7 +154,6 @@ export const OpportunityRefreshEngine: React.FC<OpportunityRefreshEngineProps> =
             activeCoverageSnippet,
             campaignSummary,
             eventSnippet,
-            eventSchemaFull,
             existingCampaignNames,
           },
         });

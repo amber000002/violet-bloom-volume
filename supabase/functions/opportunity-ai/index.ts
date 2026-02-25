@@ -18,7 +18,6 @@ serve(async (req) => {
       activeCoverageSnippet,
       campaignSummary,
       eventSnippet,
-      eventSchemaFull,
       existingCampaignNames,
     } = await req.json();
 
@@ -43,31 +42,18 @@ RULES:
   - Good examples: "Spotify Discover Weekly Engagement Boost", "Robinhood Pre-Approved Stock Alert", "Notion Workspace Adoption Sprint"
   - Bad examples: "Re-Engagement Campaign", "Upsell Flow", "Newsletter Program"
 - Each campaign name should clearly communicate what the campaign does and feel like it was written by someone who deeply understands the brand.
-
-EVENT SCHEMA PERSONALIZATION (CRITICAL):
-- You are given the brand's actual event schema (event names from their analytics).
-- targetSegment MUST reference actual event names from the schema where relevant (e.g., "Users who triggered add_to_cart but not purchase").
-- trigger MUST reference actual event names as triggers (e.g., "Event: search_performed without checkout_complete within 24h").
-- successMetric MUST append the conversion/success event name if one exists in the schema (e.g., "Conversion Rate (track via purchase_complete)").
-- If no credible event from the schema maps to a field, leave that field as a generic description — do NOT fabricate event names.
-
 - Return ONLY valid JSON — no markdown, no explanation.
 
 Return a JSON array of exactly 4 objects with these fields:
 - campaignName (string — must include brand name or product name and be descriptive of the campaign's goal)
 - channel (string: "Email", "Push", "In-App", "SMS", or "WhatsApp")
-- targetSegment (string — reference actual event names from schema where possible)
-- trigger (string — reference actual event names from schema where possible)
+- targetSegment (string)
+- trigger (string)
 - messageTheme (string)
-- successMetric (string — append conversion event from schema if available)
+- successMetric (string)
 - sourceType (string: one of "revenue_expansion", "content_program", "predictive_segment", "loyalty_program", "referral_growth", "frequency_optimization")
 - revenueImpactLevel (string: "High", "Medium", or "Low")
 - readinessStatus (string: "Ready", "Requires Event", "Requires Property", or "Requires Predictive Layer")`;
-
-    // Build full event list for AI context
-    const eventSchemaContext = eventSchemaFull && Array.isArray(eventSchemaFull) && eventSchemaFull.length > 0
-      ? `\nFull Event Schema (use these exact event names in targetSegment, trigger, successMetric):\n${eventSchemaFull.map((e: any) => `- ${e.eventName}${e.description ? ` (${e.description})` : ""}`).join("\n")}`
-      : eventSnippet ? `\nEvent names sample: ${eventSnippet}` : "";
 
     const userPrompt = `Brand: ${brandName}
 Industry: ${industry}
@@ -78,12 +64,13 @@ Website: ${websiteUrl || "N/A"}
 Active lifecycle stages covered: ${activeCoverageSnippet || "Unknown"}
 
 Campaign performance summary: ${campaignSummary || "No data"}
-${eventSchemaContext}
+
+Event schema snippet: ${eventSnippet || "No schema uploaded"}
 
 Existing campaign names to AVOID duplicating:
 ${(existingCampaignNames || []).join("\n")}
 
-Generate 4 creative, high-impact campaigns this brand should launch. Use actual event names from the schema in targetSegment, trigger, and successMetric fields.`;
+Generate 4 creative, high-impact campaigns this brand should launch.`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
