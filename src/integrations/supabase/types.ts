@@ -307,6 +307,57 @@ export type Database = {
         }
         Relationships: []
       }
+      review_resolution_attempts: {
+        Row: {
+          campaign_fingerprint: string
+          campaign_name: string | null
+          confidence: number
+          created_at: string
+          evidence_snapshot: Json
+          id: string
+          industry: string | null
+          margin_over_second: number | null
+          reason_codes: string[]
+          reason_for_review: string | null
+          resolution_status: string
+          suggested_use_case_id: string | null
+          suggested_use_case_name: string | null
+          top_candidates: Json | null
+        }
+        Insert: {
+          campaign_fingerprint: string
+          campaign_name?: string | null
+          confidence?: number
+          created_at?: string
+          evidence_snapshot?: Json
+          id?: string
+          industry?: string | null
+          margin_over_second?: number | null
+          reason_codes?: string[]
+          reason_for_review?: string | null
+          resolution_status?: string
+          suggested_use_case_id?: string | null
+          suggested_use_case_name?: string | null
+          top_candidates?: Json | null
+        }
+        Update: {
+          campaign_fingerprint?: string
+          campaign_name?: string | null
+          confidence?: number
+          created_at?: string
+          evidence_snapshot?: Json
+          id?: string
+          industry?: string | null
+          margin_over_second?: number | null
+          reason_codes?: string[]
+          reason_for_review?: string | null
+          resolution_status?: string
+          suggested_use_case_id?: string | null
+          suggested_use_case_name?: string | null
+          top_candidates?: Json | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
