@@ -215,9 +215,10 @@ const InboxAlchemyContent: React.FC = () => {
     <div className="min-h-screen relative overflow-hidden">
       <Sparkles count={viewMode === "presentation" ? 20 : 40} />
 
-      {/* Background Glow Effects - Premium Liquid AI */}
-      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: '#A855F7', filter: 'blur(150px)', opacity: 0.15 }} />
-      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: '#FB7185', filter: 'blur(150px)', opacity: 0.15 }} />
+      {/* Aurora atmospheric glow blobs */}
+      <div className="aurora-center-glow" />
+      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(168,130,247,0.18) 0%, rgba(99,102,241,0.08) 40%, transparent 70%)', filter: 'blur(100px)' }} />
+      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(251,113,133,0.15) 0%, rgba(245,180,160,0.08) 40%, transparent 70%)', filter: 'blur(100px)' }} />
 
       <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
         {/* Header */}
@@ -232,10 +233,10 @@ const InboxAlchemyContent: React.FC = () => {
               <Mail className="w-6 h-6 text-primary-foreground" />
             </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-display font-extrabold text-gradient-magic mb-3">
+          <h1 className="text-4xl md:text-5xl font-display font-extrabold text-gradient-magic text-glow-aurora mb-3">
             Inbox Alchemy
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground/85 max-w-2xl mx-auto tracking-wide">
             Design lifecycle-led emails your customers actually want to receive.
           </p>
         </motion.div>
@@ -289,26 +290,26 @@ const InboxAlchemyContent: React.FC = () => {
               </label>
               <div className="flex gap-2">
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setViewMode("app")}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium nav-pill ${
                     viewMode === "app"
-                      ? "bg-gradient-magic text-primary-foreground shadow-magic"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"
+                      ? "nav-pill-active"
+                      : "nav-pill-inactive"
                   }`}
                 >
                   <Monitor className="w-3.5 h-3.5" />
                   App
                 </motion.button>
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setViewMode("presentation")}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium nav-pill ${
                     viewMode === "presentation"
-                      ? "bg-gradient-magic text-primary-foreground shadow-magic"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"
+                      ? "nav-pill-active"
+                      : "nav-pill-inactive"
                   }`}
                 >
                   <Presentation className="w-3.5 h-3.5" />
@@ -319,14 +320,14 @@ const InboxAlchemyContent: React.FC = () => {
               {/* Export Button */}
               <div className="relative">
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setShowDeckOptions(!showDeckOptions)}
                   disabled={!industry || isExporting}
-                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all btn-aurora-glow ${
                     industry
                       ? "bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                      : "bg-muted/30 text-muted-foreground/50 cursor-not-allowed"
+                      : "bg-[rgba(255,255,255,0.08)] text-muted-foreground/50 cursor-not-allowed backdrop-blur-sm"
                   }`}
                 >
                   {isExporting ? (
@@ -404,12 +405,12 @@ const InboxAlchemyContent: React.FC = () => {
             <motion.button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-medium nav-pill ${
                 activeTab === tab.id
-                  ? "bg-gradient-magic text-primary-foreground shadow-magic"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
+                  ? "nav-pill-active"
+                  : "nav-pill-inactive"
               }`}
             >
               <tab.icon className="w-4 h-4" />
