@@ -1673,25 +1673,27 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
+                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
+                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
+                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...diagnostics.analysisReport.bestCampaigns].sort((a, b) => campaignSortBy === "clickRate" ? b.clickRate - a.clickRate : b.openRate - a.openRate).slice(0, 5).map((c, i) => {
                     const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
+                    const uniqueCTR = c.uniqueViewed > 0 ? (c.uniqueClicked / c.uniqueViewed) * 100 : 0;
                     const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
                     const hardBouncePercent = denominator > 0 ? (c.hardBounces / denominator) * 100 : 0;
                     const softBouncePercent = denominator > 0 ? (c.softBounces / denominator) * 100 : 0;
@@ -1705,6 +1707,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         <td className="text-right py-2 px-3"><ColoredPercent value={c.openRate} metricType="openRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(c.uniqueClicked)}</td>
                         <td className="text-right py-2 px-3"><ColoredPercent value={c.clickRate} metricType="clickRate" /></td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={uniqueCTR} metricType="clickRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(c.unsubscribes)}</td>
                         <td className="text-right py-2 px-3"><ColoredPercent value={unsubPercent} metricType="unsubscribeRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(c.hardBounces)}</td>
@@ -1767,25 +1770,27 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
+                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
+                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
+                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...diagnostics.analysisReport.worstCampaigns].sort((a, b) => campaignSortBy === "clickRate" ? a.clickRate - b.clickRate : a.openRate - b.openRate).slice(0, 5).map((c, i) => {
+                  {[...diagnostics.analysisReport.worstCampaigns].filter(c => c.campaignName && c.campaignName.trim() !== "").sort((a, b) => campaignSortBy === "clickRate" ? a.clickRate - b.clickRate : a.openRate - b.openRate).slice(0, 5).map((c, i) => {
                     const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
+                    const uniqueCTR = c.uniqueViewed > 0 ? (c.uniqueClicked / c.uniqueViewed) * 100 : 0;
                     const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
                     const hardBouncePercent = denominator > 0 ? (c.hardBounces / denominator) * 100 : 0;
                     const softBouncePercent = denominator > 0 ? (c.softBounces / denominator) * 100 : 0;
@@ -1799,6 +1804,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         <td className="text-right py-2 px-3"><ColoredPercent value={c.openRate} metricType="openRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(c.uniqueClicked)}</td>
                         <td className="text-right py-2 px-3"><ColoredPercent value={c.clickRate} metricType="clickRate" /></td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={uniqueCTR} metricType="clickRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(c.unsubscribes)}</td>
                         <td className="text-right py-2 px-3"><ColoredPercent value={unsubPercent} metricType="unsubscribeRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(c.hardBounces)}</td>
