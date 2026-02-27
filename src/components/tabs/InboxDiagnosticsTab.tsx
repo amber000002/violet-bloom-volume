@@ -855,7 +855,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setDiagnostics(newDiagnostics);
     setActiveReport("analysis");
     onDataChange?.(newDiagnostics);
-  }, [campaignData, postmasterData, contextText, processingSummary, onDataChange]);
+
+    // Trigger creative analysis if image is uploaded
+    if (creativeImage && !creativeAnalysis && !isAnalyzingCreative) {
+      runCreativeAnalysis();
+    }
+  }, [campaignData, postmasterData, contextText, processingSummary, onDataChange, creativeImage, creativeAnalysis, isAnalyzingCreative, runCreativeAnalysis]);
 
   const runReputationReport = useCallback(() => {
     if (campaignData.length === 0) return;
@@ -1173,117 +1178,11 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     placeholder="Additional context (e.g., clipping, low CTR, deliverability issues, AMP email...)"
                     className="w-full h-16 px-3 py-2 rounded-lg bg-muted/30 border border-border focus:border-primary focus:outline-none resize-none text-xs"
                   />
-                  <Button
-                    onClick={runCreativeAnalysis}
-                    disabled={isAnalyzingCreative}
-                    size="sm"
-                    className="w-full mt-2"
-                  >
-                    {isAnalyzingCreative ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                        Analyzing...
-                      </>
-                    ) : creativeAnalysis ? (
-                      <>
-                        <Palette className="w-3.5 h-3.5 mr-1.5" />
-                        Re-Analyze Creative
-                      </>
-                    ) : (
-                      <>
-                        <Palette className="w-3.5 h-3.5 mr-1.5" />
-                        Analyze Creative
-                      </>
-                    )}
-                  </Button>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">Analysis runs automatically when you click "Analysis and Report"</p>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Creative Analysis Results (shown inline when available) */}
-          <AnimatePresence>
-            {creativeAnalysis && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-4"
-              >
-                {/* Effective Practices */}
-                <div className="magic-card rounded-2xl p-6">
-                  <h3 className="font-display text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    Effective Design & Content Practices
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-2 px-3 font-medium text-muted-foreground w-36">Area</th>
-                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Practice</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {creativeAnalysis.effectivePractices.map((p, i) => (
-                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                            <td className="py-2 px-3 font-medium text-foreground">{p.area}</td>
-                            <td className="py-2 px-3 text-muted-foreground">{p.practice}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Risk Areas */}
-                <div className="magic-card rounded-2xl p-6">
-                  <h3 className="font-display text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    Design & Content Risk Areas
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-2 px-3 font-medium text-muted-foreground w-36">Area</th>
-                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Observation</th>
-                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Impact</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {creativeAnalysis.riskAreas.map((r, i) => (
-                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                            <td className="py-2 px-3 font-medium text-foreground">{r.area}</td>
-                            <td className="py-2 px-3 text-muted-foreground">{r.observation}</td>
-                            <td className="py-2 px-3 text-muted-foreground">{r.impact}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Improvements */}
-                <div className="magic-card rounded-2xl p-6">
-                  <h3 className="font-display text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4 text-primary" />
-                    Recommended Optimizations
-                  </h3>
-                  <div className="space-y-2">
-                    {creativeAnalysis.improvements.map((imp, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="w-5 h-5 flex items-center justify-center bg-primary/10 text-primary rounded-full text-xs font-medium flex-shrink-0 mt-0.5">
-                          {i + 1}
-                        </span>
-                        <p className="text-sm text-muted-foreground">{imp}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* Event Schema & User Property Schema Uploads (1x2 layout) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1876,6 +1775,97 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               })()}
             </p>
           </CollapsibleSection>
+
+          {/* ============= CREATIVE & CONTENT EFFECTIVENESS ANALYZER ============= */}
+          {(creativeAnalysis || isAnalyzingCreative) && (
+            <CollapsibleSection
+              title="Creative & Content Effectiveness Analyzer"
+              icon={<Palette className="w-5 h-5 text-primary" />}
+              isOpen={expandedSections.creativeAnalysis ?? true}
+              onToggle={() => toggleSection("creativeAnalysis")}
+            >
+              {isAnalyzingCreative ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <p className="text-sm text-muted-foreground">Analyzing email creative...</p>
+                </div>
+              ) : creativeAnalysis ? (
+                <div className="space-y-6">
+                  {/* Effective Practices */}
+                  <div>
+                    <h4 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      Effective Design & Content Practices
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground w-36">Area</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">Practice</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {creativeAnalysis.effectivePractices.map((p, i) => (
+                            <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                              <td className="py-2 px-3 font-medium text-foreground">{p.area}</td>
+                              <td className="py-2 px-3 text-muted-foreground">{p.practice}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Risk Areas */}
+                  <div>
+                    <h4 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                      Design & Content Risk Areas
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground w-36">Area</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">Observation</th>
+                            <th className="text-left py-2 px-3 font-medium text-muted-foreground">Impact</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {creativeAnalysis.riskAreas.map((r, i) => (
+                            <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                              <td className="py-2 px-3 font-medium text-foreground">{r.area}</td>
+                              <td className="py-2 px-3 text-muted-foreground">{r.observation}</td>
+                              <td className="py-2 px-3 text-muted-foreground">{r.impact}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Improvements */}
+                  <div>
+                    <h4 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-primary" />
+                      Recommended Optimizations
+                    </h4>
+                    <div className="space-y-2">
+                      {creativeAnalysis.improvements.map((imp, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="w-5 h-5 flex items-center justify-center bg-primary/10 text-primary rounded-full text-xs font-medium flex-shrink-0 mt-0.5">
+                            {i + 1}
+                          </span>
+                          <p className="text-sm text-muted-foreground">{imp}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </CollapsibleSection>
+          )}
 
           {/* ============= SEND MIX & USE CASE COVERAGE (collapsed by default) ============= */}
           <UseCaseCoverageAnalysis
