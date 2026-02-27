@@ -25,7 +25,10 @@ import {
   Download,
   Calendar,
   PieChart,
-  Activity
+  Activity,
+  Image as ImageIcon,
+  Palette,
+  Loader2,
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
 import { ViewMode } from "@/hooks/usePresentationMode";
@@ -635,6 +638,17 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [userPropertyFileName, setUserPropertyFileName] = useState<string>("");
   const [eventSchemaData, setEventSchemaData] = useState<EventSchemaRow[] | null>(null);
   const [userPropertyData, setUserPropertyData] = useState<UserPropertyRow[] | null>(null);
+
+  // Creative Analyzer states
+  const [creativeImage, setCreativeImage] = useState<string | null>(null);
+  const [creativeFileName, setCreativeFileName] = useState<string>("");
+  const [creativeContext, setCreativeContext] = useState<string>("");
+  const [isAnalyzingCreative, setIsAnalyzingCreative] = useState(false);
+  const [creativeAnalysis, setCreativeAnalysis] = useState<{
+    effectivePractices: { area: string; practice: string }[];
+    riskAreas: { area: string; observation: string; impact: string }[];
+    improvements: string[];
+  } | null>(null);
   
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
@@ -748,6 +762,66 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     };
     reader.readAsText(file);
   }, []);
+
+  // Creative image upload handler
+  const handleCreativeUpload = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a PNG or JPG image");
+      return;
+    }
+    setCreativeFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setCreativeImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const removeCreativeImage = useCallback(() => {
+    setCreativeImage(null);
+    setCreativeFileName("");
+    setCreativeAnalysis(null);
+  }, []);
+
+  const runCreativeAnalysis = useCallback(async () => {
+    if (!creativeImage) return;
+    setIsAnalyzingCreative(true);
+    setCreativeAnalysis(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("creative-analyze", {
+        body: {
+          imageBase64: creativeImage,
+          additionalContext: creativeContext || undefined,
+          industry: industry || undefined,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) {
+        if (data.error.includes("Rate limit")) {
+          toast.error("Rate limit exceeded. Please try again in a moment.");
+        } else if (data.error.includes("credits")) {
+          toast.error("AI credits exhausted. Please add credits to continue.");
+        } else {
+          toast.error(data.error);
+        }
+        return;
+      }
+
+      if (data?.success && data?.data) {
+        setCreativeAnalysis(data.data);
+        toast.success("Creative analysis complete");
+      } else {
+        throw new Error("Unexpected response format");
+      }
+    } catch (err: any) {
+      console.error("Creative analysis error:", err);
+      toast.error(err.message || "Failed to analyze creative. Please try again.");
+    } finally {
+      setIsAnalyzingCreative(false);
+    }
+  }, [creativeImage, creativeContext, industry]);
 
   const runAnalysisReport = useCallback(() => {
     if (campaignData.length === 0) return;
@@ -896,6 +970,10 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setUserPropertyFileName("");
     setEventSchemaData(null);
     setUserPropertyData(null);
+    setCreativeImage(null);
+    setCreativeFileName("");
+    setCreativeContext("");
+    setCreativeAnalysis(null);
     setDiagnostics(null);
     setStrategicInsights(null);
     setActiveReport(null);
@@ -996,51 +1074,216 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </AnimatePresence>
           </div>
 
-          {/* Postmaster CSV Upload (Optional) */}
-          <div className="magic-card rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
-                <Shield className="w-5 h-5 text-secondary" />
-                Postmaster CSV
-                <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-              </h3>
-              {postmasterFileName && (
-                <button onClick={() => { setPostmasterValidation(null); setPostmasterData(null); setPostmasterFileName(""); }} className="text-muted-foreground hover:text-foreground">
-                  <X className="w-4 h-4" />
-                </button>
+          {/* Postmaster + Creative Upload (1x2 layout) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Postmaster CSV Upload (Optional) */}
+            <div className="magic-card rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-secondary" />
+                  Postmaster CSV
+                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </h3>
+                {postmasterFileName && (
+                  <button onClick={() => { setPostmasterValidation(null); setPostmasterData(null); setPostmasterFileName(""); }} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {!postmasterFileName ? (
+                <motion.div
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingPostmaster(true); }}
+                  onDragLeave={() => setIsDraggingPostmaster(false)}
+                  onDrop={handleDropPostmaster}
+                  className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+                    isDraggingPostmaster ? "border-secondary bg-secondary/5" : "border-border hover:border-secondary/50"
+                  }`}
+                >
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => e.target.files?.[0] && handlePostmasterUpload(e.target.files[0])}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  <Upload className={`w-6 h-6 mx-auto mb-2 ${isDraggingPostmaster ? "text-secondary" : "text-muted-foreground"}`} />
+                  <p className="text-xs text-muted-foreground">Google Postmaster Tools export</p>
+                </motion.div>
+              ) : (
+                <div className="flex items-center gap-3 bg-secondary/5 rounded-lg px-4 py-3">
+                  <CheckCircle2 className="w-5 h-5 text-secondary" />
+                  <span className="font-medium text-sm truncate">{postmasterFileName}</span>
+                  <span className="text-xs text-muted-foreground">• {postmasterData?.length || 0} records</span>
+                </div>
+              )}
+
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground">Expected: {POSTMASTER_HEADERS.slice(0, 4).join(", ")}...</p>
+              </div>
+            </div>
+
+            {/* Creative & Content Effectiveness Analyzer */}
+            <div className="magic-card rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-primary" />
+                  Email Creative Upload
+                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </h3>
+                {creativeFileName && (
+                  <button onClick={removeCreativeImage} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {!creativeImage ? (
+                <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-border rounded-xl p-6 cursor-pointer hover:border-primary/50 transition-colors text-center">
+                  <ImageIcon className="w-6 h-6 text-muted-foreground mb-2" />
+                  <p className="text-xs text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">PNG or JPG (single creative)</p>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/png,image/jpeg"
+                    onChange={(e) => e.target.files?.[0] && handleCreativeUpload(e.target.files[0])}
+                  />
+                </label>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <img
+                      src={creativeImage}
+                      alt="Uploaded creative"
+                      className="w-full max-h-32 object-contain rounded-lg border border-border"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                    <span className="truncate">{creativeFileName}</span>
+                  </div>
+                </div>
+              )}
+
+              {creativeImage && (
+                <div className="mt-3">
+                  <textarea
+                    value={creativeContext}
+                    onChange={(e) => setCreativeContext(e.target.value)}
+                    placeholder="Additional context (e.g., clipping, low CTR, deliverability issues, AMP email...)"
+                    className="w-full h-16 px-3 py-2 rounded-lg bg-muted/30 border border-border focus:border-primary focus:outline-none resize-none text-xs"
+                  />
+                  <Button
+                    onClick={runCreativeAnalysis}
+                    disabled={isAnalyzingCreative}
+                    size="sm"
+                    className="w-full mt-2"
+                  >
+                    {isAnalyzingCreative ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : creativeAnalysis ? (
+                      <>
+                        <Palette className="w-3.5 h-3.5 mr-1.5" />
+                        Re-Analyze Creative
+                      </>
+                    ) : (
+                      <>
+                        <Palette className="w-3.5 h-3.5 mr-1.5" />
+                        Analyze Creative
+                      </>
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
-
-            {!postmasterFileName ? (
-              <motion.div
-                onDragOver={(e) => { e.preventDefault(); setIsDraggingPostmaster(true); }}
-                onDragLeave={() => setIsDraggingPostmaster(false)}
-                onDrop={handleDropPostmaster}
-                className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
-                  isDraggingPostmaster ? "border-secondary bg-secondary/5" : "border-border hover:border-secondary/50"
-                }`}
-              >
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => e.target.files?.[0] && handlePostmasterUpload(e.target.files[0])}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-                <Upload className={`w-6 h-6 mx-auto mb-2 ${isDraggingPostmaster ? "text-secondary" : "text-muted-foreground"}`} />
-                <p className="text-xs text-muted-foreground">Google Postmaster Tools export</p>
-              </motion.div>
-            ) : (
-              <div className="flex items-center gap-3 bg-secondary/5 rounded-lg px-4 py-3">
-                <CheckCircle2 className="w-5 h-5 text-secondary" />
-                <span className="font-medium text-sm">{postmasterFileName}</span>
-                <span className="text-xs text-muted-foreground">• {postmasterData?.length || 0} records</span>
-              </div>
-            )}
-
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground">Expected: {POSTMASTER_HEADERS.join(", ")}</p>
-            </div>
           </div>
+
+          {/* Creative Analysis Results (shown inline when available) */}
+          <AnimatePresence>
+            {creativeAnalysis && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                {/* Effective Practices */}
+                <div className="magic-card rounded-2xl p-6">
+                  <h3 className="font-display text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    Effective Design & Content Practices
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground w-36">Area</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Practice</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {creativeAnalysis.effectivePractices.map((p, i) => (
+                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="py-2 px-3 font-medium text-foreground">{p.area}</td>
+                            <td className="py-2 px-3 text-muted-foreground">{p.practice}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Risk Areas */}
+                <div className="magic-card rounded-2xl p-6">
+                  <h3 className="font-display text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    Design & Content Risk Areas
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground w-36">Area</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Observation</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Impact</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {creativeAnalysis.riskAreas.map((r, i) => (
+                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="py-2 px-3 font-medium text-foreground">{r.area}</td>
+                            <td className="py-2 px-3 text-muted-foreground">{r.observation}</td>
+                            <td className="py-2 px-3 text-muted-foreground">{r.impact}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Improvements */}
+                <div className="magic-card rounded-2xl p-6">
+                  <h3 className="font-display text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4 text-primary" />
+                    Recommended Optimizations
+                  </h3>
+                  <div className="space-y-2">
+                    {creativeAnalysis.improvements.map((imp, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="w-5 h-5 flex items-center justify-center bg-primary/10 text-primary rounded-full text-xs font-medium flex-shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <p className="text-sm text-muted-foreground">{imp}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Event Schema & User Property Schema Uploads (1x2 layout) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
