@@ -1,14 +1,13 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, Palette, CheckCircle2 } from "lucide-react";
+import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, CheckCircle2 } from "lucide-react";
 import { MagicSelect } from "./ui/MagicSelect";
 import { Sparkles } from "./Sparkles";
 import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
 import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
 import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
 import { InboxDiagnosticsTab } from "./tabs/InboxDiagnosticsTab";
-import { CreativeAnalyzerTab } from "./tabs/CreativeAnalyzerTab";
 import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
@@ -35,7 +34,6 @@ const tabs = [
   { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
   { id: "amp-email-studio", label: "AMP Email Studio", icon: Zap },
   { id: "inbox-diagnostics", label: "Inbox Diagnostics", icon: Activity },
-  { id: "creative", label: "Creative Analyzer", icon: Palette },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
@@ -60,8 +58,7 @@ const InboxAlchemyContent: React.FC = () => {
     useCaseData: any;
     ampData: any;
     diagnosticsData: any;
-    creativeData: any;
-  }>({ inboxData: null, useCaseData: null, ampData: null, diagnosticsData: null, creativeData: null });
+  }>({ inboxData: null, useCaseData: null, ampData: null, diagnosticsData: null });
 
   const config = industry ? industryConfigs[industry] : null;
   
@@ -471,13 +468,6 @@ const InboxAlchemyContent: React.FC = () => {
                 onDataChange={(data) => updateExportData("diagnosticsData", data)}
                 brandProfile={brandProfile}
                 websiteUrl={brandInputs.websiteUrl}
-              />
-            )}
-            {activeTab === "creative" && (
-              <CreativeAnalyzerTab 
-                industry={industry}
-                viewMode={viewMode}
-                onDataChange={(data) => updateExportData("creativeData", data)}
               />
             )}
           </motion.div>
