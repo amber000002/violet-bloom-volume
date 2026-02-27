@@ -650,6 +650,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     improvements: string[];
   } | null>(null);
   
+  // Campaign sort toggle
+  const [campaignSortBy, setCampaignSortBy] = useState<"openRate" | "clickRate">("openRate");
+
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
   const [isDraggingPostmaster, setIsDraggingPostmaster] = useState(false);
@@ -1639,7 +1642,29 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             isOpen={expandedSections.best}
             onToggle={() => toggleSection("best")}
           >
-            <div className="flex justify-end mb-2">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
+                <button
+                  onClick={() => setCampaignSortBy("openRate")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    campaignSortBy === "openRate"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  By Unique Open Rate
+                </button>
+                <button
+                  onClick={() => setCampaignSortBy("clickRate")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    campaignSortBy === "clickRate"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  By Unique CTR
+                </button>
+              </div>
               <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.bestCampaigns, "best-performing-campaigns")}>
                 <Download className="w-4 h-4 mr-1" /> Export CSV
               </Button>
@@ -1665,7 +1690,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnostics.analysisReport.bestCampaigns.slice(0, 5).map((c, i) => {
+                  {[...diagnostics.analysisReport.bestCampaigns].sort((a, b) => campaignSortBy === "clickRate" ? b.clickRate - a.clickRate : b.openRate - a.openRate).slice(0, 5).map((c, i) => {
                     const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
                     const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
                     const hardBouncePercent = denominator > 0 ? (c.hardBounces / denominator) * 100 : 0;
@@ -1711,7 +1736,29 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             isOpen={expandedSections.worst}
             onToggle={() => toggleSection("worst")}
           >
-            <div className="flex justify-end mb-2">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
+                <button
+                  onClick={() => setCampaignSortBy("openRate")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    campaignSortBy === "openRate"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  By Unique Open Rate
+                </button>
+                <button
+                  onClick={() => setCampaignSortBy("clickRate")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    campaignSortBy === "clickRate"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  By Unique CTR
+                </button>
+              </div>
               <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.worstCampaigns, "under-performing-campaigns")}>
                 <Download className="w-4 h-4 mr-1" /> Export CSV
               </Button>
@@ -1737,7 +1784,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnostics.analysisReport.worstCampaigns.slice(0, 5).map((c, i) => {
+                  {[...diagnostics.analysisReport.worstCampaigns].sort((a, b) => campaignSortBy === "clickRate" ? a.clickRate - b.clickRate : a.openRate - b.openRate).slice(0, 5).map((c, i) => {
                     const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
                     const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
                     const hardBouncePercent = denominator > 0 ? (c.hardBounces / denominator) * 100 : 0;
