@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, CheckCircle2 } from "lucide-react";
@@ -51,6 +51,35 @@ const InboxAlchemyContent: React.FC = () => {
   const [brandVersions, setBrandVersions] = useState<BrandProfileVersion[]>([]);
   
   const { viewMode, setViewMode, deckType, setDeckType, isExporting, setIsExporting } = usePresentationMode();
+
+  // Auto-load saved brand profile when URL + industry are set
+  useEffect(() => {
+    if (!industry || !brandInputs.websiteUrl.trim()) return;
+    let cancelled = false;
+
+    const loadSaved = async () => {
+      try {
+        const versions = await loadBrandProfileVersions({
+          websiteUrl: brandInputs.websiteUrl,
+          industry,
+        });
+        if (cancelled || versions.length === 0) return;
+        setBrandVersions(versions);
+        // Only auto-load if no profile is currently active
+        if (!brandProfile) {
+          const latest = versions[0];
+          setBrandProfile(latest.brandProfileJson as CoreBrandJSON);
+          setActiveBrandVersionId(latest.brandProfileVersionId);
+          toast.info(`Loaded saved brand profile for ${(latest.brandProfileJson as any)?.brand_identity?.brand_name || "brand"}`);
+        }
+      } catch {
+        // Silent — user can still generate manually
+      }
+    };
+
+    loadSaved();
+    return () => { cancelled = true; };
+  }, [industry, brandInputs.websiteUrl]);
 
   // Get current state for export
   const [exportData, setExportData] = useState<{
