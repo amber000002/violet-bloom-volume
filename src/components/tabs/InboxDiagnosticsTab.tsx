@@ -1380,7 +1380,20 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <Button 
                 variant="default" 
                 size="sm" 
-                onClick={() => exportDiagnosticsToPPT(diagnostics, "analysis", "Campaign")}
+                onClick={() => {
+                  const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
+                  const rootCauses = thresholdBreaches.length > 0 ? analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches) : [];
+                  const learnings = generateIntelligentLearnings(diagnostics.rawData, diagnostics.analysisReport, signalHealth, rootCauses, postmasterData);
+                  exportDiagnosticsToPPT({
+                    diagnostics,
+                    brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
+                    brandProfile: brandProfile || null,
+                    signalHealthData: signalHealth.map(s => ({ metric: s.signal, currentValue: s.latestValue?.toString() || "N/A", status: s.status, trend: s.trend })),
+                    rootCauseEntries: rootCauses.map(rc => ({ cause: rc.likelyCause || "Unknown", evidence: rc.negativeSignals?.map((ns: any) => ns.signal).join(", ") || "", priority: "P1" })),
+                    intelligentLearnings: learnings,
+                    industry,
+                  });
+                }}
                 className="gap-2"
               >
                 <Download className="w-4 h-4" />
@@ -2048,7 +2061,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <Button 
                 variant="default" 
                 size="sm" 
-                onClick={() => exportDiagnosticsToPPT(diagnostics, "reputation", "Campaign")}
+                onClick={() => exportDiagnosticsToPPT({
+                  diagnostics,
+                  brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
+                  brandProfile: brandProfile || null,
+                  industry,
+                })}
                 className="gap-2"
               >
                 <Download className="w-4 h-4" />
