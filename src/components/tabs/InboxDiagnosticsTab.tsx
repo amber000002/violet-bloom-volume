@@ -650,8 +650,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     improvements: string[];
   } | null>(null);
   
-  // Campaign sort toggle
-  const [campaignSortBy, setCampaignSortBy] = useState<"openRate" | "clickRate">("openRate");
+   // Campaign sort toggles (independent per table)
+   const [bestSortBy, setBestSortBy] = useState<"openRate" | "clickRate">("openRate");
+   const [worstSortBy, setWorstSortBy] = useState<"openRate" | "clickRate">("openRate");
 
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
@@ -1645,53 +1646,67 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
                 <button
-                  onClick={() => setCampaignSortBy("openRate")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    campaignSortBy === "openRate"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  By Unique Open Rate
-                </button>
-                <button
-                  onClick={() => setCampaignSortBy("clickRate")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    campaignSortBy === "clickRate"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  By Unique CTR
-                </button>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.bestCampaigns, "best-performing-campaigns")}>
-                <Download className="w-4 h-4 mr-1" /> Export CSV
-              </Button>
-            </div>
-            <div className="overflow-x-auto mb-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
-                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
-                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...diagnostics.analysisReport.bestCampaigns].sort((a, b) => campaignSortBy === "clickRate" ? b.clickRate - a.clickRate : b.openRate - a.openRate).slice(0, 5).map((c, i) => {
+                   onClick={() => setBestSortBy("openRate")}
+                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                     bestSortBy === "openRate"
+                       ? "bg-primary text-primary-foreground shadow-sm"
+                       : "text-muted-foreground hover:text-foreground"
+                   }`}
+                 >
+                   By Unique Open Rate
+                 </button>
+                 <button
+                   onClick={() => setBestSortBy("clickRate")}
+                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                     bestSortBy === "clickRate"
+                       ? "bg-primary text-primary-foreground shadow-sm"
+                       : "text-muted-foreground hover:text-foreground"
+                   }`}
+                 >
+                   By Unique CTR
+                 </button>
+               </div>
+               <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.bestCampaigns, "best-performing-campaigns")}>
+                 <Download className="w-4 h-4 mr-1" /> Export CSV
+               </Button>
+             </div>
+             <div className="overflow-x-auto mb-4">
+               <table className="w-full text-sm">
+                 <thead>
+                   <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {(bestSortBy === "clickRate"
+                     ? [...campaignData].map(c => ({
+                         campaignId: c.campaignId, campaignName: c.campaignName, subjectLine: c.subjectLine,
+                         totalSentUsers: c.totalSentUsers, totalDeliveredUsers: c.totalDeliveredUsers,
+                         uniqueViewed: c.uniqueViewedWithinConversion, uniqueClicked: c.uniqueClickedWithinConversion,
+                         conversions: c.clickThroughConversions, unsubscribes: c.totalUnsubscribes,
+                         hardBounces: c.hardBounces, softBounces: c.softBounces,
+                         openRate: c.openRate, clickRate: c.clickRate, startDate: c.startDate,
+                       })).sort((a, b) => {
+                         const ctrA = a.uniqueViewed > 0 ? (a.uniqueClicked / a.uniqueViewed) * 100 : 0;
+                         const ctrB = b.uniqueViewed > 0 ? (b.uniqueClicked / b.uniqueViewed) * 100 : 0;
+                         return ctrB - ctrA;
+                       })
+                     : [...diagnostics.analysisReport.bestCampaigns].sort((a, b) => b.openRate - a.openRate)
+                   ).slice(0, 5).map((c, i) => {
                     const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
                     const uniqueCTR = c.uniqueViewed > 0 ? (c.uniqueClicked / c.uniqueViewed) * 100 : 0;
                     const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
@@ -1742,53 +1757,67 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
                 <button
-                  onClick={() => setCampaignSortBy("openRate")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    campaignSortBy === "openRate"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  By Unique Open Rate
-                </button>
-                <button
-                  onClick={() => setCampaignSortBy("clickRate")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    campaignSortBy === "clickRate"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  By Unique CTR
-                </button>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.worstCampaigns, "under-performing-campaigns")}>
-                <Download className="w-4 h-4 mr-1" /> Export CSV
-              </Button>
-            </div>
-            <div className="overflow-x-auto mb-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
-                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
-                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
-                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...diagnostics.analysisReport.worstCampaigns].filter(c => c.campaignName && c.campaignName.trim() !== "").sort((a, b) => campaignSortBy === "clickRate" ? a.clickRate - b.clickRate : a.openRate - b.openRate).slice(0, 5).map((c, i) => {
+                   onClick={() => setWorstSortBy("openRate")}
+                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                     worstSortBy === "openRate"
+                       ? "bg-primary text-primary-foreground shadow-sm"
+                       : "text-muted-foreground hover:text-foreground"
+                   }`}
+                 >
+                   By Unique Open Rate
+                 </button>
+                 <button
+                   onClick={() => setWorstSortBy("clickRate")}
+                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                     worstSortBy === "clickRate"
+                       ? "bg-primary text-primary-foreground shadow-sm"
+                       : "text-muted-foreground hover:text-foreground"
+                   }`}
+                 >
+                   By Unique CTR
+                 </button>
+               </div>
+               <Button variant="outline" size="sm" onClick={() => exportCampaignsToCSV(diagnostics.analysisReport.worstCampaigns, "under-performing-campaigns")}>
+                 <Download className="w-4 h-4 mr-1" /> Export CSV
+               </Button>
+             </div>
+             <div className="overflow-x-auto mb-4">
+               <table className="w-full text-sm">
+                 <thead>
+                   <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Subject Line</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {(worstSortBy === "clickRate"
+                     ? [...campaignData].filter(c => c.campaignName && c.campaignName.trim() !== "").map(c => ({
+                         campaignId: c.campaignId, campaignName: c.campaignName, subjectLine: c.subjectLine,
+                         totalSentUsers: c.totalSentUsers, totalDeliveredUsers: c.totalDeliveredUsers,
+                         uniqueViewed: c.uniqueViewedWithinConversion, uniqueClicked: c.uniqueClickedWithinConversion,
+                         conversions: c.clickThroughConversions, unsubscribes: c.totalUnsubscribes,
+                         hardBounces: c.hardBounces, softBounces: c.softBounces,
+                         openRate: c.openRate, clickRate: c.clickRate, startDate: c.startDate,
+                       })).sort((a, b) => {
+                         const ctrA = a.uniqueViewed > 0 ? (a.uniqueClicked / a.uniqueViewed) * 100 : 0;
+                         const ctrB = b.uniqueViewed > 0 ? (b.uniqueClicked / b.uniqueViewed) * 100 : 0;
+                         return ctrA - ctrB;
+                       })
+                     : [...diagnostics.analysisReport.worstCampaigns].filter(c => c.campaignName && c.campaignName.trim() !== "").sort((a, b) => a.openRate - b.openRate)
+                   ).slice(0, 5).map((c, i) => {
                     const denominator = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
                     const uniqueCTR = c.uniqueViewed > 0 ? (c.uniqueClicked / c.uniqueViewed) * 100 : 0;
                     const unsubPercent = denominator > 0 ? (c.unsubscribes / denominator) * 100 : 0;
