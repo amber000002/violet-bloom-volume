@@ -378,6 +378,76 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   let slideNum = 0;
 
   // ==========================================
+  // SLIDE 0: Cover Slide
+  // ==========================================
+  {
+    const s0 = pptx.addSlide();
+    // Gradient background using brand primary
+    s0.background = { color: theme.primary };
+    // Overlay for depth
+    s0.addShape("rect" as pptxgen.SHAPE_NAME, {
+      x: 0, y: 0, w: 10, h: 5.625,
+      fill: { color: theme.secondary, transparency: 70 },
+    });
+    // Soft radial glow
+    s0.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+      x: 5, y: 1.5, w: 8, h: 4,
+      fill: { color: theme.accent, transparency: 85 },
+    });
+
+    // Brand logo placeholder (rounded rect)
+    s0.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+      x: 3.75, y: 0.6, w: 2.5, h: 1.2,
+      fill: { color: "FFFFFF", transparency: 80 },
+      line: { color: "FFFFFF", width: 1.5, dashType: "dash" },
+      rectRadius: 0.15,
+    });
+    s0.addText("LOGO", {
+      x: 3.75, y: 0.6, w: 2.5, h: 1.2,
+      fontSize: 14, color: "FFFFFF", fontFace: FONTS.body,
+      align: "center", valign: "middle", transparency: 50,
+    });
+
+    // Deck title
+    const deckBrandName = brandProfile?.brand_identity?.brand_name || brandName || "Email";
+    s0.addText(`${deckBrandName}\nEmail Diagnostics`, {
+      x: 0.5, y: 2.1, w: 9, h: 1.4,
+      fontSize: 36, bold: true, color: "FFFFFF",
+      fontFace: FONTS.headline, align: "center", valign: "middle",
+      lineSpacingMultiple: 1.2,
+    });
+
+    // Subtitle
+    s0.addText("Executive Performance Report", {
+      x: 0.5, y: 3.4, w: 9, h: 0.5,
+      fontSize: 16, color: "FFFFFF", fontFace: FONTS.body,
+      align: "center", transparency: 20,
+    });
+
+    // Date range
+    if (monthRange) {
+      s0.addText(monthRange, {
+        x: 0.5, y: 4.1, w: 9, h: 0.4,
+        fontSize: 13, color: "FFFFFF", fontFace: FONTS.body,
+        align: "center", transparency: 35,
+      });
+    }
+
+    // Bottom accent line
+    s0.addShape("rect" as pptxgen.SHAPE_NAME, {
+      x: 3, y: 4.8, w: 4, h: 0.04,
+      fill: { color: "FFFFFF", transparency: 50 },
+    });
+
+    // Footer
+    s0.addText("Generated via Inbox Diagnostics", {
+      x: 0.5, y: 5.0, w: 9, h: 0.3,
+      fontSize: 9, color: "FFFFFF", fontFace: FONTS.body,
+      align: "center", transparency: 50,
+    });
+  }
+
+  // ==========================================
   // SLIDE 1: Campaign Overview by Provider
   // ==========================================
   slideNum++;
