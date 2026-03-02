@@ -1520,7 +1520,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnostics.analysisReport.monthlyOverview.map((m, i) => (
+                  {diagnostics.analysisReport.monthlyOverview
+                    .filter((m) => {
+                      if (m.month !== "Unknown Date") return true;
+                      const eb = processingSummary?.exclusionBreakdown;
+                      const totalDateIssues = eb ? (eb.invalidStartDateFormat + eb.invalidStartDateCalendar + eb.missingStartDate) : 0;
+                      return totalDateIssues > 0;
+                    })
+                    .map((m, i) => (
                     <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
                       <td className="py-2 px-3 font-medium">{m.month}</td>
                       <td className="text-right py-2 px-3">{m.campaignCount}</td>
