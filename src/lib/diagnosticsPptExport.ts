@@ -1,82 +1,210 @@
-// Inbox Diagnostics PPT Export - Professional Executive-Ready Deck
+// Inbox Diagnostics PPT Export - 12-Slide Executive Deck Blueprint
+// Visual Enhancement Only — No Content AI / No Summarization
 import pptxgen from "pptxgenjs";
-import { DiagnosticsData, AnalysisReport, ReputationSignalRow } from "./csvAnalyzer";
+import {
+  DiagnosticsData,
+  AnalysisReport,
+  CampaignRow,
+  PostmasterRow,
+  MonthlyOverview,
+  ProviderAggregate,
+  TopCampaign,
+} from "./csvAnalyzer";
+import { CoreBrandJSON } from "@/types/brandProfile";
+
+// ============= TYPES =============
+
+interface IntelligentRecommendation {
+  issue: string;
+  recommendation: string;
+  priority: "P0" | "P1" | "P2";
+}
+
+interface SignalHealthExport {
+  metric: string;
+  currentValue: string;
+  status: string;
+  trend: string;
+}
+
+interface RootCauseExport {
+  cause: string;
+  evidence: string;
+  priority?: string;
+}
+
+interface InfrastructureDomain {
+  domain: string;
+  provider: string;
+  reputation: string;
+}
+
+interface InfrastructureIP {
+  ip: string;
+  reputation: string;
+}
+
+export interface DiagnosticsDeckOptions {
+  diagnostics: DiagnosticsData;
+  brandName?: string;
+  brandProfile?: CoreBrandJSON | null;
+  signalHealthData?: SignalHealthExport[];
+  rootCauseEntries?: RootCauseExport[];
+  intelligentLearnings?: IntelligentRecommendation[];
+  industry?: string;
+}
+
+// ============= BRAND COLOR ENGINE =============
+
+interface BrandTheme {
+  primary: string;        // hex without #
+  secondary: string;
+  accent: string;
+  headerBg: string;       // gradient start for header rows
+  headerBgEnd: string;    // gradient end
+  altRowBg: string;       // alternating row shading
+  slideBg: string;        // slide background
+  bgAccent: string;       // radial accent glow
+  titleColor: string;
+  bodyColor: string;
+  mutedColor: string;
+  footerColor: string;
+  // Signal colors (never brand-colored)
+  green: string;
+  amber: string;
+  red: string;
+}
+
+const DEFAULT_THEME: BrandTheme = {
+  primary: "4338CA",      // deep indigo
+  secondary: "7C3AED",   // soft lavender
+  accent: "A78BFA",
+  headerBg: "EEF2FF",    // indigo-50
+  headerBgEnd: "F5F3FF", // violet-50
+  altRowBg: "FAFAFA",
+  slideBg: "FFFFFF",
+  bgAccent: "F5F3FF",
+  titleColor: "1E1B4B",  // indigo-950
+  bodyColor: "374151",
+  mutedColor: "6B7280",
+  footerColor: "9CA3AF",
+  green: "059669",
+  amber: "D97706",
+  red: "DC2626",
+};
+
+const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
+  const clean = hex.replace("#", "");
+  return {
+    r: parseInt(clean.substring(0, 2), 16),
+    g: parseInt(clean.substring(2, 4), 16),
+    b: parseInt(clean.substring(4, 6), 16),
+  };
+};
+
+const rgbToHex = (r: number, g: number, b: number): string => {
+  return [r, g, b].map(c => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, "0")).join("");
+};
+
+const lighten = (hex: string, factor: number): string => {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHex(
+    r + (255 - r) * factor,
+    g + (255 - g) * factor,
+    b + (255 - b) * factor
+  );
+};
+
+const desaturate = (hex: string, factor: number): string => {
+  const { r, g, b } = hexToRgb(hex);
+  const avg = (r + g + b) / 3;
+  return rgbToHex(
+    r + (avg - r) * factor,
+    g + (avg - g) * factor,
+    b + (avg - b) * factor
+  );
+};
+
+const luminance = (hex: string): number => {
+  const { r, g, b } = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+};
+
+const buildBrandTheme = (
+  brandProfile?: CoreBrandJSON | null,
+  industry?: string
+): BrandTheme => {
+  if (!brandProfile?.brand_colors?.primary) return DEFAULT_THEME;
+
+  let primary = brandProfile.brand_colors.primary.replace("#", "");
+  let secondary = (brandProfile.brand_colors.secondary || brandProfile.brand_colors.accent || "").replace("#", "") || lighten(primary, 0.3);
+  const accent = (brandProfile.brand_colors.accent || "").replace("#", "") || lighten(primary, 0.5);
+
+  // If primary is too bright (luminance > 0.75), desaturate 15%
+  if (luminance(primary) > 0.75) {
+    primary = desaturate(primary, 0.15);
+  }
+
+  // Industry-aware adjustments
+  const ind = (industry || brandProfile.brand_identity?.industry || "").toLowerCase();
+  const isFintech = ind.includes("fintech") || ind.includes("finance") || ind.includes("banking");
+  const isConsumer = ind.includes("consumer") || ind.includes("creator") || ind.includes("lifestyle");
+
+  const headerBg = lighten(primary, isFintech ? 0.88 : 0.92);
+  const altRowBg = lighten(primary, 0.96);
+  const titleColor = isFintech ? "0F172A" : lighten(primary, -0.4) || "1E1B4B";
+
+  return {
+    ...DEFAULT_THEME,
+    primary,
+    secondary,
+    accent,
+    headerBg,
+    headerBgEnd: lighten(secondary, 0.92),
+    altRowBg,
+    bgAccent: lighten(secondary, 0.88),
+    titleColor: luminance(primary) < 0.3 ? primary : titleColor,
+    bodyColor: isFintech ? "1E293B" : "374151",
+  };
+};
 
 // ============= STYLE CONSTANTS =============
 
-const SLIDE_STYLES = {
-  // Colors (hex without #)
-  headerColor: "1F2933",      // Dark gray for headers
-  bodyColor: "374151",        // Body text
-  mutedColor: "6B7280",       // Muted/subtitle
-  footerColor: "9CA3AF",      // Light gray footer
-  
-  // Semantic colors for metrics
-  greenText: "059669",        // Healthy
-  amberText: "D97706",        // Watch/Needs Attention
-  redText: "DC2626",          // Risk/Critical
-  
-  // Table colors
-  headerRowBg: "F3F4F6",      // Light gray header background
-  borderColor: "E5E7EB",      // Hairline borders
-  
-  // Background
-  background: "FFFFFF",
-};
-
 const FONTS = {
-  primary: "Calibri",         // PPT-safe fallback
+  headline: "Calibri",
+  body: "Calibri", // PPT-safe; "Poppins" rendered via system
 };
 
 // ============= HELPER FUNCTIONS =============
 
-const formatNumber = (num: number): string => {
-  return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
-};
+const formatNumber = (num: number): string =>
+  num.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
-const formatPercent = (num: number): string => {
-  return `${num.toFixed(2)}%`;
-};
+const formatPercent = (num: number): string => `${num.toFixed(2)}%`;
 
-// Clean subject line by removing "{Subject:" prefix
 const cleanSubjectLine = (subject: string): string => {
-  if (!subject) return '';
-  return subject.replace(/^\{Subject:\s*/i, '').replace(/\}$/, '').trim();
+  if (!subject) return "";
+  return subject.replace(/^\{Subject:\s*/i, "").replace(/\}$/, "").trim();
 };
 
-// Get color for metric based on thresholds
-type MetricType = 'openRate' | 'clickRate' | 'bounceRate' | 'unsubscribeRate';
+type MetricType = "openRate" | "clickRate" | "bounceRate" | "unsubscribeRate";
 
-const getMetricColor = (value: number, metricType: MetricType): string => {
-  const roundedValue = Math.round(value * 100) / 100;
-  
+const getMetricColor = (value: number, metricType: MetricType, theme: BrandTheme): string => {
+  const v = Math.round(value * 100) / 100;
   switch (metricType) {
-    case 'openRate':
-      if (roundedValue > 25.0) return SLIDE_STYLES.greenText;
-      if (roundedValue > 10.0) return SLIDE_STYLES.amberText;
-      return SLIDE_STYLES.redText;
-    
-    case 'clickRate':
-      if (roundedValue > 3.0) return SLIDE_STYLES.greenText;
-      if (roundedValue > 1.5) return SLIDE_STYLES.amberText;
-      return SLIDE_STYLES.redText;
-    
-    case 'bounceRate':
-      if (roundedValue < 1.0) return SLIDE_STYLES.greenText;
-      if (roundedValue <= 3.0) return SLIDE_STYLES.amberText;
-      return SLIDE_STYLES.redText;
-    
-    case 'unsubscribeRate':
-      if (roundedValue < 0.3) return SLIDE_STYLES.greenText;
-      if (roundedValue <= 0.7) return SLIDE_STYLES.amberText;
-      return SLIDE_STYLES.redText;
-    
+    case "openRate":
+      return v > 25 ? theme.green : v > 10 ? theme.amber : theme.red;
+    case "clickRate":
+      return v > 3 ? theme.green : v > 1.5 ? theme.amber : theme.red;
+    case "bounceRate":
+      return v < 1 ? theme.green : v <= 3 ? theme.amber : theme.red;
+    case "unsubscribeRate":
+      return v < 0.3 ? theme.green : v <= 0.7 ? theme.amber : theme.red;
     default:
-      return SLIDE_STYLES.bodyColor;
+      return theme.bodyColor;
   }
 };
 
-// Get month range from data
 const getMonthRange = (data: AnalysisReport | null): string => {
   if (!data || data.monthlyOverview.length === 0) return "";
   const months = data.monthlyOverview.map(m => m.month);
@@ -84,1161 +212,899 @@ const getMonthRange = (data: AnalysisReport | null): string => {
   return `${months[0]} – ${months[months.length - 1]}`;
 };
 
-// Add footer to slide
-const addSlideFooter = (slide: pptxgen.Slide, hasPostmasterData: boolean = true) => {
-  const sourceText = hasPostmasterData 
-    ? "Source: Campaign Performance + Postmaster Data | Generated via Inbox Diagnostics"
-    : "Source: Campaign Performance Data | Generated via Inbox Diagnostics";
-  
-  slide.addText(sourceText, {
-    x: 0.5,
-    y: 5.2,
-    w: 9,
-    h: 0.3,
-    fontSize: 10,
-    color: SLIDE_STYLES.footerColor,
-    fontFace: FONTS.primary,
+const getReputationColor = (rep: string, theme: BrandTheme): string => {
+  const r = rep.toLowerCase();
+  if (r === "high" || r === "healthy") return theme.green;
+  if (r === "medium" || r === "warning" || r === "moderate") return theme.amber;
+  if (r === "low" || r === "bad" || r === "risk" || r === "critical") return theme.red;
+  return theme.mutedColor;
+};
+
+// ============= SLIDE HELPERS =============
+
+const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
+  slide.background = { color: theme.slideBg };
+  // Subtle radial accent glow - approximated via a very light rect
+  slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+    x: 0, y: 0, w: 10, h: 5.625,
+    fill: { color: theme.bgAccent, transparency: 85 },
   });
 };
 
-// Add header with title and optional date range
-const addSlideHeader = (slide: pptxgen.Slide, title: string, monthRange?: string) => {
-  slide.addText(title, {
-    x: 0.5,
-    y: 0.4,
-    w: monthRange ? 6.5 : 9,
-    h: 0.6,
-    fontSize: 30,
-    bold: true,
-    color: SLIDE_STYLES.headerColor,
-    fontFace: FONTS.primary,
+const addSlideHeader = (
+  slide: pptxgen.Slide,
+  title: string,
+  theme: BrandTheme,
+  monthRange?: string,
+  slideNumber?: number
+) => {
+  // Gradient accent underline
+  slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+    x: 0.5, y: 0.95, w: 2.5, h: 0.04,
+    fill: { color: theme.primary },
   });
-  
+
+  slide.addText(title, {
+    x: 0.5, y: 0.3, w: monthRange ? 6.5 : 8.5, h: 0.65,
+    fontSize: 26, bold: true,
+    color: theme.titleColor,
+    fontFace: FONTS.headline,
+  });
+
   if (monthRange) {
     slide.addText(monthRange, {
-      x: 7,
-      y: 0.5,
-      w: 2.5,
-      h: 0.4,
-      fontSize: 12,
-      color: SLIDE_STYLES.mutedColor,
-      fontFace: FONTS.primary,
-      align: "right",
+      x: 7, y: 0.4, w: 2.5, h: 0.4,
+      fontSize: 11, color: theme.mutedColor,
+      fontFace: FONTS.body, align: "right",
+    });
+  }
+
+  if (slideNumber) {
+    slide.addText(`${slideNumber}`, {
+      x: 9.3, y: 5.2, w: 0.4, h: 0.3,
+      fontSize: 9, color: theme.mutedColor,
+      fontFace: FONTS.body, align: "right",
     });
   }
 };
 
-// ============= MAIN EXPORT FUNCTION =============
+const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, hasPostmasterData: boolean = true) => {
+  const src = hasPostmasterData
+    ? "Source: Campaign Performance + Postmaster Data | Generated via Inbox Diagnostics"
+    : "Source: Campaign Performance Data | Generated via Inbox Diagnostics";
+  slide.addText(src, {
+    x: 0.5, y: 5.2, w: 8.5, h: 0.3,
+    fontSize: 9, color: theme.footerColor, fontFace: FONTS.body,
+  });
+};
+
+const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "left"): pptxgen.TableCellProps => ({
+  bold: true,
+  fill: { color: theme.headerBg },
+  fontSize: 9,
+  align,
+  color: theme.titleColor,
+  fontFace: FONTS.body,
+});
+
+const bodyCellOpts = (
+  theme: BrandTheme,
+  rowIdx: number,
+  align: "left" | "right" | "center" = "left",
+  color?: string
+): pptxgen.TableCellProps => ({
+  fontSize: 9,
+  align,
+  color: color || theme.bodyColor,
+  fontFace: FONTS.body,
+  fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
+});
+
+// ============= INFRASTRUCTURE EXTRACTION =============
+
+const extractInfrastructure = (
+  campaignData: CampaignRow[],
+  postmasterData: PostmasterRow[] | null
+): { domains: InfrastructureDomain[]; ips: InfrastructureIP[] } => {
+  const domainMap = new Map<string, InfrastructureDomain>();
+  const ipMap = new Map<string, InfrastructureIP>();
+
+  // Extract domains from campaign data
+  campaignData.forEach(c => {
+    const provider = c.providerName || c.serviceProvider || "";
+    if (provider && !domainMap.has(provider)) {
+      domainMap.set(provider, { domain: provider, provider: c.serviceProvider, reputation: "N/A" });
+    }
+  });
+
+  // Enrich with postmaster data
+  if (postmasterData) {
+    postmasterData.forEach(p => {
+      if (p.domain) {
+        domainMap.set(p.domain, {
+          domain: p.domain,
+          provider: domainMap.get(p.domain)?.provider || "",
+          reputation: p.domainReputation || "N/A",
+        });
+      }
+      if (p.sampleIps) {
+        p.sampleIps.split(",").map(ip => ip.trim()).filter(Boolean).forEach(ip => {
+          ipMap.set(ip, { ip, reputation: p.ipReputation || "N/A" });
+        });
+      }
+    });
+  }
+
+  return {
+    domains: Array.from(domainMap.values()),
+    ips: Array.from(ipMap.values()),
+  };
+};
 
 // ============= MAIN EXPORT FUNCTION =============
 
-export const exportDiagnosticsToPPT = async (
-  diagnostics: DiagnosticsData,
-  activeReport: "analysis" | "reputation" | null,
-  brandName: string = "Campaign"
-) => {
+export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
+  const {
+    diagnostics,
+    brandName = "Campaign",
+    brandProfile,
+    signalHealthData,
+    rootCauseEntries,
+    intelligentLearnings,
+    industry,
+  } = opts;
+
+  const theme = buildBrandTheme(brandProfile, industry);
+  const hasPostmasterData = !!diagnostics.postmasterData && diagnostics.postmasterData.length > 0;
+
   const pptx = new pptxgen();
-  
   pptx.author = "Inbox Diagnostics";
-  pptx.title = "Inbox Diagnostics Analysis Report";
+  pptx.title = `${brandName} – Email Diagnostics Executive Deck`;
   pptx.subject = "Email Campaign Performance Analysis";
-  pptx.company = "Inbox Alchemy";
-  
-  // Define slide dimensions (standard 16:9)
+  pptx.company = brandProfile?.brand_identity?.brand_name || "Inbox Alchemy";
   pptx.defineLayout({ name: "WIDESCREEN", width: 10, height: 5.625 });
   pptx.layout = "WIDESCREEN";
 
-  const hasPostmasterData = !!diagnostics.postmasterData && diagnostics.postmasterData.length > 0;
-  
-  if (activeReport === "analysis" && diagnostics.analysisReport) {
-    const report = diagnostics.analysisReport;
-    const monthRange = getMonthRange(report);
-    
-    // ========== SLIDE 1: Campaign Overview (Aggregate) ==========
-    const overviewSlide = pptx.addSlide();
-    addSlideHeader(overviewSlide, "Campaign Overview – Email Channel", monthRange);
-    
-    // Calculate aggregates
-    const totals = report.providerAggregates.reduce((acc, p) => ({
-      sent: acc.sent + p.totalSentUsers,
-      delivered: acc.delivered + p.totalDeliveredUsers,
-      viewed: acc.viewed + p.uniqueViewed,
-      clicked: acc.clicked + p.uniqueClicked,
-      hardBounce: acc.hardBounce + p.hardBounces,
-      softBounce: acc.softBounce + p.softBounces,
-      unsubs: acc.unsubs + p.unsubscribes,
-    }), { sent: 0, delivered: 0, viewed: 0, clicked: 0, hardBounce: 0, softBounce: 0, unsubs: 0 });
-    
-    const useDelivered = totals.delivered > 0;
-    const denominator = useDelivered ? totals.delivered : totals.sent;
-    
-    // Left column - Key insights
-    const insights = [
-      `• Total sends: ${formatNumber(totals.sent)} emails`,
-      `• Delivery health: ${denominator > 0 ? formatPercent((totals.delivered / totals.sent) * 100) : "N/A"} delivered`,
-      `• Overall engagement: ${formatPercent((totals.viewed / denominator) * 100)} open rate`,
-      `• Click performance: ${formatPercent((totals.clicked / denominator) * 100)} CTR`,
-      `• Deliverability signals: ${formatPercent(((totals.hardBounce + totals.softBounce) / totals.sent) * 100)} total bounce`,
-    ];
-    
-    insights.forEach((insight, i) => {
-      overviewSlide.addText(insight, {
-        x: 0.5,
-        y: 1.2 + i * 0.4,
-        w: 4,
-        h: 0.35,
-        fontSize: 12,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    // Right column - Aggregate table
-    const overviewTableRows: pptxgen.TableRow[] = [
-      [
-        { text: "Metric", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 11 } },
-        { text: "Value", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 11, align: "right" } },
-        { text: "%", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 11, align: "right" } },
-      ],
-      [
-        { text: "Sent", options: { fontSize: 11 } },
-        { text: formatNumber(totals.sent), options: { fontSize: 11, align: "right" } },
-        { text: "–", options: { fontSize: 11, align: "right", color: SLIDE_STYLES.mutedColor } },
-      ],
-    ];
-    
-    // Only add Delivered row if there's delivery data
-    if (useDelivered) {
-      overviewTableRows.push([
-        { text: "Delivered", options: { fontSize: 11 } },
-        { text: formatNumber(totals.delivered), options: { fontSize: 11, align: "right" } },
-        { text: formatPercent((totals.delivered / totals.sent) * 100), options: { fontSize: 11, align: "right" } },
-      ]);
-    }
-    
-    const viewedPercent = denominator > 0 ? (totals.viewed / denominator) * 100 : 0;
-    const clickedPercent = denominator > 0 ? (totals.clicked / denominator) * 100 : 0;
-    const hardBouncePercent = totals.sent > 0 ? (totals.hardBounce / totals.sent) * 100 : 0;
-    const softBouncePercent = totals.sent > 0 ? (totals.softBounce / totals.sent) * 100 : 0;
-    const unsubPercent = denominator > 0 ? (totals.unsubs / denominator) * 100 : 0;
-    
-    overviewTableRows.push(
-      [
-        { text: "Viewed", options: { fontSize: 11 } },
-        { text: formatNumber(totals.viewed), options: { fontSize: 11, align: "right" } },
-        { text: formatPercent(viewedPercent), options: { fontSize: 11, align: "right", color: getMetricColor(viewedPercent, 'openRate') } },
-      ],
-      [
-        { text: "Clicked", options: { fontSize: 11 } },
-        { text: formatNumber(totals.clicked), options: { fontSize: 11, align: "right" } },
-        { text: formatPercent(clickedPercent), options: { fontSize: 11, align: "right", color: getMetricColor(clickedPercent, 'clickRate') } },
-      ],
-      [
-        { text: "Hard Bounce", options: { fontSize: 11 } },
-        { text: formatNumber(totals.hardBounce), options: { fontSize: 11, align: "right" } },
-        { text: formatPercent(hardBouncePercent), options: { fontSize: 11, align: "right", color: getMetricColor(hardBouncePercent, 'bounceRate') } },
-      ],
-      [
-        { text: "Soft Bounce", options: { fontSize: 11 } },
-        { text: formatNumber(totals.softBounce), options: { fontSize: 11, align: "right" } },
-        { text: formatPercent(softBouncePercent), options: { fontSize: 11, align: "right", color: getMetricColor(softBouncePercent, 'bounceRate') } },
-      ],
-      [
-        { text: "Unsubscribes", options: { fontSize: 11 } },
-        { text: formatNumber(totals.unsubs), options: { fontSize: 11, align: "right" } },
-        { text: formatPercent(unsubPercent), options: { fontSize: 11, align: "right", color: getMetricColor(unsubPercent, 'unsubscribeRate') } },
-      ]
-    );
-    
-    overviewSlide.addTable(overviewTableRows, {
-      x: 4.8,
-      y: 1.1,
-      w: 4.7,
-      colW: [1.8, 1.4, 1.5],
-      border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-      fontFace: FONTS.primary,
-    });
-    
-    addSlideFooter(overviewSlide, hasPostmasterData);
-    
-    // ========== SLIDE 2: Monthly Performance Trend ==========
-    const monthlySlide = pptx.addSlide();
-    addSlideHeader(monthlySlide, "Monthly Performance Trend", monthRange);
-    
-    // Left column - trend summary
-    const monthlyData = report.monthlyOverview;
-    const trendBullets: string[] = [];
-    
-    if (monthlyData.length >= 2) {
-      const first = monthlyData[0];
-      const last = monthlyData[monthlyData.length - 1];
-      const openDiff = last.viewPercent - first.viewPercent;
-      const clickDiff = last.clickPercent - first.clickPercent;
-      
-      trendBullets.push(`• Open rate: ${openDiff >= 0 ? '↑' : '↓'} ${Math.abs(openDiff).toFixed(1)}pp MoM`);
-      trendBullets.push(`• Click rate: ${clickDiff >= 0 ? '↑' : '↓'} ${Math.abs(clickDiff).toFixed(1)}pp MoM`);
-      
-      const avgBounce = monthlyData.reduce((sum, m) => sum + m.hardBouncePercent + m.softBouncePercent, 0) / monthlyData.length;
-      trendBullets.push(`• Avg bounce: ${formatPercent(avgBounce)}`);
-    }
-    
-    trendBullets.forEach((bullet, i) => {
-      monthlySlide.addText(bullet, {
-        x: 0.5,
-        y: 1.2 + i * 0.4,
-        w: 3.5,
-        h: 0.35,
-        fontSize: 12,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    // Right column - Monthly table (max 6 rows)
-    const monthlyTableRows: pptxgen.TableRow[] = [
-      [
-        { text: "Month", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10 } },
-        { text: "Sent", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-        { text: "View %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-        { text: "Click %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-        { text: "Unsub %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-        { text: "Bounce %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-      ],
-    ];
-    
-    monthlyData.slice(0, 6).forEach(m => {
-      const totalBounce = m.hardBouncePercent + m.softBouncePercent;
-      monthlyTableRows.push([
-        { text: m.month, options: { fontSize: 10 } },
-        { text: formatNumber(m.totalSentUsers), options: { fontSize: 10, align: "right" } },
-        { text: formatPercent(m.viewPercent), options: { fontSize: 10, align: "right", color: getMetricColor(m.viewPercent, 'openRate') } },
-        { text: formatPercent(m.clickPercent), options: { fontSize: 10, align: "right", color: getMetricColor(m.clickPercent, 'clickRate') } },
-        { text: formatPercent(m.unsubscribePercent), options: { fontSize: 10, align: "right", color: getMetricColor(m.unsubscribePercent, 'unsubscribeRate') } },
-        { text: formatPercent(totalBounce), options: { fontSize: 10, align: "right", color: getMetricColor(totalBounce, 'bounceRate') } },
-      ]);
-    });
-    
-    monthlySlide.addTable(monthlyTableRows, {
-      x: 4,
-      y: 1.1,
-      w: 5.5,
-      colW: [1.2, 0.9, 0.85, 0.85, 0.85, 0.85],
-      border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-      fontFace: FONTS.primary,
-    });
-    
-    addSlideFooter(monthlySlide, hasPostmasterData);
-    
-    // ========== BEST & WORST PERFORMING CAMPAIGNS - FULL FIDELITY EXPORT ==========
-    // STRICT: 1:1 match with UI tables - all 14 columns, no truncation, multi-slide overflow
-    
-    const createCampaignTableHeader = (): pptxgen.TableRow => [
-      { text: "Start Date", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "left" } },
-      { text: "Campaign Name", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "left" } },
-      { text: "Subject Line", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "left" } },
-      { text: "Sent", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Viewed", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Open %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Clicked", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Click %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Unsubs", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Unsub %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Hard Bounce", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Hard %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Soft Bounce", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-      { text: "Soft %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 8, align: "right" } },
-    ];
-    
-    const createCampaignDataRow = (c: typeof report.bestCampaigns[0]): pptxgen.TableRow => {
-      const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
-      const unsubPercent = denom > 0 ? (c.unsubscribes / denom) * 100 : 0;
-      const hardBouncePercent = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
-      const softBouncePercent = denom > 0 ? (c.softBounces / denom) * 100 : 0;
-      // NO TRUNCATION - full text display
-      const subject = cleanSubjectLine(c.subjectLine);
-      const campaignName = c.campaignName || '';
-      
-      return [
-        { text: c.startDate || '—', options: { fontSize: 8, align: "left" } },
-        { text: campaignName, options: { fontSize: 8, align: "left" } },
-        { text: subject, options: { fontSize: 8, align: "left" } },
-        { text: formatNumber(c.totalSentUsers), options: { fontSize: 8, align: "right" } },
-        { text: formatNumber(c.uniqueViewed), options: { fontSize: 8, align: "right" } },
-        { text: formatPercent(c.openRate), options: { fontSize: 8, align: "right", color: getMetricColor(c.openRate, 'openRate') } },
-        { text: formatNumber(c.uniqueClicked), options: { fontSize: 8, align: "right" } },
-        { text: formatPercent(c.clickRate), options: { fontSize: 8, align: "right", color: getMetricColor(c.clickRate, 'clickRate') } },
-        { text: formatNumber(c.unsubscribes), options: { fontSize: 8, align: "right" } },
-        { text: formatPercent(unsubPercent), options: { fontSize: 8, align: "right", color: getMetricColor(unsubPercent, 'unsubscribeRate') } },
-        { text: formatNumber(c.hardBounces), options: { fontSize: 8, align: "right" } },
-        { text: formatPercent(hardBouncePercent), options: { fontSize: 8, align: "right", color: getMetricColor(hardBouncePercent, 'bounceRate') } },
-        { text: formatNumber(c.softBounces), options: { fontSize: 8, align: "right" } },
-        { text: formatPercent(softBouncePercent), options: { fontSize: 8, align: "right", color: getMetricColor(softBouncePercent, 'bounceRate') } },
-      ];
-    };
-    
-    // Column widths for 14-column table (total 9.5" to use full slide width with 0.25" margins)
-    const campaignTableColWidths = [0.65, 1.4, 1.8, 0.55, 0.55, 0.55, 0.55, 0.55, 0.5, 0.5, 0.55, 0.5, 0.55, 0.5];
-    const MAX_ROWS_PER_SLIDE = 8; // Header + 7 data rows max per slide to avoid overflow
-    
-    // Helper to add campaign table slides with overflow handling
-    const addCampaignTableSlides = (
-      campaigns: typeof report.bestCampaigns,
-      baseTitle: string,
-      summaryTitle: string,
-      summaryColor: string,
-      summary: string
-    ) => {
-      const allCampaigns = campaigns; // No slicing - export ALL campaigns
-      const totalSlides = Math.ceil(allCampaigns.length / (MAX_ROWS_PER_SLIDE - 1)); // -1 for header row
-      
-      for (let slideIdx = 0; slideIdx < totalSlides; slideIdx++) {
-        const slide = pptx.addSlide();
-        const startRow = slideIdx * (MAX_ROWS_PER_SLIDE - 1);
-        const endRow = Math.min(startRow + (MAX_ROWS_PER_SLIDE - 1), allCampaigns.length);
-        const campaignsOnSlide = allCampaigns.slice(startRow, endRow);
-        
-        // Title with slide indicator for multi-slide
-        const slideTitle = totalSlides > 1 
-          ? `${baseTitle} (${slideIdx + 1}/${totalSlides})`
-          : baseTitle;
-        addSlideHeader(slide, slideTitle);
-        
-        // Build table with header repeated on each slide
-        const tableRows: pptxgen.TableRow[] = [createCampaignTableHeader()];
-        campaignsOnSlide.forEach(c => tableRows.push(createCampaignDataRow(c)));
-        
-        slide.addTable(tableRows, {
-          x: 0.25,
-          y: 1.0,
-          w: 9.5,
-          colW: campaignTableColWidths,
-          border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-          fontFace: FONTS.primary,
-          autoPage: false, // We handle pagination manually
-          autoPageLineWeight: 0,
-        });
-        
-        // Only add summary on last slide
-        if (slideIdx === totalSlides - 1) {
-          const tableHeight = 0.35 + (tableRows.length * 0.3);
-          const bulletStartY = 1.0 + tableHeight + 0.15;
-          
-          slide.addText(`${summaryTitle}:`, {
-            x: 0.25,
-            y: bulletStartY,
-            w: 9.5,
-            h: 0.25,
-            fontSize: 10,
-            bold: true,
-            color: summaryColor,
-            fontFace: FONTS.primary,
-          });
-          
-          const insights = summary.split('. ').filter(s => s.trim()).slice(0, 3);
-          insights.forEach((insight, i) => {
-            slide.addText(`• ${insight.trim()}`, {
-              x: 0.25,
-              y: bulletStartY + 0.28 + i * 0.25,
-              w: 9.5,
-              h: 0.23,
-              fontSize: 9,
-              color: SLIDE_STYLES.bodyColor,
-              fontFace: FONTS.primary,
-            });
-          });
-        }
-        
-        addSlideFooter(slide, hasPostmasterData);
-      }
-    };
-    
-    // ========== SLIDE 3+: Best Performing Campaigns (all rows, no truncation) ==========
-    addCampaignTableSlides(
-      report.bestCampaigns,
-      "Best Performing Campaigns (by Views)",
-      "What Worked",
-      SLIDE_STYLES.greenText,
-      report.bestSummary
-    );
-    
-    // ========== SLIDE 4+: Under-Performing Campaigns (all rows, no truncation) ==========
-    addCampaignTableSlides(
-      report.worstCampaigns,
-      "Underperforming Campaigns",
-      "What Didn't Work",
-      SLIDE_STYLES.redText,
-      report.worstSummary
-    );
-    
-    // ========== SLIDE 5: Deliverability & Reputation Diagnostics ==========
-    const deliverabilitySlide = pptx.addSlide();
-    addSlideHeader(deliverabilitySlide, "Deliverability & Reputation Signals");
-    
-    // Left column - Reputation summary
-    const avgHardBounce = report.providerAggregates.reduce((sum, p) => sum + p.hardBouncePercent, 0) / report.providerAggregates.length;
-    const avgSoftBounce = report.providerAggregates.reduce((sum, p) => sum + p.softBouncePercent, 0) / report.providerAggregates.length;
-    const avgUnsub = report.providerAggregates.reduce((sum, p) => sum + p.unsubscribePercent, 0) / report.providerAggregates.length;
-    
-    const deliveryBullets = [
-      `• Hard bounce avg: ${formatPercent(avgHardBounce)}`,
-      `• Soft bounce avg: ${formatPercent(avgSoftBounce)}`,
-      `• Unsubscribe avg: ${formatPercent(avgUnsub)}`,
-    ];
-    
-    // Add reputation status
-    let reputationStatus = "Healthy";
-    let statusColor = SLIDE_STYLES.greenText;
-    if (avgHardBounce > 3 || avgSoftBounce > 5) {
-      reputationStatus = "Needs Attention";
-      statusColor = SLIDE_STYLES.amberText;
-    }
-    if (avgHardBounce > 5 || avgSoftBounce > 8) {
-      reputationStatus = "At Risk";
-      statusColor = SLIDE_STYLES.redText;
-    }
-    
-    deliverabilitySlide.addText(`Reputation Status: ${reputationStatus}`, {
-      x: 0.5,
-      y: 1.2,
-      w: 3.5,
-      h: 0.4,
-      fontSize: 14,
-      bold: true,
-      color: statusColor,
-      fontFace: FONTS.primary,
-    });
-    
-    deliveryBullets.forEach((bullet, i) => {
-      deliverabilitySlide.addText(bullet, {
-        x: 0.5,
-        y: 1.8 + i * 0.4,
-        w: 3.5,
-        h: 0.35,
-        fontSize: 12,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    if (!hasPostmasterData) {
-      deliverabilitySlide.addText("* Postmaster data not provided", {
-        x: 0.5,
-        y: 3.4,
-        w: 3.5,
-        h: 0.3,
-        fontSize: 10,
-        italic: true,
-        color: SLIDE_STYLES.mutedColor,
-        fontFace: FONTS.primary,
-      });
-    }
-    
-    // Right column - Provider breakdown table
-    const providerTableRows: pptxgen.TableRow[] = [
-      [
-        { text: "Provider", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10 } },
-        { text: "View %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-        { text: "Hard %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-        { text: "Soft %", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "right" } },
-      ],
-    ];
-    
-    report.providerAggregates.slice(0, 5).forEach(p => {
-      providerTableRows.push([
-        { text: p.providerName || p.serviceProvider, options: { fontSize: 10 } },
-        { text: formatPercent(p.viewPercent), options: { fontSize: 10, align: "right", color: getMetricColor(p.viewPercent, 'openRate') } },
-        { text: formatPercent(p.hardBouncePercent), options: { fontSize: 10, align: "right", color: getMetricColor(p.hardBouncePercent, 'bounceRate') } },
-        { text: formatPercent(p.softBouncePercent), options: { fontSize: 10, align: "right", color: getMetricColor(p.softBouncePercent, 'bounceRate') } },
-      ]);
-    });
-    
-    deliverabilitySlide.addTable(providerTableRows, {
-      x: 4.5,
-      y: 1.1,
-      w: 5,
-      colW: [2, 1, 1, 1],
-      border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-      fontFace: FONTS.primary,
-    });
-    
-    addSlideFooter(deliverabilitySlide, hasPostmasterData);
-    
-    // ========== SLIDE 6: Key Learnings & Next Steps ==========
-    const learningsSlide = pptx.addSlide();
-    addSlideHeader(learningsSlide, "Key Learnings & Next Steps");
-    
-    // Split learnings into "What Worked" and "What Needs Fixing"
-    const allLearnings = report.keyLearnings;
-    const whatWorked = allLearnings.filter((_, i) => i % 2 === 0).slice(0, 5);
-    const whatNeedsFix = allLearnings.filter((_, i) => i % 2 === 1).slice(0, 5);
-    
-    // Left column - What Worked
-    learningsSlide.addText("What Worked", {
-      x: 0.5,
-      y: 1.2,
-      w: 4,
-      h: 0.4,
-      fontSize: 14,
-      bold: true,
-      color: SLIDE_STYLES.greenText,
-      fontFace: FONTS.primary,
-    });
-    
-    whatWorked.forEach((learning, i) => {
-      learningsSlide.addText(`• ${learning.title}`, {
-        x: 0.5,
-        y: 1.7 + i * 0.6,
-        w: 4.2,
-        h: 0.55,
-        fontSize: 11,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    // Right column - What Needs Fixing
-    learningsSlide.addText("What Needs Fixing", {
-      x: 5,
-      y: 1.2,
-      w: 4.5,
-      h: 0.4,
-      fontSize: 14,
-      bold: true,
-      color: SLIDE_STYLES.amberText,
-      fontFace: FONTS.primary,
-    });
-    
-    whatNeedsFix.forEach((learning, i) => {
-      learningsSlide.addText(`• ${learning.title}`, {
-        x: 5,
-        y: 1.7 + i * 0.6,
-        w: 4.5,
-        h: 0.55,
-        fontSize: 11,
-        color: SLIDE_STYLES.bodyColor,
-        fontFace: FONTS.primary,
-      });
-    });
-    
-    addSlideFooter(learningsSlide, hasPostmasterData);
+  const report = diagnostics.analysisReport;
+  if (!report) {
+    // Fallback: empty deck
+    const s = pptx.addSlide();
+    s.addText("No analysis report data available", { x: 2, y: 2, w: 6, h: 1, fontSize: 20, color: theme.mutedColor });
+    await pptx.writeFile({ fileName: `Inbox_Diagnostics_${brandName}_Report.pptx` });
+    return;
   }
-  
-  // ========== REPUTATION REPAIR REPORT ==========
-  if (activeReport === "reputation" && diagnostics.reputationReport) {
-    const repReport = diagnostics.reputationReport;
-    const enhancedReport = repReport.enhancedReport;
-    
-    // Helper to get signal metric color
-    const getSignalMetricColor = (signal: string, percentage: string): string => {
-      const value = parseFloat(percentage);
-      if (isNaN(value)) return SLIDE_STYLES.bodyColor;
-      
-      const signalLower = signal.toLowerCase();
-      if (signalLower.includes('open') || signalLower.includes('view')) {
-        return getMetricColor(value, 'openRate');
-      } else if (signalLower.includes('click')) {
-        return getMetricColor(value, 'clickRate');
-      } else if (signalLower.includes('hard bounce')) {
-        return getMetricColor(value, 'bounceRate');
-      } else if (signalLower.includes('soft bounce')) {
-        // Soft bounce: more lenient thresholds
-        if (value < 2) return SLIDE_STYLES.greenText;
-        if (value <= 5) return SLIDE_STYLES.amberText;
-        return SLIDE_STYLES.redText;
-      } else if (signalLower.includes('unsub')) {
-        return getMetricColor(value, 'unsubscribeRate');
-      } else if (signalLower.includes('spam') || signalLower.includes('complaint')) {
-        if (value < 0.1) return SLIDE_STYLES.greenText;
-        if (value <= 0.3) return SLIDE_STYLES.amberText;
-        return SLIDE_STYLES.redText;
+
+  const monthRange = getMonthRange(report);
+  let slideNum = 0;
+
+  // ==========================================
+  // SLIDE 1: Campaign Overview by Provider
+  // ==========================================
+  slideNum++;
+  const s1 = pptx.addSlide();
+  addSlideBackground(s1, theme);
+  addSlideHeader(s1, "Campaign Overview by Provider", theme, monthRange, slideNum);
+
+  const useDelivered = report.providerAggregates[0]?.useDeliveredAsDenominator;
+
+  // Build provider columns matching UI exactly
+  const provHeaders: string[] = ["Provider", "Sent"];
+  if (useDelivered) provHeaders.push("Delivered");
+  provHeaders.push("Unique Open", "Open %", "Unique Clicked", "Click %", "Bounces", "Unsubs");
+
+  const provHeaderRow: pptxgen.TableCell[] = provHeaders.map((h, i) => ({
+    text: h,
+    options: headerCellOpts(theme, i === 0 ? "left" : "right"),
+  }));
+
+  const provDataRows: pptxgen.TableRow[] = [provHeaderRow];
+  const totals = { sent: 0, delivered: 0, viewed: 0, clicked: 0, bounces: 0, unsubs: 0 };
+
+  report.providerAggregates.forEach((p, ri) => {
+    totals.sent += p.totalSentUsers;
+    totals.delivered += p.totalDeliveredUsers;
+    totals.viewed += p.uniqueViewed;
+    totals.clicked += p.uniqueClicked;
+    totals.bounces += p.hardBounces + p.softBounces;
+    totals.unsubs += p.unsubscribes;
+
+    const row: pptxgen.TableCell[] = [
+      { text: `${p.serviceProvider} / ${p.providerName}`, options: bodyCellOpts(theme, ri) },
+      { text: formatNumber(p.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
+    ];
+    if (useDelivered) row.push({ text: formatNumber(p.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "right") });
+    row.push(
+      { text: formatNumber(p.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatPercent(p.viewPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(p.viewPercent, "openRate", theme)) },
+      { text: formatNumber(p.uniqueClicked), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatPercent(p.clickPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(p.clickPercent, "clickRate", theme)) },
+      { text: formatNumber(p.hardBounces + p.softBounces), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatNumber(p.unsubscribes), options: bodyCellOpts(theme, ri, "right") },
+    );
+    provDataRows.push(row);
+  });
+
+  // Grand Total row
+  const denom = useDelivered ? totals.delivered : totals.sent;
+  const gtRow: pptxgen.TableCell[] = [
+    { text: "Grand Total", options: { bold: true, fontSize: 9, fill: { color: theme.headerBg }, fontFace: FONTS.body } },
+    { text: formatNumber(totals.sent), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, fontFace: FONTS.body } },
+  ];
+  if (useDelivered) gtRow.push({ text: formatNumber(totals.delivered), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, fontFace: FONTS.body } });
+  gtRow.push(
+    { text: formatNumber(totals.viewed), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, fontFace: FONTS.body } },
+    { text: formatPercent(denom > 0 ? (totals.viewed / denom) * 100 : 0), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, color: getMetricColor(denom > 0 ? (totals.viewed / denom) * 100 : 0, "openRate", theme), fontFace: FONTS.body } },
+    { text: formatNumber(totals.clicked), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, fontFace: FONTS.body } },
+    { text: formatPercent(denom > 0 ? (totals.clicked / denom) * 100 : 0), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, color: getMetricColor(denom > 0 ? (totals.clicked / denom) * 100 : 0, "clickRate", theme), fontFace: FONTS.body } },
+    { text: formatNumber(totals.bounces), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, fontFace: FONTS.body } },
+    { text: formatNumber(totals.unsubs), options: { bold: true, fontSize: 9, align: "right", fill: { color: theme.headerBg }, fontFace: FONTS.body } },
+  );
+  provDataRows.push(gtRow);
+
+  const baseCols = useDelivered ? 9 : 8;
+  const colWidths1 = useDelivered
+    ? [2.0, 0.85, 0.85, 0.85, 0.7, 0.85, 0.7, 0.7, 0.7]
+    : [2.2, 0.95, 0.95, 0.8, 0.95, 0.8, 0.85, 0.85];
+
+  s1.addTable(provDataRows, {
+    x: 0.5, y: 1.15, w: 9,
+    colW: colWidths1,
+    border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+    fontFace: FONTS.body,
+  });
+
+  s1.addText(`* Percentages use ${useDelivered ? "Delivered" : "Sent"} as denominator`, {
+    x: 0.5, y: 4.9, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
+  });
+  addSlideFooter(s1, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 2: Monthly Overview
+  // ==========================================
+  slideNum++;
+  const s2 = pptx.addSlide();
+  addSlideBackground(s2, theme);
+  addSlideHeader(s2, "Monthly Overview", theme, monthRange, slideNum);
+
+  const monthlyData = report.monthlyOverview.filter(m => m.month !== "Unknown Date" || m.totalSentUsers > 0);
+  const mUseDelivered = monthlyData[0]?.useDeliveredAsDenominator;
+
+  const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
+  if (mUseDelivered) mHeaders.push("Delivered");
+  mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard %", "Soft %");
+
+  const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({
+    text: h,
+    options: headerCellOpts(theme, i === 0 ? "left" : "right"),
+  }));
+
+  const mRows: pptxgen.TableRow[] = [mHeaderRow];
+  monthlyData.forEach((m, ri) => {
+    const row: pptxgen.TableCell[] = [
+      { text: m.month, options: bodyCellOpts(theme, ri) },
+      { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatNumber(m.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
+    ];
+    if (mUseDelivered) row.push({ text: formatNumber(m.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "right") });
+    row.push(
+      { text: formatNumber(m.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.viewPercent, "openRate", theme)) },
+      { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatPercent(m.clickPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.clickPercent, "clickRate", theme)) },
+      { text: formatNumber(m.unsubscribes), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatPercent(m.unsubscribePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.unsubscribePercent, "unsubscribeRate", theme)) },
+      { text: formatPercent(m.hardBouncePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.hardBouncePercent, "bounceRate", theme)) },
+      { text: formatPercent(m.softBouncePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.softBouncePercent, "bounceRate", theme)) },
+    );
+    mRows.push(row);
+  });
+
+  const numMCols = mHeaders.length;
+  const mColW = mUseDelivered
+    ? [1.1, 0.65, 0.7, 0.7, 0.65, 0.6, 0.65, 0.6, 0.55, 0.6, 0.55, 0.55]
+    : [1.2, 0.7, 0.8, 0.75, 0.7, 0.75, 0.7, 0.65, 0.65, 0.65, 0.65];
+
+  s2.addTable(mRows, {
+    x: 0.5, y: 1.15, w: 9,
+    colW: mColW,
+    border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+    fontFace: FONTS.body,
+  });
+  addSlideFooter(s2, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 3: Email Metrics Trend (Chart)
+  // ==========================================
+  slideNum++;
+  const s3 = pptx.addSlide();
+  addSlideBackground(s3, theme);
+  addSlideHeader(s3, "Email Metrics Trend", theme, monthRange, slideNum);
+
+  // Build chart data from monthly overview
+  const chartLabels = monthlyData.map(m => m.month);
+  const openRateData = monthlyData.map(m => m.viewPercent);
+  const clickRateData = monthlyData.map(m => m.clickPercent);
+  const unsubRateData = monthlyData.map(m => m.unsubscribePercent);
+  const bounceRateData = monthlyData.map(m => m.hardBouncePercent + m.softBouncePercent);
+
+  if (chartLabels.length > 0) {
+    s3.addChart("line" as pptxgen.CHART_NAME, [
+      { name: "Open Rate %", labels: chartLabels, values: openRateData },
+      { name: "Click Rate %", labels: chartLabels, values: clickRateData },
+      { name: "Unsub Rate %", labels: chartLabels, values: unsubRateData },
+      { name: "Bounce Rate %", labels: chartLabels, values: bounceRateData },
+    ], {
+      x: 0.5, y: 1.15, w: 9, h: 3.8,
+      showLegend: true, legendPos: "b", legendFontSize: 9,
+      lineSmooth: true,
+      lineSize: 2,
+      showValue: false,
+      catAxisLabelFontSize: 8,
+      valAxisLabelFontSize: 8,
+      catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
+      valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
+      chartColors: [theme.primary, theme.secondary, theme.amber, theme.red],
+    });
+  } else {
+    s3.addText("No monthly data available for trend chart", {
+      x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center",
+    });
+  }
+  addSlideFooter(s3, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 4: Infrastructure Details
+  // ==========================================
+  slideNum++;
+  const s4 = pptx.addSlide();
+  addSlideBackground(s4, theme);
+  addSlideHeader(s4, "Infrastructure Details", theme, undefined, slideNum);
+
+  const infra = extractInfrastructure(diagnostics.rawData, diagnostics.postmasterData);
+
+  // Domain Details table (left)
+  if (infra.domains.length > 0) {
+    s4.addText("Domain Details", {
+      x: 0.5, y: 1.1, w: 4, h: 0.3,
+      fontSize: 12, bold: true, color: theme.titleColor, fontFace: FONTS.headline,
+    });
+
+    const domRows: pptxgen.TableRow[] = [
+      [
+        { text: "Domain", options: headerCellOpts(theme) },
+        { text: "Provider", options: headerCellOpts(theme) },
+        { text: "Reputation", options: headerCellOpts(theme, "center") },
+      ],
+    ];
+    infra.domains.slice(0, 6).forEach((d, ri) => {
+      domRows.push([
+        { text: d.domain, options: bodyCellOpts(theme, ri) },
+        { text: d.provider, options: bodyCellOpts(theme, ri) },
+        { text: d.reputation, options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
+      ]);
+    });
+
+    // Glass-style card border
+    s4.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+      x: 0.4, y: 1.45, w: 4.3, h: 0.35 * (domRows.length + 0.5),
+      fill: { color: theme.slideBg, transparency: 60 },
+      line: { color: lighten(theme.primary, 0.8), width: 0.75 },
+      rectRadius: 0.1,
+    });
+
+    s4.addTable(domRows, {
+      x: 0.5, y: 1.5, w: 4,
+      colW: [1.6, 1.4, 1.0],
+      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      fontFace: FONTS.body,
+    });
+  }
+
+  // IP Details table (right)
+  if (infra.ips.length > 0) {
+    s4.addText("IP Details", {
+      x: 5.3, y: 1.1, w: 4, h: 0.3,
+      fontSize: 12, bold: true, color: theme.titleColor, fontFace: FONTS.headline,
+    });
+
+    const ipRows: pptxgen.TableRow[] = [
+      [
+        { text: "IP Address", options: headerCellOpts(theme) },
+        { text: "Reputation", options: headerCellOpts(theme, "center") },
+      ],
+    ];
+    infra.ips.slice(0, 8).forEach((ip, ri) => {
+      ipRows.push([
+        { text: ip.ip, options: bodyCellOpts(theme, ri) },
+        { text: ip.reputation, options: bodyCellOpts(theme, ri, "center", getReputationColor(ip.reputation, theme)) },
+      ]);
+    });
+
+    s4.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+      x: 5.2, y: 1.45, w: 4.3, h: 0.35 * (ipRows.length + 0.5),
+      fill: { color: theme.slideBg, transparency: 60 },
+      line: { color: lighten(theme.primary, 0.8), width: 0.75 },
+      rectRadius: 0.1,
+    });
+
+    s4.addTable(ipRows, {
+      x: 5.3, y: 1.5, w: 4,
+      colW: [2.5, 1.5],
+      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      fontFace: FONTS.body,
+    });
+  }
+
+  if (infra.domains.length === 0 && infra.ips.length === 0) {
+    s4.addText("No infrastructure data available. Upload Postmaster data for domain & IP details.", {
+      x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center",
+    });
+  }
+  addSlideFooter(s4, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 5: Reputation Scorecard
+  // ==========================================
+  slideNum++;
+  const s5 = pptx.addSlide();
+  addSlideBackground(s5, theme);
+  addSlideHeader(s5, "Reputation Scorecard", theme, undefined, slideNum);
+
+  if (signalHealthData && signalHealthData.length > 0) {
+    const shRows: pptxgen.TableRow[] = [
+      [
+        { text: "Signal", options: headerCellOpts(theme) },
+        { text: "Current Value", options: headerCellOpts(theme, "center") },
+        { text: "Status", options: headerCellOpts(theme, "center") },
+      ],
+    ];
+
+    signalHealthData.forEach((s, ri) => {
+      const statusColor = s.status === "healthy" ? theme.green
+        : s.status === "warning" ? theme.amber
+        : s.status === "risk" || s.status === "breached" || s.status === "critical" ? theme.red
+        : theme.mutedColor;
+
+      shRows.push([
+        { text: s.metric, options: bodyCellOpts(theme, ri) },
+        { text: s.currentValue, options: bodyCellOpts(theme, ri, "center") },
+        { text: s.status.charAt(0).toUpperCase() + s.status.slice(1), options: bodyCellOpts(theme, ri, "center", statusColor) },
+      ]);
+    });
+
+    s5.addTable(shRows, {
+      x: 1.5, y: 1.15, w: 7,
+      colW: [3.0, 2.0, 2.0],
+      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      fontFace: FONTS.body,
+    });
+
+    // RAG legend
+    s5.addText("● Healthy  ● Warning  ● Risk", {
+      x: 1.5, y: 4.6, w: 7, h: 0.25, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body,
+    });
+  } else {
+    s5.addText("Signal health data not available. Generate from campaign + postmaster data.", {
+      x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center",
+    });
+  }
+  addSlideFooter(s5, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 6: Reputation Trends (Charts)
+  // ==========================================
+  slideNum++;
+  const s6 = pptx.addSlide();
+  addSlideBackground(s6, theme);
+  addSlideHeader(s6, "Reputation Trends", theme, undefined, slideNum);
+
+  if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
+    const pmData = diagnostics.postmasterData;
+    const pmDates = pmData.map(p => p.date);
+    const spamData = pmData.map(p => (p.spamRatio || 0) * 100);
+    const errorData = pmData.map(p => (p.errorRatio || 0) * 100);
+
+    // 2-chart layout
+    // Chart 1: Spam & Error Ratios
+    s6.addChart("line" as pptxgen.CHART_NAME, [
+      { name: "Spam Ratio %", labels: pmDates, values: spamData },
+      { name: "Error Ratio %", labels: pmDates, values: errorData },
+    ], {
+      x: 0.5, y: 1.15, w: 4.2, h: 3.5,
+      showLegend: true, legendPos: "b", legendFontSize: 8,
+      lineSmooth: true, lineSize: 2,
+      catAxisLabelFontSize: 7,
+      valAxisLabelFontSize: 7,
+      catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
+      valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
+      chartColors: [theme.red, theme.amber],
+      showTitle: true, title: "Spam & Error Ratios", titleFontSize: 10, titleColor: theme.titleColor,
+    });
+
+    // Chart 2: IP count trend
+    const ipCounts = pmData.map(p => p.ipCount || 0);
+    s6.addChart("bar" as pptxgen.CHART_NAME, [
+      { name: "IP Count", labels: pmDates, values: ipCounts },
+    ], {
+      x: 5.3, y: 1.15, w: 4.2, h: 3.5,
+      showLegend: true, legendPos: "b", legendFontSize: 8,
+      catAxisLabelFontSize: 7,
+      valAxisLabelFontSize: 7,
+      catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
+      valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
+      chartColors: [theme.primary],
+      showTitle: true, title: "IP Count Trend", titleFontSize: 10, titleColor: theme.titleColor,
+    });
+  } else {
+    s6.addText("Postmaster data required for reputation trend charts.", {
+      x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center",
+    });
+  }
+  addSlideFooter(s6, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 7: Root Cause Summary
+  // ==========================================
+  slideNum++;
+  const s7 = pptx.addSlide();
+  addSlideBackground(s7, theme);
+  addSlideHeader(s7, "Root Cause Summary", theme, undefined, slideNum);
+
+  if (rootCauseEntries && rootCauseEntries.length > 0) {
+    const cardY = 1.3;
+    const cardW = 4.2;
+    const cardH = 1.8;
+
+    rootCauseEntries.slice(0, 4).forEach((rc, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = 0.5 + col * 4.7;
+      const y = cardY + row * 2.0;
+
+      // Card border with brand accent stripe
+      s7.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x, y, w: cardW, h: cardH,
+        fill: { color: theme.slideBg },
+        line: { color: lighten(theme.primary, 0.75), width: 0.75 },
+        rectRadius: 0.08,
+      });
+
+      // Left accent stripe
+      s7.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x, y, w: 0.06, h: cardH,
+        fill: { color: theme.primary },
+      });
+
+      // Priority badge
+      const priority = rc.priority || "P1";
+      const prioColor = priority === "P0" ? theme.red : priority === "P1" ? theme.amber : theme.green;
+      s7.addText(priority, {
+        x: x + 0.15, y: y + 0.08, w: 0.4, h: 0.25,
+        fontSize: 8, bold: true, color: prioColor, fontFace: FONTS.body,
+      });
+
+      // Root cause text
+      s7.addText(rc.cause, {
+        x: x + 0.15, y: y + 0.35, w: cardW - 0.3, h: 0.6,
+        fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body,
+        valign: "top",
+      });
+
+      // Evidence
+      s7.addText(rc.evidence, {
+        x: x + 0.15, y: y + 0.95, w: cardW - 0.3, h: 0.75,
+        fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body,
+        valign: "top",
+      });
+    });
+  } else {
+    s7.addText("No root causes detected — signals within healthy thresholds.", {
+      x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.green, fontFace: FONTS.body, align: "center",
+    });
+  }
+  addSlideFooter(s7, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDES 8 & 9: Best & Underperforming Campaigns
+  // ==========================================
+  const createCampaignHeader = (): pptxgen.TableRow =>
+    ["Start Date", "Campaign Name", "Subject Line", "Sent", "Unique Open", "Open %", "Unique Clicked", "Click %", "Unique CTR"]
+      .map((h, i) => ({
+        text: h,
+        options: headerCellOpts(theme, i < 3 ? "left" : "right"),
+      }));
+
+  const createCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
+    const d = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
+    const uniqueCTR = c.uniqueViewed > 0 ? (c.uniqueClicked / c.uniqueViewed) * 100 : 0;
+    return [
+      { text: c.startDate || "—", options: bodyCellOpts(theme, ri) },
+      { text: c.campaignName || "", options: bodyCellOpts(theme, ri) },
+      { text: cleanSubjectLine(c.subjectLine), options: bodyCellOpts(theme, ri) },
+      { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatPercent(c.openRate), options: bodyCellOpts(theme, ri, "right", getMetricColor(c.openRate, "openRate", theme)) },
+      { text: formatNumber(c.uniqueClicked), options: bodyCellOpts(theme, ri, "right") },
+      { text: formatPercent(c.clickRate), options: bodyCellOpts(theme, ri, "right", getMetricColor(c.clickRate, "clickRate", theme)) },
+      { text: formatPercent(uniqueCTR), options: bodyCellOpts(theme, ri, "right", getMetricColor(uniqueCTR, "clickRate", theme)) },
+    ];
+  };
+
+  const campaignColW = [0.7, 1.6, 2.0, 0.6, 0.7, 0.6, 0.7, 0.6, 0.6];
+  const MAX_CAMP_ROWS = 7;
+
+  const addCampaignSlides = (
+    campaigns: TopCampaign[],
+    title: string,
+    summaryText: string,
+    accentColor: string,
+    isUnderperform: boolean = false
+  ) => {
+    const totalSlides = Math.max(1, Math.ceil(campaigns.length / MAX_CAMP_ROWS));
+
+    for (let si = 0; si < totalSlides; si++) {
+      slideNum++;
+      const slide = pptx.addSlide();
+      addSlideBackground(slide, theme);
+
+      const slideTitle = totalSlides > 1 ? `${title} (${si + 1}/${totalSlides})` : title;
+      addSlideHeader(slide, slideTitle, theme, undefined, slideNum);
+
+      // Amber outline for underperforming
+      if (isUnderperform) {
+        slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+          x: 0.4, y: 0.2, w: 9.2, h: 0.85,
+          fill: { color: theme.slideBg, transparency: 100 },
+          line: { color: theme.amber, width: 1 },
+          rectRadius: 0.06,
+        });
       }
-      return SLIDE_STYLES.bodyColor;
+
+      const startIdx = si * MAX_CAMP_ROWS;
+      const slicedCamps = campaigns.slice(startIdx, startIdx + MAX_CAMP_ROWS);
+
+      const rows: pptxgen.TableRow[] = [createCampaignHeader()];
+      slicedCamps.forEach((c, ri) => rows.push(createCampaignRow(c, ri)));
+
+      slide.addTable(rows, {
+        x: 0.35, y: 1.1, w: 9.3,
+        colW: campaignColW,
+        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        fontFace: FONTS.body,
+        autoPage: false,
+      });
+
+      // Summary on last slide
+      if (si === totalSlides - 1 && summaryText) {
+        const tableH = 0.35 + rows.length * 0.28;
+        slide.addText(summaryText, {
+          x: 0.5, y: 1.1 + tableH + 0.1, w: 9, h: 0.5,
+          fontSize: 9, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
+        });
+      }
+
+      addSlideFooter(slide, theme, hasPostmasterData);
+    }
+  };
+
+  addCampaignSlides(report.bestCampaigns, "Best Performing Campaigns", report.bestSummary, theme.green);
+  addCampaignSlides(report.worstCampaigns, "Underperforming Campaigns", report.worstSummary, theme.red, true);
+
+  // ==========================================
+  // SLIDE 10: Send Mix & Use Case Coverage
+  // ==========================================
+  slideNum++;
+  const s10 = pptx.addSlide();
+  addSlideBackground(s10, theme);
+  addSlideHeader(s10, "Send Mix & Use Case Coverage", theme, undefined, slideNum);
+
+  const enhRep = diagnostics.reputationReport?.enhancedReport;
+  if (enhRep?.sendMixAnalysis) {
+    const mix = enhRep.sendMixAnalysis;
+    const mixTypes = ["Transactional", "Lifecycle", "Promotional"];
+    const mixValues = [mix.transactionalPercent, mix.lifecyclePercent, mix.promotionalPercent];
+
+    // Mix table
+    const mixHeaderRow: pptxgen.TableCell[] = [
+      { text: "", options: headerCellOpts(theme) },
+      ...mixTypes.map(t => ({ text: t, options: headerCellOpts(theme, "center" as const) })),
+    ];
+
+    const mixValueRow: pptxgen.TableCell[] = [
+      { text: "Mix %", options: { fontSize: 10, bold: true, fontFace: FONTS.body, color: theme.bodyColor } },
+      ...mixValues.map((v, i) => ({
+        text: `${v.toFixed(1)}%`,
+        options: {
+          fontSize: 12, bold: true, align: "center" as const, fontFace: FONTS.body,
+          color: i === 2 && v > 60 ? theme.red : i === 2 && v > 40 ? theme.amber : theme.green,
+        },
+      })),
+    ];
+
+    const getStatus = (type: string): { text: string; color: string } => {
+      const tl = type.toLowerCase();
+      if (mix.overweightedTypes.includes(tl)) return { text: "Overweighted", color: theme.red };
+      if (mix.underutilizedAbsorbers.includes(tl)) return { text: "Underutilized", color: theme.amber };
+      return { text: "Balanced", color: theme.green };
     };
-    
-    // Helper to get trend color
-    const getTrendColor = (signal: string, trend: string): string => {
-      const signalLower = signal.toLowerCase();
-      const isNegativeMetric = signalLower.includes('bounce') || 
-                               signalLower.includes('unsub') || 
-                               signalLower.includes('spam') ||
-                               signalLower.includes('complaint');
-      
-      if (trend === 'up') {
-        return isNegativeMetric ? SLIDE_STYLES.redText : SLIDE_STYLES.greenText;
-      } else if (trend === 'down') {
-        return isNegativeMetric ? SLIDE_STYLES.greenText : SLIDE_STYLES.redText;
+
+    const statusRow: pptxgen.TableCell[] = [
+      { text: "Status", options: { fontSize: 10, bold: true, fontFace: FONTS.body, color: theme.bodyColor } },
+      ...mixTypes.map(t => {
+        const st = getStatus(t);
+        return { text: st.text, options: { fontSize: 10, align: "center" as const, color: st.color, fontFace: FONTS.body } };
+      }),
+    ];
+
+    s10.addTable([mixHeaderRow, mixValueRow, statusRow], {
+      x: 1.5, y: 1.4, w: 7,
+      colW: [1.2, 1.9, 1.9, 1.9],
+      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      fontFace: FONTS.body,
+    });
+
+    // Visual bar
+    const barY = 3.4;
+    let cx = 1.5;
+    const barW = 7;
+    const barColors = [theme.green, theme.amber, theme.red];
+    mixValues.forEach((v, i) => {
+      const w = (v / 100) * barW;
+      if (w > 0.05) {
+        s10.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: cx, y: barY, w, h: 0.35,
+          fill: { color: barColors[i] },
+        });
+        cx += w;
       }
-      return SLIDE_STYLES.mutedColor;
-    };
-    
-    // Slide 1: Reputation Signal Table (Horizontal Layout)
-    if (enhancedReport && enhancedReport.signalTable && enhancedReport.signalTable.length > 0) {
-      const signalSlide = pptx.addSlide();
-      addSlideHeader(signalSlide, "Reputation Signal Table");
-      
-      // Add snapshot info if available
-      if (enhancedReport.reputationSnapshot) {
-        const snapshot = enhancedReport.reputationSnapshot;
-        const statusColor = snapshot.primaryStressSignal.includes('Hard') ? SLIDE_STYLES.redText :
-                           snapshot.primaryStressSignal.includes('Spam') ? SLIDE_STYLES.redText :
-                           snapshot.primaryStressSignal === 'None identified' ? SLIDE_STYLES.greenText :
-                           SLIDE_STYLES.amberText;
-        
-        signalSlide.addText(`Primary Stress Signal: ${snapshot.primaryStressSignal}`, {
-          x: 0.5,
-          y: 1.0,
-          w: 9,
-          h: 0.3,
-          fontSize: 12,
-          bold: true,
-          color: statusColor,
-          fontFace: FONTS.primary,
-        });
+    });
+
+    s10.addText("■ Transactional  ■ Lifecycle  ■ Promotional", {
+      x: 1.5, y: 3.85, w: 7, h: 0.25,
+      fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body,
+    });
+
+    // Confidence
+    const confColor = mix.classificationConfidence === "high" ? theme.green : mix.classificationConfidence === "medium" ? theme.amber : theme.red;
+    s10.addText(`Classification Confidence: ${mix.classificationConfidence.toUpperCase()}`, {
+      x: 1.5, y: 4.2, w: 4, h: 0.25,
+      fontSize: 9, color: confColor, fontFace: FONTS.body,
+    });
+  } else {
+    s10.addText("Send mix analysis requires reputation data generation.", {
+      x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center",
+    });
+  }
+  addSlideFooter(s10, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 11: Lifecycle Coverage Matrix
+  // ==========================================
+  slideNum++;
+  const s11 = pptx.addSlide();
+  addSlideBackground(s11, theme);
+  addSlideHeader(s11, "Lifecycle Coverage Matrix", theme, undefined, slideNum);
+
+  // Build a simplified lifecycle stage distribution from campaign data
+  const stageKeywords: Record<string, string[]> = {
+    Onboarding: ["welcome", "onboard", "getting started", "verify", "activation"],
+    Engagement: ["engage", "newsletter", "weekly", "digest", "update", "content"],
+    Conversion: ["offer", "discount", "promo", "sale", "deal", "buy", "purchase", "upgrade"],
+    Retention: ["retain", "renew", "comeback", "reactivate", "win-back", "winback", "miss you"],
+    Referral: ["refer", "invite", "share", "friend"],
+    Transactional: ["receipt", "confirm", "order", "invoice", "shipping", "deliver"],
+  };
+
+  const stageCounts: Record<string, number> = {};
+  Object.keys(stageKeywords).forEach(s => { stageCounts[s] = 0; });
+
+  diagnostics.rawData.forEach(c => {
+    const text = `${c.campaignName} ${c.subjectLine} ${c.title}`.toLowerCase();
+    let matched = false;
+    for (const [stage, keywords] of Object.entries(stageKeywords)) {
+      if (keywords.some(k => text.includes(k))) {
+        stageCounts[stage]++;
+        matched = true;
+        break;
       }
-      
-      // Build horizontal signal table with signals as columns
-      const signals = enhancedReport.signalTable;
-      
-      // Header row: Signal names
-      const headerRow: pptxgen.TableCell[] = [
-        { text: "Metric", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "left" } },
-      ];
-      signals.forEach(s => {
-        headerRow.push({
-          text: s.signal.replace(' Rate', '').replace(' Ratio', ''),
-          options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center" }
-        });
-      });
-      
-      // Value row
-      const valueRow: pptxgen.TableCell[] = [
-        { text: "Value", options: { fontSize: 9, bold: true } },
-      ];
-      signals.forEach(s => {
-        valueRow.push({
-          text: typeof s.value === 'number' ? s.value.toLocaleString() : String(s.value),
-          options: { fontSize: 9, align: "center" }
-        });
-      });
-      
-      // Rate row with color coding
-      const rateRow: pptxgen.TableCell[] = [
-        { text: "Rate %", options: { fontSize: 9, bold: true } },
-      ];
-      signals.forEach(s => {
-        rateRow.push({
-          text: s.percentage,
-          options: { 
-            fontSize: 9, 
-            align: "center",
-            color: getSignalMetricColor(s.signal, s.percentage)
-          }
-        });
-      });
-      
-      // Trend row with icons and color coding
-      const trendRow: pptxgen.TableCell[] = [
-        { text: "Trend", options: { fontSize: 9, bold: true } },
-      ];
-      signals.forEach(s => {
-        const trendIcon = s.trend === 'up' ? '↑' : s.trend === 'down' ? '↓' : s.trend === 'stable' ? '→' : '–';
-        trendRow.push({
-          text: trendIcon,
-          options: { 
-            fontSize: 10, 
-            align: "center",
-            color: getTrendColor(s.signal, s.trend)
-          }
-        });
-      });
-      
-      // Change row
-      const changeRow: pptxgen.TableCell[] = [
-        { text: "Change", options: { fontSize: 9, bold: true } },
-      ];
-      signals.forEach(s => {
-        changeRow.push({
-          text: s.trendDescription || '–',
-          options: { 
-            fontSize: 8, 
-            align: "center",
-            color: getTrendColor(s.signal, s.trend)
-          }
-        });
-      });
-      
-      const signalTableRows: pptxgen.TableRow[] = [headerRow, valueRow, rateRow, trendRow, changeRow];
-      
-      // Calculate column widths: first col fixed, others equal
-      const numSignals = signals.length;
-      const firstColWidth = 0.8;
-      const remainingWidth = 8.7 - firstColWidth;
-      const signalColWidth = remainingWidth / numSignals;
-      const colWidths = [firstColWidth, ...Array(numSignals).fill(signalColWidth)];
-      
-      signalSlide.addTable(signalTableRows, {
-        x: 0.5,
-        y: 1.4,
-        w: 9,
-        colW: colWidths,
-        border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-        fontFace: FONTS.primary,
-      });
-      
-      // Add denominator note
-      if (enhancedReport.signalTableDenominatorNote) {
-        signalSlide.addText(`* ${enhancedReport.signalTableDenominatorNote}`, {
-          x: 0.5,
-          y: 3.6,
-          w: 9,
-          h: 0.3,
-          fontSize: 9,
-          italic: true,
-          color: SLIDE_STYLES.mutedColor,
-          fontFace: FONTS.primary,
-        });
-      }
-      
-      // Add color legend
-      signalSlide.addText("Legend: ", {
-        x: 0.5,
-        y: 4.0,
-        w: 0.7,
-        h: 0.25,
-        fontSize: 9,
-        color: SLIDE_STYLES.mutedColor,
-        fontFace: FONTS.primary,
-      });
-      signalSlide.addText("● Healthy", {
-        x: 1.2,
-        y: 4.0,
-        w: 1.0,
-        h: 0.25,
-        fontSize: 9,
-        color: SLIDE_STYLES.greenText,
-        fontFace: FONTS.primary,
-      });
-      signalSlide.addText("● Watch", {
-        x: 2.2,
-        y: 4.0,
-        w: 0.8,
-        h: 0.25,
-        fontSize: 9,
-        color: SLIDE_STYLES.amberText,
-        fontFace: FONTS.primary,
-      });
-      signalSlide.addText("● Risk", {
-        x: 3.0,
-        y: 4.0,
-        w: 0.6,
-        h: 0.25,
-        fontSize: 9,
-        color: SLIDE_STYLES.redText,
-        fontFace: FONTS.primary,
-      });
-      
-      addSlideFooter(signalSlide, hasPostmasterData);
     }
-    
-    // Slide 2: MoM Analysis (Horizontal Layout)
-    if (enhancedReport && enhancedReport.momAnalysis && enhancedReport.momAnalysis.comparisonAvailable) {
-      const momSlide = pptx.addSlide();
-      addSlideHeader(momSlide, "Month-over-Month Analysis");
-      
-      const mom = enhancedReport.momAnalysis;
-      const categories = ['Changes This Month', 'Stable Factors', 'Worsened Before Shift'];
-      const categoryData = [mom.changesThisMonth || [], mom.stableFactors || [], mom.worsenedBeforeShift || []];
-      const maxRows = Math.max(...categoryData.map(arr => arr.length), 1);
-      
-      // Header row
-      const momHeaderRow: pptxgen.TableCell[] = [
-        { text: "", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-      ];
-      categories.forEach((cat, i) => {
-        const color = i === 0 ? SLIDE_STYLES.amberText : i === 1 ? SLIDE_STYLES.greenText : SLIDE_STYLES.redText;
-        momHeaderRow.push({
-          text: cat,
-          options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center", color }
-        });
-      });
-      
-      const momTableRows: pptxgen.TableRow[] = [momHeaderRow];
-      
-      // Data rows
-      for (let rowIdx = 0; rowIdx < maxRows; rowIdx++) {
-        const row: pptxgen.TableCell[] = [
-          { text: rowIdx === 0 ? "Observations" : "", options: { fontSize: 9, bold: true, color: SLIDE_STYLES.mutedColor } },
-        ];
-        categoryData.forEach(data => {
-          row.push({
-            text: data[rowIdx] || '—',
-            options: { fontSize: 9, align: "center" }
-          });
-        });
-        momTableRows.push(row);
-      }
-      
-      momSlide.addTable(momTableRows, {
-        x: 0.5,
-        y: 1.2,
-        w: 9,
-        colW: [0.9, 2.7, 2.7, 2.7],
-        border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-        fontFace: FONTS.primary,
-      });
-      
-      // Comparison note
-      if (mom.comparisonNote) {
-        momSlide.addText(mom.comparisonNote, {
-          x: 0.5,
-          y: 4.2,
-          w: 9,
-          h: 0.4,
-          fontSize: 10,
-          italic: true,
-          color: SLIDE_STYLES.mutedColor,
-          fontFace: FONTS.primary,
-        });
-      }
-      
-      addSlideFooter(momSlide, hasPostmasterData);
-    }
-    
-    // Slide 3: Send Mix Analysis (Horizontal Layout)
-    if (enhancedReport && enhancedReport.sendMixAnalysis) {
-      const mixSlide = pptx.addSlide();
-      addSlideHeader(mixSlide, "Send Mix & Lifecycle Pressure");
-      
-      const mix = enhancedReport.sendMixAnalysis;
-      const mixTypes = ['Transactional', 'Lifecycle', 'Promotional'];
-      const mixValues = [mix.transactionalPercent, mix.lifecyclePercent, mix.promotionalPercent];
-      
-      // Get color for mix values
-      const getMixColor = (value: number, type: string): string => {
-        if (type === 'Promotional' && value > 60) return SLIDE_STYLES.redText;
-        if (type === 'Promotional' && value > 40) return SLIDE_STYLES.amberText;
-        if (type === 'Transactional' && value > 30) return SLIDE_STYLES.greenText;
-        if (type === 'Lifecycle' && value > 20) return SLIDE_STYLES.greenText;
-        return SLIDE_STYLES.bodyColor;
-      };
-      
-      // Get status for each type
-      const getStatus = (type: string): { text: string; color: string } => {
-        const typeLower = type.toLowerCase();
-        if (mix.overweightedTypes.includes(typeLower)) {
-          return { text: 'Overweighted', color: SLIDE_STYLES.redText };
-        }
-        if (mix.underutilizedAbsorbers.includes(typeLower)) {
-          return { text: 'Underutilized', color: SLIDE_STYLES.amberText };
-        }
-        return { text: 'Balanced', color: SLIDE_STYLES.greenText };
-      };
-      
-      // Header row
-      const mixHeaderRow: pptxgen.TableCell[] = [
-        { text: "", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10 } },
-      ];
-      mixTypes.forEach(type => {
-        mixHeaderRow.push({
-          text: type,
-          options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 10, align: "center" }
-        });
-      });
-      
-      // Mix % row
-      const mixValueRow: pptxgen.TableCell[] = [
-        { text: "Mix %", options: { fontSize: 10, bold: true } },
-      ];
-      mixTypes.forEach((type, i) => {
-        mixValueRow.push({
-          text: `${mixValues[i].toFixed(1)}%`,
-          options: { fontSize: 12, bold: true, align: "center", color: getMixColor(mixValues[i], type) }
-        });
-      });
-      
-      // Status row
-      const statusRow: pptxgen.TableCell[] = [
-        { text: "Status", options: { fontSize: 10, bold: true } },
-      ];
-      mixTypes.forEach(type => {
-        const status = getStatus(type);
-        statusRow.push({
-          text: status.text,
-          options: { fontSize: 10, align: "center", color: status.color }
-        });
-      });
-      
-      const mixTableRows: pptxgen.TableRow[] = [mixHeaderRow, mixValueRow, statusRow];
-      
-      mixSlide.addTable(mixTableRows, {
-        x: 1.5,
-        y: 1.4,
-        w: 7,
-        colW: [1.2, 1.9, 1.9, 1.9],
-        border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-        fontFace: FONTS.primary,
-      });
-      
-      // Confidence badge
-      const confidenceColor = mix.classificationConfidence === 'high' ? SLIDE_STYLES.greenText :
-                              mix.classificationConfidence === 'medium' ? SLIDE_STYLES.amberText :
-                              SLIDE_STYLES.redText;
-      mixSlide.addText(`Classification Confidence: ${mix.classificationConfidence.toUpperCase()}`, {
-        x: 0.5,
-        y: 3.2,
-        w: 4,
-        h: 0.3,
-        fontSize: 10,
-        color: confidenceColor,
-        fontFace: FONTS.primary,
-      });
-      
-      // Ambiguity notes
-      if (mix.ambiguityNotes && mix.ambiguityNotes.length > 0) {
-        mixSlide.addText(`Notes: ${mix.ambiguityNotes.join('; ')}`, {
-          x: 0.5,
-          y: 3.6,
-          w: 9,
-          h: 0.4,
-          fontSize: 9,
-          italic: true,
-          color: SLIDE_STYLES.mutedColor,
-          fontFace: FONTS.primary,
-        });
-      }
-      
-      // Visual bar chart representation
-      const barY = 4.2;
-      const barHeight = 0.4;
-      const totalWidth = 8;
-      
-      let currentX = 1;
-      const colors = ['059669', 'D97706', 'DC2626']; // green, amber, red for trans, life, promo
-      
-      mixTypes.forEach((type, i) => {
-        const width = (mixValues[i] / 100) * totalWidth;
-        if (width > 0.1) {
-          mixSlide.addShape("rect" as pptxgen.SHAPE_NAME, {
-            x: currentX,
-            y: barY,
-            w: width,
-            h: barHeight,
-            fill: { color: colors[i] },
-          });
-          currentX += width;
-        }
-      });
-      
-      // Bar labels
-      mixSlide.addText("■ Transactional  ■ Lifecycle  ■ Promotional", {
-        x: 1,
-        y: 4.7,
-        w: 8,
-        h: 0.25,
-        fontSize: 9,
-        color: SLIDE_STYLES.mutedColor,
-        fontFace: FONTS.primary,
-      });
-      
-      addSlideFooter(mixSlide, hasPostmasterData);
-    }
-    
-    // Slide 4: Root Causes & Repair Actions
-    if (enhancedReport && (enhancedReport.rootCauses.length > 0 || enhancedReport.repairActions.length > 0)) {
-      const actionsSlide = pptx.addSlide();
-      addSlideHeader(actionsSlide, "Root Causes & Repair Actions");
-      
-      // Left column - Root Causes
-      if (enhancedReport.rootCauses.length > 0) {
-        actionsSlide.addText("Root Causes", {
-          x: 0.5,
-          y: 1.2,
-          w: 4.2,
-          h: 0.35,
-          fontSize: 14,
-          bold: true,
-          color: SLIDE_STYLES.amberText,
-          fontFace: FONTS.primary,
-        });
-        
-        enhancedReport.rootCauses.slice(0, 4).forEach((rc, i) => {
-          actionsSlide.addText(`• ${rc.cause}`, {
-            x: 0.5,
-            y: 1.6 + i * 0.7,
-            w: 4.2,
-            h: 0.35,
-            fontSize: 11,
-            bold: true,
-            color: SLIDE_STYLES.bodyColor,
-            fontFace: FONTS.primary,
-          });
-          actionsSlide.addText(`Evidence: ${rc.evidence}`, {
-            x: 0.6,
-            y: 1.9 + i * 0.7,
-            w: 4.1,
-            h: 0.3,
-            fontSize: 9,
-            color: SLIDE_STYLES.mutedColor,
-            fontFace: FONTS.primary,
-          });
-        });
-      }
-      
-      // Right column - Repair Actions
-      if (enhancedReport.repairActions.length > 0) {
-        actionsSlide.addText("Repair Actions", {
-          x: 5,
-          y: 1.2,
-          w: 4.5,
-          h: 0.35,
-          fontSize: 14,
-          bold: true,
-          color: SLIDE_STYLES.greenText,
-          fontFace: FONTS.primary,
-        });
-        
-        enhancedReport.repairActions.slice(0, 5).forEach((action, i) => {
-          const priorityLabel = action.priority === 'immediate' ? '[0-7d]' : 
-                               action.priority === 'short-term' ? '[7-21d]' : '[Ongoing]';
-          const priorityColor = action.priority === 'immediate' ? SLIDE_STYLES.redText : 
-                               action.priority === 'short-term' ? SLIDE_STYLES.amberText : SLIDE_STYLES.mutedColor;
-          
-          actionsSlide.addText(`${priorityLabel} ${action.action.substring(0, 55)}${action.action.length > 55 ? '...' : ''}`, {
-            x: 5,
-            y: 1.6 + i * 0.6,
-            w: 4.5,
-            h: 0.55,
-            fontSize: 10,
-            color: priorityColor,
-            fontFace: FONTS.primary,
-          });
-        });
-      }
-      
-      addSlideFooter(actionsSlide, hasPostmasterData);
-    }
-    
-    // Slide 3: Legacy Diagnostic Summary (fallback if no enhanced report)
-    if (!enhancedReport) {
-      const summarySlide = pptx.addSlide();
-      addSlideHeader(summarySlide, "Deliverability & Performance Diagnostics");
-      
-      // Trend analysis
-      if (repReport.diagnosticSummary.trendAnalysis.length > 0) {
-        summarySlide.addText("Trend Analysis", {
-          x: 0.5,
-          y: 1.2,
-          w: 4.5,
-          h: 0.35,
-          fontSize: 14,
-          bold: true,
-          color: SLIDE_STYLES.headerColor,
-          fontFace: FONTS.primary,
-        });
-        
-        repReport.diagnosticSummary.trendAnalysis.slice(0, 4).forEach((t, i) => {
-          const trendIcon = t.trend === 'improving' ? '↑' : t.trend === 'declining' ? '↓' : '→';
-          const trendColor = t.trend === 'improving' ? SLIDE_STYLES.greenText : t.trend === 'declining' ? SLIDE_STYLES.redText : SLIDE_STYLES.mutedColor;
-          summarySlide.addText(`${trendIcon} ${t.observation}`, {
-            x: 0.5,
-            y: 1.6 + i * 0.45,
-            w: 4.5,
-            h: 0.4,
-            fontSize: 11,
-            color: trendColor,
-            fontFace: FONTS.primary,
-          });
-        });
-      }
-      
-      // Prioritized recommendations
-      if (repReport.diagnosticSummary.prioritizedRecommendations.length > 0) {
-        summarySlide.addText("Prioritized Actions", {
-          x: 5.2,
-          y: 1.2,
-          w: 4.3,
-          h: 0.35,
-          fontSize: 14,
-          bold: true,
-          color: SLIDE_STYLES.headerColor,
-          fontFace: FONTS.primary,
-        });
-        
-        repReport.diagnosticSummary.prioritizedRecommendations.slice(0, 4).forEach((r, i) => {
-          const priorityLabel = r.priority === 'immediate' ? '[0-7d]' : r.priority === 'short-term' ? '[7-21d]' : '[Ongoing]';
-          const priorityColor = r.priority === 'immediate' ? SLIDE_STYLES.redText : r.priority === 'short-term' ? SLIDE_STYLES.amberText : SLIDE_STYLES.mutedColor;
-          summarySlide.addText(`${priorityLabel} ${r.recommendation.substring(0, 60)}${r.recommendation.length > 60 ? '...' : ''}`, {
-            x: 5.2,
-            y: 1.6 + i * 0.55,
-            w: 4.3,
-            h: 0.5,
-            fontSize: 10,
-            color: priorityColor,
-            fontFace: FONTS.primary,
-          });
-        });
-      }
-      
-      addSlideFooter(summarySlide, hasPostmasterData);
-    }
-    
-    // Issues Detail Slide (if any)
-    if (repReport.issues.length > 0) {
-      const issuesSlide = pptx.addSlide();
-      addSlideHeader(issuesSlide, `Campaign Issues Detected (${repReport.issues.length})`);
-      
-      // Show top 4 issues as a table
-      const issuesTableRows: pptxgen.TableRow[] = [
+    if (!matched) stageCounts["Engagement"] = (stageCounts["Engagement"] || 0) + 1;
+  });
+
+  const totalCampaigns = diagnostics.rawData.length;
+  const lcRows: pptxgen.TableRow[] = [
+    [
+      { text: "Lifecycle Stage", options: headerCellOpts(theme) },
+      { text: "Campaign Count", options: headerCellOpts(theme, "center") },
+      { text: "Coverage %", options: headerCellOpts(theme, "center") },
+      { text: "Status", options: headerCellOpts(theme, "center") },
+    ],
+  ];
+
+  Object.entries(stageCounts).forEach(([stage, count], ri) => {
+    const pct = totalCampaigns > 0 ? (count / totalCampaigns) * 100 : 0;
+    const status = pct > 15 ? "Strong" : pct > 5 ? "Partial" : "Weak";
+    const statusColor = status === "Strong" ? theme.green : status === "Partial" ? theme.amber : theme.red;
+
+    lcRows.push([
+      { text: stage, options: bodyCellOpts(theme, ri) },
+      { text: String(count), options: bodyCellOpts(theme, ri, "center") },
+      { text: `${pct.toFixed(1)}%`, options: bodyCellOpts(theme, ri, "center") },
+      { text: status, options: bodyCellOpts(theme, ri, "center", statusColor) },
+    ]);
+  });
+
+  s11.addTable(lcRows, {
+    x: 1, y: 1.15, w: 8,
+    colW: [2.5, 1.5, 1.5, 2.5],
+    border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+    fontFace: FONTS.body,
+  });
+  addSlideFooter(s11, theme, hasPostmasterData);
+
+  // ==========================================
+  // SLIDE 12: Key Learnings & Recommendations
+  // ==========================================
+  slideNum++;
+  const s12 = pptx.addSlide();
+  addSlideBackground(s12, theme);
+  addSlideHeader(s12, "Key Learnings & Recommendations", theme, undefined, slideNum);
+
+  if (intelligentLearnings && intelligentLearnings.length > 0) {
+    const klRows: pptxgen.TableRow[] = [
+      [
+        { text: "Issue Identified", options: headerCellOpts(theme) },
+        { text: "Recommendation", options: headerCellOpts(theme) },
+        { text: "Priority", options: headerCellOpts(theme, "center") },
+      ],
+    ];
+
+    intelligentLearnings.slice(0, 8).forEach((rec, ri) => {
+      const prioColor = rec.priority === "P0" ? theme.red : rec.priority === "P1" ? theme.amber : theme.primary;
+      klRows.push([
+        { text: rec.issue, options: { ...bodyCellOpts(theme, ri), valign: "top" } },
+        { text: rec.recommendation, options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor, valign: "top" } },
+        { text: rec.priority, options: { ...bodyCellOpts(theme, ri, "center", prioColor), bold: true } },
+      ]);
+    });
+
+    s12.addTable(klRows, {
+      x: 0.5, y: 1.15, w: 9,
+      colW: [3.2, 4.0, 1.8],
+      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      fontFace: FONTS.body,
+    });
+  } else {
+    // Fallback to legacy learnings
+    const allLearnings = report.keyLearnings;
+    if (allLearnings.length > 0) {
+      const klRows: pptxgen.TableRow[] = [
         [
-          { text: "Campaign", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-          { text: "Observation", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-          { text: "Impact", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9 } },
-          { text: "Priority", options: { bold: true, fill: { color: SLIDE_STYLES.headerRowBg }, fontSize: 9, align: "center" } },
+          { text: "Learning", options: headerCellOpts(theme) },
+          { text: "Details", options: headerCellOpts(theme) },
         ],
       ];
-      
-      repReport.issues.slice(0, 4).forEach(issue => {
-        const priorityColor = issue.priority === 'immediate' ? SLIDE_STYLES.redText : 
-                              issue.priority === 'short-term' ? SLIDE_STYLES.amberText : SLIDE_STYLES.mutedColor;
-        issuesTableRows.push([
-          { text: issue.campaignId.substring(0, 12), options: { fontSize: 9 } },
-          { text: issue.observation.substring(0, 45) + (issue.observation.length > 45 ? '...' : ''), options: { fontSize: 9 } },
-          { text: issue.impact.substring(0, 35) + (issue.impact.length > 35 ? '...' : ''), options: { fontSize: 9 } },
-          { text: issue.priority || 'N/A', options: { fontSize: 9, align: "center", color: priorityColor } },
+      allLearnings.slice(0, 8).forEach((l, ri) => {
+        klRows.push([
+          { text: l.title, options: bodyCellOpts(theme, ri) },
+          { text: l.description, options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor } },
         ]);
       });
-      
-      issuesSlide.addTable(issuesTableRows, {
-        x: 0.5,
-        y: 1.2,
-        w: 9,
-        colW: [1.5, 3.5, 2.5, 1.5],
-        border: { type: "solid", color: SLIDE_STYLES.borderColor, pt: 0.5 },
-        fontFace: FONTS.primary,
+
+      s12.addTable(klRows, {
+        x: 0.5, y: 1.15, w: 9,
+        colW: [3.5, 5.5],
+        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        fontFace: FONTS.body,
       });
-      
-      if (repReport.issues.length > 4) {
-        issuesSlide.addText(`+ ${repReport.issues.length - 4} more issues in detailed report`, {
-          x: 0.5,
-          y: 4.2,
-          w: 9,
-          h: 0.3,
-          fontSize: 10,
-          italic: true,
-          color: SLIDE_STYLES.mutedColor,
-          fontFace: FONTS.primary,
-        });
-      }
-      
-      addSlideFooter(issuesSlide, hasPostmasterData);
     }
   }
-  
-  // Generate filename
-  const monthRange = diagnostics.analysisReport ? getMonthRange(diagnostics.analysisReport) : "";
+  addSlideFooter(s12, theme, hasPostmasterData);
+
+  // ============= GENERATE FILE =============
   const safeMonthRange = monthRange.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_");
-  const reportType = activeReport === "analysis" ? "Analysis" : "Reputation_Repair";
-  const fileName = `Inbox_Diagnostics_${brandName}_${safeMonthRange || "Report"}.pptx`;
-  
+  const brandLabel = brandProfile?.brand_identity?.brand_name || brandName;
+  const fileName = `${brandLabel}_Diagnostics_Executive_${safeMonthRange || "Report"}.pptx`;
+
   await pptx.writeFile({ fileName });
 };
