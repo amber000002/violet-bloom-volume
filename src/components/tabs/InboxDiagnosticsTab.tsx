@@ -1693,7 +1693,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                  </thead>
                  <tbody>
                    {(bestSortBy === "clickRate"
-                     ? [...campaignData].map(c => ({
+                     ? [...campaignData].filter(c => c.totalSentUsers >= 1000).map(c => ({
                          campaignId: c.campaignId, campaignName: c.campaignName, subjectLine: c.subjectLine,
                          totalSentUsers: c.totalSentUsers, totalDeliveredUsers: c.totalDeliveredUsers,
                          uniqueViewed: c.uniqueViewedWithinConversion, uniqueClicked: c.uniqueClickedWithinConversion,
@@ -1804,7 +1804,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                  </thead>
                  <tbody>
                    {(worstSortBy === "clickRate"
-                     ? [...campaignData].filter(c => c.campaignName && c.campaignName.trim() !== "").map(c => ({
+                     ? [...campaignData].filter(c => c.campaignName && c.campaignName.trim() !== "" && c.totalSentUsers >= 1000).map(c => ({
                          campaignId: c.campaignId, campaignName: c.campaignName, subjectLine: c.subjectLine,
                          totalSentUsers: c.totalSentUsers, totalDeliveredUsers: c.totalDeliveredUsers,
                          uniqueViewed: c.uniqueViewedWithinConversion, uniqueClicked: c.uniqueClickedWithinConversion,
