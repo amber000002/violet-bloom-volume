@@ -90,6 +90,16 @@ export interface CoreBrandJSON {
     monthly_active_users_band: string;
   };
 
+  brand_colors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    text_primary: string;
+    text_secondary: string;
+    additional_colors: string[];
+  };
+
   extraction_metadata?: {
     source_mode: "url_only" | "url_plus_text" | "text_only";
     pages_crawled: string[];
