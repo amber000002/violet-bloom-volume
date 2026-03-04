@@ -761,7 +761,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   addSlideFooter(s5, theme, hasPostmasterData);
 
   // ==========================================
-  // SLIDE 6: Reputation Trends (Charts)
+  // SLIDE 6: Reputation Trends (4 Small Multiple Charts)
   // ==========================================
   slideNum++;
   const s6 = pptx.addSlide();
@@ -774,36 +774,76 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const spamData = pmData.map(p => (p.spamRatio || 0) * 100);
     const errorData = pmData.map(p => (p.errorRatio || 0) * 100);
 
-    // 2-chart layout
-    // Chart 1: Spam & Error Ratios
-    s6.addChart("line" as pptxgen.CHART_NAME, [
-      { name: "Spam Ratio %", labels: pmDates, values: spamData },
-      { name: "Error Ratio %", labels: pmDates, values: errorData },
-    ], {
-      x: 0.5, y: 1.15, w: 4.2, h: 3.5,
-      showLegend: true, legendPos: "b", legendFontSize: 8,
-      lineSmooth: true, lineSize: 2,
-      catAxisLabelFontSize: 7,
-      valAxisLabelFontSize: 7,
-      catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
-      valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
-      chartColors: [theme.red, theme.amber],
-      showTitle: true, title: "Spam & Error Ratios", titleFontSize: 10, titleColor: theme.titleColor,
-    });
+    // Reputation numeric mapping: High=3, Medium=2, Low=1, Bad=0
+    const repToNum = (rep: string): number => {
+      if (!rep) return 0;
+      const map: Record<string, number> = { "high": 3, "medium": 2, "low": 1, "bad": 0 };
+      return map[rep.trim().toLowerCase()] ?? 0;
+    };
 
-    // Chart 2: IP count trend
-    const ipCounts = pmData.map(p => p.ipCount || 0);
-    s6.addChart("bar" as pptxgen.CHART_NAME, [
-      { name: "IP Count", labels: pmDates, values: ipCounts },
+    const ipRepData = pmData.map(p => repToNum(p.ipReputation));
+    const domainRepData = pmData.map(p => repToNum(p.domainReputation));
+
+    // 2x2 grid layout
+    const chartPositions = [
+      { x: 0.3, y: 1.1, w: 4.4, h: 2.0 },  // top-left: IP Reputation
+      { x: 5.3, y: 1.1, w: 4.4, h: 2.0 },  // top-right: Domain Reputation
+      { x: 0.3, y: 3.2, w: 4.4, h: 2.0 },  // bottom-left: Spam Ratio
+      { x: 5.3, y: 3.2, w: 4.4, h: 2.0 },  // bottom-right: Error Ratio
+    ];
+
+    // Chart 1: IP Reputation
+    s6.addChart("line" as pptxgen.CHART_NAME, [
+      { name: "IP Reputation", labels: pmDates, values: ipRepData },
     ], {
-      x: 5.3, y: 1.15, w: 4.2, h: 3.5,
-      showLegend: true, legendPos: "b", legendFontSize: 8,
-      catAxisLabelFontSize: 7,
-      valAxisLabelFontSize: 7,
+      ...chartPositions[0],
+      showLegend: false, lineSmooth: false, lineSize: 2,
+      catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
+      valAxisMinVal: 0, valAxisMaxVal: 3,
       catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
       valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
       chartColors: [theme.primary],
-      showTitle: true, title: "IP Count Trend", titleFontSize: 10, titleColor: theme.titleColor,
+      showTitle: true, title: "IP Reputation", titleFontSize: 9, titleColor: theme.titleColor,
+    });
+
+    // Chart 2: Domain Reputation
+    s6.addChart("line" as pptxgen.CHART_NAME, [
+      { name: "Domain Reputation", labels: pmDates, values: domainRepData },
+    ], {
+      ...chartPositions[1],
+      showLegend: false, lineSmooth: false, lineSize: 2,
+      catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
+      valAxisMinVal: 0, valAxisMaxVal: 3,
+      catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
+      valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
+      chartColors: [theme.secondary],
+      showTitle: true, title: "Domain Reputation", titleFontSize: 9, titleColor: theme.titleColor,
+    });
+
+    // Chart 3: Spam Ratio
+    s6.addChart("line" as pptxgen.CHART_NAME, [
+      { name: "Spam Ratio %", labels: pmDates, values: spamData },
+    ], {
+      ...chartPositions[2],
+      showLegend: false, lineSmooth: true, lineSize: 2,
+      catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
+      catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
+      valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
+      chartColors: [theme.red],
+      showTitle: true, title: "Spam Ratio %", titleFontSize: 9, titleColor: theme.titleColor,
+    });
+
+    // Chart 4: Error Ratio
+    s6.addChart("line" as pptxgen.CHART_NAME, [
+      { name: "Error Ratio %", labels: pmDates, values: errorData },
+    ], {
+      ...chartPositions[3],
+      showLegend: false, lineSmooth: true, lineSize: 2,
+      catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
+      catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
+      valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
+      chartColors: [theme.amber],
+      showTitle: true, title: "Error Ratio %", titleFontSize: 9, titleColor: theme.titleColor,
     });
   } else {
     s6.addText("Postmaster data required for reputation trend charts.", {
@@ -910,55 +950,100 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     accentColor: string,
     isUnderperform: boolean = false
   ) => {
-    const totalSlides = Math.max(1, Math.ceil(campaigns.length / MAX_CAMP_ROWS));
+    // Sort by Open Rate
+    const byOpenRate = [...campaigns]
+      .sort((a, b) => isUnderperform ? a.openRate - b.openRate : b.openRate - a.openRate)
+      .slice(0, 10);
 
-    for (let si = 0; si < totalSlides; si++) {
-      slideNum++;
-      const slide = pptx.addSlide();
-      addSlideBackground(slide, theme);
+    // Sort by Unique CTR (Clicked / Opened)
+    const byCTR = [...campaigns]
+      .sort((a, b) => {
+        const ctrA = a.uniqueViewed > 0 ? (a.uniqueClicked / a.uniqueViewed) * 100 : 0;
+        const ctrB = b.uniqueViewed > 0 ? (b.uniqueClicked / b.uniqueViewed) * 100 : 0;
+        return isUnderperform ? ctrA - ctrB : ctrB - ctrA;
+      })
+      .slice(0, 10);
 
-      const slideTitle = totalSlides > 1 ? `${title} (${si + 1}/${totalSlides})` : title;
-      addSlideHeader(slide, slideTitle, theme, undefined, slideNum);
+    const addTable = (
+      data: TopCampaign[],
+      slideTitle: string,
+      sortLabel: string
+    ) => {
+      const totalSlides = Math.max(1, Math.ceil(data.length / MAX_CAMP_ROWS));
 
-      // Amber outline for underperforming
-      if (isUnderperform) {
-        slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-          x: 0.4, y: 0.2, w: 9.2, h: 0.85,
-          fill: { color: theme.slideBg, transparency: 100 },
-          line: { color: theme.amber, width: 1 },
-          rectRadius: 0.06,
+      for (let si = 0; si < totalSlides; si++) {
+        slideNum++;
+        const slide = pptx.addSlide();
+        addSlideBackground(slide, theme);
+
+        const pageSuffix = totalSlides > 1 ? ` (${si + 1}/${totalSlides})` : "";
+        addSlideHeader(slide, `${slideTitle} — ${sortLabel}${pageSuffix}`, theme, undefined, slideNum);
+
+        // Amber outline for underperforming
+        if (isUnderperform) {
+          slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+            x: 0.4, y: 0.2, w: 9.2, h: 0.85,
+            fill: { color: theme.slideBg, transparency: 100 },
+            line: { color: theme.amber, width: 1 },
+            rectRadius: 0.06,
+          });
+        }
+
+        const startIdx = si * MAX_CAMP_ROWS;
+        const slicedCamps = data.slice(startIdx, startIdx + MAX_CAMP_ROWS);
+
+        const rows: pptxgen.TableRow[] = [createCampaignHeader()];
+        slicedCamps.forEach((c, ri) => rows.push(createCampaignRow(c, ri)));
+
+        slide.addTable(rows, {
+          x: 0.35, y: 1.1, w: 9.3,
+          colW: campaignColW,
+          border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+          fontFace: FONTS.body,
+          autoPage: false,
         });
+
+        // Summary on last slide
+        if (si === totalSlides - 1 && summaryText) {
+          const tableH = 0.35 + rows.length * 0.28;
+          slide.addText(summaryText, {
+            x: 0.5, y: 1.1 + tableH + 0.1, w: 9, h: 0.5,
+            fontSize: 9, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
+          });
+        }
+
+        addSlideFooter(slide, theme, hasPostmasterData);
       }
+    };
 
-      const startIdx = si * MAX_CAMP_ROWS;
-      const slicedCamps = campaigns.slice(startIdx, startIdx + MAX_CAMP_ROWS);
-
-      const rows: pptxgen.TableRow[] = [createCampaignHeader()];
-      slicedCamps.forEach((c, ri) => rows.push(createCampaignRow(c, ri)));
-
-      slide.addTable(rows, {
-        x: 0.35, y: 1.1, w: 9.3,
-        colW: campaignColW,
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
-        fontFace: FONTS.body,
-        autoPage: false,
-      });
-
-      // Summary on last slide
-      if (si === totalSlides - 1 && summaryText) {
-        const tableH = 0.35 + rows.length * 0.28;
-        slide.addText(summaryText, {
-          x: 0.5, y: 1.1 + tableH + 0.1, w: 9, h: 0.5,
-          fontSize: 9, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
-        });
-      }
-
-      addSlideFooter(slide, theme, hasPostmasterData);
-    }
+    addTable(byOpenRate, title, "By Unique Open Rate");
+    addTable(byCTR, title, "By Unique CTR");
   };
 
-  addCampaignSlides(report.bestCampaigns, "Best Performing Campaigns", report.bestSummary, theme.green);
-  addCampaignSlides(report.worstCampaigns, "Underperforming Campaigns", report.worstSummary, theme.red, true);
+  // Build full campaign list with ≥1000 sends filter for sorting
+  const allCampaignsForSort: TopCampaign[] = diagnostics.rawData
+    .filter(c => c.totalSentUsers >= 1000)
+    .map(c => ({
+      campaignId: c.campaignId,
+      campaignName: c.campaignName,
+      subjectLine: c.subjectLine,
+      totalSentUsers: c.totalSentUsers,
+      totalDeliveredUsers: c.totalDeliveredUsers,
+      uniqueViewed: c.uniqueViewedWithinConversion,
+      uniqueClicked: c.uniqueClickedWithinConversion,
+      conversions: c.clickThroughConversions,
+      unsubscribes: c.totalUnsubscribes,
+      hardBounces: c.hardBounces,
+      softBounces: c.softBounces,
+      openRate: c.openRate,
+      clickRate: c.clickRate,
+      startDate: c.startDate,
+    }));
+
+  const worstFiltered = allCampaignsForSort.filter(c => (c.campaignName || "").trim() !== "");
+
+  addCampaignSlides(allCampaignsForSort, "Best Performing Campaigns", report.bestSummary, theme.green);
+  addCampaignSlides(worstFiltered, "Underperforming Campaigns", report.worstSummary, theme.red, true);
 
   // ==========================================
   // SLIDE 10: Send Mix & Use Case Coverage
