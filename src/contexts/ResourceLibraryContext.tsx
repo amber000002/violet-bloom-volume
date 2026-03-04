@@ -157,7 +157,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         continue;
       }
       // Normalize type — default to "journey" if missing or non-standard
-      const useCaseType = useCase.type && ["journey", "campaign"].includes(useCase.type) ? useCase.type : "journey";
+      const useCaseType = useCase.type && ["journey", "campaign"].includes(useCase.type) ? useCase.type : "campaign";
 
       // Use case-level industry → top-level JSON industry → "all" as last resort
       const industry = useCase.industry || topLevelIndustry || "all";
