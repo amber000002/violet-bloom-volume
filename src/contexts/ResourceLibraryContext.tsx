@@ -156,10 +156,8 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         errors.push(`Use case ${useCase.use_case_id} missing 'name'`);
         continue;
       }
-      if (!useCase.type || !["journey", "campaign"].includes(useCase.type)) {
-        errors.push(`Use case ${useCase.use_case_id} has invalid 'type' (must be 'journey' or 'campaign')`);
-        continue;
-      }
+      // Normalize type — default to "journey" if missing or non-standard
+      const useCaseType = useCase.type && ["journey", "campaign"].includes(useCase.type) ? useCase.type : "journey";
 
       // Use case-level industry → top-level JSON industry → "all" as last resort
       const industry = useCase.industry || topLevelIndustry || "all";
@@ -195,7 +193,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
         resourceData.isPrimary = true;
       }
 
-      if (useCase.type === "journey") {
+      if (useCaseType === "journey") {
         const journey: ResourceJourney = {
           id: useCase.use_case_id,
           name: useCase.name,
