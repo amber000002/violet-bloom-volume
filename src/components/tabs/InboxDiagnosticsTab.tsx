@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CoreBrandJSON } from "@/types/brandProfile";
 import { StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
@@ -31,6 +31,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
+import { exportElementAsPNG, exportCreativeAnalysisAsText, exportCreativeAnalysisAsCSV } from "@/lib/exportUtils";
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { 
   parseCSV, 
@@ -662,6 +663,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [strategicContext, setStrategicContext] = useState<string>("");
   const [diagnostics, setDiagnostics] = useState<DiagnosticsData | null>(null);
+  const emailMetricsRef = useRef<HTMLDivElement>(null);
+  const reputationTrendsRef = useRef<HTMLDivElement>(null);
+  const creativeAnalysisRef = useRef<HTMLDivElement>(null);
   const [thresholdBreaches, setThresholdBreaches] = useState<ThresholdBreach[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     provider: true,
@@ -1575,8 +1579,21 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             icon={<TrendingUp className="w-5 h-5 text-primary" />}
             isOpen={expandedSections.trends}
             onToggle={() => toggleSection("trends")}
+            headerRight={
+              <Button variant="outline" size="sm" onClick={async (e) => {
+                e.stopPropagation();
+                if (emailMetricsRef.current) {
+                  await exportElementAsPNG(emailMetricsRef.current, "email-metrics-trend.png");
+                  toast.success("Email Metrics Trend exported as PNG");
+                }
+              }}>
+                <Download className="w-4 h-4 mr-1" /> PNG
+              </Button>
+            }
           >
-            <EmailMetricsTrendChart campaignData={diagnostics.rawData} />
+            <div ref={emailMetricsRef}>
+              <EmailMetricsTrendChart campaignData={diagnostics.rawData} />
+            </div>
           </CollapsibleSection>
 
           {/* ============= INFRASTRUCTURE DETAILS ============= */}
@@ -1611,14 +1628,27 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             icon={<Activity className="w-5 h-5 text-primary" />}
             isOpen={expandedSections.reputationTrends}
             onToggle={() => toggleSection("reputationTrends")}
+            headerRight={
+              <Button variant="outline" size="sm" onClick={async (e) => {
+                e.stopPropagation();
+                if (reputationTrendsRef.current) {
+                  await exportElementAsPNG(reputationTrendsRef.current, "reputation-trends.png");
+                  toast.success("Reputation Trends exported as PNG");
+                }
+              }}>
+                <Download className="w-4 h-4 mr-1" /> PNG
+              </Button>
+            }
           >
-            <ReputationSmallMultiples
-              postmasterData={postmasterData}
-              campaignData={diagnostics.rawData}
-            />
+            <div ref={reputationTrendsRef}>
+              <ReputationSmallMultiples
+                postmasterData={postmasterData}
+                campaignData={diagnostics.rawData}
+              />
+            </div>
           </CollapsibleSection>
 
-          {/* ============= LEGACY REPUTATION TREND CHART (COMBINED VIEW) ============= */}
+
           {postmasterData && postmasterData.length > 0 && (
             <CollapsibleSection
               title="Reputation Trends (Combined)"
@@ -1885,6 +1915,37 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               icon={<Palette className="w-5 h-5 text-primary" />}
               isOpen={expandedSections.creativeAnalysis ?? true}
               onToggle={() => toggleSection("creativeAnalysis")}
+              headerRight={creativeAnalysis ? (
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" onClick={async (e) => {
+                    e.stopPropagation();
+                    if (creativeAnalysisRef.current) {
+                      await exportElementAsPNG(creativeAnalysisRef.current, "creative-analysis.png");
+                      toast.success("Creative Analysis exported as PNG");
+                    }
+                  }}>
+                    <Download className="w-4 h-4 mr-1" /> PNG
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={(e) => {
+                    e.stopPropagation();
+                    if (creativeAnalysis) {
+                      exportCreativeAnalysisAsText(creativeAnalysis, "creative-analysis.txt");
+                      toast.success("Creative Analysis exported as text");
+                    }
+                  }}>
+                    <Download className="w-4 h-4 mr-1" /> TXT
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={(e) => {
+                    e.stopPropagation();
+                    if (creativeAnalysis) {
+                      exportCreativeAnalysisAsCSV(creativeAnalysis, "creative-analysis.csv");
+                      toast.success("Creative Analysis exported as CSV");
+                    }
+                  }}>
+                    <Download className="w-4 h-4 mr-1" /> CSV
+                  </Button>
+                </div>
+              ) : undefined}
             >
               {isAnalyzingCreative ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -1892,7 +1953,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   <p className="text-sm text-muted-foreground">Analyzing email creative...</p>
                 </div>
               ) : creativeAnalysis ? (
-                <div className="space-y-6">
+                <div ref={creativeAnalysisRef} className="space-y-6">
                   {/* Effective Practices */}
                   <div>
                     <h4 className="font-display text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -2382,8 +2443,9 @@ const CollapsibleSection: React.FC<{
   icon: React.ReactNode;
   isOpen: boolean;
   onToggle: () => void;
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ title, icon, isOpen, onToggle, children }) => (
+}> = ({ title, icon, isOpen, onToggle, headerRight, children }) => (
   <motion.div 
     className="rounded-2xl overflow-hidden"
     style={{
@@ -2394,16 +2456,26 @@ const CollapsibleSection: React.FC<{
       boxShadow: '0 20px 50px rgba(0, 0, 0, 0.04)',
     }}
   >
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center justify-between p-6 hover:bg-muted/10 transition-colors"
-    >
-      <h3 className="font-display text-lg font-bold text-gradient-magic flex items-center gap-2">
-        {icon}
-        {title}
-      </h3>
-      {isOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-    </button>
+    <div className="w-full flex items-center justify-between p-6">
+      <button
+        onClick={onToggle}
+        className="flex-1 flex items-center justify-between hover:bg-muted/10 transition-colors"
+      >
+        <h3 className="font-display text-lg font-bold text-gradient-magic flex items-center gap-2">
+          {icon}
+          {title}
+        </h3>
+        {!headerRight && (isOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />)}
+      </button>
+      {headerRight && (
+        <div className="flex items-center gap-2 ml-4">
+          {headerRight}
+          <button onClick={onToggle}>
+            {isOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+          </button>
+        </div>
+      )}
+    </div>
     <AnimatePresence>
       {isOpen && (
         <motion.div
