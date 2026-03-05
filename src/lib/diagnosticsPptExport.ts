@@ -1,6 +1,7 @@
 // Inbox Diagnostics PPT Export - 12-Slide Executive Deck Blueprint
 // Visual Enhancement Only — No Content AI / No Summarization
 import pptxgen from "pptxgenjs";
+import { buildExportFileName } from "./exportFileNameUtils";
 import {
   DiagnosticsData,
   AnalysisReport,
@@ -52,6 +53,7 @@ export interface DiagnosticsDeckOptions {
   rootCauseEntries?: RootCauseExport[];
   intelligentLearnings?: IntelligentRecommendation[];
   industry?: string;
+  sourceFileName?: string;
 }
 
 // ============= BRAND COLOR ENGINE =============
@@ -370,7 +372,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     // Fallback: empty deck
     const s = pptx.addSlide();
     s.addText("No analysis report data available", { x: 2, y: 2, w: 6, h: 1, fontSize: 20, color: theme.mutedColor });
-    await pptx.writeFile({ fileName: `Inbox_Diagnostics_${brandName}_Report.pptx` });
+    await pptx.writeFile({ fileName: buildExportFileName(opts.sourceFileName, `Inbox_Diagnostics_${brandName}_Report`) });
     return;
   }
 
@@ -1259,7 +1261,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ============= GENERATE FILE =============
   const safeMonthRange = monthRange.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_");
   const brandLabel = brandProfile?.brand_identity?.brand_name || brandName;
-  const fileName = `${brandLabel}_Diagnostics_Executive_${safeMonthRange || "Report"}.pptx`;
+  const fallbackName = `${brandLabel}_Diagnostics_Executive_${safeMonthRange || "Report"}`;
+  const fileName = buildExportFileName(opts.sourceFileName, fallbackName);
 
   await pptx.writeFile({ fileName });
 };
