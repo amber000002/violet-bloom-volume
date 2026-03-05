@@ -1,4 +1,5 @@
 import pptxgen from "pptxgenjs";
+import { buildExportFileName } from "./exportFileNameUtils";
 
 interface SlideContent {
   title: string;
@@ -646,6 +647,6 @@ export const exportToPPT = async (
   });
 
   // Generate and download
-  const fileName = `Inbox_Alchemy_${deckType === "executive" ? "Executive" : "Detailed"}_Deck.pptx`;
+  const fileName = buildExportFileName(undefined, `Inbox_Alchemy_${deckType === "executive" ? "Executive" : "Detailed"}_Deck`);
   await pptx.writeFile({ fileName });
 };

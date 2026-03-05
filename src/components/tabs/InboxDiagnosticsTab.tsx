@@ -1396,6 +1396,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     rootCauseEntries: rootCauses.map(rc => ({ cause: rc.likelyCause || "Unknown", evidence: rc.negativeSignals?.map((ns: any) => ns.signal).join(", ") || "", priority: "P1" })),
                     intelligentLearnings: learnings,
                     industry,
+                    sourceFileName: campaignFileName,
                   });
                 }}
                 className="gap-2"
@@ -2127,6 +2128,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
                   brandProfile: brandProfile || null,
                   industry,
+                  sourceFileName: campaignFileName,
                 })}
                 className="gap-2"
               >
