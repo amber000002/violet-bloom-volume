@@ -113,6 +113,8 @@ const InboxAlchemyContent: React.FC = () => {
           websiteText: brandInputs.websiteText || "",
           additionalContext: brandInputs.additionalContext,
           industry,
+          eventSchemaCSV: brandInputs.eventSchemaCSV || "",
+          userPropertiesCSV: brandInputs.userPropertiesCSV || "",
         },
       });
 

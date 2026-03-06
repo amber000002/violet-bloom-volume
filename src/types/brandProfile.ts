@@ -151,6 +151,8 @@ export interface CoreBrandJSON {
 export interface BrandInputs {
   websiteUrl: string;
   websiteText: string;
+  eventSchemaCSV: string;
+  userPropertiesCSV: string;
   additionalContext: {
     mauRange: string;
     productFocus: string;
@@ -170,6 +172,8 @@ export const additionalContextFields = [
 export const emptyBrandInputs: BrandInputs = {
   websiteUrl: "",
   websiteText: "",
+  eventSchemaCSV: "",
+  userPropertiesCSV: "",
   additionalContext: {
     mauRange: "",
     productFocus: "",

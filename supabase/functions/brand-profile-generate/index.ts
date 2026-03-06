@@ -68,7 +68,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { websiteUrl, websiteText, additionalContext, industry } = await req.json();
+    const { websiteUrl, websiteText, additionalContext, industry, eventSchemaCSV, userPropertiesCSV } = await req.json();
 
     if (!websiteUrl || !industry) {
       return new Response(JSON.stringify({ error: "websiteUrl and industry are required" }), {
@@ -124,6 +124,17 @@ serve(async (req) => {
       .map(([k, v]) => `${k}: ${v}`) : [];
     if (contextParts.length) combinedText += `\n\nAdditional context: ${contextParts.join("; ")}`;
 
+    // Append event schema and user properties data for lifecycle/engagement enrichment
+    let schemaContext = "";
+    if (eventSchemaCSV && eventSchemaCSV.trim().length > 20) {
+      const eventLines = eventSchemaCSV.trim().split("\n").slice(0, 200);
+      schemaContext += `\n\n[EVENT SCHEMA - ${eventLines.length - 1} events]\n${eventLines.join("\n")}`;
+    }
+    if (userPropertiesCSV && userPropertiesCSV.trim().length > 20) {
+      const propLines = userPropertiesCSV.trim().split("\n").slice(0, 200);
+      schemaContext += `\n\n[USER PROPERTIES SCHEMA - ${propLines.length - 1} properties]\n${propLines.join("\n")}`;
+    }
+
     combinedText = combinedText.slice(0, 15000);
 
     console.log(`Content length: ${combinedText.length}, pages: ${crawledPages.length}, mode: ${sourceMode}`);
@@ -140,7 +151,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a brand intelligence extraction engine. Analyze website content to produce a structured Brand JSON. Extract ONLY what is evidenced. Use empty arrays for missing data. For brand_colors, extract the actual hex color codes used on the website (from CSS, inline styles, or visual cues in the content). Primary = main brand color, secondary = supporting color, accent = highlight/CTA color. If colors cannot be determined, leave as empty strings. Industry context: ${industry}. Return ONLY valid JSON, no markdown fences.`,
+            content: `You are a brand intelligence extraction engine. Analyze website content to produce a structured Brand JSON. Extract ONLY what is evidenced. Use empty arrays for missing data. For brand_colors, extract the actual hex color codes used on the website. If EVENT SCHEMA or USER PROPERTIES SCHEMA data is provided, use it to enrich lifecycle_signal_map (map events to key_user_actions, activation_events, monetization_events, churn_signals etc.), engagement_architecture (engagement_drivers, event_based_triggers), tech_scale_layer (supported_channels, volume_indicators), and kpi_framework sections with real instrumented data. Industry context: ${industry}. Return ONLY valid JSON, no markdown fences.`,
           },
           {
             role: "user",
@@ -150,11 +161,11 @@ Return this exact JSON structure:
 {"brand_identity":{"brand_name":"","website":"","industry":"","geography_focus":"","tagline":"","positioning":"","tone_of_voice":""},"business_model":{"business_model_description":"","monetization_model":"","pricing_tiers":[]},"product_ecosystem":{"core_products":[],"product_modules":[],"feature_modules":[],"feature_clusters":[],"platforms":[],"primary_platforms":[],"has_mobile_app":false,"has_web_platform":false},"audience_intelligence":{"primary_segments":[],"secondary_segments":[],"experience_levels":[],"risk_profiles":[],"personas_detected":[]},"value_framework":{"value_propositions":[],"differentiators":[]},"engagement_architecture":{"engagement_drivers":[],"seasonal_triggers":[],"event_based_triggers":[],"urgency_patterns":[]},"lifecycle_signal_map":{"key_user_actions":[],"key_user_events":[],"activation_events":[],"monetization_events":[],"churn_signals":[],"inactivity_markers":[],"lifecycle_markers":[]},"risk_compliance_layer":{"regulatory_environment":[],"regulatory_flags":[],"compliance_intensity":"Low","risk_signals":[],"high_risk_behaviors":[]},"industry_signal_layer":{"industry_kpis":[],"industry_vocabulary":[],"industry_signal_vocabulary":[]},"kpi_framework":{"primary_kpis":[],"secondary_kpis":[],"risk_kpis":[]},"tech_scale_layer":{"has_cdp":false,"has_crm":false,"supports_real_time_triggers":false,"has_mobile_app":false,"supports_primary_channels":false,"supported_channels":[],"volume_indicators_found":[],"monthly_active_users_band":""},"brand_colors":{"primary":"","secondary":"","accent":"","background":"","text_primary":"","text_secondary":"","additional_colors":[]},"extraction_metadata":{"source_mode":"${sourceMode}","pages_crawled":${JSON.stringify(crawledPages)},"confidence_by_section":{},"evidence_snippets":[],"missing_sections":[],"warnings":${JSON.stringify(crawlWarnings)}}}
 
 Content:
-${combinedText}`,
+${combinedText}${schemaContext}`,
           },
         ],
         temperature: 0.2,
-        max_tokens: 6000,
+        max_tokens: 7000,
       }),
     });
 

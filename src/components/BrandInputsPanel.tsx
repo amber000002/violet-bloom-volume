@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, FileText, ChevronDown, ChevronUp, Plus, RefreshCw } from "lucide-react";
+import { Globe, ChevronDown, ChevronUp, Plus, RefreshCw, Upload, FileText, X, Database } from "lucide-react";
 import { BrandInputs, emptyBrandInputs, additionalContextFields } from "@/types/brandProfile";
-import { Textarea } from "@/components/ui/textarea";
 
 interface BrandInputsPanelProps {
   inputs: BrandInputs;
@@ -14,6 +13,57 @@ interface BrandInputsPanelProps {
   hasBrandProfile?: boolean;
 }
 
+const CSVUploadBox: React.FC<{
+  label: string;
+  icon: React.ReactNode;
+  fileName: string | null;
+  onFile: (text: string, name: string) => void;
+  onClear: () => void;
+  rowCount: number;
+}> = ({ label, icon, fileName, onFile, onClear, rowCount }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      onFile(text, file.name);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  return (
+    <div className="flex-1 min-w-0">
+      <label className="block text-xs font-medium text-muted-foreground mb-1.5 truncate">
+        {icon}
+        {label}
+      </label>
+      <input ref={inputRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleFile} />
+      {fileName ? (
+        <div className="h-9 px-2.5 rounded-lg border border-primary/30 bg-primary/5 flex items-center gap-1.5 text-xs">
+          <FileText className="w-3 h-3 text-primary flex-shrink-0" />
+          <span className="truncate text-foreground font-medium">{fileName}</span>
+          <span className="text-muted-foreground flex-shrink-0">({rowCount})</span>
+          <button onClick={onClear} className="ml-auto p-0.5 hover:text-destructive transition-colors flex-shrink-0">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="w-full h-9 px-2.5 rounded-lg border border-dashed border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/40 flex items-center justify-center gap-1.5 text-xs text-muted-foreground transition-all"
+        >
+          <Upload className="w-3 h-3" />
+          Upload CSV
+        </button>
+      )}
+    </div>
+  );
+};
+
 export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
   inputs,
   onChange,
@@ -24,9 +74,18 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
   hasBrandProfile,
 }) => {
   const [showAdditional, setShowAdditional] = useState(false);
+  const [eventFileName, setEventFileName] = useState<string | null>(null);
+  const [userPropFileName, setUserPropFileName] = useState<string | null>(null);
 
   const canGenerate = hasIndustry && inputs.websiteUrl.trim();
   const isEnrich = hasBrandProfile && brandMeta && brandMeta.iterationCount > 0;
+
+  const eventRowCount = inputs.eventSchemaCSV
+    ? inputs.eventSchemaCSV.trim().split("\n").length - 1
+    : 0;
+  const userPropRowCount = inputs.userPropertiesCSV
+    ? inputs.userPropertiesCSV.trim().split("\n").length - 1
+    : 0;
 
   return (
     <div className="flex-1 space-y-3">
@@ -45,24 +104,36 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
         />
       </div>
 
-      {/* Website Text */}
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-1.5">
-          <FileText className="w-3.5 h-3.5 inline mr-1.5 text-primary" />
-          Website Text <span className="text-xs text-muted-foreground font-normal">(optional)</span>
-        </label>
-        <Textarea
-          value={inputs.websiteText}
-          onChange={(e) => onChange({ ...inputs, websiteText: e.target.value })}
-          placeholder="Paste your website's main content here — homepage, about page, product descriptions, etc."
-          className="min-h-[100px] border-border bg-muted/50 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary text-sm resize-y"
+      {/* Event Schema + User Properties - 1x2 Grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <CSVUploadBox
+          label="Event Schema"
+          icon={<Database className="w-3 h-3 inline mr-1 text-primary" />}
+          fileName={eventFileName}
+          onFile={(text, name) => {
+            onChange({ ...inputs, eventSchemaCSV: text });
+            setEventFileName(name);
+          }}
+          onClear={() => {
+            onChange({ ...inputs, eventSchemaCSV: "" });
+            setEventFileName(null);
+          }}
+          rowCount={eventRowCount}
         />
-        <p className="text-xs text-muted-foreground mt-1">
-          {inputs.websiteText.length > 0 
-            ? `${inputs.websiteText.split(/\s+/).filter(Boolean).length} words detected`
-            : "More text = better brand extraction"
-          }
-        </p>
+        <CSVUploadBox
+          label="User Properties"
+          icon={<Database className="w-3 h-3 inline mr-1 text-secondary" />}
+          fileName={userPropFileName}
+          onFile={(text, name) => {
+            onChange({ ...inputs, userPropertiesCSV: text });
+            setUserPropFileName(name);
+          }}
+          onClear={() => {
+            onChange({ ...inputs, userPropertiesCSV: "" });
+            setUserPropFileName(null);
+          }}
+          rowCount={userPropRowCount}
+        />
       </div>
 
       {/* Additional Context (Expandable) */}
