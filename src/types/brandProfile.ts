@@ -1,6 +1,42 @@
 // Core Brand JSON Schema v1.0
 // Generated client-side from website text + industry + additional context
 
+export interface BrandDesignProfile {
+  logo?: {
+    logo_url: string;
+    logo_light: string;
+    logo_dark: string;
+    logo_vector: string;
+  };
+  colors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    text_primary: string;
+  };
+  fonts?: {
+    heading: string;
+    body: string;
+  };
+  gradients?: {
+    hero_gradient: string;
+    accent_gradient?: string;
+  };
+  icon_style?: "line_icons" | "filled_icons" | "duotone_icons" | "minimal_outline";
+  visual_style?: "product_ui" | "illustrations" | "photography" | "abstract_gradients" | "minimal_graphics";
+  design_density?: "minimal" | "editorial" | "corporate" | "playful";
+  cta_style?: {
+    radius: string;
+    fill: string;
+  };
+  chart_palette?: {
+    primary: string;
+    secondary: string;
+    neutral: string;
+  };
+}
+
 export interface CoreBrandJSON {
   brand_identity: {
     brand_name: string;
@@ -99,6 +135,8 @@ export interface CoreBrandJSON {
     text_secondary: string;
     additional_colors: string[];
   };
+
+  brand_design_profile?: BrandDesignProfile;
 
   extraction_metadata?: {
     source_mode: "url_only" | "url_plus_text" | "text_only";

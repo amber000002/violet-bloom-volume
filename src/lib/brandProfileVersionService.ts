@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { CoreBrandJSON } from "@/types/brandProfile";
+import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
 
 // ===== HELPERS =====
 
@@ -23,6 +23,7 @@ export interface BrandProfileVersion {
   extractionVersion: string | null;
   sourceFingerprint: string | null;
   brandProfileJson: CoreBrandJSON;
+  brandDesignProfileJson: BrandDesignProfile | null;
   confidence: string;
   status: string;
   generatedAt: string;
@@ -69,6 +70,7 @@ export async function createBrandProfileVersion(params: {
   brandId: string;
   websiteUrl: string;
   brandProfileJson: CoreBrandJSON;
+  brandDesignProfileJson?: BrandDesignProfile | null;
   extractionMethod?: string;
   extractionVersion?: string;
   sourceFingerprint?: string;
@@ -88,6 +90,7 @@ export async function createBrandProfileVersion(params: {
       extraction_version: params.extractionVersion || "1.0",
       source_fingerprint: params.sourceFingerprint || null,
       brand_profile_json: params.brandProfileJson as any,
+      brand_design_profile_json: params.brandDesignProfileJson || null,
       confidence: params.confidence || "medium",
       status: params.status || "success",
       notes: params.notes || null,
@@ -106,9 +109,10 @@ export async function createBrandProfileVersion(params: {
     .update({
       latest_brand_profile_version_id: versionId,
       brand_profile_json: params.brandProfileJson as any,
+      brand_design_profile_json: params.brandDesignProfileJson || null,
       brand_name: brandName || null,
       website_url: params.websiteUrl,
-    })
+    } as any)
     .eq("brand_id", params.brandId);
 
   return versionId;
@@ -140,6 +144,7 @@ export async function loadBrandProfileVersions(params: {
     extractionVersion: row.extraction_version,
     sourceFingerprint: row.source_fingerprint,
     brandProfileJson: row.brand_profile_json as CoreBrandJSON,
+    brandDesignProfileJson: row.brand_design_profile_json || null,
     confidence: row.confidence,
     status: row.status,
     generatedAt: row.generated_at,
@@ -167,6 +172,7 @@ export async function loadAllRecentBrandVersions(limit = 20): Promise<BrandProfi
     extractionVersion: row.extraction_version,
     sourceFingerprint: row.source_fingerprint,
     brandProfileJson: row.brand_profile_json as CoreBrandJSON,
+    brandDesignProfileJson: row.brand_design_profile_json || null,
     confidence: row.confidence,
     status: row.status,
     generatedAt: row.generated_at,
@@ -195,6 +201,7 @@ export async function loadBrandProfileVersionById(versionId: string): Promise<Br
     extractionVersion: row.extraction_version,
     sourceFingerprint: row.source_fingerprint,
     brandProfileJson: row.brand_profile_json as CoreBrandJSON,
+    brandDesignProfileJson: row.brand_design_profile_json || null,
     confidence: row.confidence,
     status: row.status,
     generatedAt: row.generated_at,

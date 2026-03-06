@@ -136,6 +136,7 @@ const InboxAlchemyContent: React.FC = () => {
             brandId,
             websiteUrl: brandInputs.websiteUrl,
             brandProfileJson: profile,
+            brandDesignProfileJson: profile.brand_design_profile || null,
             extractionMethod: sourceMode === "url_only" ? "url_crawl" : sourceMode === "text_only" ? "user_paste" : "url_crawl",
             confidence,
             status: "success",
