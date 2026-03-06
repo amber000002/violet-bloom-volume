@@ -37,6 +37,8 @@ export async function ensureBrandProfile(params: {
   websiteUrl: string;
   industry: string;
   brandName?: string;
+  eventSchemaCSV?: string;
+  userPropertiesCSV?: string;
 }): Promise<string> {
   const host = normalizeHost(params.websiteUrl);
   const industryNorm = params.industry.toLowerCase().trim();
@@ -48,7 +50,16 @@ export async function ensureBrandProfile(params: {
     .eq("industry_selected", industryNorm)
     .maybeSingle();
 
-  if (existing) return existing.brand_id;
+  if (existing) {
+    // Update schema CSVs if provided
+    const updates: Record<string, any> = {};
+    if (params.eventSchemaCSV) updates.event_schema_csv = params.eventSchemaCSV;
+    if (params.userPropertiesCSV) updates.user_properties_csv = params.userPropertiesCSV;
+    if (Object.keys(updates).length > 0) {
+      await supabase.from("brand_profiles").update(updates).eq("brand_id", existing.brand_id);
+    }
+    return existing.brand_id;
+  }
 
   const { data: inserted, error } = await supabase
     .from("brand_profiles")
@@ -57,7 +68,9 @@ export async function ensureBrandProfile(params: {
       website_host_normalized: host,
       industry_selected: industryNorm,
       brand_name: params.brandName || null,
-    })
+      event_schema_csv: params.eventSchemaCSV || null,
+      user_properties_csv: params.userPropertiesCSV || null,
+    } as any)
     .select("brand_id")
     .single();
 
@@ -138,11 +151,11 @@ export async function createBrandProfileVersion(params: {
 export async function loadBrandProfileMeta(params: {
   websiteUrl: string;
   industry: string;
-}): Promise<{ brandId: string; completenessScore: number; iterationCount: number; lastUpdated: string } | null> {
+}): Promise<{ brandId: string; completenessScore: number; iterationCount: number; lastUpdated: string; eventSchemaCSV: string | null; userPropertiesCSV: string | null } | null> {
   const host = normalizeHost(params.websiteUrl);
   const { data, error } = await supabase
     .from("brand_profiles")
-    .select("brand_id, profile_completeness_score, iteration_count, updated_at")
+    .select("brand_id, profile_completeness_score, iteration_count, updated_at, event_schema_csv, user_properties_csv")
     .eq("website_host_normalized", host)
     .eq("industry_selected", params.industry.toLowerCase().trim())
     .maybeSingle();
@@ -154,7 +167,30 @@ export async function loadBrandProfileMeta(params: {
     completenessScore: row.profile_completeness_score || 0,
     iterationCount: row.iteration_count || 0,
     lastUpdated: row.updated_at,
+    eventSchemaCSV: row.event_schema_csv || null,
+    userPropertiesCSV: row.user_properties_csv || null,
   };
+}
+
+// ===== SAVE SCHEMA CSVs =====
+
+export async function saveBrandSchemaCSVs(params: {
+  websiteUrl: string;
+  industry: string;
+  eventSchemaCSV?: string;
+  userPropertiesCSV?: string;
+}): Promise<void> {
+  const host = normalizeHost(params.websiteUrl);
+  const updates: Record<string, any> = {};
+  if (params.eventSchemaCSV !== undefined) updates.event_schema_csv = params.eventSchemaCSV || null;
+  if (params.userPropertiesCSV !== undefined) updates.user_properties_csv = params.userPropertiesCSV || null;
+  if (Object.keys(updates).length === 0) return;
+
+  await supabase
+    .from("brand_profiles")
+    .update(updates)
+    .eq("website_host_normalized", host)
+    .eq("industry_selected", params.industry.toLowerCase().trim());
 }
 
 // ===== ENRICH EXISTING PROFILE =====
