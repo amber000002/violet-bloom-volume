@@ -52,8 +52,9 @@ function isRicher(existing: string, incoming: string): boolean {
 /** Confidence ranking. */
 const CONF_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-function confScore(v: string | undefined): number {
-  return CONF_RANK[(v || "").toLowerCase()] ?? 0;
+function confScore(v: unknown): number {
+  if (typeof v !== "string") return 0;
+  return CONF_RANK[v.toLowerCase()] ?? 0;
 }
 
 // ========== COMPLETENESS SCORE ==========
