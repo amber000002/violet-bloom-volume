@@ -1,0 +1,2 @@
+ALTER TABLE public.brand_profiles ADD COLUMN IF NOT EXISTS brand_design_profile_json jsonb DEFAULT NULL;
+ALTER TABLE public.brand_profile_versions ADD COLUMN IF NOT EXISTS brand_design_profile_json jsonb DEFAULT NULL;

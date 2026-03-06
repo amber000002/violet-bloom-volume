@@ -17,12 +17,33 @@ function htmlToText(html: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&#?\w+;/g, " ")
-    .replace(/[^\x20-\x7E\n]/g, " ") // strip non-ASCII
+    .replace(/[^\x20-\x7E\n]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-async function fetchPageText(url: string): Promise<string> {
+function extractDesignSignals(html: string): string {
+  // Extract CSS-relevant snippets: style blocks, inline styles, link tags, meta tags, icon refs
+  const styleBlocks = [...html.matchAll(/<style[\s\S]*?<\/style>/gi)].map(m => m[0]).join("\n").slice(0, 6000);
+  const metaTags = [...html.matchAll(/<meta[^>]+>/gi)].map(m => m[0]).join("\n").slice(0, 2000);
+  const linkTags = [...html.matchAll(/<link[^>]+>/gi)].map(m => m[0]).join("\n").slice(0, 2000);
+  const headerArea = html.match(/<header[\s\S]*?<\/header>/i)?.[0]?.slice(0, 2000) || "";
+  const footerArea = html.match(/<footer[\s\S]*?<\/footer>/i)?.[0]?.slice(0, 1500) || "";
+  const buttonStyles = [...html.matchAll(/<button[^>]*style="[^"]*"[^>]*>/gi)].map(m => m[0]).join("\n").slice(0, 1000);
+  const svgIcons = [...html.matchAll(/<svg[^>]*>[\s\S]*?<\/svg>/gi)].slice(0, 5).map(m => m[0].slice(0, 200)).join("\n");
+  
+  return [
+    "[STYLE BLOCKS]", styleBlocks,
+    "[META TAGS]", metaTags,
+    "[LINK TAGS]", linkTags,
+    "[HEADER HTML]", headerArea,
+    "[FOOTER HTML]", footerArea,
+    "[BUTTON SAMPLES]", buttonStyles,
+    "[SVG ICON SAMPLES]", svgIcons,
+  ].join("\n").slice(0, 12000);
+}
+
+async function fetchPageRaw(url: string): Promise<{ text: string; html: string }> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -35,11 +56,11 @@ async function fetchPageText(url: string): Promise<string> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!resp.ok) return "";
+    if (!resp.ok) return { text: "", html: "" };
     const html = await resp.text();
-    return htmlToText(html).slice(0, 4000);
+    return { text: htmlToText(html).slice(0, 4000), html: html.slice(0, 50000) };
   } catch {
-    return "";
+    return { text: "", html: "" };
   }
 }
 
@@ -65,21 +86,25 @@ serve(async (req) => {
     }
 
     let crawledContent = "";
+    let designRawHtml = "";
     const crawlWarnings: string[] = [];
     const crawledPages: string[] = [];
     let sourceMode: "url_only" | "url_plus_text" | "text_only" = hasText ? "url_plus_text" : "url_only";
 
-    // Fetch homepage + a few key pages
     const origin = new URL(baseUrl).origin;
-    const urls = [origin, `${origin}/pricing`, `${origin}/products`, `${origin}/about`, `${origin}/features`];
+    const urls = [origin, `${origin}/pricing`, `${origin}/products`, `${origin}/about`, `${origin}/features`, `${origin}/solutions`];
     console.log(`Fetching pages for ${origin}`);
 
-    const results = await Promise.allSettled(urls.map(u => fetchPageText(u)));
+    const results = await Promise.allSettled(urls.map(u => fetchPageRaw(u)));
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
-      if (r.status === "fulfilled" && r.value.length > 150) {
-        crawledContent += `\n[PAGE: ${urls[i]}]\n${r.value}\n`;
+      if (r.status === "fulfilled" && r.value.text.length > 150) {
+        crawledContent += `\n[PAGE: ${urls[i]}]\n${r.value.text}\n`;
         crawledPages.push(urls[i]);
+        // Collect raw HTML for design extraction (homepage + first found page)
+        if (designRawHtml.length < 30000) {
+          designRawHtml += r.value.html;
+        }
       }
     }
 
@@ -99,11 +124,11 @@ serve(async (req) => {
       .map(([k, v]) => `${k}: ${v}`) : [];
     if (contextParts.length) combinedText += `\n\nAdditional context: ${contextParts.join("; ")}`;
 
-    // Trim to safe size
     combinedText = combinedText.slice(0, 15000);
 
     console.log(`Content length: ${combinedText.length}, pages: ${crawledPages.length}, mode: ${sourceMode}`);
 
+    // ===== STEP 1: Brand Profile extraction (existing) =====
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -151,7 +176,6 @@ ${combinedText}`,
     let jsonStr = content.trim();
     const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) jsonStr = jsonMatch[1].trim();
-    // Also strip leading/trailing non-JSON chars
     const firstBrace = jsonStr.indexOf("{");
     const lastBrace = jsonStr.lastIndexOf("}");
     if (firstBrace !== -1 && lastBrace !== -1) {
@@ -166,7 +190,86 @@ ${combinedText}`,
       throw new Error("Failed to parse brand profile JSON");
     }
 
-    return new Response(JSON.stringify({ success: true, data: parsed }), {
+    // ===== STEP 2: Brand Design Profile extraction =====
+    let designProfile = null;
+    if (designRawHtml.length > 500) {
+      try {
+        const designSignals = extractDesignSignals(designRawHtml);
+        console.log(`Design signals extracted: ${designSignals.length} chars`);
+
+        const designResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              {
+                role: "system",
+                content: `You are a visual design system extraction engine. Analyze raw HTML/CSS signals from a website to extract design tokens. Extract ONLY what is evidenced in the HTML/CSS. For colors, extract actual hex codes from CSS variables, inline styles, and class definitions. Ignore pure black (#000000), pure white (#FFFFFF), and neutral grays unless they are clearly the brand's primary design color. For fonts, extract from @font-face declarations, CSS font-family, and Google Fonts link tags. Return ONLY valid JSON, no markdown fences.`,
+              },
+              {
+                role: "user",
+                content: `Extract a Brand Design Profile from this website's HTML/CSS for "${websiteUrl}".
+
+Return this exact JSON structure:
+{"logo":{"logo_url":"","logo_light":"","logo_dark":"","logo_vector":""},"colors":{"primary":"","secondary":"","accent":"","background":"","text_primary":""},"fonts":{"heading":"","body":""},"gradients":{"hero_gradient":"","accent_gradient":""},"icon_style":"line_icons","visual_style":"product_ui","design_density":"minimal","cta_style":{"radius":"","fill":""},"chart_palette":{"primary":"","secondary":"","neutral":""}}
+
+Instructions:
+- logo: Extract from schema.org Organization.logo, og:image meta, header img/svg, favicon link tags. Prioritize schema.org > header nav > og:image > footer > favicon.
+- colors: Extract hex codes from CSS variables (:root), button backgrounds, link colors, header backgrounds. Primary = most dominant brand color, secondary = supporting, accent = CTA/highlight.
+- fonts: Extract from @font-face, font-family CSS, Google Fonts links. heading = display/heading font, body = body text font.
+- gradients: Extract from linear-gradient() or radial-gradient() in CSS. Describe as color direction (e.g. "purple-pink", "blue-teal").
+- icon_style: Analyze SVG icons — "line_icons" (stroke-based), "filled_icons" (solid fill), "duotone_icons" (two-tone), "minimal_outline".
+- visual_style: Based on page imagery — "product_ui", "illustrations", "photography", "abstract_gradients", "minimal_graphics".
+- design_density: Based on spacing/layout — "minimal" (lots of whitespace), "editorial" (magazine-like), "corporate" (dense grids), "playful" (loose/fun).
+- cta_style: Extract button border-radius and fill style from CSS.
+- chart_palette: Derive from primary, secondary, and a neutral gray from the brand colors.
+
+If an element cannot be determined, use empty string or sensible defaults (icon_style: "minimal_outline", design_density: "minimal", visual_style: "minimal_graphics").
+
+Raw HTML/CSS signals:
+${designSignals}`,
+              },
+            ],
+            temperature: 0.2,
+            max_tokens: 2000,
+          }),
+        });
+
+        if (designResponse.ok) {
+          const designData = await designResponse.json();
+          const designContent = designData.choices?.[0]?.message?.content;
+          if (designContent) {
+            let dStr = designContent.trim();
+            const dMatch = dStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (dMatch) dStr = dMatch[1].trim();
+            const dFirst = dStr.indexOf("{");
+            const dLast = dStr.lastIndexOf("}");
+            if (dFirst !== -1 && dLast !== -1) dStr = dStr.slice(dFirst, dLast + 1);
+            try {
+              designProfile = JSON.parse(dStr);
+              console.log("Design profile extracted successfully");
+            } catch {
+              console.error("Design profile JSON parse failed");
+            }
+          }
+        } else {
+          console.error("Design extraction AI error:", designResponse.status);
+        }
+      } catch (designErr) {
+        console.error("Design extraction failed (non-blocking):", designErr);
+      }
+    }
+
+    // Attach design profile to brand JSON
+    if (designProfile) {
+      parsed.brand_design_profile = designProfile;
+    }
+
+    return new Response(JSON.stringify({ success: true, data: parsed, brand_design_profile: designProfile }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

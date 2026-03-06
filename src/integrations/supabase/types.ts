@@ -120,6 +120,7 @@ export type Database = {
       }
       brand_profile_versions: {
         Row: {
+          brand_design_profile_json: Json | null
           brand_id: string
           brand_profile_json: Json
           brand_profile_version_id: string
@@ -137,6 +138,7 @@ export type Database = {
           website_url_original: string | null
         }
         Insert: {
+          brand_design_profile_json?: Json | null
           brand_id: string
           brand_profile_json: Json
           brand_profile_version_id?: string
@@ -154,6 +156,7 @@ export type Database = {
           website_url_original?: string | null
         }
         Update: {
+          brand_design_profile_json?: Json | null
           brand_id?: string
           brand_profile_json?: Json
           brand_profile_version_id?: string
@@ -174,6 +177,7 @@ export type Database = {
       }
       brand_profiles: {
         Row: {
+          brand_design_profile_json: Json | null
           brand_id: string
           brand_name: string | null
           brand_profile_json: Json | null
@@ -185,6 +189,7 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          brand_design_profile_json?: Json | null
           brand_id?: string
           brand_name?: string | null
           brand_profile_json?: Json | null
@@ -196,6 +201,7 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          brand_design_profile_json?: Json | null
           brand_id?: string
           brand_name?: string | null
           brand_profile_json?: Json | null
