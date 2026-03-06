@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
+import { computeCompletenessScore, mergeProfiles } from "@/lib/brandEnrichmentEngine";
 
 // ===== HELPERS =====
 
@@ -102,8 +103,9 @@ export async function createBrandProfileVersion(params: {
 
   const versionId = (data as any).brand_profile_version_id;
 
-  // Update brand_profiles with latest version pointer and brand name
+  // Update brand_profiles with latest version pointer, brand name, scores
   const brandName = params.brandProfileJson?.brand_identity?.brand_name;
+  const completeness = computeCompletenessScore(params.brandProfileJson);
   await supabase
     .from("brand_profiles")
     .update({
@@ -112,10 +114,57 @@ export async function createBrandProfileVersion(params: {
       brand_design_profile_json: params.brandDesignProfileJson || null,
       brand_name: brandName || null,
       website_url: params.websiteUrl,
+      profile_completeness_score: completeness,
     } as any)
     .eq("brand_id", params.brandId);
 
+  // Increment iteration_count
+  const { data: currentProfile } = await supabase
+    .from("brand_profiles")
+    .select("iteration_count")
+    .eq("brand_id", params.brandId)
+    .maybeSingle();
+  const currentCount = (currentProfile as any)?.iteration_count || 0;
+  await supabase
+    .from("brand_profiles")
+    .update({ iteration_count: currentCount + 1 } as any)
+    .eq("brand_id", params.brandId);
+
   return versionId;
+}
+
+// ===== LOAD BRAND PROFILE METADATA (completeness + iteration) =====
+
+export async function loadBrandProfileMeta(params: {
+  websiteUrl: string;
+  industry: string;
+}): Promise<{ brandId: string; completenessScore: number; iterationCount: number; lastUpdated: string } | null> {
+  const host = normalizeHost(params.websiteUrl);
+  const { data, error } = await supabase
+    .from("brand_profiles")
+    .select("brand_id, profile_completeness_score, iteration_count, updated_at")
+    .eq("website_host_normalized", host)
+    .eq("industry_selected", params.industry.toLowerCase().trim())
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const row = data as any;
+  return {
+    brandId: row.brand_id,
+    completenessScore: row.profile_completeness_score || 0,
+    iterationCount: row.iteration_count || 0,
+    lastUpdated: row.updated_at,
+  };
+}
+
+// ===== ENRICH EXISTING PROFILE =====
+
+export async function enrichBrandProfile(params: {
+  brandId: string;
+  existingProfile: CoreBrandJSON;
+  newProfile: CoreBrandJSON;
+}): Promise<CoreBrandJSON> {
+  return mergeProfiles(params.existingProfile, params.newProfile);
 }
 
 // ===== LOAD VERSIONS FOR A HOST =====
