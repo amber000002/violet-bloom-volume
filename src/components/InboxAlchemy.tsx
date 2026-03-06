@@ -270,7 +270,7 @@ const InboxAlchemyContent: React.FC = () => {
         recommendations: exportData.diagnosticsData.recommendations || [],
       } : null;
 
-      await exportToPPT(inboxData, useCaseData, ampData, type, diagnosticsExport);
+      await exportToPPT(inboxData, useCaseData, ampData, type, diagnosticsExport, brandProfile);
     } catch (error) {
       console.error("Export failed:", error);
     } finally {
