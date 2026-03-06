@@ -21,8 +21,11 @@ import {
   ensureBrandProfile,
   createBrandProfileVersion,
   loadBrandProfileVersions,
+  loadBrandProfileMeta,
+  enrichBrandProfile,
   BrandProfileVersion,
 } from "@/lib/brandProfileVersionService";
+import { computeCompletenessScore } from "@/lib/brandEnrichmentEngine";
 
 const industryOptions = Object.entries(industryConfigs).map(([key, config]) => ({
   value: key,
@@ -49,7 +52,7 @@ const InboxAlchemyContent: React.FC = () => {
   const [isGeneratingBrand, setIsGeneratingBrand] = useState(false);
   const [activeBrandVersionId, setActiveBrandVersionId] = useState<string | null>(null);
   const [brandVersions, setBrandVersions] = useState<BrandProfileVersion[]>([]);
-  
+  const [brandMeta, setBrandMeta] = useState<{ completenessScore: number; iterationCount: number; lastUpdated: string } | null>(null);
   const { viewMode, setViewMode, deckType, setDeckType, isExporting, setIsExporting } = usePresentationMode();
 
   // Auto-load saved brand profile when URL + industry are set
@@ -59,21 +62,22 @@ const InboxAlchemyContent: React.FC = () => {
 
     const loadSaved = async () => {
       try {
-        const versions = await loadBrandProfileVersions({
-          websiteUrl: brandInputs.websiteUrl,
-          industry,
-        });
-        if (cancelled || versions.length === 0) return;
+        const [versions, meta] = await Promise.all([
+          loadBrandProfileVersions({ websiteUrl: brandInputs.websiteUrl, industry }),
+          loadBrandProfileMeta({ websiteUrl: brandInputs.websiteUrl, industry }),
+        ]);
+        if (cancelled) return;
         setBrandVersions(versions);
+        if (meta) setBrandMeta({ completenessScore: meta.completenessScore, iterationCount: meta.iterationCount, lastUpdated: meta.lastUpdated });
         // Only auto-load if no profile is currently active
-        if (!brandProfile) {
+        if (!brandProfile && versions.length > 0) {
           const latest = versions[0];
           setBrandProfile(latest.brandProfileJson as CoreBrandJSON);
           setActiveBrandVersionId(latest.brandProfileVersionId);
           toast.info(`Loaded saved brand profile for ${(latest.brandProfileJson as any)?.brand_identity?.brand_name || "brand"}`);
         }
       } catch {
-        // Silent — user can still generate manually
+        // Silent
       }
     };
 
@@ -116,7 +120,16 @@ const InboxAlchemyContent: React.FC = () => {
       if (data?.error) throw new Error(data.error);
 
       if (data?.success && data.data) {
-        const profile: CoreBrandJSON = data.data;
+        let profile: CoreBrandJSON = data.data;
+
+        // === ENRICHMENT: merge with existing if available ===
+        if (brandProfile) {
+          profile = await enrichBrandProfile({
+            brandId: "", // not needed by merge logic
+            existingProfile: brandProfile,
+            newProfile: profile,
+          });
+        }
         setBrandProfile(profile);
 
         // Persist version to cloud
@@ -144,11 +157,15 @@ const InboxAlchemyContent: React.FC = () => {
 
           setActiveBrandVersionId(versionId);
 
-          // Refresh versions list
-          const versions = await loadBrandProfileVersions({ websiteUrl: brandInputs.websiteUrl, industry });
+          // Refresh versions list + meta
+          const [versions, meta] = await Promise.all([
+            loadBrandProfileVersions({ websiteUrl: brandInputs.websiteUrl, industry }),
+            loadBrandProfileMeta({ websiteUrl: brandInputs.websiteUrl, industry }),
+          ]);
           setBrandVersions(versions);
+          if (meta) setBrandMeta({ completenessScore: meta.completenessScore, iterationCount: meta.iterationCount, lastUpdated: meta.lastUpdated });
 
-          toast.success(`Brand profile saved (version ${versions.length})`);
+          toast.success(`Brand profile saved (version ${versions.length}, completeness ${meta?.completenessScore || computeCompletenessScore(profile)}%)`);
         } catch (saveErr: any) {
           console.error("Failed to persist brand profile version:", saveErr);
           toast.warning("Brand profile generated but failed to save version to cloud");
@@ -308,6 +325,8 @@ const InboxAlchemyContent: React.FC = () => {
                 onGenerate={handleGenerateBrandProfile}
                 isGenerating={isGeneratingBrand}
                 hasIndustry={!!industry}
+                brandMeta={brandMeta}
+                hasBrandProfile={!!brandProfile}
               />
 
               {/* Presentation Controls */}
@@ -414,8 +433,14 @@ const InboxAlchemyContent: React.FC = () => {
                   Brand Profile: {brandProfile.brand_identity.brand_name}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  — {brandProfile.industry_signal_layer.industry_vocabulary.length} signals detected
+                  — {brandProfile.industry_signal_layer.industry_vocabulary.length} signals
+                  {brandMeta ? ` · ${brandMeta.completenessScore}% complete · ${brandMeta.iterationCount} iteration${brandMeta.iterationCount !== 1 ? "s" : ""}` : ""}
                 </span>
+                {brandMeta && brandMeta.completenessScore < 85 && (
+                  <span className="text-[10px] text-secondary font-medium ml-auto">
+                    Enhance for richer insights →
+                  </span>
+                )}
               </div>
             )}
           </div>

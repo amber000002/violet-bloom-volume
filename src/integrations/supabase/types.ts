@@ -183,7 +183,9 @@ export type Database = {
           brand_profile_json: Json | null
           created_at: string
           industry_selected: string
+          iteration_count: number | null
           latest_brand_profile_version_id: string | null
+          profile_completeness_score: number | null
           updated_at: string
           website_host_normalized: string
           website_url: string | null
@@ -195,7 +197,9 @@ export type Database = {
           brand_profile_json?: Json | null
           created_at?: string
           industry_selected: string
+          iteration_count?: number | null
           latest_brand_profile_version_id?: string | null
+          profile_completeness_score?: number | null
           updated_at?: string
           website_host_normalized: string
           website_url?: string | null
@@ -207,7 +211,9 @@ export type Database = {
           brand_profile_json?: Json | null
           created_at?: string
           industry_selected?: string
+          iteration_count?: number | null
           latest_brand_profile_version_id?: string | null
+          profile_completeness_score?: number | null
           updated_at?: string
           website_host_normalized?: string
           website_url?: string | null
