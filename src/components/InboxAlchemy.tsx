@@ -23,6 +23,7 @@ import {
   loadBrandProfileVersions,
   loadBrandProfileMeta,
   enrichBrandProfile,
+  saveBrandSchemaCSVs,
   BrandProfileVersion,
 } from "@/lib/brandProfileVersionService";
 import { computeCompletenessScore } from "@/lib/brandEnrichmentEngine";
@@ -53,6 +54,8 @@ const InboxAlchemyContent: React.FC = () => {
   const [activeBrandVersionId, setActiveBrandVersionId] = useState<string | null>(null);
   const [brandVersions, setBrandVersions] = useState<BrandProfileVersion[]>([]);
   const [brandMeta, setBrandMeta] = useState<{ completenessScore: number; iterationCount: number; lastUpdated: string } | null>(null);
+  const [persistedEventSchemaCSV, setPersistedEventSchemaCSV] = useState<string | null>(null);
+  const [persistedUserPropertiesCSV, setPersistedUserPropertiesCSV] = useState<string | null>(null);
   const { viewMode, setViewMode, deckType, setDeckType, isExporting, setIsExporting } = usePresentationMode();
 
   // Auto-load saved brand profile when URL + industry are set
@@ -68,7 +71,19 @@ const InboxAlchemyContent: React.FC = () => {
         ]);
         if (cancelled) return;
         setBrandVersions(versions);
-        if (meta) setBrandMeta({ completenessScore: meta.completenessScore, iterationCount: meta.iterationCount, lastUpdated: meta.lastUpdated });
+        if (meta) {
+          setBrandMeta({ completenessScore: meta.completenessScore, iterationCount: meta.iterationCount, lastUpdated: meta.lastUpdated });
+          // Restore persisted schema CSVs
+          if (meta.eventSchemaCSV) setPersistedEventSchemaCSV(meta.eventSchemaCSV);
+          if (meta.userPropertiesCSV) setPersistedUserPropertiesCSV(meta.userPropertiesCSV);
+          // Also restore into brandInputs if not already set
+          if (meta.eventSchemaCSV && !brandInputs.eventSchemaCSV) {
+            setBrandInputs(prev => ({ ...prev, eventSchemaCSV: meta.eventSchemaCSV! }));
+          }
+          if (meta.userPropertiesCSV && !brandInputs.userPropertiesCSV) {
+            setBrandInputs(prev => ({ ...prev, userPropertiesCSV: meta.userPropertiesCSV! }));
+          }
+        }
         // Only auto-load if no profile is currently active
         if (!brandProfile && versions.length > 0) {
           const latest = versions[0];
@@ -140,7 +155,13 @@ const InboxAlchemyContent: React.FC = () => {
             websiteUrl: brandInputs.websiteUrl,
             industry,
             brandName: profile.brand_identity?.brand_name,
+            eventSchemaCSV: brandInputs.eventSchemaCSV || undefined,
+            userPropertiesCSV: brandInputs.userPropertiesCSV || undefined,
           });
+
+          // Update persisted state
+          if (brandInputs.eventSchemaCSV) setPersistedEventSchemaCSV(brandInputs.eventSchemaCSV);
+          if (brandInputs.userPropertiesCSV) setPersistedUserPropertiesCSV(brandInputs.userPropertiesCSV);
 
           const sourceMode = profile.extraction_metadata?.source_mode || "url_crawl";
           const confidence = profile.extraction_metadata?.confidence_by_section
@@ -323,7 +344,22 @@ const InboxAlchemyContent: React.FC = () => {
               {/* Brand Inputs */}
               <BrandInputsPanel
                 inputs={brandInputs}
-                onChange={setBrandInputs}
+                onChange={(newInputs) => {
+                  // Persist schema CSVs to cloud when changed
+                  const csvChanged = newInputs.eventSchemaCSV !== brandInputs.eventSchemaCSV || newInputs.userPropertiesCSV !== brandInputs.userPropertiesCSV;
+                  setBrandInputs(newInputs);
+                  if (csvChanged && industry && newInputs.websiteUrl.trim()) {
+                    saveBrandSchemaCSVs({
+                      websiteUrl: newInputs.websiteUrl,
+                      industry,
+                      eventSchemaCSV: newInputs.eventSchemaCSV,
+                      userPropertiesCSV: newInputs.userPropertiesCSV,
+                    }).then(() => {
+                      if (newInputs.eventSchemaCSV) setPersistedEventSchemaCSV(newInputs.eventSchemaCSV);
+                      if (newInputs.userPropertiesCSV) setPersistedUserPropertiesCSV(newInputs.userPropertiesCSV);
+                    }).catch(() => {});
+                  }
+                }}
                 onGenerate={handleGenerateBrandProfile}
                 isGenerating={isGeneratingBrand}
                 hasIndustry={!!industry}
@@ -509,6 +545,8 @@ const InboxAlchemyContent: React.FC = () => {
                 }}
                 websiteUrl={brandInputs.websiteUrl}
                 onDataChange={(data) => updateExportData("useCaseData", data)}
+                eventSchemaCSV={persistedEventSchemaCSV || brandInputs.eventSchemaCSV || undefined}
+                userPropertiesCSV={persistedUserPropertiesCSV || brandInputs.userPropertiesCSV || undefined}
               />
             )}
             {activeTab === "amp-email-studio" && (
@@ -525,6 +563,8 @@ const InboxAlchemyContent: React.FC = () => {
                 onDataChange={(data) => updateExportData("diagnosticsData", data)}
                 brandProfile={brandProfile}
                 websiteUrl={brandInputs.websiteUrl}
+                eventSchemaCSV={persistedEventSchemaCSV || brandInputs.eventSchemaCSV || undefined}
+                userPropertiesCSV={persistedUserPropertiesCSV || brandInputs.userPropertiesCSV || undefined}
               />
             )}
           </motion.div>

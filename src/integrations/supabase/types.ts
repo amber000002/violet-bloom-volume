@@ -182,11 +182,13 @@ export type Database = {
           brand_name: string | null
           brand_profile_json: Json | null
           created_at: string
+          event_schema_csv: string | null
           industry_selected: string
           iteration_count: number | null
           latest_brand_profile_version_id: string | null
           profile_completeness_score: number | null
           updated_at: string
+          user_properties_csv: string | null
           website_host_normalized: string
           website_url: string | null
         }
@@ -196,11 +198,13 @@ export type Database = {
           brand_name?: string | null
           brand_profile_json?: Json | null
           created_at?: string
+          event_schema_csv?: string | null
           industry_selected: string
           iteration_count?: number | null
           latest_brand_profile_version_id?: string | null
           profile_completeness_score?: number | null
           updated_at?: string
+          user_properties_csv?: string | null
           website_host_normalized: string
           website_url?: string | null
         }
@@ -210,11 +214,13 @@ export type Database = {
           brand_name?: string | null
           brand_profile_json?: Json | null
           created_at?: string
+          event_schema_csv?: string | null
           industry_selected?: string
           iteration_count?: number | null
           latest_brand_profile_version_id?: string | null
           profile_completeness_score?: number | null
           updated_at?: string
+          user_properties_csv?: string | null
           website_host_normalized?: string
           website_url?: string | null
         }

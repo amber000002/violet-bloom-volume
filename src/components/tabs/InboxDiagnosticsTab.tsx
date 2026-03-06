@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CoreBrandJSON } from "@/types/brandProfile";
 import { StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
@@ -84,6 +84,8 @@ interface InboxDiagnosticsTabProps {
   onDataChange?: (data: DiagnosticsData | null) => void;
   brandProfile?: CoreBrandJSON | null;
   websiteUrl?: string;
+  eventSchemaCSV?: string;
+  userPropertiesCSV?: string;
 }
 
 const REQUIRED_HEADERS = [
@@ -625,6 +627,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   onDataChange,
   brandProfile,
   websiteUrl,
+  eventSchemaCSV: brandEventSchemaCSV,
+  userPropertiesCSV: brandUserPropertiesCSV,
 }) => {
   // File states
   const [campaignValidation, setCampaignValidation] = useState<ValidationResult | null>(null);
@@ -639,6 +643,27 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [userPropertyFileName, setUserPropertyFileName] = useState<string>("");
   const [eventSchemaData, setEventSchemaData] = useState<EventSchemaRow[] | null>(null);
   const [userPropertyData, setUserPropertyData] = useState<UserPropertyRow[] | null>(null);
+
+  // Auto-populate from brand-persisted schema CSVs
+  useEffect(() => {
+    if (!eventSchemaData && brandEventSchemaCSV) {
+      const result = parseEventSchemaCSV(brandEventSchemaCSV);
+      if (result.isValid && result.data.length > 0) {
+        setEventSchemaData(result.data);
+        setEventSchemaFileName("Brand Profile (auto-loaded)");
+      }
+    }
+  }, [brandEventSchemaCSV]);
+
+  useEffect(() => {
+    if (!userPropertyData && brandUserPropertiesCSV) {
+      const result = parseUserPropertyCSV(brandUserPropertiesCSV);
+      if (result.isValid && result.data.length > 0) {
+        setUserPropertyData(result.data);
+        setUserPropertyFileName("Brand Profile (auto-loaded)");
+      }
+    }
+  }, [brandUserPropertiesCSV]);
 
   // Creative Analyzer states
   const [creativeImage, setCreativeImage] = useState<string | null>(null);

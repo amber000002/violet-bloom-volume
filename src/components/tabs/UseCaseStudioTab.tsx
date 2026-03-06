@@ -68,6 +68,8 @@ interface UseCaseStudioTabProps {
   onBrandVersionsRefresh?: () => Promise<void>;
   websiteUrl?: string;
   onDataChange?: (data: any) => void;
+  eventSchemaCSV?: string;
+  userPropertiesCSV?: string;
 }
 
 // ===== CHANNEL ICON MAP =====
@@ -312,6 +314,8 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   onBrandVersionsRefresh,
   websiteUrl: websiteUrlProp,
   onDataChange,
+  eventSchemaCSV,
+  userPropertiesCSV,
 }) => {
   const [framework, setFramework] = useState<FrameworkType>("lifecycle");
   const [selectedStage, setSelectedStage] = useState<string>("");
