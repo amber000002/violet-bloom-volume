@@ -222,6 +222,23 @@ const FONTS = {
   body: "Calibri", // PPT-safe; "Poppins" rendered via system
 };
 
+/** Fetch an external image URL as a base64 data URI for pptxgenjs embedding */
+const fetchLogoAsBase64 = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(url, { mode: "cors" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+};
+
 // ============= HELPER FUNCTIONS =============
 
 const formatNumber = (num: number): string =>
@@ -404,6 +421,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const theme = buildBrandTheme(brandProfile, industry);
   const hasPostmasterData = !!diagnostics.postmasterData && diagnostics.postmasterData.length > 0;
 
+  // Pre-fetch logo as base64 to avoid CORS issues
+  let logoBase64: string | null = null;
+  const logoUrl = brandProfile?.brand_design_profile?.logo?.logo_url;
+  if (logoUrl) {
+    logoBase64 = await fetchLogoAsBase64(logoUrl);
+  }
+
   const pptx = new pptxgen();
   pptx.author = "Inbox Diagnostics";
   pptx.title = `${brandName} – Email Diagnostics Executive Deck`;
@@ -442,23 +466,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fill: { color: theme.accent, transparency: 85 },
     });
 
-    // Brand logo - use actual logo if available from design profile
-    const logoUrl = brandProfile?.brand_design_profile?.logo?.logo_url;
-    if (logoUrl) {
-      try {
-        s0.addImage({
-          path: logoUrl,
-          x: 3.5, y: 0.4, w: 3.0, h: 1.4,
-          sizing: { type: "contain", w: 3.0, h: 1.4 },
-        });
-      } catch {
-        s0.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-          x: 3.75, y: 0.6, w: 2.5, h: 1.2,
-          fill: { color: "FFFFFF", transparency: 80 },
-          line: { color: "FFFFFF", width: 1.5, dashType: "dash" },
-          rectRadius: 0.15,
-        });
-      }
+    // Brand logo
+    if (logoBase64) {
+      s0.addImage({
+        data: logoBase64,
+        x: 3.5, y: 0.4, w: 3.0, h: 1.4,
+        sizing: { type: "contain", w: 3.0, h: 1.4 },
+      });
     } else {
       s0.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: 3.75, y: 0.6, w: 2.5, h: 1.2,
