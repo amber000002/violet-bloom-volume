@@ -293,6 +293,23 @@ const getDensitySpacing = (density: string): number => {
   }
 };
 
+/** Fetch an external image URL as a base64 data URI for pptxgenjs embedding */
+const fetchLogoAsBase64 = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(url, { mode: "cors" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+};
+
 // ============= SLIDE HELPERS =============
 
 const addBrandedBackground = (slide: pptxgen.Slide, theme: BrandSlideTheme) => {
@@ -309,7 +326,8 @@ const addSectionDivider = (
   theme: BrandSlideTheme,
   sectionNumber: string,
   title: string,
-  subtitle: string
+  subtitle: string,
+  logoBase64: string | null
 ) => {
   const slide = pptx.addSlide();
 
@@ -327,16 +345,12 @@ const addSectionDivider = (
   });
 
   // Logo on section dividers
-  if (theme.hasLogo && theme.logoUrl) {
-    try {
-      slide.addImage({
-        path: theme.logoUrl,
-        x: 4.0, y: 0.3, w: 2.0, h: 0.8,
-        sizing: { type: "contain", w: 2.0, h: 0.8 },
-      });
-    } catch {
-      // Fallback: no logo
-    }
+  if (logoBase64) {
+    slide.addImage({
+      data: logoBase64,
+      x: 4.0, y: 0.3, w: 2.0, h: 0.8,
+      sizing: { type: "contain", w: 2.0, h: 0.8 },
+    });
   }
 
   const textColor = luminance(theme.heroGradientStart) > 0.6 ? theme.textPrimary : "FFFFFF";
@@ -389,6 +403,12 @@ export const exportToPPT = async (
   const theme = buildSlideTheme(brandProfile);
   const spacing = getDensitySpacing(theme.designDensity);
 
+  // Pre-fetch logo as base64 to avoid CORS issues during PPT generation
+  let logoBase64: string | null = null;
+  if (theme.hasLogo && theme.logoUrl) {
+    logoBase64 = await fetchLogoAsBase64(theme.logoUrl);
+  }
+
   const pptx = new pptxgen();
   const brandName = brandProfile?.brand_identity?.brand_name || "Inbox Alchemy";
 
@@ -416,21 +436,12 @@ export const exportToPPT = async (
   const titleTextColor = luminance(theme.heroGradientStart) > 0.6 ? theme.textPrimary : "FFFFFF";
 
   // Logo on title slide
-  if (theme.hasLogo && theme.logoUrl) {
-    try {
-      titleSlide.addImage({
-        path: theme.logoUrl,
-        x: 3.5, y: 0.5, w: 3.0, h: 1.2,
-        sizing: { type: "contain", w: 3.0, h: 1.2 },
-      });
-    } catch {
-      // Fallback: text logo
-      titleSlide.addText(brandName, {
-        x: 0.5, y: 0.5, w: 9, h: 1,
-        fontSize: 18, color: titleTextColor, align: "center",
-        fontFace: FONTS.body, transparency: 30,
-      });
-    }
+  if (logoBase64) {
+    titleSlide.addImage({
+      data: logoBase64,
+      x: 3.5, y: 0.5, w: 3.0, h: 1.2,
+      sizing: { type: "contain", w: 3.0, h: 1.2 },
+    });
   }
 
   titleSlide.addText(brandName, {
@@ -461,7 +472,7 @@ export const exportToPPT = async (
   // SECTION 1: Inbox Potential
   // ==========================================
   if (inboxData) {
-    addSectionDivider(pptx, theme, "Section 1", "Responsible Inbox Potential", "Industry-aligned monthly email scale");
+    addSectionDivider(pptx, theme, "Section 1", "Responsible Inbox Potential", "Industry-aligned monthly email scale", logoBase64);
 
     // Volume Summary Slide
     const volumeSlide = pptx.addSlide();
@@ -553,7 +564,7 @@ export const exportToPPT = async (
   // SECTION 2: Use Case Studio
   // ==========================================
   if (useCaseData) {
-    addSectionDivider(pptx, theme, "Section 2", "Use Case Studio", "Framework-driven lifecycle journeys & campaigns");
+    addSectionDivider(pptx, theme, "Section 2", "Use Case Studio", "Framework-driven lifecycle journeys & campaigns", logoBase64);
 
     // Framework Slide
     const frameworkSlide = pptx.addSlide();
@@ -627,7 +638,7 @@ export const exportToPPT = async (
   // SECTION 3: AMP Email Studio
   // ==========================================
   if (ampData) {
-    addSectionDivider(pptx, theme, "Section 3", "AMP Email Studio", "Interactive email experiences");
+    addSectionDivider(pptx, theme, "Section 3", "AMP Email Studio", "Interactive email experiences", logoBase64);
 
     // Why Interactive Email
     const whyAmpSlide = pptx.addSlide();
@@ -727,7 +738,7 @@ export const exportToPPT = async (
   // SECTION 4: Inbox Diagnostics
   // ==========================================
   if (diagnosticsData) {
-    addSectionDivider(pptx, theme, "Section 4", "Inbox Diagnostics", "Campaign performance analysis");
+    addSectionDivider(pptx, theme, "Section 4", "Inbox Diagnostics", "Campaign performance analysis", logoBase64);
 
     // Performance slide
     const perfSlide = pptx.addSlide();
@@ -794,16 +805,12 @@ export const exportToPPT = async (
   const closingTextColor = luminance(theme.heroGradientStart) > 0.6 ? theme.textPrimary : "FFFFFF";
 
   // Logo on closing slide
-  if (theme.hasLogo && theme.logoUrl) {
-    try {
-      closingSlide.addImage({
-        path: theme.logoUrl,
-        x: 3.5, y: 0.8, w: 3.0, h: 1.0,
-        sizing: { type: "contain", w: 3.0, h: 1.0 },
-      });
-    } catch {
-      // fallback
-    }
+  if (logoBase64) {
+    closingSlide.addImage({
+      data: logoBase64,
+      x: 3.5, y: 0.8, w: 3.0, h: 1.0,
+      sizing: { type: "contain", w: 3.0, h: 1.0 },
+    });
   }
 
   closingSlide.addText("Thank You", {
