@@ -132,40 +132,85 @@ const luminance = (hex: string): number => {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 };
 
+const hexClean = (color: string | undefined): string => {
+  if (!color) return "";
+  return color.replace(/^#/, "").trim();
+};
+
+const isValidHex = (hex: string): boolean => /^[0-9a-fA-F]{6}$/.test(hex);
+
 const buildBrandTheme = (
   brandProfile?: CoreBrandJSON | null,
   industry?: string
 ): BrandTheme => {
-  if (!brandProfile?.brand_colors?.primary) return DEFAULT_THEME;
+  // Priority 1: brand_design_profile.colors
+  // Priority 2: brand_colors
+  // Priority 3: defaults
+  const designProfile = brandProfile?.brand_design_profile;
+  const brandColors = brandProfile?.brand_colors;
 
-  let primary = brandProfile.brand_colors.primary.replace("#", "");
-  let secondary = (brandProfile.brand_colors.secondary || brandProfile.brand_colors.accent || "").replace("#", "") || lighten(primary, 0.3);
-  const accent = (brandProfile.brand_colors.accent || "").replace("#", "") || lighten(primary, 0.5);
+  let primary = "";
+  let secondary = "";
+  let accent = "";
+
+  // Resolve from design profile first
+  if (designProfile?.colors) {
+    primary = hexClean(designProfile.colors.primary);
+    secondary = hexClean(designProfile.colors.secondary);
+    accent = hexClean(designProfile.colors.accent);
+  }
+
+  // Fallback to brand_colors
+  if (brandColors) {
+    if (!isValidHex(primary)) primary = hexClean(brandColors.primary);
+    if (!isValidHex(secondary)) secondary = hexClean(brandColors.secondary) || hexClean(brandColors.accent);
+    if (!isValidHex(accent)) accent = hexClean(brandColors.accent);
+  }
+
+  // If still no valid primary, use defaults
+  if (!isValidHex(primary)) return DEFAULT_THEME;
+
+  if (!isValidHex(secondary)) secondary = lighten(primary, 0.3);
+  if (!isValidHex(accent)) accent = lighten(primary, 0.5);
 
   // If primary is too bright (luminance > 0.75), desaturate 15%
   if (luminance(primary) > 0.75) {
     primary = desaturate(primary, 0.15);
   }
 
+  // Chart palette from design profile
+  let chartPrimary = primary;
+  let chartSecondary = secondary;
+  if (designProfile?.chart_palette) {
+    const cp = designProfile.chart_palette;
+    if (isValidHex(hexClean(cp.primary))) chartPrimary = hexClean(cp.primary);
+    if (isValidHex(hexClean(cp.secondary))) chartSecondary = hexClean(cp.secondary);
+  }
+
   // Industry-aware adjustments
-  const ind = (industry || brandProfile.brand_identity?.industry || "").toLowerCase();
+  const ind = (industry || brandProfile?.brand_identity?.industry || "").toLowerCase();
   const isFintech = ind.includes("fintech") || ind.includes("finance") || ind.includes("banking");
-  const isConsumer = ind.includes("consumer") || ind.includes("creator") || ind.includes("lifestyle");
 
   const headerBg = lighten(primary, isFintech ? 0.88 : 0.92);
   const altRowBg = lighten(primary, 0.96);
   const titleColor = isFintech ? "0F172A" : lighten(primary, -0.4) || "1E1B4B";
 
+  // Text colors from design profile
+  let textPrimary = "";
+  if (designProfile?.colors?.text_primary) textPrimary = hexClean(designProfile.colors.text_primary);
+  if (!isValidHex(textPrimary) && brandColors?.text_primary) textPrimary = hexClean(brandColors.text_primary);
+  const resolvedTitleColor = isValidHex(textPrimary) ? textPrimary : (luminance(primary) < 0.3 ? primary : titleColor);
+
   return {
     ...DEFAULT_THEME,
-    primary,
-    secondary,
+    primary: chartPrimary !== primary ? primary : primary,
+    secondary: chartSecondary !== secondary ? secondary : secondary,
     accent,
     headerBg,
     headerBgEnd: lighten(secondary, 0.92),
     altRowBg,
     bgAccent: lighten(secondary, 0.88),
-    titleColor: luminance(primary) < 0.3 ? primary : titleColor,
+    titleColor: resolvedTitleColor,
     bodyColor: isFintech ? "1E293B" : "374151",
   };
 };
@@ -397,18 +442,36 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fill: { color: theme.accent, transparency: 85 },
     });
 
-    // Brand logo placeholder (rounded rect)
-    s0.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-      x: 3.75, y: 0.6, w: 2.5, h: 1.2,
-      fill: { color: "FFFFFF", transparency: 80 },
-      line: { color: "FFFFFF", width: 1.5, dashType: "dash" },
-      rectRadius: 0.15,
-    });
-    s0.addText("LOGO", {
-      x: 3.75, y: 0.6, w: 2.5, h: 1.2,
-      fontSize: 14, color: "FFFFFF", fontFace: FONTS.body,
-      align: "center", valign: "middle", transparency: 50,
-    });
+    // Brand logo - use actual logo if available from design profile
+    const logoUrl = brandProfile?.brand_design_profile?.logo?.logo_url;
+    if (logoUrl) {
+      try {
+        s0.addImage({
+          path: logoUrl,
+          x: 3.5, y: 0.4, w: 3.0, h: 1.4,
+          sizing: { type: "contain", w: 3.0, h: 1.4 },
+        });
+      } catch {
+        s0.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+          x: 3.75, y: 0.6, w: 2.5, h: 1.2,
+          fill: { color: "FFFFFF", transparency: 80 },
+          line: { color: "FFFFFF", width: 1.5, dashType: "dash" },
+          rectRadius: 0.15,
+        });
+      }
+    } else {
+      s0.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x: 3.75, y: 0.6, w: 2.5, h: 1.2,
+        fill: { color: "FFFFFF", transparency: 80 },
+        line: { color: "FFFFFF", width: 1.5, dashType: "dash" },
+        rectRadius: 0.15,
+      });
+      s0.addText("LOGO", {
+        x: 3.75, y: 0.6, w: 2.5, h: 1.2,
+        fontSize: 14, color: "FFFFFF", fontFace: FONTS.body,
+        align: "center", valign: "middle", transparency: 50,
+      });
+    }
 
     // Deck title
     const deckBrandName = brandProfile?.brand_identity?.brand_name || brandName || "Email";
@@ -615,7 +678,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       valAxisLabelFontSize: 8,
       catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
       valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
-      chartColors: [theme.primary, theme.secondary, theme.amber, theme.red],
+      chartColors: [
+        (brandProfile?.brand_design_profile?.chart_palette?.primary || "").replace("#", "") || theme.primary,
+        (brandProfile?.brand_design_profile?.chart_palette?.secondary || "").replace("#", "") || theme.secondary,
+        theme.amber,
+        theme.red,
+      ],
     });
   } else {
     s3.addText("No monthly data available for trend chart", {
