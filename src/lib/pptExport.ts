@@ -114,6 +114,7 @@ const DEFAULT_SLIDE_THEME: BrandSlideTheme = {
   visualStyle: "minimal_graphics",
   ctaRadius: "8px",
   ctaFill: "solid",
+  visualAssets: null,
 };
 
 const hexClean = (color: string | undefined): string => {
@@ -248,6 +249,9 @@ const buildSlideTheme = (brandProfile?: CoreBrandJSON | null): BrandSlideTheme =
   const ctaRadius = designProfile?.cta_style?.radius || "8px";
   const ctaFill = designProfile?.cta_style?.fill || "solid";
 
+  // Visual assets
+  const visualAssets = brandProfile?.brand_visual_assets || null;
+
   return {
     primary,
     secondary,
@@ -268,6 +272,7 @@ const buildSlideTheme = (brandProfile?: CoreBrandJSON | null): BrandSlideTheme =
     visualStyle,
     ctaRadius,
     ctaFill,
+    visualAssets,
   };
 };
 
