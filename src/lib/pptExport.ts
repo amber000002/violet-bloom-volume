@@ -675,6 +675,7 @@ export const exportToPPT = async (
     // Volume Summary Slide
     const volumeSlide = pptx.addSlide();
     addBrandedBackground(volumeSlide, theme);
+    addDecorativeMotif(volumeSlide, theme, "corner");
     addSlideTitle(volumeSlide, "Volume Summary", theme);
 
     volumeSlide.addText(
@@ -723,6 +724,7 @@ export const exportToPPT = async (
     // Strategic Insight Slide
     const insightSlide = pptx.addSlide();
     addBrandedBackground(insightSlide, theme);
+    addDecorativeMotif(insightSlide, theme, "side");
     addSlideTitle(insightSlide, "Strategic Insight", theme);
     // Product imagery as subtle contextual visual
     if (productImageBase64) {
