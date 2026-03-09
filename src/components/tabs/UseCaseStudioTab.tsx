@@ -101,6 +101,113 @@ const stageToLabel = (stage: string): string => {
     .join(" ");
 };
 
+// ===== BRAND GROUP COLLAPSIBLE =====
+const BrandGroupCollapsible: React.FC<{
+  brandName: string;
+  host: string;
+  versions: BrandProfileVersion[];
+  activeBrandVersionId: string | null;
+  onSelect: (v: BrandProfileVersion) => void;
+  onView: (v: BrandProfileVersion) => void;
+  countSignals: (p: CoreBrandJSON | null) => number;
+  computeCompleteness: (p: CoreBrandJSON | null) => number;
+}> = ({ brandName, host, versions, activeBrandVersionId, onSelect, onView, countSignals, computeCompleteness }) => {
+  const [open, setOpen] = useState(false);
+  const hasActive = versions.some(v => v.brandProfileVersionId === activeBrandVersionId);
+
+  return (
+    <div className="border-b border-border last:border-b-0">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted/20 transition-colors ${hasActive ? "bg-primary/5" : ""}`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <User className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <span className="text-sm font-medium text-foreground truncate">{brandName}</span>
+          <span className="text-xs text-muted-foreground truncate">({host})</span>
+          <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium flex-shrink-0">
+            {versions.length} {versions.length === 1 ? "version" : "versions"}
+          </span>
+          {hasActive && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary flex-shrink-0">
+              <Check className="w-2.5 h-2.5" /> Active
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="divide-y divide-border/50 bg-muted/5">
+              {versions.map((v, idx) => {
+                const signals = countSignals(v.brandProfileJson);
+                const completeness = computeCompleteness(v.brandProfileJson);
+                const isActive = activeBrandVersionId === v.brandProfileVersionId;
+                return (
+                  <div key={v.brandProfileVersionId} className={`px-4 py-2.5 hover:bg-muted/10 transition-colors ${isActive ? "bg-primary/5" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Iteration {versions.length - idx}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                            v.confidence === "high" ? "bg-emerald-500/10 text-emerald-400"
+                              : v.confidence === "medium" ? "bg-amber-500/10 text-amber-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            {v.confidence}
+                          </span>
+                          {isActive && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                              <Check className="w-2.5 h-2.5" /> Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Activity className="w-3 h-3" />
+                            {signals} signals
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <BarChart3 className="w-3 h-3" />
+                            {completeness}% complete
+                          </span>
+                          <span>{new Date(v.generatedAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onSelect(v); }}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
+                        >
+                          <Check className="w-3 h-3" /> Use
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onView(v); }}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
+                        >
+                          <Eye className="w-3 h-3" /> View
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // ===== PERSONALIZED USE CASE CARD =====
 const UseCaseCard: React.FC<{
   useCase: PersonalizedUseCase;
