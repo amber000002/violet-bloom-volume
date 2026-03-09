@@ -529,25 +529,30 @@ export const exportToPPT = async (
     fill: { color: theme.accentGradientStart, transparency: 85 },
   });
 
+  // Hero image as subtle side illustration on title slide
+  if (heroImageBase64) {
+    addSideIllustration(titleSlide, heroImageBase64, "right", 20);
+  }
+
   const titleTextColor = luminance(theme.heroGradientStart) > 0.6 ? theme.textPrimary : "FFFFFF";
 
   // Logo on title slide
   if (logoBase64) {
     titleSlide.addImage({
       data: logoBase64,
-      x: 3.5, y: 0.5, w: 3.0, h: 1.2,
-      sizing: { type: "contain", w: 3.0, h: 1.2 },
+      x: 0.5, y: 0.5, w: 2.5, h: 1.0,
+      sizing: { type: "contain", w: 2.5, h: 1.0 },
     });
   }
 
   titleSlide.addText(brandName, {
-    x: 0.5, y: 2.0, w: 9, h: 1,
-    fontSize: 44, bold: true, color: titleTextColor, align: "center",
+    x: 0.5, y: 2.0, w: heroImageBase64 ? 6 : 9, h: 1,
+    fontSize: 44, bold: true, color: titleTextColor, align: heroImageBase64 ? "left" : "center",
     fontFace: FONTS.headline,
   });
   titleSlide.addText("Email Strategy Overview", {
-    x: 0.5, y: 3.2, w: 9, h: 0.5,
-    fontSize: 24, color: titleTextColor, align: "center",
+    x: 0.5, y: 3.2, w: heroImageBase64 ? 6 : 9, h: 0.5,
+    fontSize: 24, color: titleTextColor, align: heroImageBase64 ? "left" : "center",
     fontFace: FONTS.body, transparency: 15,
   });
   if (inboxData) {
