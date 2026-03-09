@@ -223,19 +223,57 @@ const FONTS = {
 };
 
 /** Fetch an external image URL as a base64 data URI for pptxgenjs embedding */
+/** Convert ArrayBuffer to base64 using chunked processing to avoid stack overflow */
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    for (let j = 0; j < chunk.length; j++) {
+      binary += String.fromCharCode(chunk[j]);
+    }
+  }
+  return btoa(binary);
+};
+
+/** Detect MIME type from ArrayBuffer magic bytes */
+const detectMimeType = (buffer: ArrayBuffer): string => {
+  const arr = new Uint8Array(buffer).subarray(0, 4);
+  let header = "";
+  for (let i = 0; i < arr.length; i++) header += arr[i].toString(16).padStart(2, "0");
+  if (header.startsWith("89504e47")) return "image/png";
+  if (header.startsWith("ffd8ff")) return "image/jpeg";
+  if (header.startsWith("47494638")) return "image/gif";
+  if (header.startsWith("52494646")) return "image/webp";
+  if (header.startsWith("3c737667") || header.startsWith("3c3f786d")) return "image/svg+xml";
+  return "image/png";
+};
+
 const fetchLogoAsBase64 = async (url: string): Promise<string | null> => {
+  if (!url || url.length < 5) return null;
   try {
+    // Try CORS fetch first
     const response = await fetch(url, { mode: "cors" });
     if (!response.ok) return null;
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength < 100) return null; // too small, likely error page
+    const mime = detectMimeType(buffer);
+    const base64 = arrayBufferToBase64(buffer);
+    return `data:${mime};base64,${base64}`;
   } catch {
-    return null;
+    // CORS failed — try no-cors as opaque (won't work for data but handles redirects)
+    try {
+      const resp2 = await fetch(url);
+      if (!resp2.ok) return null;
+      const buffer = await resp2.arrayBuffer();
+      if (buffer.byteLength < 100) return null;
+      const mime = detectMimeType(buffer);
+      const base64 = arrayBufferToBase64(buffer);
+      return `data:${mime};base64,${base64}`;
+    } catch {
+      return null;
+    }
   }
 };
 
