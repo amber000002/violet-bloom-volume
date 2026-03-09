@@ -127,11 +127,22 @@ serve(async (req) => {
     // Append event schema and user properties data for lifecycle/engagement enrichment
     let schemaContext = "";
     if (eventSchemaCSV && eventSchemaCSV.trim().length > 20) {
-      const eventLines = eventSchemaCSV.trim().split("\n").slice(0, 200);
-      schemaContext += `\n\n[EVENT SCHEMA - ${eventLines.length - 1} events]\n${eventLines.join("\n")}`;
+      // Deduplicate: keep only unique event names with first few properties
+      const eventLines = eventSchemaCSV.trim().split("\n");
+      const header = eventLines[0];
+      const seenEvents = new Set<string>();
+      const dedupedLines = [header];
+      for (let i = 1; i < eventLines.length && dedupedLines.length < 40; i++) {
+        const eventName = eventLines[i].split(",")[0]?.trim();
+        if (eventName && !seenEvents.has(eventName)) {
+          seenEvents.add(eventName);
+          dedupedLines.push(eventLines[i]);
+        }
+      }
+      schemaContext += `\n\n[EVENT SCHEMA - ${seenEvents.size} unique events]\n${dedupedLines.join("\n")}`;
     }
     if (userPropertiesCSV && userPropertiesCSV.trim().length > 20) {
-      const propLines = userPropertiesCSV.trim().split("\n").slice(0, 200);
+      const propLines = userPropertiesCSV.trim().split("\n").slice(0, 50);
       schemaContext += `\n\n[USER PROPERTIES SCHEMA - ${propLines.length - 1} properties]\n${propLines.join("\n")}`;
     }
 
@@ -197,26 +208,43 @@ ${combinedText}${schemaContext}`,
     try {
       parsed = JSON.parse(jsonStr);
     } catch (e1) {
-      // Attempt repair: balance braces if truncated
       console.error("JSON parse failed, attempting repair. First 300 chars:", jsonStr.substring(0, 300));
+      console.error("Last 200 chars:", jsonStr.substring(jsonStr.length - 200));
       try {
-        let open = 0, close = 0;
-        for (const ch of jsonStr) { if (ch === '{') open++; if (ch === '}') close++; }
+        // Step 1: If truncated mid-string, close the string
         let repaired = jsonStr;
-        if (open > close) repaired += '}'.repeat(open - close);
-        // Also try closing any open arrays
-        let openArr = 0, closeArr = 0;
-        for (const ch of repaired) { if (ch === '[') openArr++; if (ch === ']') closeArr++; }
-        if (openArr > closeArr) repaired = repaired.replace(/,?\s*$/, '') + ']'.repeat(openArr - closeArr) + '}'.repeat(Math.max(0, open - close));
-        // Re-balance after array fix
-        open = 0; close = 0;
-        for (const ch of repaired) { if (ch === '{') open++; if (ch === '}') close++; }
-        if (open > close) repaired += '}'.repeat(open - close);
+        // Remove any trailing incomplete escape sequence
+        repaired = repaired.replace(/\\$/, '');
+        // Count unescaped quotes to see if we're inside a string
+        let inString = false;
+        for (let i = 0; i < repaired.length; i++) {
+          if (repaired[i] === '\\' && inString) { i++; continue; }
+          if (repaired[i] === '"') inString = !inString;
+        }
+        if (inString) repaired += '"';
+        
+        // Step 2: Remove any trailing comma or colon (incomplete key-value)
+        repaired = repaired.replace(/[,:\s]+$/, '');
+        
+        // Step 3: Balance brackets and braces
+        let openArr = 0, closeArr = 0, openObj = 0, closeObj = 0;
+        let inStr = false;
+        for (let i = 0; i < repaired.length; i++) {
+          if (repaired[i] === '\\' && inStr) { i++; continue; }
+          if (repaired[i] === '"') { inStr = !inStr; continue; }
+          if (inStr) continue;
+          if (repaired[i] === '[') openArr++;
+          if (repaired[i] === ']') closeArr++;
+          if (repaired[i] === '{') openObj++;
+          if (repaired[i] === '}') closeObj++;
+        }
+        repaired += ']'.repeat(Math.max(0, openArr - closeArr));
+        repaired += '}'.repeat(Math.max(0, openObj - closeObj));
+        
         parsed = JSON.parse(repaired);
         console.log("JSON repair succeeded");
-      } catch {
-        // Last resort: truncate to last valid closing brace
-        console.error("JSON repair also failed, last 200 chars:", jsonStr.substring(jsonStr.length - 200));
+      } catch (e2) {
+        console.error("JSON repair also failed:", e2);
         throw new Error("Failed to parse brand profile JSON");
       }
     }
