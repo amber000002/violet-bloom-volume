@@ -427,6 +427,61 @@ const addSideIllustration = (
 
 // ============= SLIDE HELPERS =============
 
+/** Add decorative motif shapes based on brand visual style */
+const addDecorativeMotif = (
+  slide: pptxgen.Slide,
+  theme: BrandSlideTheme,
+  variant: "corner" | "side" | "diagonal" | "dots" = "corner"
+) => {
+  const motifColor = hexClean(theme.accentGradientStart);
+  const primaryColor = hexClean(theme.primary);
+  switch (variant) {
+    case "corner":
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 7.5, y: -1.5, w: 4, h: 4,
+        fill: { color: motifColor, transparency: 90 },
+      });
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: -0.5, y: 4.2, w: 2, h: 2,
+        fill: { color: primaryColor, transparency: 92 },
+      });
+      break;
+    case "side":
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 9.6, y: 0, w: 0.4, h: 5.625,
+        fill: { color: motifColor, transparency: 80 },
+      });
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 8.8, y: 4.5, w: 0.6, h: 0.6,
+        fill: { color: primaryColor, transparency: 85 },
+      });
+      break;
+    case "diagonal":
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 6.5, y: -1, w: 6, h: 1.2,
+        fill: { color: motifColor, transparency: 92 },
+        rotate: -15,
+      });
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 7, y: -0.3, w: 5.5, h: 0.6,
+        fill: { color: primaryColor, transparency: 94 },
+        rotate: -15,
+      });
+      break;
+    case "dots":
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+            x: 8.2 + i * 0.5, y: 3.8 + j * 0.5,
+            w: 0.15, h: 0.15,
+            fill: { color: motifColor, transparency: 85 },
+          });
+        }
+      }
+      break;
+  }
+};
+
 const addBrandedBackground = (slide: pptxgen.Slide, theme: BrandSlideTheme) => {
   slide.background = { color: theme.background };
   // Subtle brand accent glow
