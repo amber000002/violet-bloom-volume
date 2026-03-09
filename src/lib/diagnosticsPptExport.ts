@@ -11,7 +11,7 @@ import {
   ProviderAggregate,
   TopCampaign,
 } from "./csvAnalyzer";
-import { CoreBrandJSON } from "@/types/brandProfile";
+import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
 
 // ============= TYPES =============
 
