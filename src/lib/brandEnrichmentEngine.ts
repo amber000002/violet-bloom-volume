@@ -144,6 +144,16 @@ const ALL_FIELDS: string[] = [
   "brand_design_profile.cta_style",
   "brand_design_profile.chart_palette",
   "brand_design_profile.logo",
+  // brand_visual_assets (9)
+  "brand_visual_assets.hero_images",
+  "brand_visual_assets.product_imagery",
+  "brand_visual_assets.background_motifs",
+  "brand_visual_assets.decorative_patterns",
+  "brand_visual_assets.icon_style",
+  "brand_visual_assets.illustration_style",
+  "brand_visual_assets.photography_style",
+  "brand_visual_assets.icon_library",
+  "brand_visual_assets.category_visuals",
 ];
 
 function getNestedValue(obj: any, path: string): any {
