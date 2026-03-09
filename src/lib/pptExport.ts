@@ -633,6 +633,13 @@ export const exportToPPT = async (
     const insightSlide = pptx.addSlide();
     addBrandedBackground(insightSlide, theme);
     addSlideTitle(insightSlide, "Strategic Insight", theme);
+    // Product imagery as subtle contextual visual
+    if (productImageBase64) {
+      addSubtleBackgroundImage(insightSlide, productImageBase64, "bottom-right", 8);
+    }
+
+    // Constrain content to ~65% width when visual assets present
+    const insightContentW = productImageBase64 ? 6.5 : 9.2;
 
     const insights = [
       { label: "What drives volume", text: inboxData.purchaseCycle },
