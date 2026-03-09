@@ -648,9 +648,9 @@ export const exportToPPT = async (
     ];
 
     insights.forEach((insight, i) => {
-      // Insight callout card with accent gradient
+      // Insight callout card with accent gradient — 70% table area rule
       insightSlide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: 0.4, y: 1.4 + i * 1.4, w: 9.2, h: 1.2,
+        x: 0.4, y: 1.4 + i * 1.4, w: insightContentW, h: 1.2,
         fill: { color: theme.accentGradientStart, transparency: 92 },
         line: { color: lighten(theme.primary, 0.8), width: 0.5 },
         rectRadius: 0.06,
