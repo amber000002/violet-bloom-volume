@@ -90,6 +90,8 @@ interface BrandSlideTheme {
   visualStyle: string;
   ctaRadius: string;
   ctaFill: string;
+  // Visual asset references
+  visualAssets: BrandVisualAssets | null;
 }
 
 const DEFAULT_SLIDE_THEME: BrandSlideTheme = {
