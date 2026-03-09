@@ -1325,6 +1325,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const s12 = pptx.addSlide();
   addSlideBackground(s12, theme);
   addSlideHeader(s12, "Key Learnings & Recommendations", theme, undefined, slideNum);
+  // Subtle product context
+  if (productImageBase64) {
+    s12.addImage({
+      data: productImageBase64,
+      x: 7, y: 3.5, w: 3, h: 2,
+      sizing: { type: "contain", w: 3, h: 2 },
+      transparency: 92,
+    });
+  }
 
   if (intelligentLearnings && intelligentLearnings.length > 0) {
     const klRows: pptxgen.TableRow[] = [
