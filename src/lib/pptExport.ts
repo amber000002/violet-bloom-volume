@@ -406,7 +406,8 @@ const addSectionDivider = (
   sectionNumber: string,
   title: string,
   subtitle: string,
-  logoBase64: string | null
+  logoBase64: string | null,
+  motifBase64?: string | null
 ) => {
   const slide = pptx.addSlide();
 
@@ -416,6 +417,11 @@ const addSectionDivider = (
     x: 0, y: 0, w: 10, h: 5.625,
     fill: { color: theme.heroGradientEnd, transparency: 60 },
   });
+
+  // Subtle motif background pattern on section dividers
+  if (motifBase64) {
+    addSubtleBackgroundImage(slide, motifBase64, "full", 7);
+  }
 
   // Accent gradient panel
   slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
