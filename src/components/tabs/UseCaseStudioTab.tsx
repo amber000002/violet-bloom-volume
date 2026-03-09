@@ -158,13 +158,18 @@ const BrandGroupCollapsible: React.FC<{
                           <span className="text-xs font-medium text-muted-foreground">
                             Iteration {versions.length - idx}
                           </span>
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                            v.confidence === "high" ? "bg-emerald-500/10 text-emerald-400"
-                              : v.confidence === "medium" ? "bg-amber-500/10 text-amber-400"
-                              : "bg-muted text-muted-foreground"
-                          }`}>
-                            {v.confidence}
-                          </span>
+                          {(() => {
+                            const qualityLabel = completeness >= 75 ? "high" : completeness >= 45 ? "medium" : "low";
+                            return (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                                qualityLabel === "high" ? "bg-emerald-500/10 text-emerald-400"
+                                  : qualityLabel === "medium" ? "bg-amber-500/10 text-amber-400"
+                                  : "bg-destructive/10 text-destructive"
+                              }`}>
+                                {qualityLabel} quality
+                              </span>
+                            );
+                          })()}
                           {isActive && (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                               <Check className="w-2.5 h-2.5" /> Active
