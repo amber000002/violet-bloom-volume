@@ -5,7 +5,7 @@
  * following 7 merge rules from the PRD.
  */
 
-import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
+import { CoreBrandJSON, BrandDesignProfile, BrandVisualAssets } from "@/types/brandProfile";
 
 // ========== HELPERS ==========
 
@@ -144,6 +144,16 @@ const ALL_FIELDS: string[] = [
   "brand_design_profile.cta_style",
   "brand_design_profile.chart_palette",
   "brand_design_profile.logo",
+  // brand_visual_assets (9)
+  "brand_visual_assets.hero_images",
+  "brand_visual_assets.product_imagery",
+  "brand_visual_assets.background_motifs",
+  "brand_visual_assets.decorative_patterns",
+  "brand_visual_assets.icon_style",
+  "brand_visual_assets.illustration_style",
+  "brand_visual_assets.photography_style",
+  "brand_visual_assets.icon_library",
+  "brand_visual_assets.category_visuals",
 ];
 
 function getNestedValue(obj: any, path: string): any {
@@ -371,6 +381,25 @@ export function mergeProfiles(
         result.extraction_metadata.warnings || [],
         incoming.extraction_metadata.warnings || []
       );
+    }
+  }
+
+  // --- brand_visual_assets (merge arrays, fill missing string fields) ---
+  if (incoming.brand_visual_assets) {
+    if (!result.brand_visual_assets) {
+      result.brand_visual_assets = incoming.brand_visual_assets;
+    } else {
+      const ev = result.brand_visual_assets;
+      const nv = incoming.brand_visual_assets;
+      ev.hero_images = mergeArrays(ev.hero_images || [], nv.hero_images || []);
+      ev.product_imagery = mergeArrays(ev.product_imagery || [], nv.product_imagery || []);
+      ev.background_motifs = mergeArrays(ev.background_motifs || [], nv.background_motifs || []);
+      ev.decorative_patterns = mergeArrays(ev.decorative_patterns || [], nv.decorative_patterns || []);
+      ev.icon_library = mergeArrays(ev.icon_library || [], nv.icon_library || []);
+      ev.category_visuals = mergeArrays(ev.category_visuals || [], nv.category_visuals || []);
+      if (!ev.icon_style && nv.icon_style) ev.icon_style = nv.icon_style;
+      if (!ev.illustration_style && nv.illustration_style) ev.illustration_style = nv.illustration_style;
+      if (!ev.photography_style && nv.photography_style) ev.photography_style = nv.photography_style;
     }
   }
 

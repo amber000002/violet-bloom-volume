@@ -1,6 +1,6 @@
 import pptxgen from "pptxgenjs";
 import { buildExportFileName } from "./exportFileNameUtils";
-import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
+import { CoreBrandJSON, BrandDesignProfile, BrandVisualAssets } from "@/types/brandProfile";
 
 // ============= TYPES =============
 
@@ -90,6 +90,8 @@ interface BrandSlideTheme {
   visualStyle: string;
   ctaRadius: string;
   ctaFill: string;
+  // Visual asset references
+  visualAssets: BrandVisualAssets | null;
 }
 
 const DEFAULT_SLIDE_THEME: BrandSlideTheme = {
@@ -112,6 +114,7 @@ const DEFAULT_SLIDE_THEME: BrandSlideTheme = {
   visualStyle: "minimal_graphics",
   ctaRadius: "8px",
   ctaFill: "solid",
+  visualAssets: null,
 };
 
 const hexClean = (color: string | undefined): string => {
@@ -246,6 +249,9 @@ const buildSlideTheme = (brandProfile?: CoreBrandJSON | null): BrandSlideTheme =
   const ctaRadius = designProfile?.cta_style?.radius || "8px";
   const ctaFill = designProfile?.cta_style?.fill || "solid";
 
+  // Visual assets
+  const visualAssets = brandProfile?.brand_visual_assets || null;
+
   return {
     primary,
     secondary,
@@ -266,6 +272,7 @@ const buildSlideTheme = (brandProfile?: CoreBrandJSON | null): BrandSlideTheme =
     visualStyle,
     ctaRadius,
     ctaFill,
+    visualAssets,
   };
 };
 
@@ -310,6 +317,78 @@ const fetchLogoAsBase64 = async (url: string): Promise<string | null> => {
   }
 };
 
+/** Fetch multiple image URLs as base64, returning a map of url -> base64 data URI */
+const fetchImagesAsBase64 = async (urls: string[]): Promise<Map<string, string>> => {
+  const map = new Map<string, string>();
+  if (!urls || urls.length === 0) return map;
+  const uniqueUrls = [...new Set(urls)].slice(0, 5);
+  await Promise.allSettled(uniqueUrls.map(async (url) => {
+    const b64 = await fetchLogoAsBase64(url);
+    if (b64) map.set(url, b64);
+  }));
+  return map;
+};
+
+/** Add a subtle background image (5-12% opacity) as a watermark/motif layer */
+const addSubtleBackgroundImage = (
+  slide: pptxgen.Slide,
+  imageBase64: string,
+  position: "full" | "right" | "bottom-right" = "right",
+  opacity: number = 8
+) => {
+  const transparency = 100 - Math.max(5, Math.min(12, opacity));
+  switch (position) {
+    case "full":
+      slide.addImage({
+        data: imageBase64,
+        x: 0, y: 0, w: 10, h: 5.625,
+        sizing: { type: "cover", w: 10, h: 5.625 },
+        transparency,
+      });
+      break;
+    case "right":
+      slide.addImage({
+        data: imageBase64,
+        x: 6, y: 0.5, w: 4, h: 4.5,
+        sizing: { type: "contain", w: 4, h: 4.5 },
+        transparency,
+      });
+      break;
+    case "bottom-right":
+      slide.addImage({
+        data: imageBase64,
+        x: 7, y: 3.5, w: 3, h: 2,
+        sizing: { type: "contain", w: 3, h: 2 },
+        transparency,
+      });
+      break;
+  }
+};
+
+/** Add a visible side illustration for title/recommendation slides */
+const addSideIllustration = (
+  slide: pptxgen.Slide,
+  imageBase64: string,
+  side: "right" | "left" = "right",
+  transparency: number = 15
+) => {
+  if (side === "right") {
+    slide.addImage({
+      data: imageBase64,
+      x: 6.5, y: 1.2, w: 3.2, h: 3.6,
+      sizing: { type: "contain", w: 3.2, h: 3.6 },
+      transparency,
+    });
+  } else {
+    slide.addImage({
+      data: imageBase64,
+      x: 0.3, y: 1.2, w: 3.2, h: 3.6,
+      sizing: { type: "contain", w: 3.2, h: 3.6 },
+      transparency,
+    });
+  }
+};
+
 // ============= SLIDE HELPERS =============
 
 const addBrandedBackground = (slide: pptxgen.Slide, theme: BrandSlideTheme) => {
@@ -327,7 +406,8 @@ const addSectionDivider = (
   sectionNumber: string,
   title: string,
   subtitle: string,
-  logoBase64: string | null
+  logoBase64: string | null,
+  motifBase64?: string | null
 ) => {
   const slide = pptx.addSlide();
 
@@ -337,6 +417,11 @@ const addSectionDivider = (
     x: 0, y: 0, w: 10, h: 5.625,
     fill: { color: theme.heroGradientEnd, transparency: 60 },
   });
+
+  // Subtle motif background pattern on section dividers
+  if (motifBase64) {
+    addSubtleBackgroundImage(slide, motifBase64, "full", 7);
+  }
 
   // Accent gradient panel
   slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
@@ -409,6 +494,23 @@ export const exportToPPT = async (
     logoBase64 = await fetchLogoAsBase64(theme.logoUrl);
   }
 
+  // Pre-fetch visual assets as base64
+  let heroImageBase64: string | null = null;
+  let productImageBase64: string | null = null;
+  const va = theme.visualAssets;
+  if (va) {
+    const allImageUrls = [...(va.hero_images || []).slice(0, 2), ...(va.product_imagery || []).slice(0, 2)];
+    const imageMap = await fetchImagesAsBase64(allImageUrls);
+    // Get first successful hero image
+    for (const url of (va.hero_images || [])) {
+      if (imageMap.has(url)) { heroImageBase64 = imageMap.get(url)!; break; }
+    }
+    // Get first successful product image
+    for (const url of (va.product_imagery || [])) {
+      if (imageMap.has(url)) { productImageBase64 = imageMap.get(url)!; break; }
+    }
+  }
+
   const pptx = new pptxgen();
   const brandName = brandProfile?.brand_identity?.brand_name || "Inbox Alchemy";
 
@@ -433,25 +535,30 @@ export const exportToPPT = async (
     fill: { color: theme.accentGradientStart, transparency: 85 },
   });
 
+  // Hero image as subtle side illustration on title slide
+  if (heroImageBase64) {
+    addSideIllustration(titleSlide, heroImageBase64, "right", 20);
+  }
+
   const titleTextColor = luminance(theme.heroGradientStart) > 0.6 ? theme.textPrimary : "FFFFFF";
 
   // Logo on title slide
   if (logoBase64) {
     titleSlide.addImage({
       data: logoBase64,
-      x: 3.5, y: 0.5, w: 3.0, h: 1.2,
-      sizing: { type: "contain", w: 3.0, h: 1.2 },
+      x: 0.5, y: 0.5, w: 2.5, h: 1.0,
+      sizing: { type: "contain", w: 2.5, h: 1.0 },
     });
   }
 
   titleSlide.addText(brandName, {
-    x: 0.5, y: 2.0, w: 9, h: 1,
-    fontSize: 44, bold: true, color: titleTextColor, align: "center",
+    x: 0.5, y: 2.0, w: heroImageBase64 ? 6 : 9, h: 1,
+    fontSize: 44, bold: true, color: titleTextColor, align: heroImageBase64 ? "left" : "center",
     fontFace: FONTS.headline,
   });
   titleSlide.addText("Email Strategy Overview", {
-    x: 0.5, y: 3.2, w: 9, h: 0.5,
-    fontSize: 24, color: titleTextColor, align: "center",
+    x: 0.5, y: 3.2, w: heroImageBase64 ? 6 : 9, h: 0.5,
+    fontSize: 24, color: titleTextColor, align: heroImageBase64 ? "left" : "center",
     fontFace: FONTS.body, transparency: 15,
   });
   if (inboxData) {
@@ -472,7 +579,7 @@ export const exportToPPT = async (
   // SECTION 1: Inbox Potential
   // ==========================================
   if (inboxData) {
-    addSectionDivider(pptx, theme, "Section 1", "Responsible Inbox Potential", "Industry-aligned monthly email scale", logoBase64);
+    addSectionDivider(pptx, theme, "Section 1", "Responsible Inbox Potential", "Industry-aligned monthly email scale", logoBase64, heroImageBase64);
 
     // Volume Summary Slide
     const volumeSlide = pptx.addSlide();
@@ -526,6 +633,13 @@ export const exportToPPT = async (
     const insightSlide = pptx.addSlide();
     addBrandedBackground(insightSlide, theme);
     addSlideTitle(insightSlide, "Strategic Insight", theme);
+    // Product imagery as subtle contextual visual
+    if (productImageBase64) {
+      addSubtleBackgroundImage(insightSlide, productImageBase64, "bottom-right", 8);
+    }
+
+    // Constrain content to ~65% width when visual assets present
+    const insightContentW = productImageBase64 ? 6.5 : 9.2;
 
     const insights = [
       { label: "What drives volume", text: inboxData.purchaseCycle },
@@ -534,9 +648,9 @@ export const exportToPPT = async (
     ];
 
     insights.forEach((insight, i) => {
-      // Insight callout card with accent gradient
+      // Insight callout card with accent gradient — 70% table area rule
       insightSlide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: 0.4, y: 1.4 + i * 1.4, w: 9.2, h: 1.2,
+        x: 0.4, y: 1.4 + i * 1.4, w: insightContentW, h: 1.2,
         fill: { color: theme.accentGradientStart, transparency: 92 },
         line: { color: lighten(theme.primary, 0.8), width: 0.5 },
         rectRadius: 0.06,
@@ -564,7 +678,7 @@ export const exportToPPT = async (
   // SECTION 2: Use Case Studio
   // ==========================================
   if (useCaseData) {
-    addSectionDivider(pptx, theme, "Section 2", "Use Case Studio", "Framework-driven lifecycle journeys & campaigns", logoBase64);
+    addSectionDivider(pptx, theme, "Section 2", "Use Case Studio", "Framework-driven lifecycle journeys & campaigns", logoBase64, heroImageBase64);
 
     // Framework Slide
     const frameworkSlide = pptx.addSlide();
@@ -638,7 +752,7 @@ export const exportToPPT = async (
   // SECTION 3: AMP Email Studio
   // ==========================================
   if (ampData) {
-    addSectionDivider(pptx, theme, "Section 3", "AMP Email Studio", "Interactive email experiences", logoBase64);
+    addSectionDivider(pptx, theme, "Section 3", "AMP Email Studio", "Interactive email experiences", logoBase64, heroImageBase64);
 
     // Why Interactive Email
     const whyAmpSlide = pptx.addSlide();
@@ -738,7 +852,7 @@ export const exportToPPT = async (
   // SECTION 4: Inbox Diagnostics
   // ==========================================
   if (diagnosticsData) {
-    addSectionDivider(pptx, theme, "Section 4", "Inbox Diagnostics", "Campaign performance analysis", logoBase64);
+    addSectionDivider(pptx, theme, "Section 4", "Inbox Diagnostics", "Campaign performance analysis", logoBase64, heroImageBase64);
 
     // Performance slide
     const perfSlide = pptx.addSlide();
@@ -801,6 +915,11 @@ export const exportToPPT = async (
     x: 0, y: 0, w: 10, h: 5.625,
     fill: { color: theme.heroGradientEnd, transparency: 55 },
   });
+
+  // Subtle hero motif on closing slide
+  if (heroImageBase64) {
+    addSubtleBackgroundImage(closingSlide, heroImageBase64, "full", 6);
+  }
 
   const closingTextColor = luminance(theme.heroGradientStart) > 0.6 ? theme.textPrimary : "FFFFFF";
 

@@ -37,6 +37,18 @@ export interface BrandDesignProfile {
   };
 }
 
+export interface BrandVisualAssets {
+  hero_images: string[];
+  product_imagery: string[];
+  background_motifs: string[];
+  decorative_patterns: string[];
+  icon_style: string;
+  illustration_style: string;
+  photography_style: string;
+  icon_library: string[];
+  category_visuals: string[];
+}
+
 export interface CoreBrandJSON {
   brand_identity: {
     brand_name: string;
@@ -137,6 +149,8 @@ export interface CoreBrandJSON {
   };
 
   brand_design_profile?: BrandDesignProfile;
+
+  brand_visual_assets?: BrandVisualAssets;
 
   extraction_metadata?: {
     source_mode: "url_only" | "url_plus_text" | "text_only";

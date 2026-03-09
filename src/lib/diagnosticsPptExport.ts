@@ -11,7 +11,7 @@ import {
   ProviderAggregate,
   TopCampaign,
 } from "./csvAnalyzer";
-import { CoreBrandJSON } from "@/types/brandProfile";
+import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
 
 // ============= TYPES =============
 
@@ -428,6 +428,24 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     logoBase64 = await fetchLogoAsBase64(logoUrl);
   }
 
+  // Pre-fetch visual assets as base64
+  let heroImageBase64: string | null = null;
+  let productImageBase64: string | null = null;
+  const va = brandProfile?.brand_visual_assets;
+  if (va) {
+    const allUrls = [...(va.hero_images || []).slice(0, 2), ...(va.product_imagery || []).slice(0, 2)];
+    const fetches = await Promise.allSettled(allUrls.map(url => fetchLogoAsBase64(url)));
+    for (let i = 0; i < (va.hero_images || []).length && i < 2; i++) {
+      const r = fetches[i];
+      if (r.status === "fulfilled" && r.value) { heroImageBase64 = r.value; break; }
+    }
+    const productStart = Math.min((va.hero_images || []).length, 2);
+    for (let i = productStart; i < fetches.length; i++) {
+      const r = fetches[i];
+      if (r.status === "fulfilled" && r.value) { productImageBase64 = r.value; break; }
+    }
+  }
+
   const pptx = new pptxgen();
   pptx.author = "Inbox Diagnostics";
   pptx.title = `${brandName} – Email Diagnostics Executive Deck`;
@@ -466,11 +484,21 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fill: { color: theme.accent, transparency: 85 },
     });
 
-    // Brand logo
+    // Subtle hero image as background motif on cover
+    if (heroImageBase64) {
+      s0.addImage({
+        data: heroImageBase64,
+        x: 0, y: 0, w: 10, h: 5.625,
+        sizing: { type: "cover", w: 10, h: 5.625 },
+        transparency: 93,
+      });
+    }
+
+    // Brand logo — left-aligned when hero image present
     if (logoBase64) {
       s0.addImage({
         data: logoBase64,
-        x: 3.5, y: 0.4, w: 3.0, h: 1.4,
+        x: heroImageBase64 ? 0.5 : 3.5, y: 0.4, w: 3.0, h: 1.4,
         sizing: { type: "contain", w: 3.0, h: 1.4 },
       });
     } else {
@@ -943,6 +971,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const s7 = pptx.addSlide();
   addSlideBackground(s7, theme);
   addSlideHeader(s7, "Root Cause Summary", theme, undefined, slideNum);
+  // Subtle product imagery on insight slides
+  if (productImageBase64) {
+    s7.addImage({
+      data: productImageBase64,
+      x: 7, y: 3.5, w: 3, h: 2,
+      sizing: { type: "contain", w: 3, h: 2 },
+      transparency: 92,
+    });
+  }
 
   if (rootCauseEntries && rootCauseEntries.length > 0) {
     const cardY = 1.3;
@@ -1288,6 +1325,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const s12 = pptx.addSlide();
   addSlideBackground(s12, theme);
   addSlideHeader(s12, "Key Learnings & Recommendations", theme, undefined, slideNum);
+  // Subtle product context
+  if (productImageBase64) {
+    s12.addImage({
+      data: productImageBase64,
+      x: 7, y: 3.5, w: 3, h: 2,
+      sizing: { type: "contain", w: 3, h: 2 },
+      transparency: 92,
+    });
+  }
 
   if (intelligentLearnings && intelligentLearnings.length > 0) {
     const klRows: pptxgen.TableRow[] = [
