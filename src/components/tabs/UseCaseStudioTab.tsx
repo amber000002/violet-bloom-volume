@@ -28,6 +28,7 @@ import {
   loadAllRecentBrandVersions,
   BrandProfileVersion,
 } from "@/lib/brandProfileVersionService";
+import { computeCompletenessScore } from "@/lib/brandEnrichmentEngine";
 import {
   industryConfigs,
   JourneyUseCase,
@@ -1093,26 +1094,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
                     const computeCompleteness = (profile: CoreBrandJSON | null): number => {
                       if (!profile) return 0;
-                      const fields = [
-                        "brand_identity.brand_name", "brand_identity.tagline", "brand_identity.positioning", "brand_identity.tone_of_voice",
-                        "business_model.business_model_description", "business_model.monetization_model",
-                        "product_ecosystem.core_products", "product_ecosystem.feature_modules",
-                        "audience_intelligence.primary_segments", "audience_intelligence.personas_detected",
-                        "value_framework.value_propositions", "value_framework.differentiators",
-                        "engagement_architecture.engagement_drivers", "engagement_architecture.seasonal_triggers",
-                        "lifecycle_signal_map.key_user_actions", "lifecycle_signal_map.activation_events", "lifecycle_signal_map.churn_signals",
-                        "kpi_framework.primary_kpis",
-                        "tech_scale_layer.supported_channels",
-                        "industry_signal_layer.industry_kpis",
-                      ];
-                      let populated = 0;
-                      fields.forEach(path => {
-                        const parts = path.split(".");
-                        let val: any = profile;
-                        for (const p of parts) { val = val?.[p]; }
-                        if (val !== undefined && val !== null && val !== "" && !(Array.isArray(val) && val.length === 0)) populated++;
-                      });
-                      return Math.round((populated / fields.length) * 100);
+                      return computeCompletenessScore(profile);
                     };
 
                     return Array.from(grouped.entries()).map(([host, group]) => (
