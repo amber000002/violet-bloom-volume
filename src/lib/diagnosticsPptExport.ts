@@ -968,6 +968,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s5 = pptx.addSlide();
   addSlideBackground(s5, theme);
+  addDecorativeMotif(s5, theme, "dots");
   addSlideHeader(s5, "Reputation Scorecard", theme, undefined, slideNum);
 
   if (signalHealthData && signalHealthData.length > 0) {
@@ -1016,6 +1017,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s6 = pptx.addSlide();
   addSlideBackground(s6, theme);
+  addDecorativeMotif(s6, theme, "corner");
   addSlideHeader(s6, "Reputation Trends", theme, undefined, slideNum);
 
   if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
@@ -1108,15 +1110,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s7 = pptx.addSlide();
   addSlideBackground(s7, theme);
+  addDecorativeMotif(s7, theme, "side");
   addSlideHeader(s7, "Root Cause Summary", theme, undefined, slideNum);
   // Subtle product imagery on insight slides
   if (productImageBase64) {
-    s7.addImage({
-      data: productImageBase64,
-      x: 7, y: 3.5, w: 3, h: 2,
-      sizing: { type: "contain", w: 3, h: 2 },
-      transparency: 92,
-    });
+    addSubtleWatermark(s7, productImageBase64, "bottom-right", 90);
   }
 
   if (rootCauseEntries && rootCauseEntries.length > 0) {
@@ -1310,6 +1308,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s10 = pptx.addSlide();
   addSlideBackground(s10, theme);
+  addDecorativeMotif(s10, theme, "diagonal");
+  if (heroImageBase64) addSubtleWatermark(s10, heroImageBase64, "bottom-right", 92);
   addSlideHeader(s10, "Send Mix & Use Case Coverage", theme, undefined, slideNum);
 
   const enhRep = diagnostics.reputationReport?.enhancedReport;
@@ -1397,6 +1397,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s11 = pptx.addSlide();
   addSlideBackground(s11, theme);
+  addDecorativeMotif(s11, theme, "dots");
   addSlideHeader(s11, "Lifecycle Coverage Matrix", theme, undefined, slideNum);
 
   // Build a simplified lifecycle stage distribution from campaign data
