@@ -484,11 +484,21 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fill: { color: theme.accent, transparency: 85 },
     });
 
-    // Brand logo
+    // Subtle hero image as background motif on cover
+    if (heroImageBase64) {
+      s0.addImage({
+        data: heroImageBase64,
+        x: 0, y: 0, w: 10, h: 5.625,
+        sizing: { type: "cover", w: 10, h: 5.625 },
+        transparency: 93,
+      });
+    }
+
+    // Brand logo — left-aligned when hero image present
     if (logoBase64) {
       s0.addImage({
         data: logoBase64,
-        x: 3.5, y: 0.4, w: 3.0, h: 1.4,
+        x: heroImageBase64 ? 0.5 : 3.5, y: 0.4, w: 3.0, h: 1.4,
         sizing: { type: "contain", w: 3.0, h: 1.4 },
       });
     } else {
