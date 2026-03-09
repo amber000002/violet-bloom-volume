@@ -150,6 +150,8 @@ export interface CoreBrandJSON {
 
   brand_design_profile?: BrandDesignProfile;
 
+  brand_visual_assets?: BrandVisualAssets;
+
   extraction_metadata?: {
     source_mode: "url_only" | "url_plus_text" | "text_only";
     pages_crawled: string[];
