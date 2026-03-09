@@ -488,6 +488,23 @@ export const exportToPPT = async (
     logoBase64 = await fetchLogoAsBase64(theme.logoUrl);
   }
 
+  // Pre-fetch visual assets as base64
+  let heroImageBase64: string | null = null;
+  let productImageBase64: string | null = null;
+  const va = theme.visualAssets;
+  if (va) {
+    const allImageUrls = [...(va.hero_images || []).slice(0, 2), ...(va.product_imagery || []).slice(0, 2)];
+    const imageMap = await fetchImagesAsBase64(allImageUrls);
+    // Get first successful hero image
+    for (const url of (va.hero_images || [])) {
+      if (imageMap.has(url)) { heroImageBase64 = imageMap.get(url)!; break; }
+    }
+    // Get first successful product image
+    for (const url of (va.product_imagery || [])) {
+      if (imageMap.has(url)) { productImageBase64 = imageMap.get(url)!; break; }
+    }
+  }
+
   const pptx = new pptxgen();
   const brandName = brandProfile?.brand_identity?.brand_name || "Inbox Alchemy";
 
