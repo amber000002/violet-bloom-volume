@@ -280,7 +280,134 @@ ${designSignals}`,
       parsed.brand_design_profile = designProfile;
     }
 
-    return new Response(JSON.stringify({ success: true, data: parsed, brand_design_profile: designProfile }), {
+    // ===== STEP 3: Brand Visual Assets extraction =====
+    let visualAssets = null;
+    if (designRawHtml.length > 500) {
+      try {
+        // Extract image URLs, SVG icons, background patterns from HTML
+        const imgTags = [...designRawHtml.matchAll(/<img[^>]+src="([^"]+)"[^>]*>/gi)]
+          .map(m => ({ src: m[1], context: m[0] }))
+          .filter(m => !m.src.includes("data:") && !m.src.includes("tracking") && !m.src.includes("pixel"));
+
+        const heroSignals = imgTags
+          .filter(m => /hero|banner|header|main|splash|featured|cover/i.test(m.context))
+          .map(m => m.src)
+          .slice(0, 5);
+
+        const productSignals = imgTags
+          .filter(m => /product|item|card|catalog|shop|collection|bouquet|gift/i.test(m.context))
+          .map(m => m.src)
+          .slice(0, 8);
+
+        const bgPatterns = [...designRawHtml.matchAll(/background(?:-image)?\s*:\s*url\(['"]?([^'")\s]+)['"]?\)/gi)]
+          .map(m => m[1])
+          .filter(u => !u.includes("data:image/svg+xml") || u.length < 500)
+          .slice(0, 5);
+
+        const svgIcons = [...designRawHtml.matchAll(/<svg[^>]*class="([^"]*)"[^>]*>/gi)]
+          .map(m => m[1])
+          .filter(c => /icon|ico|symbol|glyph/i.test(c))
+          .slice(0, 10);
+
+        // Use AI to classify visual style
+        const visualClassResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              {
+                role: "system",
+                content: `You are a visual asset classifier. Given image URLs and HTML context from a website, classify the visual style. Return ONLY valid JSON, no markdown fences.`,
+              },
+              {
+                role: "user",
+                content: `Classify visual assets for "${websiteUrl}" (industry: ${industry}).
+
+Hero images found: ${JSON.stringify(heroSignals.slice(0, 3))}
+Product images found: ${JSON.stringify(productSignals.slice(0, 3))}
+Background patterns found: ${JSON.stringify(bgPatterns.slice(0, 3))}
+SVG icon classes: ${JSON.stringify(svgIcons.slice(0, 5))}
+
+Return this JSON:
+{"icon_style":"","illustration_style":"","photography_style":"","background_motifs":[],"decorative_patterns":[],"category_visuals":[]}
+
+Rules:
+- icon_style: "minimal_outline", "filled_solid", "duotone", "hand_drawn", or ""
+- illustration_style: "flat_vector", "isometric", "hand_drawn", "3d_render", "none", or ""
+- photography_style: "vibrant_product", "lifestyle", "studio_minimal", "editorial", "stock_generic", or ""
+- background_motifs: describe any repeating visual motifs (e.g., "floral pattern", "geometric grid", "wave lines")
+- decorative_patterns: describe decorative elements (e.g., "petal overlay", "dot grid", "gradient mesh")
+- category_visuals: list product/content categories detected (e.g., "bouquets", "gift baskets", "roses")`,
+              },
+            ],
+            temperature: 0.2,
+            max_tokens: 800,
+          }),
+        });
+
+        if (visualClassResponse.ok) {
+          const vcData = await visualClassResponse.json();
+          const vcContent = vcData.choices?.[0]?.message?.content;
+          if (vcContent) {
+            let vcStr = vcContent.trim();
+            const vcMatch = vcStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (vcMatch) vcStr = vcMatch[1].trim();
+            const vcFirst = vcStr.indexOf("{");
+            const vcLast = vcStr.lastIndexOf("}");
+            if (vcFirst !== -1 && vcLast !== -1) vcStr = vcStr.slice(vcFirst, vcLast + 1);
+            try {
+              const classified = JSON.parse(vcStr);
+              visualAssets = {
+                hero_images: heroSignals,
+                product_imagery: productSignals,
+                background_motifs: Array.isArray(classified.background_motifs) ? classified.background_motifs : [],
+                decorative_patterns: Array.isArray(classified.decorative_patterns) ? classified.decorative_patterns : [],
+                icon_style: classified.icon_style || "",
+                illustration_style: classified.illustration_style || "",
+                photography_style: classified.photography_style || "",
+                icon_library: svgIcons,
+                category_visuals: Array.isArray(classified.category_visuals) ? classified.category_visuals : [],
+              };
+              console.log("Visual assets extracted successfully");
+            } catch {
+              console.error("Visual assets JSON parse failed");
+            }
+          }
+        }
+      } catch (vaErr) {
+        console.error("Visual assets extraction failed (non-blocking):", vaErr);
+      }
+    }
+
+    // Fallback: construct minimal visual assets if AI classification failed but images were found
+    if (!visualAssets) {
+      const imgFallback = [...(designRawHtml || "").matchAll(/<img[^>]+src="([^"]+)"[^>]*>/gi)]
+        .map(m => m[1])
+        .filter(s => !s.includes("data:") && !s.includes("tracking") && !s.includes("pixel"));
+      if (imgFallback.length > 0) {
+        visualAssets = {
+          hero_images: imgFallback.filter((_, i) => i < 3),
+          product_imagery: imgFallback.slice(3, 8),
+          background_motifs: [],
+          decorative_patterns: [],
+          icon_style: "",
+          illustration_style: "",
+          photography_style: "",
+          icon_library: [],
+          category_visuals: [],
+        };
+      }
+    }
+
+    if (visualAssets) {
+      parsed.brand_visual_assets = visualAssets;
+    }
+
+    return new Response(JSON.stringify({ success: true, data: parsed, brand_design_profile: designProfile, brand_visual_assets: visualAssets }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
