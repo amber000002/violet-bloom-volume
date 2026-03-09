@@ -695,6 +695,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s1 = pptx.addSlide();
   addSlideBackground(s1, theme);
+  addDecorativeMotif(s1, theme, "corner");
   addSlideHeader(s1, "Campaign Overview by Provider", theme, monthRange, slideNum);
 
   const useDelivered = report.providerAggregates[0]?.useDeliveredAsDenominator;
@@ -776,6 +777,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s2 = pptx.addSlide();
   addSlideBackground(s2, theme);
+  addDecorativeMotif(s2, theme, "side");
   addSlideHeader(s2, "Monthly Overview", theme, monthRange, slideNum);
 
   const monthlyData = report.monthlyOverview.filter(m => m.month !== "Unknown Date" || m.totalSentUsers > 0);
@@ -875,6 +877,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s4 = pptx.addSlide();
   addSlideBackground(s4, theme);
+  addDecorativeMotif(s4, theme, "diagonal");
   addSlideHeader(s4, "Infrastructure Details", theme, undefined, slideNum);
 
   const infra = extractInfrastructure(diagnostics.rawData, diagnostics.postmasterData);
