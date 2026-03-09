@@ -916,6 +916,11 @@ export const exportToPPT = async (
     fill: { color: theme.heroGradientEnd, transparency: 55 },
   });
 
+  // Subtle hero motif on closing slide
+  if (heroImageBase64) {
+    addSubtleBackgroundImage(closingSlide, heroImageBase64, "full", 6);
+  }
+
   const closingTextColor = luminance(theme.heroGradientStart) > 0.6 ? theme.textPrimary : "FFFFFF";
 
   // Logo on closing slide
