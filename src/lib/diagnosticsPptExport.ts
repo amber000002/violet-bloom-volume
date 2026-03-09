@@ -1232,6 +1232,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         slideNum++;
         const slide = pptx.addSlide();
         addSlideBackground(slide, theme);
+        addDecorativeMotif(slide, theme, motifVariants[si % motifVariants.length]);
 
         const pageSuffix = totalSlides > 1 ? ` (${si + 1}/${totalSlides})` : "";
         addSlideHeader(slide, `${slideTitle} — ${sortLabel}${pageSuffix}`, theme, undefined, slideNum);
@@ -1463,15 +1464,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s12 = pptx.addSlide();
   addSlideBackground(s12, theme);
+  addDecorativeMotif(s12, theme, "corner");
   addSlideHeader(s12, "Key Learnings & Recommendations", theme, undefined, slideNum);
   // Subtle product context
   if (productImageBase64) {
-    s12.addImage({
-      data: productImageBase64,
-      x: 7, y: 3.5, w: 3, h: 2,
-      sizing: { type: "contain", w: 3, h: 2 },
-      transparency: 92,
-    });
+    addSubtleWatermark(s12, productImageBase64, "bottom-right", 90);
   }
 
   if (intelligentLearnings && intelligentLearnings.length > 0) {
