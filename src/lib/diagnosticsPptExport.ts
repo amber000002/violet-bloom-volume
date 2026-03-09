@@ -428,6 +428,24 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     logoBase64 = await fetchLogoAsBase64(logoUrl);
   }
 
+  // Pre-fetch visual assets as base64
+  let heroImageBase64: string | null = null;
+  let productImageBase64: string | null = null;
+  const va = brandProfile?.brand_visual_assets;
+  if (va) {
+    const allUrls = [...(va.hero_images || []).slice(0, 2), ...(va.product_imagery || []).slice(0, 2)];
+    const fetches = await Promise.allSettled(allUrls.map(url => fetchLogoAsBase64(url)));
+    for (let i = 0; i < (va.hero_images || []).length && i < 2; i++) {
+      const r = fetches[i];
+      if (r.status === "fulfilled" && r.value) { heroImageBase64 = r.value; break; }
+    }
+    const productStart = Math.min((va.hero_images || []).length, 2);
+    for (let i = productStart; i < fetches.length; i++) {
+      const r = fetches[i];
+      if (r.status === "fulfilled" && r.value) { productImageBase64 = r.value; break; }
+    }
+  }
+
   const pptx = new pptxgen();
   pptx.author = "Inbox Diagnostics";
   pptx.title = `${brandName} – Email Diagnostics Executive Deck`;
