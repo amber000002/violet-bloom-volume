@@ -196,9 +196,29 @@ ${combinedText}${schemaContext}`,
     let parsed;
     try {
       parsed = JSON.parse(jsonStr);
-    } catch {
-      console.error("JSON parse failed, first 300 chars:", jsonStr.substring(0, 300));
-      throw new Error("Failed to parse brand profile JSON");
+    } catch (e1) {
+      // Attempt repair: balance braces if truncated
+      console.error("JSON parse failed, attempting repair. First 300 chars:", jsonStr.substring(0, 300));
+      try {
+        let open = 0, close = 0;
+        for (const ch of jsonStr) { if (ch === '{') open++; if (ch === '}') close++; }
+        let repaired = jsonStr;
+        if (open > close) repaired += '}'.repeat(open - close);
+        // Also try closing any open arrays
+        let openArr = 0, closeArr = 0;
+        for (const ch of repaired) { if (ch === '[') openArr++; if (ch === ']') closeArr++; }
+        if (openArr > closeArr) repaired = repaired.replace(/,?\s*$/, '') + ']'.repeat(openArr - closeArr) + '}'.repeat(Math.max(0, open - close));
+        // Re-balance after array fix
+        open = 0; close = 0;
+        for (const ch of repaired) { if (ch === '{') open++; if (ch === '}') close++; }
+        if (open > close) repaired += '}'.repeat(open - close);
+        parsed = JSON.parse(repaired);
+        console.log("JSON repair succeeded");
+      } catch {
+        // Last resort: truncate to last valid closing brace
+        console.error("JSON repair also failed, last 200 chars:", jsonStr.substring(jsonStr.length - 200));
+        throw new Error("Failed to parse brand profile JSON");
+      }
     }
 
     // ===== STEP 2: Brand Design Profile extraction =====
