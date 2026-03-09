@@ -317,6 +317,78 @@ const fetchLogoAsBase64 = async (url: string): Promise<string | null> => {
   }
 };
 
+/** Fetch multiple image URLs as base64, returning a map of url -> base64 data URI */
+const fetchImagesAsBase64 = async (urls: string[]): Promise<Map<string, string>> => {
+  const map = new Map<string, string>();
+  if (!urls || urls.length === 0) return map;
+  const uniqueUrls = [...new Set(urls)].slice(0, 5);
+  await Promise.allSettled(uniqueUrls.map(async (url) => {
+    const b64 = await fetchLogoAsBase64(url);
+    if (b64) map.set(url, b64);
+  }));
+  return map;
+};
+
+/** Add a subtle background image (5-12% opacity) as a watermark/motif layer */
+const addSubtleBackgroundImage = (
+  slide: pptxgen.Slide,
+  imageBase64: string,
+  position: "full" | "right" | "bottom-right" = "right",
+  opacity: number = 8
+) => {
+  const transparency = 100 - Math.max(5, Math.min(12, opacity));
+  switch (position) {
+    case "full":
+      slide.addImage({
+        data: imageBase64,
+        x: 0, y: 0, w: 10, h: 5.625,
+        sizing: { type: "cover", w: 10, h: 5.625 },
+        transparency,
+      });
+      break;
+    case "right":
+      slide.addImage({
+        data: imageBase64,
+        x: 6, y: 0.5, w: 4, h: 4.5,
+        sizing: { type: "contain", w: 4, h: 4.5 },
+        transparency,
+      });
+      break;
+    case "bottom-right":
+      slide.addImage({
+        data: imageBase64,
+        x: 7, y: 3.5, w: 3, h: 2,
+        sizing: { type: "contain", w: 3, h: 2 },
+        transparency,
+      });
+      break;
+  }
+};
+
+/** Add a visible side illustration for title/recommendation slides */
+const addSideIllustration = (
+  slide: pptxgen.Slide,
+  imageBase64: string,
+  side: "right" | "left" = "right",
+  transparency: number = 15
+) => {
+  if (side === "right") {
+    slide.addImage({
+      data: imageBase64,
+      x: 6.5, y: 1.2, w: 3.2, h: 3.6,
+      sizing: { type: "contain", w: 3.2, h: 3.6 },
+      transparency,
+    });
+  } else {
+    slide.addImage({
+      data: imageBase64,
+      x: 0.3, y: 1.2, w: 3.2, h: 3.6,
+      sizing: { type: "contain", w: 3.2, h: 3.6 },
+      transparency,
+    });
+  }
+};
+
 // ============= SLIDE HELPERS =============
 
 const addBrandedBackground = (slide: pptxgen.Slide, theme: BrandSlideTheme) => {
