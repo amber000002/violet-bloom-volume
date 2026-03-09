@@ -495,9 +495,14 @@ Rules:
 
     // Fallback: construct minimal visual assets if AI classification failed but images were found
     if (!visualAssets) {
-      const imgFallback = [...(designRawHtml || "").matchAll(/<img[^>]+src="([^"]+)"[^>]*>/gi)]
-        .map(m => m[1])
-        .filter(s => !s.includes("data:") && !s.includes("tracking") && !s.includes("pixel"));
+      const fallbackBaseUrl = websiteUrl.startsWith("http") ? websiteUrl : `https://${websiteUrl}`;
+      const resolveFallback = (src: string): string => {
+        if (!src || src.startsWith("data:")) return "";
+        try { return new URL(src, fallbackBaseUrl).href; } catch { return src.startsWith("//") ? `https:${src}` : src; }
+      };
+      const imgFallback = [...(designRawHtml || "").matchAll(/<img[^>]+(?:src|data-src)="([^"]+)"[^>]*>/gi)]
+        .map(m => resolveFallback(m[1]))
+        .filter(s => s && !s.includes("data:") && !s.includes("tracking") && !s.includes("pixel") && !s.includes("spacer") && s.length > 10);
       if (imgFallback.length > 0) {
         visualAssets = {
           hero_images: imgFallback.filter((_, i) => i < 3),
