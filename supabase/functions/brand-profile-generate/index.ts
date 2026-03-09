@@ -127,11 +127,22 @@ serve(async (req) => {
     // Append event schema and user properties data for lifecycle/engagement enrichment
     let schemaContext = "";
     if (eventSchemaCSV && eventSchemaCSV.trim().length > 20) {
-      const eventLines = eventSchemaCSV.trim().split("\n").slice(0, 200);
-      schemaContext += `\n\n[EVENT SCHEMA - ${eventLines.length - 1} events]\n${eventLines.join("\n")}`;
+      // Deduplicate: keep only unique event names with first few properties
+      const eventLines = eventSchemaCSV.trim().split("\n");
+      const header = eventLines[0];
+      const seenEvents = new Set<string>();
+      const dedupedLines = [header];
+      for (let i = 1; i < eventLines.length && dedupedLines.length < 40; i++) {
+        const eventName = eventLines[i].split(",")[0]?.trim();
+        if (eventName && !seenEvents.has(eventName)) {
+          seenEvents.add(eventName);
+          dedupedLines.push(eventLines[i]);
+        }
+      }
+      schemaContext += `\n\n[EVENT SCHEMA - ${seenEvents.size} unique events]\n${dedupedLines.join("\n")}`;
     }
     if (userPropertiesCSV && userPropertiesCSV.trim().length > 20) {
-      const propLines = userPropertiesCSV.trim().split("\n").slice(0, 200);
+      const propLines = userPropertiesCSV.trim().split("\n").slice(0, 50);
       schemaContext += `\n\n[USER PROPERTIES SCHEMA - ${propLines.length - 1} properties]\n${propLines.join("\n")}`;
     }
 
