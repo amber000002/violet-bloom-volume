@@ -208,14 +208,14 @@ ${combinedText}${schemaContext}`,
     try {
       parsed = JSON.parse(jsonStr);
     } catch (e1) {
-      console.error("JSON parse failed, attempting repair. First 300 chars:", jsonStr.substring(0, 300));
-      console.error("Last 200 chars:", jsonStr.substring(jsonStr.length - 200));
+      console.error("JSON parse failed, attempting repair. Length:", jsonStr.length);
+      console.error("Last 300 chars:", jsonStr.substring(jsonStr.length - 300));
       try {
-        // Step 1: If truncated mid-string, close the string
         let repaired = jsonStr;
-        // Remove any trailing incomplete escape sequence
+        // Remove trailing incomplete escape
         repaired = repaired.replace(/\\$/, '');
-        // Count unescaped quotes to see if we're inside a string
+        
+        // Track string state and close unclosed strings
         let inString = false;
         for (let i = 0; i < repaired.length; i++) {
           if (repaired[i] === '\\' && inString) { i++; continue; }
@@ -223,10 +223,12 @@ ${combinedText}${schemaContext}`,
         }
         if (inString) repaired += '"';
         
-        // Step 2: Remove any trailing comma or colon (incomplete key-value)
+        // Remove trailing incomplete tokens: comma, colon, key-only patterns
+        repaired = repaired.replace(/,\s*"[^"]*"\s*:\s*$/, '');
+        repaired = repaired.replace(/,\s*"[^"]*"\s*$/, '');
         repaired = repaired.replace(/[,:\s]+$/, '');
         
-        // Step 3: Balance brackets and braces
+        // Balance brackets and braces
         let openArr = 0, closeArr = 0, openObj = 0, closeObj = 0;
         let inStr = false;
         for (let i = 0; i < repaired.length; i++) {
@@ -244,8 +246,32 @@ ${combinedText}${schemaContext}`,
         parsed = JSON.parse(repaired);
         console.log("JSON repair succeeded");
       } catch (e2) {
-        console.error("JSON repair also failed:", e2);
-        throw new Error("Failed to parse brand profile JSON");
+        // Aggressive fallback: find the last complete top-level section
+        try {
+          // Find the last successfully closed major section
+          let lastGood = jsonStr.lastIndexOf('},');
+          if (lastGood === -1) lastGood = jsonStr.lastIndexOf('}');
+          if (lastGood > jsonStr.length * 0.3) {
+            let truncated = jsonStr.substring(0, lastGood + 1);
+            // Balance remaining braces
+            let ob = 0, cb = 0, ins = false;
+            for (let i = 0; i < truncated.length; i++) {
+              if (truncated[i] === '\\' && ins) { i++; continue; }
+              if (truncated[i] === '"') { ins = !ins; continue; }
+              if (ins) continue;
+              if (truncated[i] === '{') ob++;
+              if (truncated[i] === '}') cb++;
+            }
+            truncated += '}'.repeat(Math.max(0, ob - cb));
+            parsed = JSON.parse(truncated);
+            console.log("JSON aggressive truncation repair succeeded");
+          } else {
+            throw e2;
+          }
+        } catch (e3) {
+          console.error("All JSON repair attempts failed:", e3);
+          throw new Error("Failed to parse brand profile JSON");
+        }
       }
     }
 
