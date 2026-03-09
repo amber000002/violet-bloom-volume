@@ -384,5 +384,24 @@ export function mergeProfiles(
     }
   }
 
+  // --- brand_visual_assets (merge arrays, fill missing string fields) ---
+  if (incoming.brand_visual_assets) {
+    if (!result.brand_visual_assets) {
+      result.brand_visual_assets = incoming.brand_visual_assets;
+    } else {
+      const ev = result.brand_visual_assets;
+      const nv = incoming.brand_visual_assets;
+      ev.hero_images = mergeArrays(ev.hero_images || [], nv.hero_images || []);
+      ev.product_imagery = mergeArrays(ev.product_imagery || [], nv.product_imagery || []);
+      ev.background_motifs = mergeArrays(ev.background_motifs || [], nv.background_motifs || []);
+      ev.decorative_patterns = mergeArrays(ev.decorative_patterns || [], nv.decorative_patterns || []);
+      ev.icon_library = mergeArrays(ev.icon_library || [], nv.icon_library || []);
+      ev.category_visuals = mergeArrays(ev.category_visuals || [], nv.category_visuals || []);
+      if (!ev.icon_style && nv.icon_style) ev.icon_style = nv.icon_style;
+      if (!ev.illustration_style && nv.illustration_style) ev.illustration_style = nv.illustration_style;
+      if (!ev.photography_style && nv.photography_style) ev.photography_style = nv.photography_style;
+    }
+  }
+
   return result;
 }
