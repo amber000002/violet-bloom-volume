@@ -358,24 +358,60 @@ ${designSignals}`,
     let visualAssets = null;
     if (designRawHtml.length > 500) {
       try {
-        // Extract image URLs, SVG icons, background patterns from HTML
-        const imgTags = [...designRawHtml.matchAll(/<img[^>]+src="([^"]+)"[^>]*>/gi)]
-          .map(m => ({ src: m[1], context: m[0] }))
-          .filter(m => !m.src.includes("data:") && !m.src.includes("tracking") && !m.src.includes("pixel"));
+        // Helper: resolve relative URLs to absolute
+        const baseUrl = websiteUrl.startsWith("http") ? websiteUrl : `https://${websiteUrl}`;
+        const resolveUrl = (src: string): string => {
+          if (!src || src.startsWith("data:")) return "";
+          try { return new URL(src, baseUrl).href; } catch { return src.startsWith("//") ? `https:${src}` : src; }
+        };
 
-        const heroSignals = imgTags
-          .filter(m => /hero|banner|header|main|splash|featured|cover/i.test(m.context))
+        // Extract image URLs from multiple sources: src, data-src, data-lazy, srcset, picture>source
+        const imgMatches = [
+          ...designRawHtml.matchAll(/<img[^>]+(?:src|data-src|data-lazy-src|data-original)="([^"]+)"[^>]*>/gi),
+          ...designRawHtml.matchAll(/<img[^>]+(?:src|data-src|data-lazy-src|data-original)='([^']+)'[^>]*>/gi),
+          ...designRawHtml.matchAll(/<source[^>]+srcset="([^",\s]+)/gi),
+        ];
+
+        const imgTags = imgMatches
+          .map(m => {
+            const src = resolveUrl(m[1]);
+            return { src, context: m[0] };
+          })
+          .filter(m => m.src && !m.src.includes("data:") && !m.src.includes("tracking") && !m.src.includes("pixel") && !m.src.includes("spacer") && !m.src.includes("1x1") && m.src.length > 10);
+
+        // Dedupe by URL
+        const seen = new Set<string>();
+        const uniqueImgTags = imgTags.filter(m => { if (seen.has(m.src)) return false; seen.add(m.src); return true; });
+
+        const heroSignals = uniqueImgTags
+          .filter(m => /hero|banner|header|main|splash|featured|cover|slider|carousel|jumbotron|masthead/i.test(m.context))
           .map(m => m.src)
           .slice(0, 5);
 
-        const productSignals = imgTags
-          .filter(m => /product|item|card|catalog|shop|collection|bouquet|gift/i.test(m.context))
+        const productSignals = uniqueImgTags
+          .filter(m => /product|item|card|catalog|shop|collection|bouquet|gift|thumbnail|listing|gallery/i.test(m.context))
           .map(m => m.src)
           .slice(0, 8);
 
+        // If hero/product specific selectors didn't match, use positional heuristics
+        if (heroSignals.length === 0 && uniqueImgTags.length > 0) {
+          // First large-looking images are likely hero/banner
+          const candidates = uniqueImgTags
+            .filter(m => /width\s*[:=]\s*["']?\d{3,}/i.test(m.context) || /class="[^"]*(?:full|wide|lg|xl|big)/i.test(m.context))
+            .map(m => m.src);
+          heroSignals.push(...candidates.slice(0, 3));
+          // Fallback: first 3 images on page (skip tiny icons)
+          if (heroSignals.length === 0) {
+            heroSignals.push(...uniqueImgTags.filter(m => !/(icon|logo|avatar|badge|flag|emoji)/i.test(m.context)).map(m => m.src).slice(0, 3));
+          }
+        }
+        if (productSignals.length === 0 && uniqueImgTags.length > 3) {
+          productSignals.push(...uniqueImgTags.filter(m => !heroSignals.includes(m.src) && !/(icon|logo|avatar|badge|flag|emoji)/i.test(m.context)).map(m => m.src).slice(0, 5));
+        }
+
         const bgPatterns = [...designRawHtml.matchAll(/background(?:-image)?\s*:\s*url\(['"]?([^'")\s]+)['"]?\)/gi)]
-          .map(m => m[1])
-          .filter(u => !u.includes("data:image/svg+xml") || u.length < 500)
+          .map(m => resolveUrl(m[1]))
+          .filter(u => u && (!u.includes("data:image/svg+xml") || u.length < 500))
           .slice(0, 5);
 
         const svgIcons = [...designRawHtml.matchAll(/<svg[^>]*class="([^"]*)"[^>]*>/gi)]
@@ -459,9 +495,14 @@ Rules:
 
     // Fallback: construct minimal visual assets if AI classification failed but images were found
     if (!visualAssets) {
-      const imgFallback = [...(designRawHtml || "").matchAll(/<img[^>]+src="([^"]+)"[^>]*>/gi)]
-        .map(m => m[1])
-        .filter(s => !s.includes("data:") && !s.includes("tracking") && !s.includes("pixel"));
+      const fallbackBaseUrl = websiteUrl.startsWith("http") ? websiteUrl : `https://${websiteUrl}`;
+      const resolveFallback = (src: string): string => {
+        if (!src || src.startsWith("data:")) return "";
+        try { return new URL(src, fallbackBaseUrl).href; } catch { return src.startsWith("//") ? `https:${src}` : src; }
+      };
+      const imgFallback = [...(designRawHtml || "").matchAll(/<img[^>]+(?:src|data-src)="([^"]+)"[^>]*>/gi)]
+        .map(m => resolveFallback(m[1]))
+        .filter(s => s && !s.includes("data:") && !s.includes("tracking") && !s.includes("pixel") && !s.includes("spacer") && s.length > 10);
       if (imgFallback.length > 0) {
         visualAssets = {
           hero_images: imgFallback.filter((_, i) => i < 3),

@@ -427,6 +427,61 @@ const addSideIllustration = (
 
 // ============= SLIDE HELPERS =============
 
+/** Add decorative motif shapes based on brand visual style */
+const addDecorativeMotif = (
+  slide: pptxgen.Slide,
+  theme: BrandSlideTheme,
+  variant: "corner" | "side" | "diagonal" | "dots" = "corner"
+) => {
+  const motifColor = hexClean(theme.accentGradientStart);
+  const primaryColor = hexClean(theme.primary);
+  switch (variant) {
+    case "corner":
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 7.5, y: -1.5, w: 4, h: 4,
+        fill: { color: motifColor, transparency: 90 },
+      });
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: -0.5, y: 4.2, w: 2, h: 2,
+        fill: { color: primaryColor, transparency: 92 },
+      });
+      break;
+    case "side":
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 9.6, y: 0, w: 0.4, h: 5.625,
+        fill: { color: motifColor, transparency: 80 },
+      });
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 8.8, y: 4.5, w: 0.6, h: 0.6,
+        fill: { color: primaryColor, transparency: 85 },
+      });
+      break;
+    case "diagonal":
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 6.5, y: -1, w: 6, h: 1.2,
+        fill: { color: motifColor, transparency: 92 },
+        rotate: -15,
+      });
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 7, y: -0.3, w: 5.5, h: 0.6,
+        fill: { color: primaryColor, transparency: 94 },
+        rotate: -15,
+      });
+      break;
+    case "dots":
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+            x: 8.2 + i * 0.5, y: 3.8 + j * 0.5,
+            w: 0.15, h: 0.15,
+            fill: { color: motifColor, transparency: 85 },
+          });
+        }
+      }
+      break;
+  }
+};
+
 const addBrandedBackground = (slide: pptxgen.Slide, theme: BrandSlideTheme) => {
   slide.background = { color: theme.background };
   // Subtle brand accent glow
@@ -620,6 +675,7 @@ export const exportToPPT = async (
     // Volume Summary Slide
     const volumeSlide = pptx.addSlide();
     addBrandedBackground(volumeSlide, theme);
+    addDecorativeMotif(volumeSlide, theme, "corner");
     addSlideTitle(volumeSlide, "Volume Summary", theme);
 
     volumeSlide.addText(
@@ -668,6 +724,7 @@ export const exportToPPT = async (
     // Strategic Insight Slide
     const insightSlide = pptx.addSlide();
     addBrandedBackground(insightSlide, theme);
+    addDecorativeMotif(insightSlide, theme, "side");
     addSlideTitle(insightSlide, "Strategic Insight", theme);
     // Product imagery as subtle contextual visual
     if (productImageBase64) {
@@ -719,6 +776,7 @@ export const exportToPPT = async (
     // Framework Slide
     const frameworkSlide = pptx.addSlide();
     addBrandedBackground(frameworkSlide, theme);
+    addDecorativeMotif(frameworkSlide, theme, "diagonal");
     addSlideTitle(frameworkSlide, "Use Case Framework", theme);
 
     frameworkSlide.addText(`Selected Framework: ${useCaseData.framework}`, {
@@ -735,6 +793,7 @@ export const exportToPPT = async (
     // Journeys Slide
     const journeysSlide = pptx.addSlide();
     addBrandedBackground(journeysSlide, theme);
+    addDecorativeMotif(journeysSlide, theme, "dots");
     addSlideTitle(journeysSlide, "Always-on Journeys", theme);
 
     const journeysToShow = deckType === "executive"
@@ -759,6 +818,7 @@ export const exportToPPT = async (
     // Campaigns Slide
     const campaignsSlide = pptx.addSlide();
     addBrandedBackground(campaignsSlide, theme);
+    addDecorativeMotif(campaignsSlide, theme, "corner");
     addSlideTitle(campaignsSlide, "Contextual Campaigns", theme);
 
     const campaignsToShow = deckType === "executive"
@@ -793,6 +853,7 @@ export const exportToPPT = async (
     // Why Interactive Email
     const whyAmpSlide = pptx.addSlide();
     addBrandedBackground(whyAmpSlide, theme);
+    addDecorativeMotif(whyAmpSlide, theme, "side");
     addSlideTitle(whyAmpSlide, "Why Interactive Email", theme);
 
     whyAmpSlide.addText("Where AMP adds value:", {
@@ -828,6 +889,7 @@ export const exportToPPT = async (
     // Brand-led Carousel Template
     const brandCarouselSlide = pptx.addSlide();
     addBrandedBackground(brandCarouselSlide, theme);
+    addDecorativeMotif(brandCarouselSlide, theme, "diagonal");
     addSlideTitle(brandCarouselSlide, "Brand-led Carousel Template", theme);
 
     const carouselFeatures = [
@@ -857,6 +919,7 @@ export const exportToPPT = async (
     if (ampData.supportsGamification) {
       const gamifiedSlide = pptx.addSlide();
       addBrandedBackground(gamifiedSlide, theme);
+      addDecorativeMotif(gamifiedSlide, theme, "dots");
       addSlideTitle(gamifiedSlide, "Gamified Interactive Template", theme);
 
       const gamifiedFeatures = [
@@ -893,6 +956,7 @@ export const exportToPPT = async (
     // Performance slide
     const perfSlide = pptx.addSlide();
     addBrandedBackground(perfSlide, theme);
+    addDecorativeMotif(perfSlide, theme, "corner");
     addSlideTitle(perfSlide, "Campaign Performance", theme);
 
     perfSlide.addText(`${formatNumber(diagnosticsData.totalEmailsSent)} emails across ${diagnosticsData.totalCampaigns} campaigns`, {
@@ -913,6 +977,7 @@ export const exportToPPT = async (
     // Recommendations slide
     const recSlide = pptx.addSlide();
     addBrandedBackground(recSlide, theme);
+    addDecorativeMotif(recSlide, theme, "side");
     addSlideTitle(recSlide, "Key Recommendations", theme);
 
     diagnosticsData.recommendations.slice(0, 4).forEach((rec, i) => {

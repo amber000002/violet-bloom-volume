@@ -324,6 +324,103 @@ const getReputationColor = (rep: string, theme: BrandTheme): string => {
 
 // ============= SLIDE HELPERS =============
 
+/** Add decorative motif shapes based on brand visual style */
+const addDecorativeMotif = (
+  slide: pptxgen.Slide,
+  theme: BrandTheme,
+  variant: "corner" | "side" | "diagonal" | "dots" = "corner"
+) => {
+  const motifColor = theme.accent;
+  switch (variant) {
+    case "corner":
+      // Top-right corner accent arc
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 7.5, y: -1.5, w: 4, h: 4,
+        fill: { color: motifColor, transparency: 90 },
+      });
+      // Bottom-left small circle
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: -0.5, y: 4.2, w: 2, h: 2,
+        fill: { color: theme.primary, transparency: 92 },
+      });
+      break;
+    case "side":
+      // Right edge vertical bar
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 9.6, y: 0, w: 0.4, h: 5.625,
+        fill: { color: motifColor, transparency: 80 },
+      });
+      // Small accent dot
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 8.8, y: 4.5, w: 0.6, h: 0.6,
+        fill: { color: theme.primary, transparency: 85 },
+      });
+      break;
+    case "diagonal":
+      // Diagonal stripe effect
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 6.5, y: -1, w: 6, h: 1.2,
+        fill: { color: motifColor, transparency: 92 },
+        rotate: -15,
+      });
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 7, y: -0.3, w: 5.5, h: 0.6,
+        fill: { color: theme.primary, transparency: 94 },
+        rotate: -15,
+      });
+      break;
+    case "dots":
+      // Subtle dot pattern in bottom-right
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+            x: 8.2 + i * 0.5, y: 3.8 + j * 0.5,
+            w: 0.15, h: 0.15,
+            fill: { color: motifColor, transparency: 85 },
+          });
+        }
+      }
+      break;
+  }
+};
+
+/** Add a subtle watermark image to a slide */
+const addSubtleWatermark = (
+  slide: pptxgen.Slide,
+  imageBase64: string,
+  position: "bottom-right" | "right" | "full" = "bottom-right",
+  transparency: number = 88
+) => {
+  switch (position) {
+    case "bottom-right":
+      slide.addImage({
+        data: imageBase64,
+        x: 7, y: 3.2, w: 3, h: 2.2,
+        sizing: { type: "contain", w: 3, h: 2.2 },
+        transparency,
+      });
+      break;
+    case "right":
+      slide.addImage({
+        data: imageBase64,
+        x: 6.5, y: 1, w: 3.5, h: 3.5,
+        sizing: { type: "contain", w: 3.5, h: 3.5 },
+        transparency,
+      });
+      break;
+    case "full":
+      slide.addImage({
+        data: imageBase64,
+        x: 0, y: 0, w: 10, h: 5.625,
+        sizing: { type: "cover", w: 10, h: 5.625 },
+        transparency,
+      });
+      break;
+  }
+};
+
+const motifVariants: Array<"corner" | "side" | "diagonal" | "dots"> = ["corner", "side", "diagonal", "dots"];
+
 const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
   slide.background = { color: theme.slideBg };
   // Subtle radial accent glow - approximated via a very light rect
@@ -598,6 +695,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s1 = pptx.addSlide();
   addSlideBackground(s1, theme);
+  addDecorativeMotif(s1, theme, "corner");
   addSlideHeader(s1, "Campaign Overview by Provider", theme, monthRange, slideNum);
 
   const useDelivered = report.providerAggregates[0]?.useDeliveredAsDenominator;
@@ -679,6 +777,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s2 = pptx.addSlide();
   addSlideBackground(s2, theme);
+  addDecorativeMotif(s2, theme, "side");
   addSlideHeader(s2, "Monthly Overview", theme, monthRange, slideNum);
 
   const monthlyData = report.monthlyOverview.filter(m => m.month !== "Unknown Date" || m.totalSentUsers > 0);
@@ -778,6 +877,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s4 = pptx.addSlide();
   addSlideBackground(s4, theme);
+  addDecorativeMotif(s4, theme, "diagonal");
   addSlideHeader(s4, "Infrastructure Details", theme, undefined, slideNum);
 
   const infra = extractInfrastructure(diagnostics.rawData, diagnostics.postmasterData);
@@ -868,6 +968,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s5 = pptx.addSlide();
   addSlideBackground(s5, theme);
+  addDecorativeMotif(s5, theme, "dots");
   addSlideHeader(s5, "Reputation Scorecard", theme, undefined, slideNum);
 
   if (signalHealthData && signalHealthData.length > 0) {
@@ -916,6 +1017,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s6 = pptx.addSlide();
   addSlideBackground(s6, theme);
+  addDecorativeMotif(s6, theme, "corner");
   addSlideHeader(s6, "Reputation Trends", theme, undefined, slideNum);
 
   if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
@@ -1008,15 +1110,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s7 = pptx.addSlide();
   addSlideBackground(s7, theme);
+  addDecorativeMotif(s7, theme, "side");
   addSlideHeader(s7, "Root Cause Summary", theme, undefined, slideNum);
   // Subtle product imagery on insight slides
   if (productImageBase64) {
-    s7.addImage({
-      data: productImageBase64,
-      x: 7, y: 3.5, w: 3, h: 2,
-      sizing: { type: "contain", w: 3, h: 2 },
-      transparency: 92,
-    });
+    addSubtleWatermark(s7, productImageBase64, "bottom-right", 90);
   }
 
   if (rootCauseEntries && rootCauseEntries.length > 0) {
@@ -1134,6 +1232,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         slideNum++;
         const slide = pptx.addSlide();
         addSlideBackground(slide, theme);
+        addDecorativeMotif(slide, theme, motifVariants[si % motifVariants.length]);
 
         const pageSuffix = totalSlides > 1 ? ` (${si + 1}/${totalSlides})` : "";
         addSlideHeader(slide, `${slideTitle} — ${sortLabel}${pageSuffix}`, theme, undefined, slideNum);
@@ -1210,6 +1309,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s10 = pptx.addSlide();
   addSlideBackground(s10, theme);
+  addDecorativeMotif(s10, theme, "diagonal");
+  if (heroImageBase64) addSubtleWatermark(s10, heroImageBase64, "bottom-right", 92);
   addSlideHeader(s10, "Send Mix & Use Case Coverage", theme, undefined, slideNum);
 
   const enhRep = diagnostics.reputationReport?.enhancedReport;
@@ -1297,6 +1398,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s11 = pptx.addSlide();
   addSlideBackground(s11, theme);
+  addDecorativeMotif(s11, theme, "dots");
   addSlideHeader(s11, "Lifecycle Coverage Matrix", theme, undefined, slideNum);
 
   // Build a simplified lifecycle stage distribution from campaign data
@@ -1362,15 +1464,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   const s12 = pptx.addSlide();
   addSlideBackground(s12, theme);
+  addDecorativeMotif(s12, theme, "corner");
   addSlideHeader(s12, "Key Learnings & Recommendations", theme, undefined, slideNum);
   // Subtle product context
   if (productImageBase64) {
-    s12.addImage({
-      data: productImageBase64,
-      x: 7, y: 3.5, w: 3, h: 2,
-      sizing: { type: "contain", w: 3, h: 2 },
-      transparency: 92,
-    });
+    addSubtleWatermark(s12, productImageBase64, "bottom-right", 90);
   }
 
   if (intelligentLearnings && intelligentLearnings.length > 0) {
