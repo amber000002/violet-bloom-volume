@@ -165,7 +165,7 @@ ${combinedText}${schemaContext}`,
           },
         ],
         temperature: 0.2,
-        max_tokens: 7000,
+        max_tokens: 10000,
       }),
     });
 
