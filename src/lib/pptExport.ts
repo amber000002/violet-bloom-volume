@@ -579,7 +579,7 @@ export const exportToPPT = async (
   // SECTION 1: Inbox Potential
   // ==========================================
   if (inboxData) {
-    addSectionDivider(pptx, theme, "Section 1", "Responsible Inbox Potential", "Industry-aligned monthly email scale", logoBase64);
+    addSectionDivider(pptx, theme, "Section 1", "Responsible Inbox Potential", "Industry-aligned monthly email scale", logoBase64, heroImageBase64);
 
     // Volume Summary Slide
     const volumeSlide = pptx.addSlide();
@@ -671,7 +671,7 @@ export const exportToPPT = async (
   // SECTION 2: Use Case Studio
   // ==========================================
   if (useCaseData) {
-    addSectionDivider(pptx, theme, "Section 2", "Use Case Studio", "Framework-driven lifecycle journeys & campaigns", logoBase64);
+    addSectionDivider(pptx, theme, "Section 2", "Use Case Studio", "Framework-driven lifecycle journeys & campaigns", logoBase64, heroImageBase64);
 
     // Framework Slide
     const frameworkSlide = pptx.addSlide();
@@ -745,7 +745,7 @@ export const exportToPPT = async (
   // SECTION 3: AMP Email Studio
   // ==========================================
   if (ampData) {
-    addSectionDivider(pptx, theme, "Section 3", "AMP Email Studio", "Interactive email experiences", logoBase64);
+    addSectionDivider(pptx, theme, "Section 3", "AMP Email Studio", "Interactive email experiences", logoBase64, heroImageBase64);
 
     // Why Interactive Email
     const whyAmpSlide = pptx.addSlide();
@@ -845,7 +845,7 @@ export const exportToPPT = async (
   // SECTION 4: Inbox Diagnostics
   // ==========================================
   if (diagnosticsData) {
-    addSectionDivider(pptx, theme, "Section 4", "Inbox Diagnostics", "Campaign performance analysis", logoBase64);
+    addSectionDivider(pptx, theme, "Section 4", "Inbox Diagnostics", "Campaign performance analysis", logoBase64, heroImageBase64);
 
     // Performance slide
     const perfSlide = pptx.addSlide();
