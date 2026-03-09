@@ -101,6 +101,113 @@ const stageToLabel = (stage: string): string => {
     .join(" ");
 };
 
+// ===== BRAND GROUP COLLAPSIBLE =====
+const BrandGroupCollapsible: React.FC<{
+  brandName: string;
+  host: string;
+  versions: BrandProfileVersion[];
+  activeBrandVersionId: string | null;
+  onSelect: (v: BrandProfileVersion) => void;
+  onView: (v: BrandProfileVersion) => void;
+  countSignals: (p: CoreBrandJSON | null) => number;
+  computeCompleteness: (p: CoreBrandJSON | null) => number;
+}> = ({ brandName, host, versions, activeBrandVersionId, onSelect, onView, countSignals, computeCompleteness }) => {
+  const [open, setOpen] = useState(false);
+  const hasActive = versions.some(v => v.brandProfileVersionId === activeBrandVersionId);
+
+  return (
+    <div className="border-b border-border last:border-b-0">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted/20 transition-colors ${hasActive ? "bg-primary/5" : ""}`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <User className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <span className="text-sm font-medium text-foreground truncate">{brandName}</span>
+          <span className="text-xs text-muted-foreground truncate">({host})</span>
+          <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium flex-shrink-0">
+            {versions.length} {versions.length === 1 ? "version" : "versions"}
+          </span>
+          {hasActive && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary flex-shrink-0">
+              <Check className="w-2.5 h-2.5" /> Active
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: "auto" }}
+            exit={{ height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="divide-y divide-border/50 bg-muted/5">
+              {versions.map((v, idx) => {
+                const signals = countSignals(v.brandProfileJson);
+                const completeness = computeCompleteness(v.brandProfileJson);
+                const isActive = activeBrandVersionId === v.brandProfileVersionId;
+                return (
+                  <div key={v.brandProfileVersionId} className={`px-4 py-2.5 hover:bg-muted/10 transition-colors ${isActive ? "bg-primary/5" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Iteration {versions.length - idx}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                            v.confidence === "high" ? "bg-emerald-500/10 text-emerald-400"
+                              : v.confidence === "medium" ? "bg-amber-500/10 text-amber-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            {v.confidence}
+                          </span>
+                          {isActive && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                              <Check className="w-2.5 h-2.5" /> Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Activity className="w-3 h-3" />
+                            {signals} signals
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <BarChart3 className="w-3 h-3" />
+                            {completeness}% complete
+                          </span>
+                          <span>{new Date(v.generatedAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onSelect(v); }}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
+                        >
+                          <Check className="w-3 h-3" /> Use
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onView(v); }}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
+                        >
+                          <Eye className="w-3 h-3" /> View
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // ===== PERSONALIZED USE CASE CARD =====
 const UseCaseCard: React.FC<{
   useCase: PersonalizedUseCase;
@@ -946,64 +1053,82 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                 </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {brandVersionsToShow.map((v) => (
-                    <div key={v.brandProfileVersionId} className={`p-3 hover:bg-muted/10 transition-colors ${activeBrandVersionId === v.brandProfileVersionId ? "bg-primary/5" : ""}`}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-foreground truncate">
-                              {v.websiteHostNormalized}
-                            </span>
-                            {v.brandProfileJson?.brand_identity?.brand_name && (
-                              <span className="text-xs text-muted-foreground">
-                                ({v.brandProfileJson.brand_identity.brand_name})
-                              </span>
-                            )}
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                              v.confidence === "high"
-                                ? "bg-emerald-500/10 text-emerald-400"
-                                : v.confidence === "medium"
-                                ? "bg-amber-500/10 text-amber-400"
-                                : "bg-muted text-muted-foreground"
-                            }`}>
-                              {v.confidence}
-                            </span>
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                              v.status === "success"
-                                ? "bg-emerald-500/10 text-emerald-400"
-                                : "bg-destructive/10 text-destructive"
-                            }`}>
-                              {v.status}
-                            </span>
-                            {activeBrandVersionId === v.brandProfileVersionId && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                                <Check className="w-3 h-3" /> Active
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="capitalize">{v.extractionMethod?.replace(/_/g, " ")}</span>
-                            <span>•</span>
-                            <span>{new Date(v.generatedAt).toLocaleString()}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-shrink-0">
-                          <button
-                            onClick={() => onBrandVersionSelect?.(v)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-primary hover:bg-primary/10 border border-primary/30 transition-colors"
-                          >
-                            <Check className="w-3 h-3" /> Use
-                          </button>
-                          <button
-                            onClick={() => setViewingProfileJson(v.brandProfileJson)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border transition-colors"
-                          >
-                            <Eye className="w-3 h-3" /> View
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {(() => {
+                    // Group versions by brand (websiteHostNormalized)
+                    const grouped = new Map<string, { brandName: string; host: string; versions: typeof brandVersionsToShow }>();
+                    brandVersionsToShow.forEach((v) => {
+                      const key = v.websiteHostNormalized;
+                      if (!grouped.has(key)) {
+                        grouped.set(key, {
+                          brandName: v.brandProfileJson?.brand_identity?.brand_name || key,
+                          host: key,
+                          versions: [],
+                        });
+                      }
+                      grouped.get(key)!.versions.push(v);
+                    });
+
+                    const countSignals = (profile: CoreBrandJSON | null): number => {
+                      if (!profile) return 0;
+                      let count = 0;
+                      const lsm = profile.lifecycle_signal_map;
+                      if (lsm) {
+                        count += (lsm.key_user_actions?.length || 0)
+                          + (lsm.key_user_events?.length || 0)
+                          + (lsm.activation_events?.length || 0)
+                          + (lsm.monetization_events?.length || 0)
+                          + (lsm.churn_signals?.length || 0)
+                          + (lsm.inactivity_markers?.length || 0)
+                          + (lsm.lifecycle_markers?.length || 0);
+                      }
+                      const ea = profile.engagement_architecture;
+                      if (ea) {
+                        count += (ea.engagement_drivers?.length || 0)
+                          + (ea.seasonal_triggers?.length || 0)
+                          + (ea.event_based_triggers?.length || 0)
+                          + (ea.urgency_patterns?.length || 0);
+                      }
+                      return count;
+                    };
+
+                    const computeCompleteness = (profile: CoreBrandJSON | null): number => {
+                      if (!profile) return 0;
+                      const fields = [
+                        "brand_identity.brand_name", "brand_identity.tagline", "brand_identity.positioning", "brand_identity.tone_of_voice",
+                        "business_model.business_model_description", "business_model.monetization_model",
+                        "product_ecosystem.core_products", "product_ecosystem.feature_modules",
+                        "audience_intelligence.primary_segments", "audience_intelligence.personas_detected",
+                        "value_framework.value_propositions", "value_framework.differentiators",
+                        "engagement_architecture.engagement_drivers", "engagement_architecture.seasonal_triggers",
+                        "lifecycle_signal_map.key_user_actions", "lifecycle_signal_map.activation_events", "lifecycle_signal_map.churn_signals",
+                        "kpi_framework.primary_kpis",
+                        "tech_scale_layer.supported_channels",
+                        "industry_signal_layer.industry_kpis",
+                      ];
+                      let populated = 0;
+                      fields.forEach(path => {
+                        const parts = path.split(".");
+                        let val: any = profile;
+                        for (const p of parts) { val = val?.[p]; }
+                        if (val !== undefined && val !== null && val !== "" && !(Array.isArray(val) && val.length === 0)) populated++;
+                      });
+                      return Math.round((populated / fields.length) * 100);
+                    };
+
+                    return Array.from(grouped.entries()).map(([host, group]) => (
+                      <BrandGroupCollapsible
+                        key={host}
+                        brandName={group.brandName}
+                        host={host}
+                        versions={group.versions}
+                        activeBrandVersionId={activeBrandVersionId}
+                        onSelect={(v) => onBrandVersionSelect?.(v)}
+                        onView={(v) => setViewingProfileJson(v.brandProfileJson)}
+                        countSignals={countSignals}
+                        computeCompleteness={computeCompleteness}
+                      />
+                    ));
+                  })()}
                 </div>
               )}
             </motion.div>
