@@ -324,6 +324,103 @@ const getReputationColor = (rep: string, theme: BrandTheme): string => {
 
 // ============= SLIDE HELPERS =============
 
+/** Add decorative motif shapes based on brand visual style */
+const addDecorativeMotif = (
+  slide: pptxgen.Slide,
+  theme: BrandTheme,
+  variant: "corner" | "side" | "diagonal" | "dots" = "corner"
+) => {
+  const motifColor = theme.accent;
+  switch (variant) {
+    case "corner":
+      // Top-right corner accent arc
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 7.5, y: -1.5, w: 4, h: 4,
+        fill: { color: motifColor, transparency: 90 },
+      });
+      // Bottom-left small circle
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: -0.5, y: 4.2, w: 2, h: 2,
+        fill: { color: theme.primary, transparency: 92 },
+      });
+      break;
+    case "side":
+      // Right edge vertical bar
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 9.6, y: 0, w: 0.4, h: 5.625,
+        fill: { color: motifColor, transparency: 80 },
+      });
+      // Small accent dot
+      slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: 8.8, y: 4.5, w: 0.6, h: 0.6,
+        fill: { color: theme.primary, transparency: 85 },
+      });
+      break;
+    case "diagonal":
+      // Diagonal stripe effect
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 6.5, y: -1, w: 6, h: 1.2,
+        fill: { color: motifColor, transparency: 92 },
+        rotate: -15,
+      });
+      slide.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: 7, y: -0.3, w: 5.5, h: 0.6,
+        fill: { color: theme.primary, transparency: 94 },
+        rotate: -15,
+      });
+      break;
+    case "dots":
+      // Subtle dot pattern in bottom-right
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          slide.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+            x: 8.2 + i * 0.5, y: 3.8 + j * 0.5,
+            w: 0.15, h: 0.15,
+            fill: { color: motifColor, transparency: 85 },
+          });
+        }
+      }
+      break;
+  }
+};
+
+/** Add a subtle watermark image to a slide */
+const addSubtleWatermark = (
+  slide: pptxgen.Slide,
+  imageBase64: string,
+  position: "bottom-right" | "right" | "full" = "bottom-right",
+  transparency: number = 88
+) => {
+  switch (position) {
+    case "bottom-right":
+      slide.addImage({
+        data: imageBase64,
+        x: 7, y: 3.2, w: 3, h: 2.2,
+        sizing: { type: "contain", w: 3, h: 2.2 },
+        transparency,
+      });
+      break;
+    case "right":
+      slide.addImage({
+        data: imageBase64,
+        x: 6.5, y: 1, w: 3.5, h: 3.5,
+        sizing: { type: "contain", w: 3.5, h: 3.5 },
+        transparency,
+      });
+      break;
+    case "full":
+      slide.addImage({
+        data: imageBase64,
+        x: 0, y: 0, w: 10, h: 5.625,
+        sizing: { type: "cover", w: 10, h: 5.625 },
+        transparency,
+      });
+      break;
+  }
+};
+
+const motifVariants: Array<"corner" | "side" | "diagonal" | "dots"> = ["corner", "side", "diagonal", "dots"];
+
 const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
   slide.background = { color: theme.slideBg };
   // Subtle radial accent glow - approximated via a very light rect
