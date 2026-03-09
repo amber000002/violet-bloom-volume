@@ -29,9 +29,11 @@ const COLOR_SIMILARITY_THRESHOLD = 40; // treat as same if delta < 40
 
 /** Merge two string arrays, keeping unique lowercase-normalised items. */
 function mergeArrays(existing: string[], incoming: string[]): string[] {
-  const seen = new Set(existing.map((s) => s.toLowerCase().trim()));
-  const result = [...existing];
-  for (const item of incoming) {
+  const safeExisting = (existing || []).filter((s): s is string => typeof s === "string");
+  const safeIncoming = (incoming || []).filter((s): s is string => typeof s === "string");
+  const seen = new Set(safeExisting.map((s) => s.toLowerCase().trim()));
+  const result = [...safeExisting];
+  for (const item of safeIncoming) {
     const key = item.toLowerCase().trim();
     if (key && !seen.has(key)) {
       seen.add(key);
