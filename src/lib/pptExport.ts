@@ -776,6 +776,7 @@ export const exportToPPT = async (
     // Framework Slide
     const frameworkSlide = pptx.addSlide();
     addBrandedBackground(frameworkSlide, theme);
+    addDecorativeMotif(frameworkSlide, theme, "diagonal");
     addSlideTitle(frameworkSlide, "Use Case Framework", theme);
 
     frameworkSlide.addText(`Selected Framework: ${useCaseData.framework}`, {
@@ -792,6 +793,7 @@ export const exportToPPT = async (
     // Journeys Slide
     const journeysSlide = pptx.addSlide();
     addBrandedBackground(journeysSlide, theme);
+    addDecorativeMotif(journeysSlide, theme, "dots");
     addSlideTitle(journeysSlide, "Always-on Journeys", theme);
 
     const journeysToShow = deckType === "executive"
@@ -816,6 +818,7 @@ export const exportToPPT = async (
     // Campaigns Slide
     const campaignsSlide = pptx.addSlide();
     addBrandedBackground(campaignsSlide, theme);
+    addDecorativeMotif(campaignsSlide, theme, "corner");
     addSlideTitle(campaignsSlide, "Contextual Campaigns", theme);
 
     const campaignsToShow = deckType === "executive"
@@ -850,6 +853,7 @@ export const exportToPPT = async (
     // Why Interactive Email
     const whyAmpSlide = pptx.addSlide();
     addBrandedBackground(whyAmpSlide, theme);
+    addDecorativeMotif(whyAmpSlide, theme, "side");
     addSlideTitle(whyAmpSlide, "Why Interactive Email", theme);
 
     whyAmpSlide.addText("Where AMP adds value:", {
@@ -885,6 +889,7 @@ export const exportToPPT = async (
     // Brand-led Carousel Template
     const brandCarouselSlide = pptx.addSlide();
     addBrandedBackground(brandCarouselSlide, theme);
+    addDecorativeMotif(brandCarouselSlide, theme, "diagonal");
     addSlideTitle(brandCarouselSlide, "Brand-led Carousel Template", theme);
 
     const carouselFeatures = [
@@ -914,6 +919,7 @@ export const exportToPPT = async (
     if (ampData.supportsGamification) {
       const gamifiedSlide = pptx.addSlide();
       addBrandedBackground(gamifiedSlide, theme);
+      addDecorativeMotif(gamifiedSlide, theme, "dots");
       addSlideTitle(gamifiedSlide, "Gamified Interactive Template", theme);
 
       const gamifiedFeatures = [
@@ -950,6 +956,7 @@ export const exportToPPT = async (
     // Performance slide
     const perfSlide = pptx.addSlide();
     addBrandedBackground(perfSlide, theme);
+    addDecorativeMotif(perfSlide, theme, "corner");
     addSlideTitle(perfSlide, "Campaign Performance", theme);
 
     perfSlide.addText(`${formatNumber(diagnosticsData.totalEmailsSent)} emails across ${diagnosticsData.totalCampaigns} campaigns`, {
@@ -970,6 +977,7 @@ export const exportToPPT = async (
     // Recommendations slide
     const recSlide = pptx.addSlide();
     addBrandedBackground(recSlide, theme);
+    addDecorativeMotif(recSlide, theme, "side");
     addSlideTitle(recSlide, "Key Recommendations", theme);
 
     diagnosticsData.recommendations.slice(0, 4).forEach((rec, i) => {
