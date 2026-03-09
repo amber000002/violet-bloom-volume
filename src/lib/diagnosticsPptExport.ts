@@ -971,6 +971,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const s7 = pptx.addSlide();
   addSlideBackground(s7, theme);
   addSlideHeader(s7, "Root Cause Summary", theme, undefined, slideNum);
+  // Subtle product imagery on insight slides
+  if (productImageBase64) {
+    s7.addImage({
+      data: productImageBase64,
+      x: 7, y: 3.5, w: 3, h: 2,
+      sizing: { type: "contain", w: 3, h: 2 },
+      transparency: 92,
+    });
+  }
 
   if (rootCauseEntries && rootCauseEntries.length > 0) {
     const cardY = 1.3;
