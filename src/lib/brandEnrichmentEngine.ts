@@ -5,7 +5,7 @@
  * following 7 merge rules from the PRD.
  */
 
-import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
+import { CoreBrandJSON, BrandDesignProfile, BrandVisualAssets } from "@/types/brandProfile";
 
 // ========== HELPERS ==========
 
