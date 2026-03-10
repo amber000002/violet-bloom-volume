@@ -249,15 +249,39 @@ const fetchLogoAsBase64 = async (url: string): Promise<string | null> => {
 
 // ============= HELPER FUNCTIONS =============
 
-const formatNumber = (num: number): string => num.toLocaleString("en-US", { maximumFractionDigits: 0 });
-const formatPercent = (num: number): string => `${num.toFixed(2)}%`;
+/**
+ * Sanitize text for PPTX XML safety:
+ * - Remove invalid XML 1.0 characters (control chars except tab/newline/carriage-return)
+ * - Remove unpaired surrogates that break XML serialization
+ * - Strip emojis that may use surrogate pairs and cause corruption
+ */
+const sanitizeText = (text: string | null | undefined): string => {
+  if (!text) return "";
+  // Remove XML-invalid control characters (0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F, 0x7F)
+  let cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  // Remove characters outside the Basic Multilingual Plane (emojis, supplementary chars)
+  // that use surrogate pairs and can corrupt PPTX XML
+  cleaned = cleaned.replace(/[\uD800-\uDFFF]/g, "");
+  // Also remove common emoji ranges that might slip through
+  cleaned = cleaned.replace(/[\u{10000}-\u{10FFFF}]/gu, "");
+  return cleaned;
+};
+
+const formatNumber = (num: number): string => {
+  if (!isFinite(num) || isNaN(num)) return "0";
+  return num.toLocaleString("en-US", { maximumFractionDigits: 0 });
+};
+const formatPercent = (num: number): string => {
+  if (!isFinite(num) || isNaN(num)) return "0.00%";
+  return `${num.toFixed(2)}%`;
+};
 
 const cleanSubjectLine = (subject: string): string => {
   if (!subject) return "";
   let cleaned = subject.replace(/^\{Subject:\s*/i, "").replace(/\}$/, "").trim();
   cleaned = cleaned.split('|')[0].trim();
   cleaned = cleaned.split(',Preheader:')[0].trim();
-  return cleaned;
+  return sanitizeText(cleaned);
 };
 
 type MetricType = "openRate" | "clickRate" | "bounceRate" | "unsubscribeRate";
