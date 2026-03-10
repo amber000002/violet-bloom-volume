@@ -658,26 +658,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       .sort((a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime());
 
     const useDeliveredForChart = report.providerAggregates[0]?.useDeliveredAsDenominator;
-    const chartLabels = sortedDates;
+    const chartLabels = sortedDates.map(d => sanitizeText(d));
+    const safeRate = (num: number, denom: number) => denom > 0 ? (num / denom) * 100 : 0;
     const openRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.viewed / base) * 100 : 0;
+      return safeRate(v.viewed, base);
     });
     const clickRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.clicked / base) * 100 : 0;
+      return safeRate(v.clicked, base);
     });
     const unsubRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.unsubs / base) * 100 : 0;
+      return safeRate(v.unsubs, base);
     });
     const bounceRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.bounces / base) * 100 : 0;
+      return safeRate(v.bounces, base);
     });
 
     if (chartLabels.length > 0) {
