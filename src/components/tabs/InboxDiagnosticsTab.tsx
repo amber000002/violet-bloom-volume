@@ -1418,10 +1418,11 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
                     brandProfile: brandProfile || null,
                     signalHealthData: signalHealth.map(s => ({ metric: s.signal, currentValue: s.latestValue?.toString() || "N/A", status: s.status, trend: s.trend })),
-                    rootCauseEntries: rootCauses.map(rc => ({ cause: rc.likelyCause || "Unknown", evidence: rc.negativeSignals?.map((ns: any) => ns.signal).join(", ") || "", priority: "P1" })),
                     intelligentLearnings: learnings,
                     industry,
                     sourceFileName: campaignFileName,
+                    creativeAnalysis: creativeAnalysis || null,
+                    creativeImage: creativeImage || null,
                   });
                 }}
                 className="gap-2"
