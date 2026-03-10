@@ -249,15 +249,39 @@ const fetchLogoAsBase64 = async (url: string): Promise<string | null> => {
 
 // ============= HELPER FUNCTIONS =============
 
-const formatNumber = (num: number): string => num.toLocaleString("en-US", { maximumFractionDigits: 0 });
-const formatPercent = (num: number): string => `${num.toFixed(2)}%`;
+/**
+ * Sanitize text for PPTX XML safety:
+ * - Remove invalid XML 1.0 characters (control chars except tab/newline/carriage-return)
+ * - Remove unpaired surrogates that break XML serialization
+ * - Strip emojis that may use surrogate pairs and cause corruption
+ */
+const sanitizeText = (text: string | null | undefined): string => {
+  if (!text) return "";
+  // Remove XML-invalid control characters (0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F, 0x7F)
+  let cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  // Remove characters outside the Basic Multilingual Plane (emojis, supplementary chars)
+  // that use surrogate pairs and can corrupt PPTX XML
+  cleaned = cleaned.replace(/[\uD800-\uDFFF]/g, "");
+  // Also remove common emoji ranges that might slip through
+  cleaned = cleaned.replace(/[\u{10000}-\u{10FFFF}]/gu, "");
+  return cleaned;
+};
+
+const formatNumber = (num: number): string => {
+  if (!isFinite(num) || isNaN(num)) return "0";
+  return num.toLocaleString("en-US", { maximumFractionDigits: 0 });
+};
+const formatPercent = (num: number): string => {
+  if (!isFinite(num) || isNaN(num)) return "0.00%";
+  return `${num.toFixed(2)}%`;
+};
 
 const cleanSubjectLine = (subject: string): string => {
   if (!subject) return "";
   let cleaned = subject.replace(/^\{Subject:\s*/i, "").replace(/\}$/, "").trim();
   cleaned = cleaned.split('|')[0].trim();
   cleaned = cleaned.split(',Preheader:')[0].trim();
-  return cleaned;
+  return sanitizeText(cleaned);
 };
 
 type MetricType = "openRate" | "clickRate" | "bounceRate" | "unsubscribeRate";
@@ -435,10 +459,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       s0.addText("LOGO", { x: 3.75, y: 0.6, w: 2.5, h: 1.2, fontSize: 14, color: "FFFFFF", fontFace: FONTS.body, align: "center", valign: "middle", transparency: 50 });
     }
 
-    const deckBrandName = brandProfile?.brand_identity?.brand_name || brandName || "Email";
+    const deckBrandName = sanitizeText(brandProfile?.brand_identity?.brand_name || brandName || "Email");
     s0.addText(`${deckBrandName}\nInbox Diagnostics Report`, { x: 0.5, y: 2.1, w: 9, h: 1.4, fontSize: 36, bold: true, color: "FFFFFF", fontFace: FONTS.headline, align: "center", valign: "middle", lineSpacingMultiple: 1.2 });
     s0.addText("Executive Performance Report", { x: 0.5, y: 3.4, w: 9, h: 0.5, fontSize: 16, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 20 });
-    if (monthRange) s0.addText(monthRange, { x: 0.5, y: 4.1, w: 9, h: 0.4, fontSize: 13, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 35 });
+    if (monthRange) s0.addText(sanitizeText(monthRange), { x: 0.5, y: 4.1, w: 9, h: 0.4, fontSize: 13, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 35 });
     s0.addShape("rect" as pptxgen.SHAPE_NAME, { x: 3, y: 4.8, w: 4, h: 0.04, fill: { color: "FFFFFF", transparency: 50 } });
     const now = new Date();
     s0.addText(`Generated: ${now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, { x: 0.5, y: 5.0, w: 9, h: 0.3, fontSize: 9, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 50 });
@@ -475,7 +499,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       totals.soft += p.softBounces;
 
       const row: pptxgen.TableCell[] = [
-        { text: `${p.serviceProvider} / ${p.providerName}`, options: bodyCellOpts(theme, ri) },
+        { text: sanitizeText(`${p.serviceProvider} / ${p.providerName}`), options: bodyCellOpts(theme, ri) },
         { text: formatNumber(p.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
       ];
       if (useDelivered) row.push({ text: formatNumber(p.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "right") });
@@ -555,7 +579,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     monthlyData.forEach((m, ri) => {
       const row: pptxgen.TableCell[] = [
-        { text: m.month, options: bodyCellOpts(theme, ri) },
+        { text: sanitizeText(m.month), options: bodyCellOpts(theme, ri) },
         { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "right") },
         { text: formatNumber(m.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
       ];
@@ -634,26 +658,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       .sort((a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime());
 
     const useDeliveredForChart = report.providerAggregates[0]?.useDeliveredAsDenominator;
-    const chartLabels = sortedDates;
+    const chartLabels = sortedDates.map(d => sanitizeText(d));
+    const safeRate = (num: number, denom: number) => denom > 0 ? (num / denom) * 100 : 0;
     const openRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.viewed / base) * 100 : 0;
+      return safeRate(v.viewed, base);
     });
     const clickRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.clicked / base) * 100 : 0;
+      return safeRate(v.clicked, base);
     });
     const unsubRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.unsubs / base) * 100 : 0;
+      return safeRate(v.unsubs, base);
     });
     const bounceRateData = sortedDates.map(d => {
       const v = dailyMap.get(d)!;
       const base = useDeliveredForChart ? v.delivered : v.sent;
-      return base > 0 ? (v.bounces / base) * 100 : 0;
+      return safeRate(v.bounces, base);
     });
 
     if (chartLabels.length > 0) {
@@ -708,9 +733,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       infra.domains.forEach((d, ri) => {
         domRows.push([
-          { text: d.domain, options: bodyCellOpts(theme, ri) },
-          { text: d.provider || "—", options: bodyCellOpts(theme, ri) },
-          { text: d.reputation, options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
+          { text: sanitizeText(d.domain), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(d.provider) || "—", options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(d.reputation), options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
         ]);
       });
 
@@ -775,10 +800,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         const statusColor = sig.status === "healthy" ? theme.green : sig.status === "warning" ? theme.amber : theme.red;
         const trendColor = sig.trend === "improving" ? theme.green : sig.trend === "stable" ? theme.mutedColor : theme.red;
         shRows.push([
-          { text: sig.metric, options: bodyCellOpts(theme, ri) },
-          { text: sig.currentValue, options: bodyCellOpts(theme, ri, "center") },
-          { text: sig.status, options: bodyCellOpts(theme, ri, "center", statusColor) },
-          { text: sig.trend, options: bodyCellOpts(theme, ri, "center", trendColor) },
+          { text: sanitizeText(sig.metric), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(sig.currentValue), options: bodyCellOpts(theme, ri, "center") },
+          { text: sanitizeText(sig.status), options: bodyCellOpts(theme, ri, "center", statusColor) },
+          { text: sanitizeText(sig.trend), options: bodyCellOpts(theme, ri, "center", trendColor) },
         ]);
       });
 
@@ -806,7 +831,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
       const pmData = diagnostics.postmasterData;
-      const pmDates = pmData.map(p => p.date);
+      const pmDates = pmData.map(p => sanitizeText(p.date));
       const spamData = pmData.map(p => (p.spamRatio || 0) * 100);
       const errorData = pmData.map(p => (p.errorRatio || 0) * 100);
 
@@ -869,8 +894,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const hardPct = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
     const softPct = denom > 0 ? (c.softBounces / denom) * 100 : 0;
     return [
-      { text: c.startDate || "—", options: bodyCellOpts(theme, ri) },
-      { text: (c.campaignName || "").substring(0, 40), options: bodyCellOpts(theme, ri) },
+      { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri) },
+      { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri) },
       { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
       { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
@@ -1014,8 +1039,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.effectivePractices.forEach((p, ri) => {
         practiceRows.push([
-          { text: p.area, options: bodyCellOpts(theme, ri) },
-          { text: p.practice, options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(p.area), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(p.practice), options: bodyCellOpts(theme, ri) },
         ]);
       });
 
@@ -1054,9 +1079,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.riskAreas.forEach((r, ri) => {
         riskRows.push([
-          { text: r.area, options: bodyCellOpts(theme, ri) },
-          { text: r.observation, options: bodyCellOpts(theme, ri) },
-          { text: r.impact, options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.area), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.observation), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.impact), options: bodyCellOpts(theme, ri) },
         ]);
       });
 
@@ -1090,7 +1115,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           fontSize: 10, bold: true, color: theme.primary, fontFace: FONTS.body, align: "center", valign: "middle",
         });
         // Recommendation text
-        s.addText(imp, {
+        s.addText(sanitizeText(imp), {
           x: 1.3, y: y, w: 8, h: 0.45,
           fontSize: 10, color: theme.bodyColor, fontFace: FONTS.body, valign: "middle",
         });
@@ -1258,9 +1283,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       intelligentLearnings.forEach((rec, ri) => {
         const prioColor = rec.priority === "P0" ? theme.red : rec.priority === "P1" ? theme.amber : theme.primary;
         klRows.push([
-          { text: rec.issue, options: { ...bodyCellOpts(theme, ri), valign: "top" } },
-          { text: rec.recommendation, options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor, valign: "top" } },
-          { text: rec.priority, options: { ...bodyCellOpts(theme, ri, "center", prioColor), bold: true } },
+          { text: sanitizeText(rec.issue), options: { ...bodyCellOpts(theme, ri), valign: "top" } },
+          { text: sanitizeText(rec.recommendation), options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor, valign: "top" } },
+          { text: sanitizeText(rec.priority), options: { ...bodyCellOpts(theme, ri, "center", prioColor), bold: true } },
         ]);
       });
 
@@ -1280,8 +1305,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         ];
         allLearnings.slice(0, 8).forEach((l, ri) => {
           klRows.push([
-            { text: l.title, options: bodyCellOpts(theme, ri) },
-            { text: l.description, options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor } },
+            { text: sanitizeText(l.title), options: bodyCellOpts(theme, ri) },
+            { text: sanitizeText(l.description), options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor } },
           ]);
         });
         s.addTable(klRows, {
