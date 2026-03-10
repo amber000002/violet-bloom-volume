@@ -1109,14 +1109,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fontFace: FONTS.body,
       });
 
-      // Center: Creative image
+      // Center: Creative image — use contain to preserve aspect ratio without stretching
       if (creativeImage) {
         s.addImage({
           data: creativeImage,
-          x: 3.5, y: 1.35, w: 3, h: 3.5,
-          sizing: { type: "contain", w: 3, h: 3.5 },
+          x: 3.6, y: 1.35, w: 2.8, h: 3.2,
+          sizing: { type: "contain", w: 2.8, h: 3.2 },
         });
-      } else {
+      } else if (false) {
+        // placeholder disabled
         s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
           x: 3.8, y: 1.8, w: 2.4, h: 2.5,
           fill: { color: theme.altRowBg },
