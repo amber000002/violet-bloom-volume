@@ -966,26 +966,35 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }));
   const worstFiltered = allCampaignsForSort.filter(c => (c.campaignName || "").trim() !== "");
 
-  // Best Performing — single slide, top 5 by Open Rate + by CTR
+  // Best Performing — by Open Rate (separate slide)
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Best Performing Campaigns", theme, undefined, slideNum);
+    addSlideHeader(s, "Best Performing Campaigns — by Open Rate", theme, undefined, slideNum);
 
     const byOpenRate = [...allCampaignsForSort].sort((a, b) => b.openRate - a.openRate).slice(0, 5);
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Sorted by Unique Open Rate (Top 5)", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addText("Top 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.2, w: 9.6, colW: campaignColW,
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
+    addSlideFooter(s, theme, hasPostmasterData);
+  }
 
-    // Also add by CTR below if space
+  // Best Performing — by CTR (separate slide)
+  slideNum++;
+  {
+    const s = pptx.addSlide();
+    addSlideBackground(s, theme);
+    addDecorativeMotif(s, theme, "corner");
+    addSlideHeader(s, "Best Performing Campaigns — by CTR", theme, undefined, slideNum);
+
     const byCTR = [...allCampaignsForSort]
       .sort((a, b) => {
         const ctrA = a.uniqueViewed > 0 ? (a.uniqueClicked / a.uniqueViewed) * 100 : 0;
@@ -993,29 +1002,26 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         return ctrB - ctrA;
       }).slice(0, 5);
 
-    const rows2: pptxgen.TableRow[] = [createFullCampaignHeader()];
-    byCTR.forEach((c, ri) => rows2.push(createFullCampaignRow(c, ri)));
+    const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
+    byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    const tableEndY = 1.2 + (rows.length) * 0.28 + 0.15;
-    s.addText("Sorted by Unique CTR (Top 5)", { x: 0.5, y: tableEndY, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
-    s.addTable(rows2, {
-      x: 0.2, y: tableEndY + 0.2, w: 9.6, colW: campaignColW,
+    s.addText("Top 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addTable(rows, {
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
-
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
-  // Underperforming — single slide, bottom 5 by Open Rate + by CTR
+  // Underperforming — by Open Rate (separate slide)
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "side");
-    addSlideHeader(s, "Underperforming Campaigns", theme, undefined, slideNum);
+    addSlideHeader(s, "Underperforming Campaigns — by Open Rate", theme, undefined, slideNum);
 
-    // Amber border accent
     s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
       x: 0.1, y: 0.15, w: 9.8, h: 0.9,
       fill: { color: theme.slideBg, transparency: 100 },
@@ -1026,11 +1032,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Sorted by Unique Open Rate (Bottom 5)", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addText("Bottom 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.2, w: 9.6, colW: campaignColW,
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
+    });
+    addSlideFooter(s, theme, hasPostmasterData);
+  }
+
+  // Underperforming — by CTR (separate slide)
+  slideNum++;
+  {
+    const s = pptx.addSlide();
+    addSlideBackground(s, theme);
+    addDecorativeMotif(s, theme, "side");
+    addSlideHeader(s, "Underperforming Campaigns — by CTR", theme, undefined, slideNum);
+
+    s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+      x: 0.1, y: 0.15, w: 9.8, h: 0.9,
+      fill: { color: theme.slideBg, transparency: 100 },
+      line: { color: theme.amber, width: 1 }, rectRadius: 0.06,
     });
 
     const byCTR = [...worstFiltered]
@@ -1040,17 +1062,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         return ctrA - ctrB;
       }).slice(0, 5);
 
-    const rows2: pptxgen.TableRow[] = [createFullCampaignHeader()];
-    byCTR.forEach((c, ri) => rows2.push(createFullCampaignRow(c, ri)));
+    const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
+    byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    const tableEndY = 1.2 + (rows.length) * 0.28 + 0.15;
-    s.addText("Sorted by Unique CTR (Bottom 5)", { x: 0.5, y: tableEndY, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
-    s.addTable(rows2, {
-      x: 0.2, y: tableEndY + 0.2, w: 9.6, colW: campaignColW,
+    s.addText("Bottom 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addTable(rows, {
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
-
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
