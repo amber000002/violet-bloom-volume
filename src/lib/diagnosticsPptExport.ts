@@ -579,7 +579,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     monthlyData.forEach((m, ri) => {
       const row: pptxgen.TableCell[] = [
-        { text: m.month, options: bodyCellOpts(theme, ri) },
+        { text: sanitizeText(m.month), options: bodyCellOpts(theme, ri) },
         { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "right") },
         { text: formatNumber(m.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
       ];
