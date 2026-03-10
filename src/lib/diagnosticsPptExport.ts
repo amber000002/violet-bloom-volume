@@ -615,8 +615,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
   // ==========================================
   // SLIDE 4: Email Metrics Trend (Daily Line Chart)
-  // Metrics: Open Rate, Click Rate, Unsub Rate, Bounce Rate
-  // Uses daily campaign-level data points
+  // Shows absolute values: Sent, Delivered, Unique Opens, Unique Clicks, Bounces, Unsubscribes
+  // Matches the app's Email Metrics Trend chart exactly
   // ==========================================
   slideNum++;
   {
@@ -641,7 +641,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     // Sort by date
     const parseDateKey = (d: string): Date => {
-      // Handle DD/MM/YY or DD/MM/YYYY
       const parts = d.split("/");
       if (parts.length === 3) {
         const day = parseInt(parts[0], 10);
@@ -657,50 +656,65 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       .filter(d => d !== "Unknown")
       .sort((a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime());
 
-    const useDeliveredForChart = report.providerAggregates[0]?.useDeliveredAsDenominator;
     const chartLabels = sortedDates.map(d => sanitizeText(d));
-    const safeRate = (num: number, denom: number) => denom > 0 ? (num / denom) * 100 : 0;
-    const openRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.viewed, base);
-    });
-    const clickRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.clicked, base);
-    });
-    const unsubRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.unsubs, base);
-    });
-    const bounceRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.bounces, base);
-    });
+    
+    // Absolute values — matching the app chart
+    const sentData = sortedDates.map(d => dailyMap.get(d)!.sent);
+    const deliveredData = sortedDates.map(d => dailyMap.get(d)!.delivered);
+    const viewedData = sortedDates.map(d => dailyMap.get(d)!.viewed);
+    const clickedData = sortedDates.map(d => dailyMap.get(d)!.clicked);
+    const bouncesData = sortedDates.map(d => dailyMap.get(d)!.bounces);
+    const unsubsData = sortedDates.map(d => dailyMap.get(d)!.unsubs);
+
+    // Check if delivered data has any non-zero values
+    const hasDelivered = deliveredData.some(v => v > 0);
 
     if (chartLabels.length > 0) {
-      s.addChart("line" as pptxgen.CHART_NAME, [
-        { name: "Open Rate %", labels: chartLabels, values: openRateData },
-        { name: "Click Rate %", labels: chartLabels, values: clickRateData },
-        { name: "Unsub Rate %", labels: chartLabels, values: unsubRateData },
-        { name: "Bounce Rate %", labels: chartLabels, values: bounceRateData },
-      ], {
-        x: 0.5, y: 1.15, w: 9, h: 3.8,
-        showLegend: true, legendPos: "b", legendFontSize: 9,
-        lineSmooth: true, lineSize: 2, showValue: false,
-        catAxisLabelFontSize: 7, valAxisLabelFontSize: 8,
+      const chartSeries: { name: string; labels: string[]; values: number[] }[] = [
+        { name: "Sent", labels: chartLabels, values: sentData },
+      ];
+      const colors: string[] = [
+        "EC4899", // pink/rose for Sent
+      ];
+      if (hasDelivered) {
+        chartSeries.push({ name: "Delivered", labels: chartLabels, values: deliveredData });
+        colors.push("06B6D4"); // cyan for Delivered
+      }
+      chartSeries.push(
+        { name: "Unique Opens", labels: chartLabels, values: viewedData },
+        { name: "Unique Clicks", labels: chartLabels, values: clickedData },
+        { name: "Bounces", labels: chartLabels, values: bouncesData },
+        { name: "Unsubscribes", labels: chartLabels, values: unsubsData },
+      );
+      colors.push(
+        "374151", // dark gray for Opens
+        "10B981", // green for Clicks
+        "F97316", // orange for Bounces
+        "8B5CF6", // purple for Unsubs
+      );
+
+      // Grand Total Averages caption
+      const totalSent = sentData.reduce((a, b) => a + b, 0);
+      const totalViewed = viewedData.reduce((a, b) => a + b, 0);
+      const totalClicked = clickedData.reduce((a, b) => a + b, 0);
+      const totalBounces = bouncesData.reduce((a, b) => a + b, 0);
+      const totalUnsubs = unsubsData.reduce((a, b) => a + b, 0);
+      const denom = totalSent || 1;
+      const avgLine = `Grand Total Avg:  Open Rate: ${((totalViewed / denom) * 100).toFixed(1)}%   Click Rate: ${((totalClicked / denom) * 100).toFixed(1)}%   Bounce Rate: ${((totalBounces / denom) * 100).toFixed(2)}%   Unsub Rate: ${((totalUnsubs / denom) * 100).toFixed(2)}%`;
+      s.addText(sanitizeText(avgLine), { x: 0.5, y: 1.0, w: 9, h: 0.25, fontSize: 7, color: theme.bodyColor, fontFace: FONTS.body });
+
+      s.addChart("line" as pptxgen.CHART_NAME, chartSeries, {
+        x: 0.3, y: 1.3, w: 9.4, h: 3.5,
+        showLegend: true, legendPos: "t", legendFontSize: 8,
+        lineSmooth: false, lineSize: 1.5, showValue: false,
+        catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
+        catAxisLabelRotate: 45,
         catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
         valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
-        chartColors: [
-          (brandProfile?.brand_design_profile?.chart_palette?.primary || "").replace("#", "") || theme.primary,
-          (brandProfile?.brand_design_profile?.chart_palette?.secondary || "").replace("#", "") || theme.secondary,
-          theme.amber,
-          theme.red,
-        ],
+        chartColors: colors,
       });
+
+      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, { x: 0.5, y: 4.9, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     } else {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
