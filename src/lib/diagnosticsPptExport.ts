@@ -1039,8 +1039,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.effectivePractices.forEach((p, ri) => {
         practiceRows.push([
-          { text: p.area, options: bodyCellOpts(theme, ri) },
-          { text: p.practice, options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(p.area), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(p.practice), options: bodyCellOpts(theme, ri) },
         ]);
       });
 
