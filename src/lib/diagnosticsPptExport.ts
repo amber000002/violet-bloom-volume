@@ -831,7 +831,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
       const pmData = diagnostics.postmasterData;
-      const pmDates = pmData.map(p => p.date);
+      const pmDates = pmData.map(p => sanitizeText(p.date));
       const spamData = pmData.map(p => (p.spamRatio || 0) * 100);
       const errorData = pmData.map(p => (p.errorRatio || 0) * 100);
 
