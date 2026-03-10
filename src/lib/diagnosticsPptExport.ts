@@ -499,7 +499,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       totals.soft += p.softBounces;
 
       const row: pptxgen.TableCell[] = [
-        { text: `${p.serviceProvider} / ${p.providerName}`, options: bodyCellOpts(theme, ri) },
+        { text: sanitizeText(`${p.serviceProvider} / ${p.providerName}`), options: bodyCellOpts(theme, ri) },
         { text: formatNumber(p.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
       ];
       if (useDelivered) row.push({ text: formatNumber(p.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "right") });
