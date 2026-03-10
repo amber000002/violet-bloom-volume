@@ -800,10 +800,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         const statusColor = sig.status === "healthy" ? theme.green : sig.status === "warning" ? theme.amber : theme.red;
         const trendColor = sig.trend === "improving" ? theme.green : sig.trend === "stable" ? theme.mutedColor : theme.red;
         shRows.push([
-          { text: sig.metric, options: bodyCellOpts(theme, ri) },
-          { text: sig.currentValue, options: bodyCellOpts(theme, ri, "center") },
-          { text: sig.status, options: bodyCellOpts(theme, ri, "center", statusColor) },
-          { text: sig.trend, options: bodyCellOpts(theme, ri, "center", trendColor) },
+          { text: sanitizeText(sig.metric), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(sig.currentValue), options: bodyCellOpts(theme, ri, "center") },
+          { text: sanitizeText(sig.status), options: bodyCellOpts(theme, ri, "center", statusColor) },
+          { text: sanitizeText(sig.trend), options: bodyCellOpts(theme, ri, "center", trendColor) },
         ]);
       });
 
