@@ -1305,8 +1305,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         ];
         allLearnings.slice(0, 8).forEach((l, ri) => {
           klRows.push([
-            { text: l.title, options: bodyCellOpts(theme, ri) },
-            { text: l.description, options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor } },
+            { text: sanitizeText(l.title), options: bodyCellOpts(theme, ri) },
+            { text: sanitizeText(l.description), options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor } },
           ]);
         });
         s.addTable(klRows, {
