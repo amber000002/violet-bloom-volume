@@ -1115,7 +1115,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           fontSize: 10, bold: true, color: theme.primary, fontFace: FONTS.body, align: "center", valign: "middle",
         });
         // Recommendation text
-        s.addText(imp, {
+        s.addText(sanitizeText(imp), {
           x: 1.3, y: y, w: 8, h: 0.45,
           fontSize: 10, color: theme.bodyColor, fontFace: FONTS.body, valign: "middle",
         });
