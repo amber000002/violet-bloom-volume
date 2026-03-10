@@ -1079,9 +1079,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.riskAreas.forEach((r, ri) => {
         riskRows.push([
-          { text: r.area, options: bodyCellOpts(theme, ri) },
-          { text: r.observation, options: bodyCellOpts(theme, ri) },
-          { text: r.impact, options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.area), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.observation), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.impact), options: bodyCellOpts(theme, ri) },
         ]);
       });
 
