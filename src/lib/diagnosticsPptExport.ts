@@ -866,16 +866,16 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
 
       const chartConfigs = [
-        { name: "IP Reputation", data: ipRepData, color: theme.primary, min: 0, max: 3 },
-        { name: "Domain Reputation", data: domainRepData, color: theme.secondary, min: 0, max: 3 },
-        { name: "Spam Ratio %", data: spamData, color: theme.red },
-        { name: "Error Ratio %", data: errorData, color: theme.amber },
+        { name: "IP Reputation", data: ipRepData, color: theme.primary, min: 0, max: 3, isReputation: true },
+        { name: "Domain Reputation", data: domainRepData, color: theme.secondary, min: 0, max: 3, isReputation: true },
+        { name: "Spam Ratio %", data: spamData, color: theme.red, isReputation: false },
+        { name: "Error Ratio %", data: errorData, color: theme.amber, isReputation: false },
       ];
 
       chartConfigs.forEach((cfg, i) => {
         const opts: any = {
           ...chartPositions[i],
-          showLegend: false, lineSmooth: cfg.name.includes("Ratio"), lineSize: 2,
+          showLegend: false, lineSmooth: !cfg.isReputation, lineSize: 2,
           catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
           catGridLine: { style: "none" },
           valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" },
@@ -885,7 +885,32 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         if (cfg.min !== undefined) opts.valAxisMinVal = cfg.min;
         if (cfg.max !== undefined) opts.valAxisMaxVal = cfg.max;
 
+        // For reputation charts, use custom labels: BAD(0), LOW(1), MEDIUM(2), HIGH(3)
+        if (cfg.isReputation) {
+          opts.valAxisLabelFormatCode = "General";
+          opts.valAxisMajorUnit = 1;
+          // pptxgenjs doesn't support custom value axis labels natively,
+          // so we add text annotations for the Y-axis levels
+        }
+
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: pmDates, values: cfg.data }], opts);
+
+        // Add reputation level labels as text overlays for reputation charts
+        if (cfg.isReputation) {
+          const pos = chartPositions[i];
+          const repLabels = ["BAD", "LOW", "MEDIUM", "HIGH"];
+          const chartAreaX = pos.x + 0.35; // left edge of chart area
+          const chartTop = pos.y + 0.3; // top of chart plot area
+          const chartHeight = pos.h - 0.6; // plot area height
+          repLabels.forEach((label, li) => {
+            const yPos = chartTop + chartHeight - (li / 3) * chartHeight - 0.08;
+            s.addText(label, {
+              x: chartAreaX - 0.55, y: yPos, w: 0.55, h: 0.16,
+              fontSize: 5, color: li >= 2 ? theme.green : li === 1 ? theme.amber : theme.red,
+              fontFace: FONTS.body, align: "right", bold: true,
+            });
+          });
+        }
       });
     } else {
       s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
