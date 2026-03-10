@@ -361,11 +361,11 @@ const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, hasPostmasterDa
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "left"): pptxgen.TableCellProps => ({
-  bold: true, fill: { color: theme.headerBg }, fontSize: 8, align, color: theme.titleColor, fontFace: FONTS.body,
+  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body,
 });
 
 const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "left", color?: string): pptxgen.TableCellProps => ({
-  fontSize: 8, align, color: color || theme.bodyColor, fontFace: FONTS.body,
+  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body,
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
 });
 
@@ -615,8 +615,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
   // ==========================================
   // SLIDE 4: Email Metrics Trend (Daily Line Chart)
-  // Metrics: Open Rate, Click Rate, Unsub Rate, Bounce Rate
-  // Uses daily campaign-level data points
+  // Shows absolute values: Sent, Delivered, Unique Opens, Unique Clicks, Bounces, Unsubscribes
+  // Matches the app's Email Metrics Trend chart exactly
   // ==========================================
   slideNum++;
   {
@@ -641,7 +641,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     // Sort by date
     const parseDateKey = (d: string): Date => {
-      // Handle DD/MM/YY or DD/MM/YYYY
       const parts = d.split("/");
       if (parts.length === 3) {
         const day = parseInt(parts[0], 10);
@@ -657,50 +656,65 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       .filter(d => d !== "Unknown")
       .sort((a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime());
 
-    const useDeliveredForChart = report.providerAggregates[0]?.useDeliveredAsDenominator;
     const chartLabels = sortedDates.map(d => sanitizeText(d));
-    const safeRate = (num: number, denom: number) => denom > 0 ? (num / denom) * 100 : 0;
-    const openRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.viewed, base);
-    });
-    const clickRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.clicked, base);
-    });
-    const unsubRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.unsubs, base);
-    });
-    const bounceRateData = sortedDates.map(d => {
-      const v = dailyMap.get(d)!;
-      const base = useDeliveredForChart ? v.delivered : v.sent;
-      return safeRate(v.bounces, base);
-    });
+    
+    // Absolute values — matching the app chart
+    const sentData = sortedDates.map(d => dailyMap.get(d)!.sent);
+    const deliveredData = sortedDates.map(d => dailyMap.get(d)!.delivered);
+    const viewedData = sortedDates.map(d => dailyMap.get(d)!.viewed);
+    const clickedData = sortedDates.map(d => dailyMap.get(d)!.clicked);
+    const bouncesData = sortedDates.map(d => dailyMap.get(d)!.bounces);
+    const unsubsData = sortedDates.map(d => dailyMap.get(d)!.unsubs);
+
+    // Check if delivered data has any non-zero values
+    const hasDelivered = deliveredData.some(v => v > 0);
 
     if (chartLabels.length > 0) {
-      s.addChart("line" as pptxgen.CHART_NAME, [
-        { name: "Open Rate %", labels: chartLabels, values: openRateData },
-        { name: "Click Rate %", labels: chartLabels, values: clickRateData },
-        { name: "Unsub Rate %", labels: chartLabels, values: unsubRateData },
-        { name: "Bounce Rate %", labels: chartLabels, values: bounceRateData },
-      ], {
-        x: 0.5, y: 1.15, w: 9, h: 3.8,
-        showLegend: true, legendPos: "b", legendFontSize: 9,
-        lineSmooth: true, lineSize: 2, showValue: false,
-        catAxisLabelFontSize: 7, valAxisLabelFontSize: 8,
+      const chartSeries: { name: string; labels: string[]; values: number[] }[] = [
+        { name: "Sent", labels: chartLabels, values: sentData },
+      ];
+      const colors: string[] = [
+        "EC4899", // pink/rose for Sent
+      ];
+      if (hasDelivered) {
+        chartSeries.push({ name: "Delivered", labels: chartLabels, values: deliveredData });
+        colors.push("06B6D4"); // cyan for Delivered
+      }
+      chartSeries.push(
+        { name: "Unique Opens", labels: chartLabels, values: viewedData },
+        { name: "Unique Clicks", labels: chartLabels, values: clickedData },
+        { name: "Bounces", labels: chartLabels, values: bouncesData },
+        { name: "Unsubscribes", labels: chartLabels, values: unsubsData },
+      );
+      colors.push(
+        "374151", // dark gray for Opens
+        "10B981", // green for Clicks
+        "F97316", // orange for Bounces
+        "8B5CF6", // purple for Unsubs
+      );
+
+      // Grand Total Averages caption
+      const totalSent = sentData.reduce((a, b) => a + b, 0);
+      const totalViewed = viewedData.reduce((a, b) => a + b, 0);
+      const totalClicked = clickedData.reduce((a, b) => a + b, 0);
+      const totalBounces = bouncesData.reduce((a, b) => a + b, 0);
+      const totalUnsubs = unsubsData.reduce((a, b) => a + b, 0);
+      const denom = totalSent || 1;
+      const avgLine = `Grand Total Avg:  Open Rate: ${((totalViewed / denom) * 100).toFixed(1)}%   Click Rate: ${((totalClicked / denom) * 100).toFixed(1)}%   Bounce Rate: ${((totalBounces / denom) * 100).toFixed(2)}%   Unsub Rate: ${((totalUnsubs / denom) * 100).toFixed(2)}%`;
+      s.addText(sanitizeText(avgLine), { x: 0.5, y: 1.0, w: 9, h: 0.25, fontSize: 7, color: theme.bodyColor, fontFace: FONTS.body });
+
+      s.addChart("line" as pptxgen.CHART_NAME, chartSeries, {
+        x: 0.3, y: 1.3, w: 9.4, h: 3.5,
+        showLegend: true, legendPos: "t", legendFontSize: 8,
+        lineSmooth: false, lineSize: 1.5, showValue: false,
+        catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
+        catAxisLabelRotate: 45,
         catGridLine: { style: "none" } as pptxgen.OptsChartGridLine,
         valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" } as pptxgen.OptsChartGridLine,
-        chartColors: [
-          (brandProfile?.brand_design_profile?.chart_palette?.primary || "").replace("#", "") || theme.primary,
-          (brandProfile?.brand_design_profile?.chart_palette?.secondary || "").replace("#", "") || theme.secondary,
-          theme.amber,
-          theme.red,
-        ],
+        chartColors: colors,
       });
+
+      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, { x: 0.5, y: 4.9, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     } else {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
@@ -852,16 +866,16 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
 
       const chartConfigs = [
-        { name: "IP Reputation", data: ipRepData, color: theme.primary, min: 0, max: 3 },
-        { name: "Domain Reputation", data: domainRepData, color: theme.secondary, min: 0, max: 3 },
-        { name: "Spam Ratio %", data: spamData, color: theme.red },
-        { name: "Error Ratio %", data: errorData, color: theme.amber },
+        { name: "IP Reputation", data: ipRepData, color: theme.primary, min: 0, max: 3, isReputation: true },
+        { name: "Domain Reputation", data: domainRepData, color: theme.secondary, min: 0, max: 3, isReputation: true },
+        { name: "Spam Ratio %", data: spamData, color: theme.red, isReputation: false },
+        { name: "Error Ratio %", data: errorData, color: theme.amber, isReputation: false },
       ];
 
       chartConfigs.forEach((cfg, i) => {
         const opts: any = {
           ...chartPositions[i],
-          showLegend: false, lineSmooth: cfg.name.includes("Ratio"), lineSize: 2,
+          showLegend: false, lineSmooth: !cfg.isReputation, lineSize: 2,
           catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
           catGridLine: { style: "none" },
           valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" },
@@ -871,7 +885,32 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         if (cfg.min !== undefined) opts.valAxisMinVal = cfg.min;
         if (cfg.max !== undefined) opts.valAxisMaxVal = cfg.max;
 
+        // For reputation charts, use custom labels: BAD(0), LOW(1), MEDIUM(2), HIGH(3)
+        if (cfg.isReputation) {
+          opts.valAxisLabelFormatCode = "General";
+          opts.valAxisMajorUnit = 1;
+          // pptxgenjs doesn't support custom value axis labels natively,
+          // so we add text annotations for the Y-axis levels
+        }
+
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: pmDates, values: cfg.data }], opts);
+
+        // Add reputation level labels as text overlays for reputation charts
+        if (cfg.isReputation) {
+          const pos = chartPositions[i];
+          const repLabels = ["BAD", "LOW", "MEDIUM", "HIGH"];
+          const chartAreaX = pos.x + 0.35; // left edge of chart area
+          const chartTop = pos.y + 0.3; // top of chart plot area
+          const chartHeight = pos.h - 0.6; // plot area height
+          repLabels.forEach((label, li) => {
+            const yPos = chartTop + chartHeight - (li / 3) * chartHeight - 0.08;
+            s.addText(label, {
+              x: chartAreaX - 0.55, y: yPos, w: 0.55, h: 0.16,
+              fontSize: 5, color: li >= 2 ? theme.green : li === 1 ? theme.amber : theme.red,
+              fontFace: FONTS.body, align: "right", bold: true,
+            });
+          });
+        }
       });
     } else {
       s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
@@ -927,26 +966,35 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }));
   const worstFiltered = allCampaignsForSort.filter(c => (c.campaignName || "").trim() !== "");
 
-  // Best Performing — single slide, top 5 by Open Rate + by CTR
+  // Best Performing — by Open Rate (separate slide)
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Best Performing Campaigns", theme, undefined, slideNum);
+    addSlideHeader(s, "Best Performing Campaigns — by Open Rate", theme, undefined, slideNum);
 
     const byOpenRate = [...allCampaignsForSort].sort((a, b) => b.openRate - a.openRate).slice(0, 5);
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Sorted by Unique Open Rate (Top 5)", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addText("Top 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.2, w: 9.6, colW: campaignColW,
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
+    addSlideFooter(s, theme, hasPostmasterData);
+  }
 
-    // Also add by CTR below if space
+  // Best Performing — by CTR (separate slide)
+  slideNum++;
+  {
+    const s = pptx.addSlide();
+    addSlideBackground(s, theme);
+    addDecorativeMotif(s, theme, "corner");
+    addSlideHeader(s, "Best Performing Campaigns — by CTR", theme, undefined, slideNum);
+
     const byCTR = [...allCampaignsForSort]
       .sort((a, b) => {
         const ctrA = a.uniqueViewed > 0 ? (a.uniqueClicked / a.uniqueViewed) * 100 : 0;
@@ -954,29 +1002,26 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         return ctrB - ctrA;
       }).slice(0, 5);
 
-    const rows2: pptxgen.TableRow[] = [createFullCampaignHeader()];
-    byCTR.forEach((c, ri) => rows2.push(createFullCampaignRow(c, ri)));
+    const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
+    byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    const tableEndY = 1.2 + (rows.length) * 0.28 + 0.15;
-    s.addText("Sorted by Unique CTR (Top 5)", { x: 0.5, y: tableEndY, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
-    s.addTable(rows2, {
-      x: 0.2, y: tableEndY + 0.2, w: 9.6, colW: campaignColW,
+    s.addText("Top 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addTable(rows, {
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
-
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
-  // Underperforming — single slide, bottom 5 by Open Rate + by CTR
+  // Underperforming — by Open Rate (separate slide)
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "side");
-    addSlideHeader(s, "Underperforming Campaigns", theme, undefined, slideNum);
+    addSlideHeader(s, "Underperforming Campaigns — by Open Rate", theme, undefined, slideNum);
 
-    // Amber border accent
     s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
       x: 0.1, y: 0.15, w: 9.8, h: 0.9,
       fill: { color: theme.slideBg, transparency: 100 },
@@ -987,11 +1032,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Sorted by Unique Open Rate (Bottom 5)", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addText("Bottom 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.2, w: 9.6, colW: campaignColW,
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
+    });
+    addSlideFooter(s, theme, hasPostmasterData);
+  }
+
+  // Underperforming — by CTR (separate slide)
+  slideNum++;
+  {
+    const s = pptx.addSlide();
+    addSlideBackground(s, theme);
+    addDecorativeMotif(s, theme, "side");
+    addSlideHeader(s, "Underperforming Campaigns — by CTR", theme, undefined, slideNum);
+
+    s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+      x: 0.1, y: 0.15, w: 9.8, h: 0.9,
+      fill: { color: theme.slideBg, transparency: 100 },
+      line: { color: theme.amber, width: 1 }, rectRadius: 0.06,
     });
 
     const byCTR = [...worstFiltered]
@@ -1001,17 +1062,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         return ctrA - ctrB;
       }).slice(0, 5);
 
-    const rows2: pptxgen.TableRow[] = [createFullCampaignHeader()];
-    byCTR.forEach((c, ri) => rows2.push(createFullCampaignRow(c, ri)));
+    const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
+    byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    const tableEndY = 1.2 + (rows.length) * 0.28 + 0.15;
-    s.addText("Sorted by Unique CTR (Bottom 5)", { x: 0.5, y: tableEndY, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
-    s.addTable(rows2, {
-      x: 0.2, y: tableEndY + 0.2, w: 9.6, colW: campaignColW,
+    s.addText("Bottom 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    s.addTable(rows, {
+      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
-
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1050,14 +1109,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fontFace: FONTS.body,
       });
 
-      // Center: Creative image
+      // Center: Creative image — use contain to preserve aspect ratio without stretching
       if (creativeImage) {
         s.addImage({
           data: creativeImage,
-          x: 3.5, y: 1.35, w: 3, h: 3.5,
-          sizing: { type: "contain", w: 3, h: 3.5 },
+          x: 3.6, y: 1.35, w: 2.8, h: 3.2,
+          sizing: { type: "contain", w: 2.8, h: 3.2 },
         });
-      } else {
+      } else if (false) {
+        // placeholder disabled
         s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
           x: 3.8, y: 1.8, w: 2.4, h: 2.5,
           fill: { color: theme.altRowBg },
