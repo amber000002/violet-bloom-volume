@@ -361,11 +361,11 @@ const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, hasPostmasterDa
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "left"): pptxgen.TableCellProps => ({
-  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body, wrap: false,
+  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body,
 });
 
 const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "left", color?: string): pptxgen.TableCellProps => ({
-  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body, wrap: false,
+  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body,
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
 });
 
