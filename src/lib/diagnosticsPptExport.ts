@@ -894,8 +894,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const hardPct = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
     const softPct = denom > 0 ? (c.softBounces / denom) * 100 : 0;
     return [
-      { text: c.startDate || "—", options: bodyCellOpts(theme, ri) },
-      { text: (c.campaignName || "").substring(0, 40), options: bodyCellOpts(theme, ri) },
+      { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri) },
+      { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri) },
       { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
       { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
