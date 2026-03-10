@@ -1283,9 +1283,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       intelligentLearnings.forEach((rec, ri) => {
         const prioColor = rec.priority === "P0" ? theme.red : rec.priority === "P1" ? theme.amber : theme.primary;
         klRows.push([
-          { text: rec.issue, options: { ...bodyCellOpts(theme, ri), valign: "top" } },
-          { text: rec.recommendation, options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor, valign: "top" } },
-          { text: rec.priority, options: { ...bodyCellOpts(theme, ri, "center", prioColor), bold: true } },
+          { text: sanitizeText(rec.issue), options: { ...bodyCellOpts(theme, ri), valign: "top" } },
+          { text: sanitizeText(rec.recommendation), options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor, valign: "top" } },
+          { text: sanitizeText(rec.priority), options: { ...bodyCellOpts(theme, ri, "center", prioColor), bold: true } },
         ]);
       });
 
