@@ -733,9 +733,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       infra.domains.forEach((d, ri) => {
         domRows.push([
-          { text: d.domain, options: bodyCellOpts(theme, ri) },
-          { text: d.provider || "—", options: bodyCellOpts(theme, ri) },
-          { text: d.reputation, options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
+          { text: sanitizeText(d.domain), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(d.provider) || "—", options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(d.reputation), options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
         ]);
       });
 
