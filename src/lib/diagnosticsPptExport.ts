@@ -921,7 +921,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   const createFullCampaignHeader = (): pptxgen.TableRow =>
     ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
-      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i < 3 ? "left" : "right") }));
+      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i < 3 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
     const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
