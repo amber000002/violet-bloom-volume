@@ -488,6 +488,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     });
 
     const denom = gt.sent || 1;
+    const viewRate = (gt.viewed / denom) * 100;
+    const clickRate = (gt.clicked / denom) * 100;
     const unsubRate = (gt.unsubs / denom) * 100;
     const hardRate = (gt.hard / denom) * 100;
     const softRate = (gt.soft / denom) * 100;
@@ -496,13 +498,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       return getMetricColor(rate, type, theme);
     };
 
-    const metricCards: { label: string; value: string; context: string; shape: string; accentColor: string }[] = [
-      { label: "SENT", value: formatNumber(gt.sent), context: "Total emails dispatched", shape: "paperPlane", accentColor: theme.primary },
-      { label: "VIEWED", value: formatNumber(gt.viewed), context: "Unique opens recorded", shape: "eye", accentColor: theme.secondary },
-      { label: "CLICKED", value: formatNumber(gt.clicked), context: "Unique click-throughs", shape: "pointer", accentColor: theme.accent },
-      { label: "UNSUBS", value: formatNumber(gt.unsubs), context: `Unsub rate: ${formatPercent(unsubRate)}`, shape: "noSign", accentColor: getRiskColor(unsubRate, "unsubscribeRate") },
-      { label: "HARD BOUNCE", value: formatNumber(gt.hard), context: `Hard bounce rate: ${formatPercent(hardRate)}`, shape: "warning", accentColor: getRiskColor(hardRate, "bounceRate") },
-      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), context: `Soft bounce rate: ${formatPercent(softRate)}`, shape: "refresh", accentColor: getRiskColor(softRate, "bounceRate") },
+    const metricCards: { label: string; value: string; percent: string | null; context: string; shape: string; accentColor: string }[] = [
+      { label: "SENT", value: formatNumber(gt.sent), percent: null, context: "Total emails dispatched", shape: "paperPlane", accentColor: theme.primary },
+      { label: "VIEWED", value: formatNumber(gt.viewed), percent: formatPercent(viewRate), context: "Unique opens recorded", shape: "eye", accentColor: theme.secondary },
+      { label: "CLICKED", value: formatNumber(gt.clicked), percent: formatPercent(clickRate), context: "Unique click-throughs", shape: "pointer", accentColor: theme.accent },
+      { label: "UNSUBS", value: formatNumber(gt.unsubs), percent: formatPercent(unsubRate), context: "Unsubscribe rate", shape: "noSign", accentColor: getRiskColor(unsubRate, "unsubscribeRate") },
+      { label: "HARD BOUNCE", value: formatNumber(gt.hard), percent: formatPercent(hardRate), context: "Hard bounce rate", shape: "warning", accentColor: getRiskColor(hardRate, "bounceRate") },
+      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), percent: formatPercent(softRate), context: "Soft bounce rate", shape: "refresh", accentColor: getRiskColor(softRate, "bounceRate") },
     ];
 
     // 3 columns × 2 rows grid
