@@ -633,6 +633,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   websiteUrl,
   eventSchemaCSV: brandEventSchemaCSV,
   userPropertiesCSV: brandUserPropertiesCSV,
+  brandVersions = [],
+  activeBrandVersionId,
+  onBrandVersionSelect,
 }) => {
   // File states
   const [campaignValidation, setCampaignValidation] = useState<ValidationResult | null>(null);
