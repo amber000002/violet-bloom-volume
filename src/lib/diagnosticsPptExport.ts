@@ -572,10 +572,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         });
       }
 
-      // Metric label (small, uppercase)
+      // Metric label (small, uppercase, single accent color)
       s.addText(card.label, {
         x: x + 0.3, y: y + 0.25, w: cardW - 0.6, h: 0.3,
-        fontSize: 9, bold: true, color: theme.mutedColor, fontFace: FONTS.body,
+        fontSize: 9, bold: true, color: theme.primary, fontFace: FONTS.body,
         align: "left", valign: "middle",
       });
 
