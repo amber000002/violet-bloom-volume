@@ -565,12 +565,6 @@ const InboxAlchemyContent: React.FC = () => {
                 websiteUrl={brandInputs.websiteUrl}
                 eventSchemaCSV={persistedEventSchemaCSV || brandInputs.eventSchemaCSV || undefined}
                 userPropertiesCSV={persistedUserPropertiesCSV || brandInputs.userPropertiesCSV || undefined}
-                brandVersions={brandVersions}
-                activeBrandVersionId={activeBrandVersionId}
-                onBrandVersionSelect={(v) => {
-                  setActiveBrandVersionId(v.brandProfileVersionId);
-                  setBrandProfile(v.brandProfileJson);
-                }}
               />
             )}
           </motion.div>
