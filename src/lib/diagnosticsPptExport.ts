@@ -496,13 +496,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       return getMetricColor(rate, type, theme);
     };
 
-    const metricCards: { label: string; value: string; context: string; icon: string; accentColor: string }[] = [
-      { label: "SENT", value: formatNumber(gt.sent), context: "Total emails dispatched", icon: "✈", accentColor: theme.primary },
-      { label: "VIEWED", value: formatNumber(gt.viewed), context: "Unique opens recorded", icon: "👁", accentColor: theme.secondary },
-      { label: "CLICKED", value: formatNumber(gt.clicked), context: "Unique click-throughs", icon: "🖱", accentColor: theme.accent },
-      { label: "UNSUBS", value: formatNumber(gt.unsubs), context: `Unsub rate: ${formatPercent(unsubRate)}`, icon: "⊘", accentColor: getRiskColor(unsubRate, "unsubscribeRate") },
-      { label: "HARD BOUNCE", value: formatNumber(gt.hard), context: `Hard bounce rate: ${formatPercent(hardRate)}`, icon: "⚠", accentColor: getRiskColor(hardRate, "bounceRate") },
-      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), context: `Soft bounce rate: ${formatPercent(softRate)}`, icon: "↻", accentColor: getRiskColor(softRate, "bounceRate") },
+    const metricCards: { label: string; value: string; context: string; shape: string; accentColor: string }[] = [
+      { label: "SENT", value: formatNumber(gt.sent), context: "Total emails dispatched", shape: "paperPlane", accentColor: theme.primary },
+      { label: "VIEWED", value: formatNumber(gt.viewed), context: "Unique opens recorded", shape: "eye", accentColor: theme.secondary },
+      { label: "CLICKED", value: formatNumber(gt.clicked), context: "Unique click-throughs", shape: "pointer", accentColor: theme.accent },
+      { label: "UNSUBS", value: formatNumber(gt.unsubs), context: `Unsub rate: ${formatPercent(unsubRate)}`, shape: "noSign", accentColor: getRiskColor(unsubRate, "unsubscribeRate") },
+      { label: "HARD BOUNCE", value: formatNumber(gt.hard), context: `Hard bounce rate: ${formatPercent(hardRate)}`, shape: "warning", accentColor: getRiskColor(hardRate, "bounceRate") },
+      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), context: `Soft bounce rate: ${formatPercent(softRate)}`, shape: "refresh", accentColor: getRiskColor(softRate, "bounceRate") },
     ];
 
     // 3 columns × 2 rows grid
@@ -542,12 +542,66 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fill: { color: card.accentColor },
       });
 
-      // Icon watermark (large, low opacity, behind value)
-      s.addText(card.icon, {
-        x: x + cardW - 1.0, y: y + 0.2, w: 0.8, h: 0.8,
-        fontSize: 28, color: card.accentColor, fontFace: FONTS.body,
-        align: "center", valign: "middle", transparency: 80,
-      });
+      // Professional shape icon (top right corner, low opacity)
+      const iconX = x + cardW - 0.7;
+      const iconY = y + 0.25;
+      const iconSize = 0.4;
+      
+      if (card.shape === "paperPlane") {
+        // Paper plane icon using triangle + line combination
+        s.addShape("isocelesTriangle" as pptxgen.SHAPE_NAME, {
+          x: iconX, y: iconY + 0.05, w: iconSize, h: iconSize * 0.7,
+          fill: { color: card.accentColor, transparency: 70 },
+          line: { type: "none" },
+          rotate: 45,
+        });
+      } else if (card.shape === "eye") {
+        // Eye icon using oval + small circle
+        s.addShape("oval" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.05, y: iconY + 0.1, w: iconSize * 0.9, h: iconSize * 0.6,
+          fill: { color: card.accentColor, transparency: 70 },
+          line: { type: "none" },
+        });
+        s.addShape("oval" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.2, y: iconY + 0.2, w: iconSize * 0.35, h: iconSize * 0.35,
+          fill: { color: card.accentColor, transparency: 40 },
+          line: { type: "none" },
+        });
+      } else if (card.shape === "pointer") {
+        // Pointer/click icon using arrow
+        s.addShape("rightArrow" as pptxgen.SHAPE_NAME, {
+          x: iconX, y: iconY + 0.1, w: iconSize, h: iconSize * 0.6,
+          fill: { color: card.accentColor, transparency: 70 },
+          line: { type: "none" },
+          rotate: -30,
+        });
+      } else if (card.shape === "noSign") {
+        // No/unsubscribe icon using circle with diagonal line
+        s.addShape("oval" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.05, y: iconY + 0.05, w: iconSize * 0.8, h: iconSize * 0.8,
+          fill: { color: "FFFFFF", transparency: 50 },
+          line: { color: card.accentColor, width: 2 },
+        });
+        s.addShape("line" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.15, y: iconY + 0.15, w: iconSize * 0.6, h: iconSize * 0.6,
+          line: { color: card.accentColor, width: 2 },
+        });
+      } else if (card.shape === "warning") {
+        // Warning triangle icon
+        s.addShape("triangle" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.1, y: iconY, w: iconSize * 0.8, h: iconSize * 0.9,
+          fill: { color: card.accentColor, transparency: 60 },
+          line: { type: "none" },
+        });
+      } else if (card.shape === "refresh") {
+        // Refresh/retry using curved arrow shape
+        s.addShape("arc" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.05, y: iconY + 0.05, w: iconSize * 0.8, h: iconSize * 0.8,
+          fill: { color: card.accentColor, transparency: 60 },
+          line: { type: "none" },
+          rotate: 180,
+        });
+      }
 
       // Metric label (small, uppercase)
       s.addText(card.label, {
