@@ -517,7 +517,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     // Grand Total row
     const denom = useDelivered ? totals.delivered : totals.sent;
-    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 8, align, fill: { color: theme.headerBg }, fontFace: FONTS.body, autoFit: true });
+    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 8, align, fill: { color: theme.headerBg }, fontFace: FONTS.body });
     const gt: pptxgen.TableCell[] = [
       { text: "Grand Total", options: gtOpts("left") },
       { text: formatNumber(totals.sent), options: gtOpts() },
