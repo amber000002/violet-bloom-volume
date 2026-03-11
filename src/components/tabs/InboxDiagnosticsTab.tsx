@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CoreBrandJSON } from "@/types/brandProfile";
+import { BrandProfileVersion } from "@/lib/brandProfileVersionService";
 import { StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
 import { StrategicInsights } from "../StrategicInsights";
 import { StrategicInsightsExtended } from "../StrategicInsightsExtended";
@@ -29,6 +30,7 @@ import {
   Image as ImageIcon,
   Palette,
   Loader2,
+  History,
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
 import { exportElementAsPNG, exportCreativeAnalysisAsText, exportCreativeAnalysisAsCSV } from "@/lib/exportUtils";
@@ -86,6 +88,9 @@ interface InboxDiagnosticsTabProps {
   websiteUrl?: string;
   eventSchemaCSV?: string;
   userPropertiesCSV?: string;
+  brandVersions?: BrandProfileVersion[];
+  activeBrandVersionId?: string | null;
+  onBrandVersionSelect?: (version: BrandProfileVersion) => void;
 }
 
 const REQUIRED_HEADERS = [
@@ -629,6 +634,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   websiteUrl,
   eventSchemaCSV: brandEventSchemaCSV,
   userPropertiesCSV: brandUserPropertiesCSV,
+  brandVersions = [],
+  activeBrandVersionId,
+  onBrandVersionSelect,
 }) => {
   // File states
   const [campaignValidation, setCampaignValidation] = useState<ValidationResult | null>(null);
@@ -687,6 +695,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [strategicInsights, setStrategicInsights] = useState<StrategicInsightsOutput | null>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [strategicContext, setStrategicContext] = useState<string>("");
+  const [strategicBrandOverride, setStrategicBrandOverride] = useState<CoreBrandJSON | null>(null);
+  const [strategicBrandVersionId, setStrategicBrandVersionId] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsData | null>(null);
   const emailMetricsRef = useRef<HTMLDivElement>(null);
   const reputationTrendsRef = useRef<HTMLDivElement>(null);
@@ -956,10 +966,13 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       };
     }
 
+    // Use overridden brand profile if selected, otherwise default (latest)
+    const effectiveBrandProfile = strategicBrandOverride || brandProfile || null;
+
     try {
       const { data, error } = await supabase.functions.invoke("strategic-insights", {
         body: {
-          brandProfile: brandProfile || null,
+          brandProfile: effectiveBrandProfile,
           industry,
           websiteUrl: websiteUrl || "",
           strategicContext,
@@ -992,7 +1005,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     } finally {
       setIsGeneratingInsights(false);
     }
-  }, [industry, brandProfile, websiteUrl, campaignData, strategicContext]);
+  }, [industry, brandProfile, strategicBrandOverride, websiteUrl, campaignData, strategicContext]);
 
   const clearAll = useCallback(() => {
     setCampaignValidation(null);
@@ -1309,6 +1322,61 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               className="w-full h-24 px-4 py-3 rounded-xl bg-muted/30 border border-border focus:border-primary focus:outline-none resize-none text-sm"
             />
           </div>
+
+          {/* Brand Profile Version Selector (for Strategic Insights) */}
+          {brandVersions.length > 1 && (
+            <div className="magic-card rounded-2xl p-6">
+              <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                <History className="w-5 h-5 text-muted-foreground" />
+                Brand Profile Version
+                <span className="text-xs text-muted-foreground font-normal">(Latest used by default)</span>
+              </h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {brandVersions.map((v, i) => {
+                  const isActive = strategicBrandVersionId 
+                    ? strategicBrandVersionId === v.brandProfileVersionId
+                    : i === 0; // first = latest by default
+                  const profileJson = v.brandProfileJson as any;
+                  const brandName = profileJson?.brand_identity?.brand_name || v.websiteHostNormalized;
+                  const date = new Date(v.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                  
+                  return (
+                    <button
+                      key={v.brandProfileVersionId}
+                      onClick={() => {
+                        if (i === 0) {
+                          // Selecting latest = clear override, use default
+                          setStrategicBrandOverride(null);
+                          setStrategicBrandVersionId(null);
+                          onBrandVersionSelect?.(v);
+                        } else {
+                          setStrategicBrandOverride(v.brandProfileJson);
+                          setStrategicBrandVersionId(v.brandProfileVersionId);
+                          onBrandVersionSelect?.(v);
+                        }
+                        toast.info(`Strategic insights will use: ${brandName} (${date})`);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                        isActive 
+                          ? "bg-primary/10 border border-primary/30" 
+                          : "bg-muted/20 border border-transparent hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${isActive ? "text-primary" : "text-foreground"}`}>
+                          {brandName}
+                          {i === 0 && <span className="ml-1.5 text-[10px] text-muted-foreground font-normal">(Latest)</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{date} · {v.confidence} confidence · {v.extractionMethod}</p>
+                      </div>
+                      {isActive && <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
