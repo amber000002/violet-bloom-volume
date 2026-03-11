@@ -14,6 +14,7 @@ const HEADERS = [
   "Risk Overlay",
   "Why This Fits This Brand",
   "Personalization Layers Applied",
+  "Channel-Specific Execution",
 ];
 
 function escapeCSV(val: string): string {
@@ -21,6 +22,18 @@ function escapeCSV(val: string): string {
     return `"${val.replace(/"/g, '""')}"`;
   }
   return val;
+}
+
+function formatExecutionDetails(uc: AugmentedUseCase): string {
+  if (!uc.execution_details || uc.execution_details.length === 0) return "";
+  return uc.execution_details
+    .map((detail) => {
+      const fieldEntries = Object.entries(detail.fields || {})
+        .map(([key, value]) => `${key.replace(/_/g, " ")}: ${value}`)
+        .join("; ");
+      return `[${detail.channel}] Trigger: ${detail.trigger}${fieldEntries ? " | " + fieldEntries : ""}`;
+    })
+    .join(" /// ");
 }
 
 function useCaseToRow(uc: AugmentedUseCase): string[] {
@@ -38,6 +51,7 @@ function useCaseToRow(uc: AugmentedUseCase): string[] {
     uc.risk_overlay || "",
     uc.why_this_fits_brand,
     uc.personalization_layers.join(", "),
+    formatExecutionDetails(uc),
   ];
 }
 
@@ -49,10 +63,9 @@ export function exportAugmentedCSV(useCases: AugmentedUseCase[], filename = "use
 }
 
 export function exportAugmentedXLSX(useCases: AugmentedUseCase[], filename = "use-cases-augmented.xlsx") {
-  // Build a simple XLSX-compatible XML (SpreadsheetML)
   const rows = [HEADERS, ...useCases.map(useCaseToRow)];
   
-  const xmlRows = rows.map((row, ri) => {
+  const xmlRows = rows.map((row) => {
     const cells = row.map((cell) => {
       const escaped = cell.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       return `<Cell><Data ss:Type="String">${escaped}</Data></Cell>`;
