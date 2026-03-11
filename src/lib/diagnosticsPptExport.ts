@@ -543,32 +543,37 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const x = gridStartX + col * (cardW + gapX);
       const y = gridStartY + row * (cardH + gapY);
 
-      // Card background — glassmorphism effect (semi-transparent rounded rect)
+      // Card background — frosted glass effect (more prominent)
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x, y, w: cardW, h: cardH,
-        fill: { color: "FFFFFF", transparency: 80 },
-        line: { color: "FFFFFF", width: 0.75 },
+        fill: { color: "FFFFFF", transparency: 40 },
+        line: { color: "CCCCCC", width: 0.75 },
         rectRadius: 0.2,
-        shadow: { type: "outer", blur: 12, offset: 3, color: lighten(theme.primary, 0.7), opacity: 0.2 },
+        shadow: { type: "outer", blur: 16, offset: 4, color: "999999", opacity: 0.25 },
       });
 
-      // Inner highlight gradient (top-left shimmer)
+      // Inner highlight shimmer (top portion, frosted)
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: x, y: y, w: cardW, h: cardH * 0.4,
-        fill: { color: "FFFFFF", transparency: 88 },
+        x: x, y: y, w: cardW, h: cardH * 0.35,
+        fill: { color: "FFFFFF", transparency: 60 },
         line: { type: "none" } as any,
         rectRadius: 0.2,
       });
 
-
-      // Icon image (top right corner, watermark style)
+      // Icon image (top right corner, watermark style) with per-icon sizing
       const iconData = iconBase64Map[card.shape];
       if (iconData) {
+        // Custom sizes: sent=0.64x0.64cm, viewed=0.8x0.44cm, others=0.5x0.5 inches
+        const cmToIn = (cm: number) => cm / 2.54;
+        let iconW = 0.5, iconH = 0.5;
+        if (card.shape === "paperPlane") { iconW = cmToIn(0.64); iconH = cmToIn(0.64); }
+        else if (card.shape === "eye") { iconW = cmToIn(0.8); iconH = cmToIn(0.44); }
+        else { iconW = 0.5; iconH = 0.5; }
         s.addImage({
           data: iconData,
-          x: x + cardW - 0.7, y: y + 0.15, w: 0.5, h: 0.5,
-          sizing: { type: "contain", w: 0.5, h: 0.5 },
-          transparency: 60,
+          x: x + cardW - iconW - 0.2, y: y + 0.15, w: iconW, h: iconH,
+          sizing: { type: "contain", w: iconW, h: iconH },
+          transparency: 50,
         });
       }
 
