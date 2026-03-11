@@ -572,7 +572,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     if (mUseDelivered) mHeaders.push("Delivered");
     mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
-    const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "right") }));
+    const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
     const mRows: pptxgen.TableRow[] = [mHeaderRow];
 
     monthlyData.forEach((m, ri) => {
