@@ -360,13 +360,14 @@ const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, hasPostmasterDa
   slide.addText(src, { x: 0.5, y: 5.2, w: 8.5, h: 0.3, fontSize: 9, color: theme.footerColor, fontFace: FONTS.body });
 };
 
-const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "left"): pptxgen.TableCellProps => ({
-  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body,
+const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
+  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
 });
 
-const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "left", color?: string): pptxgen.TableCellProps => ({
-  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body,
+const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string): pptxgen.TableCellProps => ({
+  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body, valign: "middle",
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
+  autoFit: true,
 });
 
 // ============= INFRASTRUCTURE EXTRACTION =============
