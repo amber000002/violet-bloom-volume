@@ -538,11 +538,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         rectRadius: 0.2,
       });
 
-      // Accent bar at top
-      s.addShape("rect" as pptxgen.SHAPE_NAME, {
-        x: x + 0.3, y: y + 0.12, w: 0.6, h: 0.05,
-        fill: { color: card.accentColor },
-      });
 
       // Professional shape icon (top right corner, low opacity watermark)
       const iconX = x + cardW - 0.65;
@@ -624,10 +619,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         align: "left", valign: "middle",
       });
 
-      // Metric value (large, bold, centered)
+      // Metric value (large, normal weight, black)
       s.addText(card.value, {
         x: x + 0.15, y: y + (card.percent ? 0.5 : 0.6), w: cardW - 0.3, h: 0.65,
-        fontSize: 28, bold: true, color: card.accentColor, fontFace: FONTS.headline,
+        fontSize: 28, bold: false, color: "000000", fontFace: FONTS.headline,
         align: "center", valign: "middle",
       });
 
