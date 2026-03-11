@@ -542,64 +542,76 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fill: { color: card.accentColor },
       });
 
-      // Professional shape icon (top right corner, low opacity)
-      const iconX = x + cardW - 0.7;
-      const iconY = y + 0.25;
-      const iconSize = 0.4;
-      
+      // Professional shape icon (top right corner, low opacity watermark)
+      const iconX = x + cardW - 0.65;
+      const iconY = y + 0.2;
+
       if (card.shape === "paperPlane") {
-        // Paper plane icon using triangle + line combination
-        s.addShape("isocelesTriangle" as pptxgen.SHAPE_NAME, {
-          x: iconX, y: iconY + 0.05, w: iconSize, h: iconSize * 0.7,
-          fill: { color: card.accentColor, transparency: 70 },
-          line: { type: "none" },
-          rotate: 45,
+        // Diagonal rectangle to suggest motion/send
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX, y: iconY + 0.05, w: 0.35, h: 0.2,
+          fill: { color: card.accentColor, transparency: 75 },
+          rotate: 35,
+        });
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.08, y: iconY + 0.18, w: 0.2, h: 0.12,
+          fill: { color: card.accentColor, transparency: 82 },
+          rotate: 35,
         });
       } else if (card.shape === "eye") {
-        // Eye icon using oval + small circle
-        s.addShape("oval" as pptxgen.SHAPE_NAME, {
-          x: iconX + 0.05, y: iconY + 0.1, w: iconSize * 0.9, h: iconSize * 0.6,
-          fill: { color: card.accentColor, transparency: 70 },
-          line: { type: "none" },
+        // Eye: ellipse with inner dot
+        s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+          x: iconX, y: iconY + 0.08, w: 0.4, h: 0.25,
+          fill: { color: card.accentColor, transparency: 75 },
         });
-        s.addShape("oval" as pptxgen.SHAPE_NAME, {
-          x: iconX + 0.2, y: iconY + 0.2, w: iconSize * 0.35, h: iconSize * 0.35,
-          fill: { color: card.accentColor, transparency: 40 },
-          line: { type: "none" },
+        s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.13, y: iconY + 0.13, w: 0.14, h: 0.14,
+          fill: { color: card.accentColor, transparency: 50 },
         });
       } else if (card.shape === "pointer") {
-        // Pointer/click icon using arrow
-        s.addShape("rightArrow" as pptxgen.SHAPE_NAME, {
-          x: iconX, y: iconY + 0.1, w: iconSize, h: iconSize * 0.6,
+        // Pointer: small arrow-like rectangles
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.05, y: iconY + 0.05, w: 0.3, h: 0.12,
           fill: { color: card.accentColor, transparency: 70 },
-          line: { type: "none" },
-          rotate: -30,
+          rotate: -25,
+        });
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.12, y: iconY + 0.15, w: 0.12, h: 0.2,
+          fill: { color: card.accentColor, transparency: 80 },
         });
       } else if (card.shape === "noSign") {
-        // No/unsubscribe icon using circle with diagonal line
-        s.addShape("oval" as pptxgen.SHAPE_NAME, {
-          x: iconX + 0.05, y: iconY + 0.05, w: iconSize * 0.8, h: iconSize * 0.8,
-          fill: { color: "FFFFFF", transparency: 50 },
-          line: { color: card.accentColor, width: 2 },
+        // Unsubscribe: circle with line
+        s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.03, y: iconY + 0.03, w: 0.34, h: 0.34,
+          fill: { color: "FFFFFF", transparency: 60 },
+          line: { color: card.accentColor, width: 1.5 },
         });
-        s.addShape("line" as pptxgen.SHAPE_NAME, {
-          x: iconX + 0.15, y: iconY + 0.15, w: iconSize * 0.6, h: iconSize * 0.6,
-          line: { color: card.accentColor, width: 2 },
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.08, y: iconY + 0.18, w: 0.24, h: 0.03,
+          fill: { color: card.accentColor, transparency: 50 },
+          rotate: -45,
         });
       } else if (card.shape === "warning") {
-        // Warning triangle icon
-        s.addShape("triangle" as pptxgen.SHAPE_NAME, {
-          x: iconX + 0.1, y: iconY, w: iconSize * 0.8, h: iconSize * 0.9,
-          fill: { color: card.accentColor, transparency: 60 },
-          line: { type: "none" },
+        // Warning: stacked rects suggesting a triangle
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.12, y: iconY + 0.02, w: 0.16, h: 0.16,
+          fill: { color: card.accentColor, transparency: 65 },
+          rotate: 45,
+        });
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.05, y: iconY + 0.2, w: 0.3, h: 0.12,
+          fill: { color: card.accentColor, transparency: 75 },
         });
       } else if (card.shape === "refresh") {
-        // Refresh/retry using curved arrow shape
-        s.addShape("arc" as pptxgen.SHAPE_NAME, {
-          x: iconX + 0.05, y: iconY + 0.05, w: iconSize * 0.8, h: iconSize * 0.8,
-          fill: { color: card.accentColor, transparency: 60 },
-          line: { type: "none" },
-          rotate: 180,
+        // Refresh: two offset ellipses suggesting rotation
+        s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.03, y: iconY + 0.03, w: 0.3, h: 0.3,
+          fill: { color: "FFFFFF", transparency: 60 },
+          line: { color: card.accentColor, width: 1.5 },
+        });
+        s.addShape("rect" as pptxgen.SHAPE_NAME, {
+          x: iconX + 0.22, y: iconY + 0.05, w: 0.1, h: 0.1,
+          fill: { color: card.accentColor, transparency: 55 },
         });
       }
 
