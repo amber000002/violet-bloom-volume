@@ -353,11 +353,8 @@ const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, 
   if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: 5.2, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
 };
 
-const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, hasPostmasterData: boolean = true) => {
-  const src = hasPostmasterData
-    ? "Source: Campaign Performance + Postmaster Data | Generated via Inbox Diagnostics"
-    : "Source: Campaign Performance Data | Generated via Inbox Diagnostics";
-  slide.addText(src, { x: 0.5, y: 5.2, w: 8.5, h: 0.3, fontSize: 9, color: theme.footerColor, fontFace: FONTS.body });
+const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, _hasPostmasterData: boolean = true) => {
+  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: 5.2, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
@@ -367,6 +364,7 @@ const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = 
 const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string): pptxgen.TableCellProps => ({
   fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body, valign: "middle",
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
+  autoFit: true,
 });
 
 // ============= INFRASTRUCTURE EXTRACTION =============
