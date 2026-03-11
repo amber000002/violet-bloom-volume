@@ -897,10 +897,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           const pos = chartPositions[i];
           const repLabels = ["BAD", "LOW", "MEDIUM", "HIGH"];
           const chartAreaX = pos.x + 0.35; // left edge of chart area
-          const chartTop = pos.y + 0.3; // top of chart plot area
-          const chartHeight = pos.h - 0.6; // plot area height
+          const chartTop = pos.y + 0.35; // top of chart plot area (after title)
+          const chartBottom = pos.y + pos.h - 0.25; // bottom of chart plot area
+          const plotHeight = chartBottom - chartTop;
           repLabels.forEach((label, li) => {
-            const yPos = chartTop + chartHeight - (li / 3) * chartHeight - 0.08;
+            // li=0 is BAD (val=0, bottom), li=3 is HIGH (val=3, top)
+            const yPos = chartBottom - (li / 3) * plotHeight - 0.08;
             s.addText(label, {
               x: chartAreaX - 0.55, y: yPos, w: 0.55, h: 0.16,
               fontSize: 5, color: li >= 2 ? theme.green : li === 1 ? theme.amber : theme.red,
