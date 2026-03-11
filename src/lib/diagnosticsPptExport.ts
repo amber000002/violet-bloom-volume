@@ -572,7 +572,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
     if (mUseDelivered) mHeaders.push("Delivered");
-    mHeaders.push("Unique Sent", "Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
+    mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
     const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "right") }));
     const mRows: pptxgen.TableRow[] = [mHeaderRow];
@@ -585,7 +585,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       if (mUseDelivered) row.push({ text: formatNumber(m.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "right") });
       row.push(
-        { text: formatNumber(m.uniqueSentUsers), options: bodyCellOpts(theme, ri, "right") },
         { text: formatNumber(m.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
         { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.viewPercent, "openRate", theme)) },
         { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "right") },
@@ -600,10 +599,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       mRows.push(row);
     });
 
-    const numMCols = mHeaders.length;
     const mColW = mUseDelivered
-      ? [0.9, 0.5, 0.55, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.45, 0.5, 0.5, 0.5, 0.5, 0.5]
-      : [1.0, 0.55, 0.6, 0.6, 0.55, 0.55, 0.55, 0.55, 0.5, 0.55, 0.55, 0.55, 0.55, 0.55];
+      ? [0.9, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.45, 0.5, 0.55, 0.5, 0.55, 0.5]
+      : [1.0, 0.6, 0.65, 0.6, 0.6, 0.6, 0.6, 0.55, 0.6, 0.6, 0.6, 0.6, 0.6];
 
     s.addTable(mRows, {
       x: 0.3, y: 1.15, w: 9.4, colW: mColW,
