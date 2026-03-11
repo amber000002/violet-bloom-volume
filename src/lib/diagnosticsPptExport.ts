@@ -888,10 +888,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
         // For reputation charts, use custom labels: BAD(0), LOW(1), MEDIUM(2), HIGH(3)
         if (cfg.isReputation) {
-          opts.valAxisLabelFormatCode = "General";
           opts.valAxisMajorUnit = 1;
-          // pptxgenjs doesn't support custom value axis labels natively,
-          // so we add text annotations for the Y-axis levels
+          // Hide numeric axis labels — we overlay text labels instead
+          opts.valAxisHidden = true;
+          opts.valAxisLabelFontSize = 1;
+          opts.valAxisLabelColor = theme.slideBg; // make invisible
         }
 
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: pmDates, values: cfg.data }], opts);
