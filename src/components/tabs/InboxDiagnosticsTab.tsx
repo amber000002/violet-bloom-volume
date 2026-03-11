@@ -1004,7 +1004,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     } finally {
       setIsGeneratingInsights(false);
     }
-  }, [industry, brandProfile, websiteUrl, campaignData, strategicContext]);
+  }, [industry, brandProfile, strategicBrandOverride, websiteUrl, campaignData, strategicContext]);
 
   const clearAll = useCallback(() => {
     setCampaignValidation(null);
