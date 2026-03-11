@@ -488,6 +488,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     });
 
     const denom = gt.sent || 1;
+    const viewRate = (gt.viewed / denom) * 100;
+    const clickRate = (gt.clicked / denom) * 100;
     const unsubRate = (gt.unsubs / denom) * 100;
     const hardRate = (gt.hard / denom) * 100;
     const softRate = (gt.soft / denom) * 100;
@@ -496,13 +498,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       return getMetricColor(rate, type, theme);
     };
 
-    const metricCards: { label: string; value: string; context: string; shape: string; accentColor: string }[] = [
-      { label: "SENT", value: formatNumber(gt.sent), context: "Total emails dispatched", shape: "paperPlane", accentColor: theme.primary },
-      { label: "VIEWED", value: formatNumber(gt.viewed), context: "Unique opens recorded", shape: "eye", accentColor: theme.secondary },
-      { label: "CLICKED", value: formatNumber(gt.clicked), context: "Unique click-throughs", shape: "pointer", accentColor: theme.accent },
-      { label: "UNSUBS", value: formatNumber(gt.unsubs), context: `Unsub rate: ${formatPercent(unsubRate)}`, shape: "noSign", accentColor: getRiskColor(unsubRate, "unsubscribeRate") },
-      { label: "HARD BOUNCE", value: formatNumber(gt.hard), context: `Hard bounce rate: ${formatPercent(hardRate)}`, shape: "warning", accentColor: getRiskColor(hardRate, "bounceRate") },
-      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), context: `Soft bounce rate: ${formatPercent(softRate)}`, shape: "refresh", accentColor: getRiskColor(softRate, "bounceRate") },
+    const metricCards: { label: string; value: string; percent: string | null; context: string; shape: string; accentColor: string }[] = [
+      { label: "SENT", value: formatNumber(gt.sent), percent: null, context: "Total emails dispatched", shape: "paperPlane", accentColor: theme.primary },
+      { label: "VIEWED", value: formatNumber(gt.viewed), percent: formatPercent(viewRate), context: "Unique opens recorded", shape: "eye", accentColor: theme.secondary },
+      { label: "CLICKED", value: formatNumber(gt.clicked), percent: formatPercent(clickRate), context: "Unique click-throughs", shape: "pointer", accentColor: theme.accent },
+      { label: "UNSUBS", value: formatNumber(gt.unsubs), percent: formatPercent(unsubRate), context: "Unsubscribe rate", shape: "noSign", accentColor: getRiskColor(unsubRate, "unsubscribeRate") },
+      { label: "HARD BOUNCE", value: formatNumber(gt.hard), percent: formatPercent(hardRate), context: "Hard bounce rate", shape: "warning", accentColor: getRiskColor(hardRate, "bounceRate") },
+      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), percent: formatPercent(softRate), context: "Soft bounce rate", shape: "refresh", accentColor: getRiskColor(softRate, "bounceRate") },
     ];
 
     // 3 columns × 2 rows grid
@@ -624,21 +626,29 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       // Metric value (large, bold, centered)
       s.addText(card.value, {
-        x: x + 0.15, y: y + 0.6, w: cardW - 0.3, h: 0.75,
+        x: x + 0.15, y: y + (card.percent ? 0.5 : 0.6), w: cardW - 0.3, h: 0.65,
         fontSize: 28, bold: true, color: card.accentColor, fontFace: FONTS.headline,
         align: "center", valign: "middle",
       });
 
+      // Percentage value (secondary, greyed out, below metric value)
+      if (card.percent) {
+        s.addText(card.percent, {
+          x: x + 0.15, y: y + 1.1, w: cardW - 0.3, h: 0.35,
+          fontSize: 14, color: "8E8E8E", fontFace: FONTS.body,
+          align: "center", valign: "middle", transparency: 35,
+        });
+      }
+
       // Context line (small, muted)
       s.addText(card.context, {
-        x: x + 0.3, y: y + cardH - 0.5, w: cardW - 0.6, h: 0.35,
+        x: x + 0.3, y: y + cardH - 0.45, w: cardW - 0.6, h: 0.3,
         fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body,
         align: "center", valign: "middle", italic: true,
       });
     });
 
     // Optional insight headline at bottom
-    const viewRate = (gt.viewed / denom) * 100;
     let insight = "";
     if (unsubRate > 0.5) insight = "Campaign reach remains strong but unsubscribe signals are rising";
     else if (hardRate > 2) insight = "Hard bounce rates indicate list hygiene attention needed";
