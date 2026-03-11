@@ -965,10 +965,13 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       };
     }
 
+    // Use overridden brand profile if selected, otherwise default (latest)
+    const effectiveBrandProfile = strategicBrandOverride || brandProfile || null;
+
     try {
       const { data, error } = await supabase.functions.invoke("strategic-insights", {
         body: {
-          brandProfile: brandProfile || null,
+          brandProfile: effectiveBrandProfile,
           industry,
           websiteUrl: websiteUrl || "",
           strategicContext,
