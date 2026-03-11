@@ -544,71 +544,72 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const iconY = y + 0.2;
 
       if (card.shape === "paperPlane") {
-        // Diagonal rectangle to suggest motion/send
+        // Diagonal rectangle to suggest motion/send — BLACK & WHITE
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX, y: iconY + 0.05, w: 0.35, h: 0.2,
-          fill: { color: card.accentColor, transparency: 75 },
+          fill: { color: "000000", transparency: 60 },
           rotate: 35,
         });
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.08, y: iconY + 0.18, w: 0.2, h: 0.12,
-          fill: { color: card.accentColor, transparency: 82 },
+          fill: { color: "000000", transparency: 70 },
           rotate: 35,
         });
       } else if (card.shape === "eye") {
-        // Eye: ellipse with inner dot
+        // Eye: ellipse with inner dot — BLACK & WHITE
         s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
           x: iconX, y: iconY + 0.08, w: 0.4, h: 0.25,
-          fill: { color: card.accentColor, transparency: 75 },
+          fill: { color: "000000", transparency: 60 },
         });
         s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.13, y: iconY + 0.13, w: 0.14, h: 0.14,
-          fill: { color: card.accentColor, transparency: 50 },
+          fill: { color: "FFFFFF" },
+          line: { color: "000000", width: 1 },
         });
       } else if (card.shape === "pointer") {
-        // Pointer: small arrow-like rectangles
+        // Pointer: small arrow-like rectangles — BLACK & WHITE
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.05, y: iconY + 0.05, w: 0.3, h: 0.12,
-          fill: { color: card.accentColor, transparency: 70 },
+          fill: { color: "000000", transparency: 60 },
           rotate: -25,
         });
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.12, y: iconY + 0.15, w: 0.12, h: 0.2,
-          fill: { color: card.accentColor, transparency: 80 },
+          fill: { color: "000000", transparency: 70 },
         });
       } else if (card.shape === "noSign") {
-        // Unsubscribe: circle with line
+        // Unsubscribe: circle with line — BLACK & WHITE
         s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.03, y: iconY + 0.03, w: 0.34, h: 0.34,
           fill: { color: "FFFFFF", transparency: 60 },
-          line: { color: card.accentColor, width: 1.5 },
+          line: { color: "000000", width: 1.5 },
         });
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.08, y: iconY + 0.18, w: 0.24, h: 0.03,
-          fill: { color: card.accentColor, transparency: 50 },
+          fill: { color: "000000", transparency: 40 },
           rotate: -45,
         });
       } else if (card.shape === "warning") {
-        // Warning: stacked rects suggesting a triangle
+        // Warning: stacked rects suggesting a triangle — BLACK & WHITE
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.12, y: iconY + 0.02, w: 0.16, h: 0.16,
-          fill: { color: card.accentColor, transparency: 65 },
+          fill: { color: "000000", transparency: 70 },
           rotate: 45,
         });
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.05, y: iconY + 0.2, w: 0.3, h: 0.12,
-          fill: { color: card.accentColor, transparency: 75 },
+          fill: { color: "000000", transparency: 50 },
         });
       } else if (card.shape === "refresh") {
-        // Refresh: two offset ellipses suggesting rotation
+        // Refresh: two offset ellipses suggesting rotation — BLACK & WHITE
         s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.03, y: iconY + 0.03, w: 0.3, h: 0.3,
           fill: { color: "FFFFFF", transparency: 60 },
-          line: { color: card.accentColor, width: 1.5 },
+          line: { color: "000000", width: 1.5 },
         });
         s.addShape("rect" as pptxgen.SHAPE_NAME, {
           x: iconX + 0.22, y: iconY + 0.05, w: 0.1, h: 0.1,
-          fill: { color: card.accentColor, transparency: 55 },
+          fill: { color: "000000", transparency: 50 },
         });
       }
 
