@@ -86,6 +86,9 @@ interface InboxDiagnosticsTabProps {
   websiteUrl?: string;
   eventSchemaCSV?: string;
   userPropertiesCSV?: string;
+  brandVersions?: BrandProfileVersion[];
+  activeBrandVersionId?: string | null;
+  onBrandVersionSelect?: (version: BrandProfileVersion) => void;
 }
 
 const REQUIRED_HEADERS = [
