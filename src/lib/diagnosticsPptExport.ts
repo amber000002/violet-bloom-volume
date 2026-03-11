@@ -421,6 +421,28 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const logoUrl = brandProfile?.brand_design_profile?.logo?.logo_url;
   if (logoUrl) logoBase64 = await fetchLogoAsBase64(logoUrl);
 
+  // Pre-fetch metric card icons
+  const iconPaths: Record<string, string> = {
+    paperPlane: "/icons/icon-send.png",
+    eye: "/icons/icon-eye.png",
+    pointer: "/icons/icon-click.png",
+    noSign: "/icons/icon-unsub.png",
+    warning: "/icons/icon-warning.png",
+    refresh: "/icons/icon-refresh.png",
+  };
+  const iconBase64Map: Record<string, string | null> = {};
+  await Promise.all(
+    Object.entries(iconPaths).map(async ([key, path]) => {
+      try {
+        const resp = await fetch(path);
+        if (!resp.ok) { iconBase64Map[key] = null; return; }
+        const buffer = await resp.arrayBuffer();
+        const mime = detectMimeType(buffer);
+        iconBase64Map[key] = `data:${mime};base64,${arrayBufferToBase64(buffer)}`;
+      } catch { iconBase64Map[key] = null; }
+    })
+  );
+
   const pptx = new pptxgen();
   pptx.author = "Inbox Diagnostics";
   pptx.title = `${brandName} – Email Diagnostics Executive Deck`;
