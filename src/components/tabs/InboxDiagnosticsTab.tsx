@@ -30,6 +30,7 @@ import {
   Image as ImageIcon,
   Palette,
   Loader2,
+  History,
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
 import { exportElementAsPNG, exportCreativeAnalysisAsText, exportCreativeAnalysisAsCSV } from "@/lib/exportUtils";
