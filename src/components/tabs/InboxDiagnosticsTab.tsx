@@ -1579,7 +1579,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       {m.useDeliveredAsDenominator && (
                         <td className="text-right py-2 px-3">{formatNumber(m.totalDeliveredUsers)}</td>
                       )}
-                      <td className="text-right py-2 px-3">{formatNumber(m.uniqueSentUsers)}</td>
+                      
                       <td className="text-right py-2 px-3">{formatNumber(m.uniqueViewed)}</td>
                       <td className="text-right py-2 px-3"><ColoredPercent value={m.viewPercent} metricType="openRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.uniqueClicked)}</td>
