@@ -624,10 +624,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         align: "left", valign: "middle",
       });
 
-      // Metric value (large, bold, centered)
+      // Metric value (large, normal weight, black)
       s.addText(card.value, {
         x: x + 0.15, y: y + (card.percent ? 0.5 : 0.6), w: cardW - 0.3, h: 0.65,
-        fontSize: 28, bold: true, color: card.accentColor, fontFace: FONTS.headline,
+        fontSize: 28, bold: false, color: "000000", fontFace: FONTS.headline,
         align: "center", valign: "middle",
       });
 
