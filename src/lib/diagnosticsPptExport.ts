@@ -367,7 +367,6 @@ const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = 
 const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string): pptxgen.TableCellProps => ({
   fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body, valign: "middle",
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
-  autoFit: true,
 });
 
 // ============= INFRASTRUCTURE EXTRACTION =============
