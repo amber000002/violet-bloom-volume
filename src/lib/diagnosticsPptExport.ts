@@ -640,7 +640,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     });
 
     // Optional insight headline at bottom
-    const viewRate = (gt.viewed / denom) * 100;
     let insight = "";
     if (unsubRate > 0.5) insight = "Campaign reach remains strong but unsubscribe signals are rising";
     else if (hardRate > 2) insight = "Hard bounce rates indicate list hygiene attention needed";
