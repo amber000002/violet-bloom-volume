@@ -353,11 +353,8 @@ const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, 
   if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: 5.2, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
 };
 
-const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, hasPostmasterData: boolean = true) => {
-  const src = hasPostmasterData
-    ? "Source: Campaign Performance + Postmaster Data | Generated via Inbox Diagnostics"
-    : "Source: Campaign Performance Data | Generated via Inbox Diagnostics";
-  slide.addText(src, { x: 0.5, y: 5.2, w: 8.5, h: 0.3, fontSize: 9, color: theme.footerColor, fontFace: FONTS.body });
+const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, _hasPostmasterData: boolean = true) => {
+  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: 5.2, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
@@ -484,7 +481,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     if (useDelivered) headers.push("Delivered");
     headers.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
-    const hRow: pptxgen.TableCell[] = headers.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "right") }));
+    const hRow: pptxgen.TableCell[] = headers.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
     const rows: pptxgen.TableRow[] = [hRow];
 
     const totals = { sent: 0, delivered: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0 };
@@ -500,27 +497,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       const row: pptxgen.TableCell[] = [
         { text: sanitizeText(`${p.serviceProvider} / ${p.providerName}`), options: bodyCellOpts(theme, ri) },
-        { text: formatNumber(p.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
+        { text: formatNumber(p.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       ];
-      if (useDelivered) row.push({ text: formatNumber(p.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "right") });
+      if (useDelivered) row.push({ text: formatNumber(p.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "center") });
       row.push(
-        { text: formatNumber(p.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(p.viewPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(p.viewPercent, "openRate", theme)) },
-        { text: formatNumber(p.uniqueClicked), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(p.clickPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(p.clickPercent, "clickRate", theme)) },
-        { text: formatNumber(p.unsubscribes), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(p.unsubscribePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(p.unsubscribePercent, "unsubscribeRate", theme)) },
-        { text: formatNumber(p.hardBounces), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(p.hardBouncePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(p.hardBouncePercent, "bounceRate", theme)) },
-        { text: formatNumber(p.softBounces), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(p.softBouncePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(p.softBouncePercent, "bounceRate", theme)) },
+        { text: formatNumber(p.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(p.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.viewPercent, "openRate", theme)) },
+        { text: formatNumber(p.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(p.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.clickPercent, "clickRate", theme)) },
+        { text: formatNumber(p.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(p.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.unsubscribePercent, "unsubscribeRate", theme)) },
+        { text: formatNumber(p.hardBounces), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(p.hardBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.hardBouncePercent, "bounceRate", theme)) },
+        { text: formatNumber(p.softBounces), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(p.softBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.softBouncePercent, "bounceRate", theme)) },
       );
       rows.push(row);
     });
 
     // Grand Total row
     const denom = useDelivered ? totals.delivered : totals.sent;
-    const gtOpts = (align: "left" | "right" = "right"): pptxgen.TableCellProps => ({ bold: true, fontSize: 8, align, fill: { color: theme.headerBg }, fontFace: FONTS.body });
+    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 8, align, fill: { color: theme.headerBg }, fontFace: FONTS.body });
     const gt: pptxgen.TableCell[] = [
       { text: "Grand Total", options: gtOpts("left") },
       { text: formatNumber(totals.sent), options: gtOpts() },
@@ -574,27 +571,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     if (mUseDelivered) mHeaders.push("Delivered");
     mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
-    const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "right") }));
+    const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
     const mRows: pptxgen.TableRow[] = [mHeaderRow];
 
     monthlyData.forEach((m, ri) => {
       const row: pptxgen.TableCell[] = [
         { text: sanitizeText(m.month), options: bodyCellOpts(theme, ri) },
-        { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatNumber(m.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
+        { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatNumber(m.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       ];
-      if (mUseDelivered) row.push({ text: formatNumber(m.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "right") });
+      if (mUseDelivered) row.push({ text: formatNumber(m.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "center") });
       row.push(
-        { text: formatNumber(m.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.viewPercent, "openRate", theme)) },
-        { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(m.clickPercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.clickPercent, "clickRate", theme)) },
-        { text: formatNumber(m.unsubscribes), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(m.unsubscribePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.unsubscribePercent, "unsubscribeRate", theme)) },
-        { text: formatNumber(m.hardBounces), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(m.hardBouncePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.hardBouncePercent, "bounceRate", theme)) },
-        { text: formatNumber(m.softBounces), options: bodyCellOpts(theme, ri, "right") },
-        { text: formatPercent(m.softBouncePercent), options: bodyCellOpts(theme, ri, "right", getMetricColor(m.softBouncePercent, "bounceRate", theme)) },
+        { text: formatNumber(m.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.viewPercent, "openRate", theme)) },
+        { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(m.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.clickPercent, "clickRate", theme)) },
+        { text: formatNumber(m.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(m.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.unsubscribePercent, "unsubscribeRate", theme)) },
+        { text: formatNumber(m.hardBounces), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(m.hardBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.hardBouncePercent, "bounceRate", theme)) },
+        { text: formatNumber(m.softBounces), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(m.softBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.softBouncePercent, "bounceRate", theme)) },
       );
       mRows.push(row);
     });
@@ -899,10 +896,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           const pos = chartPositions[i];
           const repLabels = ["BAD", "LOW", "MEDIUM", "HIGH"];
           const chartAreaX = pos.x + 0.35; // left edge of chart area
-          const chartTop = pos.y + 0.3; // top of chart plot area
-          const chartHeight = pos.h - 0.6; // plot area height
+          const chartTop = pos.y + 0.35; // top of chart plot area (after title)
+          const chartBottom = pos.y + pos.h - 0.25; // bottom of chart plot area
+          const plotHeight = chartBottom - chartTop;
           repLabels.forEach((label, li) => {
-            const yPos = chartTop + chartHeight - (li / 3) * chartHeight - 0.08;
+            // li=0 is BAD (val=0, bottom), li=3 is HIGH (val=3, top)
+            const yPos = chartBottom - (li / 3) * plotHeight - 0.08;
             s.addText(label, {
               x: chartAreaX - 0.55, y: yPos, w: 0.55, h: 0.16,
               fontSize: 5, color: li >= 2 ? theme.green : li === 1 ? theme.amber : theme.red,
@@ -923,7 +922,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   const createFullCampaignHeader = (): pptxgen.TableRow =>
     ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
-      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i < 3 ? "left" : "right") }));
+      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i < 3 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
     const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
@@ -935,18 +934,18 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri) },
       { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri) },
       { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri) },
-      { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "right") },
-      { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "right") },
-      { text: formatPercent(c.openRate), options: bodyCellOpts(theme, ri, "right", getMetricColor(c.openRate, "openRate", theme)) },
-      { text: formatNumber(c.uniqueClicked), options: bodyCellOpts(theme, ri, "right") },
-      { text: formatPercent(c.clickRate), options: bodyCellOpts(theme, ri, "right", getMetricColor(c.clickRate, "clickRate", theme)) },
-      { text: formatPercent(uniqueCTR), options: bodyCellOpts(theme, ri, "right", getMetricColor(uniqueCTR, "clickRate", theme)) },
-      { text: formatNumber(c.unsubscribes), options: bodyCellOpts(theme, ri, "right") },
-      { text: formatPercent(unsubPct), options: bodyCellOpts(theme, ri, "right", getMetricColor(unsubPct, "unsubscribeRate", theme)) },
-      { text: formatNumber(c.hardBounces), options: bodyCellOpts(theme, ri, "right") },
-      { text: formatPercent(hardPct), options: bodyCellOpts(theme, ri, "right", getMetricColor(hardPct, "bounceRate", theme)) },
-      { text: formatNumber(c.softBounces), options: bodyCellOpts(theme, ri, "right") },
-      { text: formatPercent(softPct), options: bodyCellOpts(theme, ri, "right", getMetricColor(softPct, "bounceRate", theme)) },
+      { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
+      { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
+      { text: formatPercent(c.openRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(c.openRate, "openRate", theme)) },
+      { text: formatNumber(c.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
+      { text: formatPercent(c.clickRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(c.clickRate, "clickRate", theme)) },
+      { text: formatPercent(uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(uniqueCTR, "clickRate", theme)) },
+      { text: formatNumber(c.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
+      { text: formatPercent(unsubPct), options: bodyCellOpts(theme, ri, "center", getMetricColor(unsubPct, "unsubscribeRate", theme)) },
+      { text: formatNumber(c.hardBounces), options: bodyCellOpts(theme, ri, "center") },
+      { text: formatPercent(hardPct), options: bodyCellOpts(theme, ri, "center", getMetricColor(hardPct, "bounceRate", theme)) },
+      { text: formatNumber(c.softBounces), options: bodyCellOpts(theme, ri, "center") },
+      { text: formatPercent(softPct), options: bodyCellOpts(theme, ri, "center", getMetricColor(softPct, "bounceRate", theme)) },
     ];
   };
 
