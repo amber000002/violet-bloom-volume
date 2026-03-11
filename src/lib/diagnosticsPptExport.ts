@@ -626,14 +626,23 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       // Metric value (large, bold, centered)
       s.addText(card.value, {
-        x: x + 0.15, y: y + 0.6, w: cardW - 0.3, h: 0.75,
+        x: x + 0.15, y: y + (card.percent ? 0.5 : 0.6), w: cardW - 0.3, h: 0.65,
         fontSize: 28, bold: true, color: card.accentColor, fontFace: FONTS.headline,
         align: "center", valign: "middle",
       });
 
+      // Percentage value (secondary, greyed out, below metric value)
+      if (card.percent) {
+        s.addText(card.percent, {
+          x: x + 0.15, y: y + 1.1, w: cardW - 0.3, h: 0.35,
+          fontSize: 14, color: "8E8E8E", fontFace: FONTS.body,
+          align: "center", valign: "middle", transparency: 35,
+        });
+      }
+
       // Context line (small, muted)
       s.addText(card.context, {
-        x: x + 0.3, y: y + cardH - 0.5, w: cardW - 0.6, h: 0.35,
+        x: x + 0.3, y: y + cardH - 0.45, w: cardW - 0.6, h: 0.3,
         fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body,
         align: "center", valign: "middle", italic: true,
       });
