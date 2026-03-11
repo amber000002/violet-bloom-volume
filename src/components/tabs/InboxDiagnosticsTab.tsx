@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CoreBrandJSON } from "@/types/brandProfile";
+import { BrandProfileVersion } from "@/lib/brandProfileVersionService";
 import { StrategicInsightsOutput } from "@/lib/strategicInsightsEngine";
 import { StrategicInsights } from "../StrategicInsights";
 import { StrategicInsightsExtended } from "../StrategicInsightsExtended";
