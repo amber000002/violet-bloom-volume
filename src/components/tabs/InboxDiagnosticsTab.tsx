@@ -568,7 +568,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const emailMetricsRef = useRef<HTMLDivElement>(null);
   const reputationTrendsRef = useRef<HTMLDivElement>(null);
   const creativeAnalysisRef = useRef<HTMLDivElement>(null);
-  const [thresholdBreaches, setThresholdBreaches] = useState<ThresholdBreach[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     provider: true,
     monthly: true,
