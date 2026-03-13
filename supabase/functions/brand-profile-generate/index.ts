@@ -44,6 +44,7 @@ function extractDesignSignals(html: string): string {
 }
 
 async function fetchPageRaw(url: string): Promise<{ text: string; html: string }> {
+  // First try direct fetch
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -56,9 +57,46 @@ async function fetchPageRaw(url: string): Promise<{ text: string; html: string }
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!resp.ok) return { text: "", html: "" };
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const html = await resp.text();
-    return { text: htmlToText(html).slice(0, 4000), html: html.slice(0, 50000) };
+    const text = htmlToText(html).slice(0, 4000);
+    // If we got meaningful content, return it
+    if (text.length > 150) {
+      return { text, html: html.slice(0, 50000) };
+    }
+    // Otherwise fall through to Firecrawl
+    throw new Error("Insufficient content from direct fetch");
+  } catch {
+    // Fall through to Firecrawl
+  }
+
+  // Fallback: use Firecrawl for JS-rendered sites
+  try {
+    const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+    if (!firecrawlKey) return { text: "", html: "" };
+
+    console.log(`Firecrawl fallback for: ${url}`);
+    const resp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${firecrawlKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["markdown", "html"],
+        waitFor: 5000,
+      }),
+    });
+
+    if (!resp.ok) return { text: "", html: "" };
+    const result = await resp.json();
+    const markdown = result?.data?.markdown || result?.markdown || "";
+    const html = result?.data?.html || result?.html || "";
+    return {
+      text: markdown.slice(0, 4000),
+      html: html.slice(0, 50000),
+    };
   } catch {
     return { text: "", html: "" };
   }
