@@ -1010,12 +1010,12 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   // ===== RENDER =====
 
-  // Always-visible history panel (used in both no-industry and main view)
-  const historyRunsToShow = industry && websiteHost ? runHistory : allRecentRuns;
-  const isLoadingHistory = industry && websiteHost ? isLoadingCache : isLoadingAllRuns;
+  // Always show ALL brand profiles and runs across all brands
+  const historyRunsToShow = allRecentRuns;
+  const isLoadingHistory = isLoadingAllRuns;
 
-  // Brand versions to show: from parent (filtered) or global
-  const brandVersionsToShow = brandVersions.length > 0 ? brandVersions : allRecentBrandVersions;
+  // Always show all brand versions across all brands
+  const brandVersionsToShow = allRecentBrandVersions;
 
   const renderHistoryPanel = () => (
     <div className="space-y-3">
