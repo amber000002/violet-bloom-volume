@@ -170,131 +170,24 @@ const sortByPriority = (recs: IntelligentRecommendation[]): IntelligentRecommend
   });
 };
 
-// ============= TACTICAL FINDINGS (Segment/Campaign-Specific → Root Cause) =============
+// ============= TACTICAL FINDINGS (Segment/Campaign-Specific) =============
+// NOTE: Reputation repair analysis removed - simplified tactical findings
 export const generateTacticalFindings = (
   campaignData: CampaignRow[],
-  rootCauses: RootCauseEntry[],
   postmasterData: PostmasterRow[] | null
 ): TacticalFinding[] => {
   const recs: TacticalFinding[] = [];
-  const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
-  const totalViewed = campaignData.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
-  const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
-  const totalBounce = campaignData.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
-  const totalUnsub = campaignData.reduce((s, c) => s + c.totalUnsubscribes, 0);
-  const avgOpenRate = totalSent > 0 ? (totalViewed / totalSent) * 100 : 0;
-  const avgClickRate = totalSent > 0 ? (totalClicked / totalSent) * 100 : 0;
-  const avgBounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
-  const avgUnsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
-
-  // Segment-Linked Correlation Analysis
-  const segmentRiskMap = new Map<string, {
-    bounceSpikes: number; spamCorrelations: number; unsubSpikes: number;
-    lowEngagement: number; blockSignals: number; totalCampaigns: number;
-    avgBounce: number; avgOpen: number; avgUnsub: number; totalSent: number;
-  }>();
-
-  rootCauses.forEach((rc) => {
-    rc.segmentPatterns.forEach((sp) => {
-      const existing = segmentRiskMap.get(sp.pattern) || {
-        bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0,
-        lowEngagement: 0, blockSignals: 0, totalCampaigns: 0,
-        avgBounce: 0, avgOpen: 0, avgUnsub: 0, totalSent: 0,
-      };
-      if (sp.observation.toLowerCase().includes("bounce")) existing.bounceSpikes++;
-      if (sp.observation.toLowerCase().includes("unsub")) existing.unsubSpikes++;
-      if (sp.observation.toLowerCase().includes("open rate")) existing.lowEngagement++;
-      if (sp.observation.toLowerCase().includes("block")) existing.blockSignals++;
-      existing.spamCorrelations += sp.frequency;
-      segmentRiskMap.set(sp.pattern, existing);
-    });
-  });
-
-  campaignData.forEach(c => {
-    if (!c.whoQuery || c.whoQuery.trim() === "") return;
-    const query = c.whoQuery.trim();
-    const existing = segmentRiskMap.get(query) || {
-      bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0,
-      lowEngagement: 0, blockSignals: 0, totalCampaigns: 0,
-      avgBounce: 0, avgOpen: 0, avgUnsub: 0, totalSent: 0,
-    };
-    existing.totalCampaigns++;
-    existing.totalSent += c.totalSentUsers;
-    existing.avgBounce += c.hardBounceRate + c.softBounceRate;
-    existing.avgOpen += c.totalSentUsers > 0 ? (c.uniqueViewedWithinConversion / c.totalSentUsers) * 100 : 0;
-    existing.avgUnsub += c.unsubscribeRate;
-    segmentRiskMap.set(query, existing);
-  });
-
-  segmentRiskMap.forEach((data, segment) => {
-    if (data.totalSent < MIN_VOLUME_THRESHOLD) return; // Volume threshold
-    if (data.totalCampaigns === 0 && data.spamCorrelations === 0) return;
-
-    const segAvgBounce = data.totalCampaigns > 0 ? data.avgBounce / data.totalCampaigns : 0;
-    const segAvgOpen = data.totalCampaigns > 0 ? data.avgOpen / data.totalCampaigns : 0;
-    const segAvgUnsub = data.totalCampaigns > 0 ? data.avgUnsub / data.totalCampaigns : 0;
-
-    const issues: string[] = [];
-    const metrics: string[] = [];
-
-    if (data.bounceSpikes > 0 || segAvgBounce > avgBounceRate * 2) {
-      issues.push("elevated bounce rates");
-      metrics.push(`bounce: ${segAvgBounce.toFixed(2)}% vs ${avgBounceRate.toFixed(2)}% avg`);
-    }
-    if (data.unsubSpikes > 0 || segAvgUnsub > avgUnsubRate * 2) {
-      issues.push("high unsubscribe signals");
-      metrics.push(`unsub: ${segAvgUnsub.toFixed(2)}% vs ${avgUnsubRate.toFixed(2)}% avg`);
-    }
-    if (data.lowEngagement > 0 || (segAvgOpen > 0 && segAvgOpen < avgOpenRate * 0.7)) {
-      issues.push("below-average engagement");
-      metrics.push(`open: ${segAvgOpen.toFixed(1)}% vs ${avgOpenRate.toFixed(1)}% avg`);
-    }
-    if (data.blockSignals > 0) {
-      issues.push("block signals");
-    }
-
-    if (issues.length > 0) {
-      const isP0 = issues.includes("elevated bounce rates") || issues.includes("block signals") || data.spamCorrelations > 1;
-      recs.push({
-        issue: `${issues.join(" and ")} consistently observed in segment: "${segment}" (${data.totalCampaigns} campaigns, ${data.totalSent.toLocaleString()} sends). ${metrics.join("; ")}.`,
-        recommendation: `Implement a 3-step sunset policy for segment "${segment.length > 80 ? segment.substring(0, 77) + "..." : segment}": (1) Reduce frequency by 50% for 2 weeks, (2) Suppress non-engagers after 3 consecutive non-opens, (3) Re-validate email addresses before re-inclusion.`,
-        priority: isP0 ? "P0" : "P1",
-        severity: isP0 ? 7 : 5,
-      });
-    }
-  });
-
-  // Campaign-specific high unsubscribe offenders (volume-filtered)
-  const highUnsubCampaigns = campaignData
-    .filter(c => c.totalSentUsers >= MIN_VOLUME_THRESHOLD && c.unsubscribeRate > avgUnsubRate * 3)
-    .sort((a, b) => b.unsubscribeRate - a.unsubscribeRate)
-    .slice(0, 5);
-
-  highUnsubCampaigns.forEach(c => {
+  
+  // Volume-based findings
+  const lowVolumeCampaigns = campaignData.filter(c => c.totalSentUsers < MIN_VOLUME_THRESHOLD);
+  if (lowVolumeCampaigns.length > 0) {
     recs.push({
-      issue: `Campaign "${c.campaignName}" showed ${c.unsubscribeRate.toFixed(2)}% unsubscribe rate (${(c.unsubscribeRate / avgUnsubRate).toFixed(1)}x account average). Sent: ${c.totalSentUsers.toLocaleString()}.`,
-      recommendation: `Review content-audience alignment for this campaign. Consider suppressing this segment after 3 non-engagement cycles.`,
-      priority: c.unsubscribeRate > 1 ? "P0" : "P1",
-      severity: c.unsubscribeRate > 1 ? 6 : 4,
+      issue: `${lowVolumeCampaigns.length} campaigns sent to fewer than ${MIN_VOLUME_THRESHOLD} users`,
+      recommendation: "Consider consolidating low-volume campaigns or reviewing targeting criteria to improve statistical significance",
+      priority: "P2", severity: 3,
     });
-  });
-
-  // Campaign-specific high bounce offenders (volume-filtered)
-  const highBounceCampaigns = campaignData
-    .filter(c => c.totalSentUsers >= MIN_VOLUME_THRESHOLD && (c.hardBounceRate + c.softBounceRate) > avgBounceRate * 2)
-    .sort((a, b) => (b.hardBounceRate + b.softBounceRate) - (a.hardBounceRate + a.softBounceRate))
-    .slice(0, 5);
-
-  highBounceCampaigns.forEach(c => {
-    const bounceRate = c.hardBounceRate + c.softBounceRate;
-    recs.push({
-      issue: `Campaign "${c.campaignName}" had ${bounceRate.toFixed(2)}% bounce rate (${(bounceRate / avgBounceRate).toFixed(1)}x account average). Sent: ${c.totalSentUsers.toLocaleString()}.`,
-      recommendation: `Audit list source and email validation for this campaign's audience. Remove addresses with 2+ consecutive hard bounces.`,
-      priority: bounceRate > 3 ? "P0" : "P1",
-      severity: bounceRate > 3 ? 6 : 4,
-    });
-  });
-
+  }
+  
   return sortByPriority(recs) as TacticalFinding[];
 };
 
