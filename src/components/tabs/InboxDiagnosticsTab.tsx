@@ -337,24 +337,7 @@ const generateIntelligentLearnings = (
     }
   });
 
-  // === LAYER 5: Campaign Structure Concentration (structural) ===
-  const channels = new Map<string, number>();
-  significantCampaigns.forEach(c => {
-    channels.set(c.channel, (channels.get(c.channel) || 0) + 1);
-  });
-  const totalCampaigns = significantCampaigns.length;
-  channels.forEach((count, channel) => {
-    const pct = (count / totalCampaigns) * 100;
-    if (pct > 70) {
-      recs.push({
-        issue: `${channel} channel accounts for ${pct.toFixed(0)}% of all significant campaigns (${count}/${totalCampaigns}), indicating over-concentration on a single campaign type.`,
-        recommendation: `Diversify campaign mix by introducing transactional triggers, lifecycle journeys, and re-engagement automations alongside ${channel} campaigns. Target <50% concentration per channel type.`,
-        priority: "P2", severity: 2,
-      });
-    }
-  });
-
-  // === LAYER 8: Postmaster Delivery Error Patterns (global) ===
+  // === LAYER 7: Postmaster Delivery Error Patterns (global) ===
   if (postmasterData && postmasterData.length > 0) {
     const errorDays = postmasterData.filter(p => (p.errorRatio || 0) > 0);
     if (errorDays.length > postmasterData.length * 0.3) {
