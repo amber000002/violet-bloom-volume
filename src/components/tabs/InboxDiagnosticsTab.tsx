@@ -1322,15 +1322,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               Analysis and Report
             </Button>
             <Button
-              onClick={runReputationReport}
-              disabled={!hasData}
-              className="flex-1 h-14 text-base font-semibold"
-              variant="secondary"
-            >
-              <Shield className="w-5 h-5 mr-2" />
-              Reputation Repair Recommendations
-            </Button>
-            <Button
               onClick={runStrategicInsights}
               disabled={!industry || isGeneratingInsights}
               className="flex-1 h-14 text-base font-semibold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] text-primary-foreground hover:opacity-90"
