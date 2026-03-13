@@ -1322,15 +1322,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               Analysis and Report
             </Button>
             <Button
-              onClick={runReputationReport}
-              disabled={!hasData}
-              className="flex-1 h-14 text-base font-semibold"
-              variant="secondary"
-            >
-              <Shield className="w-5 h-5 mr-2" />
-              Reputation Repair Recommendations
-            </Button>
-            <Button
               onClick={runStrategicInsights}
               disabled={!industry || isGeneratingInsights}
               className="flex-1 h-14 text-base font-semibold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] text-primary-foreground hover:opacity-90"
@@ -2135,14 +2126,13 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
         </motion.div>
       )}
 
-      {/* Reputation Repair View - Enhanced Structure */}
-      {activeReport === "reputation" && diagnostics?.reputationReport && (
+      {/* Reputation Repair View - REMOVED */}
+      {false && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {/* Header */}
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl font-bold text-gradient-magic">Reputation Repair Analysis</h2>
             <div className="flex gap-2">
