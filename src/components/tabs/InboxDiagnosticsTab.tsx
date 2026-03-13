@@ -62,7 +62,6 @@ import {
   InfrastructureDetailsTable,
   ReputationSmallMultiples,
 } from "../metrics";
-import type { ThresholdBreach } from "../reputation";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
