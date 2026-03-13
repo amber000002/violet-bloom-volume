@@ -560,7 +560,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
   const [isDraggingPostmaster, setIsDraggingPostmaster] = useState(false);
-  const [activeReport, setActiveReport] = useState<"analysis" | "reputation" | "strategic" | null>(null);
+  const [activeReport, setActiveReport] = useState<"analysis" | "strategic" | null>(null);
   const [strategicInsights, setStrategicInsights] = useState<StrategicInsightsOutput | null>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [strategicContext, setStrategicContext] = useState<string>("");
