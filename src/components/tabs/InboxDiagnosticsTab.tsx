@@ -192,11 +192,10 @@ export const generateTacticalFindings = (
 };
 
 // ============= EXECUTIVE KEY LEARNINGS (Global/Structural patterns only) =============
+// NOTE: Simplified - removed reputation signal analysis dependencies
 const generateIntelligentLearnings = (
   campaignData: CampaignRow[],
   analysisReport: AnalysisReport,
-  signalHealth: SignalHealth[],
-  rootCauses: RootCauseEntry[],
   postmasterData: PostmasterRow[] | null
 ): IntelligentRecommendation[] => {
   const recs: IntelligentRecommendation[] = [];
