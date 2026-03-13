@@ -306,7 +306,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
       <motion.button
         whileHover={{ scale: canGenerate ? 1.01 : 1 }}
         whileTap={{ scale: canGenerate ? 0.98 : 1 }}
-        onClick={onGenerate}
+        onClick={handleGenerate}
         disabled={!canGenerate || isGenerating}
         className={`w-full h-10 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
           canGenerate
