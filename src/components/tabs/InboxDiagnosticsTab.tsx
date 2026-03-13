@@ -749,14 +749,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       });
     }
     
-    // Also generate reputation report for Reputation Snapshot, Root Cause Summary, and Repair Actions
-    const reputationReport = generateReputationRepairReport(campaignData, postmasterData, contextText || null);
     const newDiagnostics: DiagnosticsData = {
       rawData: campaignData,
       postmasterData,
       contextText: contextText || null,
       analysisReport,
-      reputationReport,
+      reputationReport: null,
     };
     setDiagnostics(newDiagnostics);
     setActiveReport("analysis");
@@ -767,22 +765,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       runCreativeAnalysis();
     }
   }, [campaignData, postmasterData, contextText, processingSummary, onDataChange, creativeImage, creativeAnalysis, isAnalyzingCreative, runCreativeAnalysis]);
-
-  const runReputationReport = useCallback(() => {
-    if (campaignData.length === 0) return;
-    
-    const reputationReport = generateReputationRepairReport(campaignData, postmasterData, contextText || null);
-    const newDiagnostics: DiagnosticsData = {
-      rawData: campaignData,
-      postmasterData,
-      contextText: contextText || null,
-      analysisReport: null,
-      reputationReport,
-    };
-    setDiagnostics(newDiagnostics);
-    setActiveReport("reputation");
-    onDataChange?.(newDiagnostics);
-  }, [campaignData, postmasterData, contextText, onDataChange]);
 
   const runStrategicInsights = useCallback(async () => {
     if (!industry) return;
