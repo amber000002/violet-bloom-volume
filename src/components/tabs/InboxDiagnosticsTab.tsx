@@ -37,16 +37,12 @@ import {
   parseCSV, 
   parsePostmasterCSV,
   generateAnalysisReport,
-  generateReputationRepairReport,
   runReconciliationCheck,
   DiagnosticsData,
   ValidationResult,
   PostmasterValidationResult,
   CampaignRow,
   PostmasterRow,
-  DeliverabilityDiagnosticSummary,
-  EnhancedReputationReport,
-  ReputationSignalRow,
   ProcessingSummary,
   TopCampaign,
   AnalysisReport,
@@ -66,17 +62,6 @@ import {
   InfrastructureDetailsTable,
   ReputationSmallMultiples,
 } from "../metrics";
-import {
-  ReputationTrendChart,
-  SignalHealthTable,
-  RootCauseCorrelation,
-  RepairActionsModule,
-  ThresholdBreach,
-  calculateSignalHealth,
-  analyzeRootCauses,
-  type SignalHealth,
-  type RootCauseEntry,
-} from "../reputation";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
@@ -185,140 +170,32 @@ const sortByPriority = (recs: IntelligentRecommendation[]): IntelligentRecommend
   });
 };
 
-// ============= TACTICAL FINDINGS (Segment/Campaign-Specific → Root Cause) =============
+// ============= TACTICAL FINDINGS (Segment/Campaign-Specific) =============
+// NOTE: Reputation repair analysis removed - simplified tactical findings
 export const generateTacticalFindings = (
   campaignData: CampaignRow[],
-  rootCauses: RootCauseEntry[],
   postmasterData: PostmasterRow[] | null
 ): TacticalFinding[] => {
   const recs: TacticalFinding[] = [];
-  const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
-  const totalViewed = campaignData.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
-  const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
-  const totalBounce = campaignData.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
-  const totalUnsub = campaignData.reduce((s, c) => s + c.totalUnsubscribes, 0);
-  const avgOpenRate = totalSent > 0 ? (totalViewed / totalSent) * 100 : 0;
-  const avgClickRate = totalSent > 0 ? (totalClicked / totalSent) * 100 : 0;
-  const avgBounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
-  const avgUnsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
-
-  // Segment-Linked Correlation Analysis
-  const segmentRiskMap = new Map<string, {
-    bounceSpikes: number; spamCorrelations: number; unsubSpikes: number;
-    lowEngagement: number; blockSignals: number; totalCampaigns: number;
-    avgBounce: number; avgOpen: number; avgUnsub: number; totalSent: number;
-  }>();
-
-  rootCauses.forEach((rc) => {
-    rc.segmentPatterns.forEach((sp) => {
-      const existing = segmentRiskMap.get(sp.pattern) || {
-        bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0,
-        lowEngagement: 0, blockSignals: 0, totalCampaigns: 0,
-        avgBounce: 0, avgOpen: 0, avgUnsub: 0, totalSent: 0,
-      };
-      if (sp.observation.toLowerCase().includes("bounce")) existing.bounceSpikes++;
-      if (sp.observation.toLowerCase().includes("unsub")) existing.unsubSpikes++;
-      if (sp.observation.toLowerCase().includes("open rate")) existing.lowEngagement++;
-      if (sp.observation.toLowerCase().includes("block")) existing.blockSignals++;
-      existing.spamCorrelations += sp.frequency;
-      segmentRiskMap.set(sp.pattern, existing);
-    });
-  });
-
-  campaignData.forEach(c => {
-    if (!c.whoQuery || c.whoQuery.trim() === "") return;
-    const query = c.whoQuery.trim();
-    const existing = segmentRiskMap.get(query) || {
-      bounceSpikes: 0, spamCorrelations: 0, unsubSpikes: 0,
-      lowEngagement: 0, blockSignals: 0, totalCampaigns: 0,
-      avgBounce: 0, avgOpen: 0, avgUnsub: 0, totalSent: 0,
-    };
-    existing.totalCampaigns++;
-    existing.totalSent += c.totalSentUsers;
-    existing.avgBounce += c.hardBounceRate + c.softBounceRate;
-    existing.avgOpen += c.totalSentUsers > 0 ? (c.uniqueViewedWithinConversion / c.totalSentUsers) * 100 : 0;
-    existing.avgUnsub += c.unsubscribeRate;
-    segmentRiskMap.set(query, existing);
-  });
-
-  segmentRiskMap.forEach((data, segment) => {
-    if (data.totalSent < MIN_VOLUME_THRESHOLD) return; // Volume threshold
-    if (data.totalCampaigns === 0 && data.spamCorrelations === 0) return;
-
-    const segAvgBounce = data.totalCampaigns > 0 ? data.avgBounce / data.totalCampaigns : 0;
-    const segAvgOpen = data.totalCampaigns > 0 ? data.avgOpen / data.totalCampaigns : 0;
-    const segAvgUnsub = data.totalCampaigns > 0 ? data.avgUnsub / data.totalCampaigns : 0;
-
-    const issues: string[] = [];
-    const metrics: string[] = [];
-
-    if (data.bounceSpikes > 0 || segAvgBounce > avgBounceRate * 2) {
-      issues.push("elevated bounce rates");
-      metrics.push(`bounce: ${segAvgBounce.toFixed(2)}% vs ${avgBounceRate.toFixed(2)}% avg`);
-    }
-    if (data.unsubSpikes > 0 || segAvgUnsub > avgUnsubRate * 2) {
-      issues.push("high unsubscribe signals");
-      metrics.push(`unsub: ${segAvgUnsub.toFixed(2)}% vs ${avgUnsubRate.toFixed(2)}% avg`);
-    }
-    if (data.lowEngagement > 0 || (segAvgOpen > 0 && segAvgOpen < avgOpenRate * 0.7)) {
-      issues.push("below-average engagement");
-      metrics.push(`open: ${segAvgOpen.toFixed(1)}% vs ${avgOpenRate.toFixed(1)}% avg`);
-    }
-    if (data.blockSignals > 0) {
-      issues.push("block signals");
-    }
-
-    if (issues.length > 0) {
-      const isP0 = issues.includes("elevated bounce rates") || issues.includes("block signals") || data.spamCorrelations > 1;
-      recs.push({
-        issue: `${issues.join(" and ")} consistently observed in segment: "${segment}" (${data.totalCampaigns} campaigns, ${data.totalSent.toLocaleString()} sends). ${metrics.join("; ")}.`,
-        recommendation: `Implement a 3-step sunset policy for segment "${segment.length > 80 ? segment.substring(0, 77) + "..." : segment}": (1) Reduce frequency by 50% for 2 weeks, (2) Suppress non-engagers after 3 consecutive non-opens, (3) Re-validate email addresses before re-inclusion.`,
-        priority: isP0 ? "P0" : "P1",
-        severity: isP0 ? 7 : 5,
-      });
-    }
-  });
-
-  // Campaign-specific high unsubscribe offenders (volume-filtered)
-  const highUnsubCampaigns = campaignData
-    .filter(c => c.totalSentUsers >= MIN_VOLUME_THRESHOLD && c.unsubscribeRate > avgUnsubRate * 3)
-    .sort((a, b) => b.unsubscribeRate - a.unsubscribeRate)
-    .slice(0, 5);
-
-  highUnsubCampaigns.forEach(c => {
+  
+  // Volume-based findings
+  const lowVolumeCampaigns = campaignData.filter(c => c.totalSentUsers < MIN_VOLUME_THRESHOLD);
+  if (lowVolumeCampaigns.length > 0) {
     recs.push({
-      issue: `Campaign "${c.campaignName}" showed ${c.unsubscribeRate.toFixed(2)}% unsubscribe rate (${(c.unsubscribeRate / avgUnsubRate).toFixed(1)}x account average). Sent: ${c.totalSentUsers.toLocaleString()}.`,
-      recommendation: `Review content-audience alignment for this campaign. Consider suppressing this segment after 3 non-engagement cycles.`,
-      priority: c.unsubscribeRate > 1 ? "P0" : "P1",
-      severity: c.unsubscribeRate > 1 ? 6 : 4,
+      issue: `${lowVolumeCampaigns.length} campaigns sent to fewer than ${MIN_VOLUME_THRESHOLD} users`,
+      recommendation: "Consider consolidating low-volume campaigns or reviewing targeting criteria to improve statistical significance",
+      priority: "P2", severity: 3,
     });
-  });
-
-  // Campaign-specific high bounce offenders (volume-filtered)
-  const highBounceCampaigns = campaignData
-    .filter(c => c.totalSentUsers >= MIN_VOLUME_THRESHOLD && (c.hardBounceRate + c.softBounceRate) > avgBounceRate * 2)
-    .sort((a, b) => (b.hardBounceRate + b.softBounceRate) - (a.hardBounceRate + a.softBounceRate))
-    .slice(0, 5);
-
-  highBounceCampaigns.forEach(c => {
-    const bounceRate = c.hardBounceRate + c.softBounceRate;
-    recs.push({
-      issue: `Campaign "${c.campaignName}" had ${bounceRate.toFixed(2)}% bounce rate (${(bounceRate / avgBounceRate).toFixed(1)}x account average). Sent: ${c.totalSentUsers.toLocaleString()}.`,
-      recommendation: `Audit list source and email validation for this campaign's audience. Remove addresses with 2+ consecutive hard bounces.`,
-      priority: bounceRate > 3 ? "P0" : "P1",
-      severity: bounceRate > 3 ? 6 : 4,
-    });
-  });
-
+  }
+  
   return sortByPriority(recs) as TacticalFinding[];
 };
 
 // ============= EXECUTIVE KEY LEARNINGS (Global/Structural patterns only) =============
+// NOTE: Simplified - removed reputation signal analysis dependencies
 const generateIntelligentLearnings = (
   campaignData: CampaignRow[],
   analysisReport: AnalysisReport,
-  signalHealth: SignalHealth[],
-  rootCauses: RootCauseEntry[],
   postmasterData: PostmasterRow[] | null
 ): IntelligentRecommendation[] => {
   const recs: IntelligentRecommendation[] = [];
@@ -334,47 +211,39 @@ const generateIntelligentLearnings = (
   const avgBounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
   const avgUnsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
 
-  // === LAYER 1: Reputation Signal Analysis (P0) — Global ===
-  const domainSig = signalHealth.find(s => s.signal === "Domain Reputation");
-  const ipSig = signalHealth.find(s => s.signal === "IP Reputation");
-  const spamSig = signalHealth.find(s => s.signal === "Spam Rate");
-
-  if (domainSig && (domainSig.status === "critical" || domainSig.status === "breached" || domainSig.status === "risk")) {
+  // === LAYER 1: Critical Bounce Rate (P0) ===
+  if (avgBounceRate > 3.0) {
     recs.push({
-      issue: `Domain reputation degraded to "${domainSig.latestValue}". This directly impacts inbox placement across all mailbox providers and suppresses visibility of all campaigns.`,
-      recommendation: "Immediately restrict sending to engaged-only segments (opened/clicked in last 30 days) for 7–14 days. Validate SPF/DKIM/DMARC alignment. Follow CleverTap Email Best Practices: Sending Volume guidelines for gradual warm-up post-recovery.",
+      issue: `Critical bounce rate at ${avgBounceRate.toFixed(2)}% — exceeds 3% threshold and risks reputation degradation.`,
+      recommendation: "Immediate list hygiene required: validate email collection points, suppress hard-bounced addresses before next send. Review CleverTap Email Best Practices: List Hygiene.",
       priority: "P0", severity: 10,
     });
   }
 
-  if (ipSig && (ipSig.status === "critical" || ipSig.status === "breached" || ipSig.status === "risk")) {
-    const highVolumeDays = new Map<string, number>();
-    significantCampaigns.forEach(c => {
-      highVolumeDays.set(c.startDate, (highVolumeDays.get(c.startDate) || 0) + c.totalSentUsers);
+  // === LAYER 2: High Unsubscribe Rate (P0) ===
+  if (avgUnsubRate > 0.7) {
+    recs.push({
+      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}% — exceeding 0.7% indicates content/expectation misalignment.`,
+      recommendation: "Audit opt-in flows for clear value proposition. Review send frequency and content relevance per segment. Add preference center options.",
+      priority: "P0", severity: 9,
     });
-    const avgDailyVolume = totalSent / Math.max(highVolumeDays.size, 1);
-    const spikeDays = [...highVolumeDays.entries()].filter(([_, v]) => v > avgDailyVolume * 2);
-
-    if (spikeDays.length > 0) {
-      recs.push({
-        issue: `IP reputation at "${ipSig.latestValue}" with ${spikeDays.length} high-volume spike day(s) detected (>2x daily average of ${Math.round(avgDailyVolume).toLocaleString()}). Batch-and-blast sending pattern correlates with IP degradation.`,
-        recommendation: `Redistribute send volume across IP pools. Implement throttled sending (max ${Math.round(avgDailyVolume * 1.3).toLocaleString()} per day per IP). Stagger campaign launches with minimum 2-hour intervals. Follow CleverTap Email Best Practices: Compliance.`,
-        priority: "P0", severity: 9,
-      });
-    } else {
-      recs.push({
-        issue: `IP reputation at "${ipSig.latestValue}". Delivery rates at risk across shared infrastructure.`,
-        recommendation: "Audit IP allocation strategy. Consider dedicated IP for transactional vs. promotional streams. Implement throttled sending and monitor Postmaster Tools daily. Follow CleverTap Email Best Practices: Compliance.",
-        priority: "P0", severity: 9,
-      });
-    }
   }
 
-  if (spamSig && (spamSig.status === "breached" || spamSig.status === "warning")) {
+  // === LAYER 3: Low Open Rate (P1) ===
+  if (avgOpenRate < 10.0) {
     recs.push({
-      issue: `Spam rate at ${spamSig.latestValue}, exceeding the 0.1% Google threshold. Continued elevation risks automatic throttling by mailbox providers.`,
-      recommendation: "Implement double opt-in for all new subscribers. Add one-click unsubscribe header (RFC 8058). Deploy a preference center per CleverTap Email Best Practices: Compliance. Audit recent promotional content for spam trigger patterns.",
-      priority: "P0", severity: 8,
+      issue: `Low average open rate (${avgOpenRate.toFixed(2)}%). Consider reputation audit.`,
+      recommendation: "Review subject line practices, preheader optimization, and send-time targeting. Validate authentication setup (SPF/DKIM/DMARC). Check blocklist status via Google Postmaster Tools and third-party tools.",
+      priority: "P1", severity: 7,
+    });
+  }
+
+  // === LAYER 4: Low Click Rate (P1) ===
+  if (avgClickRate < 1.5) {
+    recs.push({
+      issue: `Click rate at ${avgClickRate.toFixed(2)}% across significant campaigns, indicating weak content engagement across the program.`,
+      recommendation: "Review content relevance per lifecycle stage. Test dynamic content blocks personalized by user behavior. Ensure mobile optimization of all templates.",
+      priority: "P2", severity: 2,
     });
   }
 
@@ -468,17 +337,7 @@ const generateIntelligentLearnings = (
     }
   });
 
-  // === LAYER 7: Recurring Breach Pattern (structural, not individual) ===
-  if (rootCauses.length > 3) {
-    const highConfidence = rootCauses.filter(r => r.confidence === "high" || r.confidence === "medium");
-    recs.push({
-      issue: `${rootCauses.length} reputation breach days detected in the analysis period (${highConfidence.length} with strong campaign correlation). This indicates persistent deliverability stress requiring structural intervention.`,
-      recommendation: "Establish automated Postmaster Tools monitoring with daily alerting. Implement a breach response protocol: pause promotional sends within 4 hours of detection, restrict to engaged-only segments for 48 hours.",
-      priority: "P1", severity: 5,
-    });
-  }
-
-  // === LAYER 8: Postmaster Delivery Error Patterns (global) ===
+  // === LAYER 7: Postmaster Delivery Error Patterns (global) ===
   if (postmasterData && postmasterData.length > 0) {
     const errorDays = postmasterData.filter(p => (p.errorRatio || 0) > 0);
     if (errorDays.length > postmasterData.length * 0.3) {
@@ -683,7 +542,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
   const [isDraggingPostmaster, setIsDraggingPostmaster] = useState(false);
-  const [activeReport, setActiveReport] = useState<"analysis" | "reputation" | "strategic" | null>(null);
+  const [activeReport, setActiveReport] = useState<"analysis" | "strategic" | null>(null);
   const [strategicInsights, setStrategicInsights] = useState<StrategicInsightsOutput | null>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [strategicContext, setStrategicContext] = useState<string>("");
@@ -691,14 +550,10 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const emailMetricsRef = useRef<HTMLDivElement>(null);
   const reputationTrendsRef = useRef<HTMLDivElement>(null);
   const creativeAnalysisRef = useRef<HTMLDivElement>(null);
-  const [thresholdBreaches, setThresholdBreaches] = useState<ThresholdBreach[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     provider: true,
     monthly: true,
     reputationTrends: true,
-    signalHealth: true,
-    rootCause: false,
-    repairActions: true,
     best: true,
     worst: true,
     trends: true,
@@ -876,14 +731,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       });
     }
     
-    // Also generate reputation report for Reputation Snapshot, Root Cause Summary, and Repair Actions
-    const reputationReport = generateReputationRepairReport(campaignData, postmasterData, contextText || null);
     const newDiagnostics: DiagnosticsData = {
       rawData: campaignData,
       postmasterData,
       contextText: contextText || null,
       analysisReport,
-      reputationReport,
+      reputationReport: null,
     };
     setDiagnostics(newDiagnostics);
     setActiveReport("analysis");
@@ -894,22 +747,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       runCreativeAnalysis();
     }
   }, [campaignData, postmasterData, contextText, processingSummary, onDataChange, creativeImage, creativeAnalysis, isAnalyzingCreative, runCreativeAnalysis]);
-
-  const runReputationReport = useCallback(() => {
-    if (campaignData.length === 0) return;
-    
-    const reputationReport = generateReputationRepairReport(campaignData, postmasterData, contextText || null);
-    const newDiagnostics: DiagnosticsData = {
-      rawData: campaignData,
-      postmasterData,
-      contextText: contextText || null,
-      analysisReport: null,
-      reputationReport,
-    };
-    setDiagnostics(newDiagnostics);
-    setActiveReport("reputation");
-    onDataChange?.(newDiagnostics);
-  }, [campaignData, postmasterData, contextText, onDataChange]);
 
   const runStrategicInsights = useCallback(async () => {
     if (!industry) return;
@@ -1386,14 +1223,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 variant="default" 
                 size="sm" 
                 onClick={() => {
-                  const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
-                  const rootCauses = thresholdBreaches.length > 0 ? analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches) : [];
-                  const learnings = generateIntelligentLearnings(diagnostics.rawData, diagnostics.analysisReport, signalHealth, rootCauses, postmasterData);
+                  const learnings = generateIntelligentLearnings(diagnostics.rawData, diagnostics.analysisReport, postmasterData);
                   exportDiagnosticsToPPT({
                     diagnostics,
                     brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
                     brandProfile: brandProfile || null,
-                    signalHealthData: signalHealth.map(s => ({ metric: s.signal, currentValue: s.latestValue?.toString() || "N/A", status: s.status, trend: s.trend })),
+                    signalHealthData: [],
                     intelligentLearnings: learnings,
                     industry,
                     sourceFileName: campaignFileName,
@@ -1612,19 +1447,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             />
           </CollapsibleSection>
 
-          {/* ============= REPUTATION SCORECARD ============= */}
-          <CollapsibleSection
-            title="Reputation Scorecard"
-            icon={<Shield className="w-5 h-5 text-primary" />}
-            isOpen={expandedSections.signalHealth}
-            onToggle={() => toggleSection("signalHealth")}
-          >
-            <SignalHealthTable
-              postmasterData={postmasterData}
-              campaignData={diagnostics.rawData}
-            />
-          </CollapsibleSection>
-
           {/* ============= REPUTATION TRENDS (SMALL MULTIPLES) ============= */}
           <CollapsibleSection
             title="Reputation Trends"
@@ -1650,44 +1472,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               />
             </div>
           </CollapsibleSection>
-
-
-          {postmasterData && postmasterData.length > 0 && (
-            <CollapsibleSection
-              title="Reputation Trends (Combined)"
-              icon={<Activity className="w-5 h-5 text-primary" />}
-              isOpen={expandedSections.reputationTrends}
-              onToggle={() => toggleSection("reputationTrends")}
-            >
-              <ReputationTrendChart
-                postmasterData={postmasterData}
-                onBreachDetected={setThresholdBreaches}
-              />
-            </CollapsibleSection>
-          )}
-
-          {/* ============= ROOT CAUSE SUMMARY ============= */}
-          {thresholdBreaches.length > 0 && (
-            <CollapsibleSection
-              title="Root Cause Summary"
-              icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
-              isOpen={expandedSections.rootCause}
-              onToggle={() => toggleSection("rootCause")}
-            >
-              {(() => {
-                const rcEntries = analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches);
-                const tactical = generateTacticalFindings(diagnostics.rawData, rcEntries, postmasterData);
-                return (
-                  <RootCauseCorrelation
-                    postmasterData={postmasterData}
-                    campaignData={diagnostics.rawData}
-                    breaches={thresholdBreaches}
-                    tacticalFindings={tactical}
-                  />
-                );
-              })()}
-            </CollapsibleSection>
-          )}
 
           {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
           <CollapsibleSection
@@ -2057,15 +1841,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             onToggle={() => toggleSection("learnings")}
           >
             {(() => {
-              const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
-              const rootCauses = thresholdBreaches.length > 0 
-                ? analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches) 
-                : [];
               const recommendations = generateIntelligentLearnings(
                 diagnostics.rawData,
                 diagnostics.analysisReport,
-                signalHealth,
-                rootCauses,
                 postmasterData
               );
 
