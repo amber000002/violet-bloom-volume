@@ -471,7 +471,27 @@ const InboxAlchemyContent: React.FC = () => {
                   Brand Profile: {brandProfile.brand_identity.brand_name}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  — {brandProfile.industry_signal_layer.industry_vocabulary.length} signals
+                  — {(() => {
+                    let count = 0;
+                    const lsm = brandProfile.lifecycle_signal_map;
+                    if (lsm) {
+                      count += (lsm.key_user_actions?.length || 0)
+                        + (lsm.key_user_events?.length || 0)
+                        + (lsm.activation_events?.length || 0)
+                        + (lsm.monetization_events?.length || 0)
+                        + (lsm.churn_signals?.length || 0)
+                        + (lsm.inactivity_markers?.length || 0)
+                        + (lsm.lifecycle_markers?.length || 0);
+                    }
+                    const ea = brandProfile.engagement_architecture;
+                    if (ea) {
+                      count += (ea.engagement_drivers?.length || 0)
+                        + (ea.seasonal_triggers?.length || 0)
+                        + (ea.event_based_triggers?.length || 0)
+                        + (ea.urgency_patterns?.length || 0);
+                    }
+                    return count;
+                  })()} signals
                   {brandMeta ? ` · ${brandMeta.completenessScore}% complete · ${brandMeta.iterationCount} iteration${brandMeta.iterationCount !== 1 ? "s" : ""}` : ""}
                 </span>
                 {brandMeta && brandMeta.completenessScore < 85 && (
