@@ -1,7 +1,26 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe, ChevronDown, ChevronUp, Plus, RefreshCw, Upload, FileText, X, Database } from "lucide-react";
 import { BrandInputs, emptyBrandInputs, additionalContextFields } from "@/types/brandProfile";
+
+const URL_HISTORY_KEY = "brand-url-history";
+const MAX_URL_HISTORY = 20;
+
+function loadUrlHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(URL_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveUrlToHistory(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) return;
+  const existing = loadUrlHistory();
+  const filtered = existing.filter((u) => u.toLowerCase() !== trimmed.toLowerCase());
+  const updated = [trimmed, ...filtered].slice(0, MAX_URL_HISTORY);
+  localStorage.setItem(URL_HISTORY_KEY, JSON.stringify(updated));
+}
 
 interface BrandInputsPanelProps {
   inputs: BrandInputs;
@@ -87,21 +106,90 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     ? inputs.userPropertiesCSV.trim().split("\n").length - 1
     : 0;
 
+  const [urlHistory, setUrlHistory] = useState<string[]>(loadUrlHistory);
+  const [showUrlDropdown, setShowUrlDropdown] = useState(false);
+  const urlWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (urlWrapperRef.current && !urlWrapperRef.current.contains(e.target as Node)) {
+        setShowUrlDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Save URL to history when it's used (on generate)
+  const originalOnGenerate = onGenerate;
+  const handleGenerate = useCallback(() => {
+    if (inputs.websiteUrl.trim()) {
+      saveUrlToHistory(inputs.websiteUrl);
+      setUrlHistory(loadUrlHistory());
+    }
+    originalOnGenerate();
+  }, [inputs.websiteUrl, originalOnGenerate]);
+
+  const filteredHistory = urlHistory.filter(
+    (u) => u.toLowerCase().includes(inputs.websiteUrl.toLowerCase()) && u.toLowerCase() !== inputs.websiteUrl.toLowerCase()
+  );
+
   return (
     <div className="flex-1 space-y-3">
       {/* Website URL */}
-      <div>
+      <div ref={urlWrapperRef} className="relative">
         <label className="block text-sm font-medium text-foreground mb-1.5">
           <Globe className="w-3.5 h-3.5 inline mr-1.5 text-primary" />
           Website URL <span className="text-secondary">*</span>
         </label>
-        <input
-          type="url"
-          value={inputs.websiteUrl}
-          onChange={(e) => onChange({ ...inputs, websiteUrl: e.target.value })}
-          placeholder="https://www.yourbrand.com"
-          className="w-full h-10 px-3 rounded-lg border border-border bg-muted/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300 text-sm"
-        />
+        <div className="relative">
+          <input
+            type="url"
+            value={inputs.websiteUrl}
+            onChange={(e) => {
+              onChange({ ...inputs, websiteUrl: e.target.value });
+              setShowUrlDropdown(true);
+            }}
+            onFocus={() => setShowUrlDropdown(true)}
+            placeholder="https://www.yourbrand.com"
+            className="w-full h-10 px-3 pr-8 rounded-lg border border-border bg-muted/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300 text-sm"
+          />
+          {urlHistory.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowUrlDropdown(!showUrlDropdown)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showUrlDropdown ? "rotate-180" : ""}`} />
+            </button>
+          )}
+        </div>
+        <AnimatePresence>
+          {showUrlDropdown && (inputs.websiteUrl ? filteredHistory : urlHistory).length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="absolute z-50 w-full mt-1 rounded-lg border border-border bg-card shadow-lg overflow-hidden max-h-[200px] overflow-y-auto"
+            >
+              {(inputs.websiteUrl ? filteredHistory : urlHistory).map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => {
+                    onChange({ ...inputs, websiteUrl: url });
+                    setShowUrlDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors truncate"
+                >
+                  {url}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Event Schema + User Properties - 1x2 Grid */}
@@ -218,7 +306,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
       <motion.button
         whileHover={{ scale: canGenerate ? 1.01 : 1 }}
         whileTap={{ scale: canGenerate ? 0.98 : 1 }}
-        onClick={onGenerate}
+        onClick={handleGenerate}
         disabled={!canGenerate || isGenerating}
         className={`w-full h-10 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
           canGenerate
