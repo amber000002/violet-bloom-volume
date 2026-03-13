@@ -337,13 +337,17 @@ const generateIntelligentLearnings = (
     }
   });
 
-  // === LAYER 7: Recurring Breach Pattern (structural, not individual) ===
-  if (rootCauses.length > 3) {
-    const highConfidence = rootCauses.filter(r => r.confidence === "high" || r.confidence === "medium");
+  // === LAYER 5: Lifecycle Gap Detection (structural, not campaign-specific) ===
+  const highPerformLowVolume = significantCampaigns.filter(c =>
+    c.totalSentUsers > 0 && c.totalSentUsers < totalSent * 0.01 &&
+    (c.uniqueViewedWithinConversion / c.totalSentUsers) * 100 > avgOpenRate * 1.5
+  );
+  if (highPerformLowVolume.length >= 3) {
+    const examples = highPerformLowVolume.slice(0, 2).map(c => `"${c.campaignName}"`).join(", ");
     recs.push({
-      issue: `${rootCauses.length} reputation breach days detected in the analysis period (${highConfidence.length} with strong campaign correlation). This indicates persistent deliverability stress requiring structural intervention.`,
-      recommendation: "Establish automated Postmaster Tools monitoring with daily alerting. Implement a breach response protocol: pause promotional sends within 4 hours of detection, restrict to engaged-only segments for 48 hours.",
-      priority: "P1", severity: 5,
+      issue: `${highPerformLowVolume.length} campaigns show strong engagement (>1.5x avg open rate) but account for <1% of total volume each. Examples: ${examples}. Lifecycle-triggered messaging is underutilized.`,
+      recommendation: "Expand trigger-based and lifecycle journey campaigns. Shift 20-30% of batch promotional volume to behavior-triggered journeys (e.g., browse abandonment, milestone-based). This improves engagement ratios and dilutes negative signals.",
+      priority: "P2", severity: 4,
     });
   }
 
