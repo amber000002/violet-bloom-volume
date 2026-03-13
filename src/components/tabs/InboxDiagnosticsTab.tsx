@@ -1280,21 +1280,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </div>
 
-          {/* Context Text (Optional) */}
-          <div className="magic-card rounded-2xl p-6">
-            <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
-              <MessageSquare className="w-5 h-5 text-muted-foreground" />
-              Additional Context
-              <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-            </h3>
-            <textarea
-              value={contextText}
-              onChange={(e) => setContextText(e.target.value)}
-              placeholder="E.g., 'Emails started landing in spam since last week' or 'Long emails getting clipped in Gmail'"
-              className="w-full h-24 px-4 py-3 rounded-xl bg-muted/30 border border-border focus:border-primary focus:outline-none resize-none text-sm"
-            />
-          </div>
-
           {/* Strategic Priorities (Optional - for Strategic Insights) */}
           <div className="magic-card rounded-2xl p-6">
             <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
