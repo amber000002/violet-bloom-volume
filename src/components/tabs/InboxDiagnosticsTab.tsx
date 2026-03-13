@@ -1855,15 +1855,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             onToggle={() => toggleSection("learnings")}
           >
             {(() => {
-              const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
-              const rootCauses = thresholdBreaches.length > 0 
-                ? analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches) 
-                : [];
               const recommendations = generateIntelligentLearnings(
                 diagnostics.rawData,
                 diagnostics.analysisReport,
-                signalHealth,
-                rootCauses,
                 postmasterData
               );
 
