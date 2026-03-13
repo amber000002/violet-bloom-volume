@@ -66,17 +66,7 @@ import {
   InfrastructureDetailsTable,
   ReputationSmallMultiples,
 } from "../metrics";
-import {
-  ReputationTrendChart,
-  SignalHealthTable,
-  RootCauseCorrelation,
-  RepairActionsModule,
-  ThresholdBreach,
-  calculateSignalHealth,
-  analyzeRootCauses,
-  type SignalHealth,
-  type RootCauseEntry,
-} from "../reputation";
+import type { ThresholdBreach } from "../reputation";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
