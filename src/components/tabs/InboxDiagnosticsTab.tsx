@@ -211,47 +211,39 @@ const generateIntelligentLearnings = (
   const avgBounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
   const avgUnsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
 
-  // === LAYER 1: Reputation Signal Analysis (P0) — Global ===
-  const domainSig = signalHealth.find(s => s.signal === "Domain Reputation");
-  const ipSig = signalHealth.find(s => s.signal === "IP Reputation");
-  const spamSig = signalHealth.find(s => s.signal === "Spam Rate");
-
-  if (domainSig && (domainSig.status === "critical" || domainSig.status === "breached" || domainSig.status === "risk")) {
+  // === LAYER 1: Critical Bounce Rate (P0) ===
+  if (avgBounceRate > 3.0) {
     recs.push({
-      issue: `Domain reputation degraded to "${domainSig.latestValue}". This directly impacts inbox placement across all mailbox providers and suppresses visibility of all campaigns.`,
-      recommendation: "Immediately restrict sending to engaged-only segments (opened/clicked in last 30 days) for 7–14 days. Validate SPF/DKIM/DMARC alignment. Follow CleverTap Email Best Practices: Sending Volume guidelines for gradual warm-up post-recovery.",
+      issue: `Critical bounce rate at ${avgBounceRate.toFixed(2)}% — exceeds 3% threshold and risks reputation degradation.`,
+      recommendation: "Immediate list hygiene required: validate email collection points, suppress hard-bounced addresses before next send. Review CleverTap Email Best Practices: List Hygiene.",
       priority: "P0", severity: 10,
     });
   }
 
-  if (ipSig && (ipSig.status === "critical" || ipSig.status === "breached" || ipSig.status === "risk")) {
-    const highVolumeDays = new Map<string, number>();
-    significantCampaigns.forEach(c => {
-      highVolumeDays.set(c.startDate, (highVolumeDays.get(c.startDate) || 0) + c.totalSentUsers);
+  // === LAYER 2: High Unsubscribe Rate (P0) ===
+  if (avgUnsubRate > 0.7) {
+    recs.push({
+      issue: `Unsubscribe rate at ${avgUnsubRate.toFixed(2)}% — exceeding 0.7% indicates content/expectation misalignment.`,
+      recommendation: "Audit opt-in flows for clear value proposition. Review send frequency and content relevance per segment. Add preference center options.",
+      priority: "P0", severity: 9,
     });
-    const avgDailyVolume = totalSent / Math.max(highVolumeDays.size, 1);
-    const spikeDays = [...highVolumeDays.entries()].filter(([_, v]) => v > avgDailyVolume * 2);
-
-    if (spikeDays.length > 0) {
-      recs.push({
-        issue: `IP reputation at "${ipSig.latestValue}" with ${spikeDays.length} high-volume spike day(s) detected (>2x daily average of ${Math.round(avgDailyVolume).toLocaleString()}). Batch-and-blast sending pattern correlates with IP degradation.`,
-        recommendation: `Redistribute send volume across IP pools. Implement throttled sending (max ${Math.round(avgDailyVolume * 1.3).toLocaleString()} per day per IP). Stagger campaign launches with minimum 2-hour intervals. Follow CleverTap Email Best Practices: Compliance.`,
-        priority: "P0", severity: 9,
-      });
-    } else {
-      recs.push({
-        issue: `IP reputation at "${ipSig.latestValue}". Delivery rates at risk across shared infrastructure.`,
-        recommendation: "Audit IP allocation strategy. Consider dedicated IP for transactional vs. promotional streams. Implement throttled sending and monitor Postmaster Tools daily. Follow CleverTap Email Best Practices: Compliance.",
-        priority: "P0", severity: 9,
-      });
-    }
   }
 
-  if (spamSig && (spamSig.status === "breached" || spamSig.status === "warning")) {
+  // === LAYER 3: Low Open Rate (P1) ===
+  if (avgOpenRate < 10.0) {
     recs.push({
-      issue: `Spam rate at ${spamSig.latestValue}, exceeding the 0.1% Google threshold. Continued elevation risks automatic throttling by mailbox providers.`,
-      recommendation: "Implement double opt-in for all new subscribers. Add one-click unsubscribe header (RFC 8058). Deploy a preference center per CleverTap Email Best Practices: Compliance. Audit recent promotional content for spam trigger patterns.",
-      priority: "P0", severity: 8,
+      issue: `Low average open rate (${avgOpenRate.toFixed(2)}%). Consider reputation audit.`,
+      recommendation: "Review subject line practices, preheader optimization, and send-time targeting. Validate authentication setup (SPF/DKIM/DMARC). Check blocklist status via Google Postmaster Tools and third-party tools.",
+      priority: "P1", severity: 7,
+    });
+  }
+
+  // === LAYER 4: Low Click Rate (P1) ===
+  if (avgClickRate < 1.5) {
+    recs.push({
+      issue: `Click rate at ${avgClickRate.toFixed(2)}% across significant campaigns, indicating weak content engagement across the program.`,
+      recommendation: "Review content relevance per lifecycle stage. Test dynamic content blocks personalized by user behavior. Ensure mobile optimization of all templates.",
+      priority: "P2", severity: 2,
     });
   }
 
