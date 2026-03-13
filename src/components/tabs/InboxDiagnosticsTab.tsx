@@ -337,19 +337,22 @@ const generateIntelligentLearnings = (
     }
   });
 
-  // === LAYER 5: Lifecycle Gap Detection (structural, not campaign-specific) ===
-  const highPerformLowVolume = significantCampaigns.filter(c =>
-    c.totalSentUsers > 0 && c.totalSentUsers < totalSent * 0.01 &&
-    (c.uniqueViewedWithinConversion / c.totalSentUsers) * 100 > avgOpenRate * 1.5
-  );
-  if (highPerformLowVolume.length >= 3) {
-    const examples = highPerformLowVolume.slice(0, 2).map(c => `"${c.campaignName}"`).join(", ");
-    recs.push({
-      issue: `${highPerformLowVolume.length} campaigns show strong engagement (>1.5x avg open rate) but account for <1% of total volume each. Examples: ${examples}. Lifecycle-triggered messaging is underutilized.`,
-      recommendation: "Expand trigger-based and lifecycle journey campaigns. Shift 20-30% of batch promotional volume to behavior-triggered journeys (e.g., browse abandonment, milestone-based). This improves engagement ratios and dilutes negative signals.",
-      priority: "P2", severity: 4,
-    });
-  }
+  // === LAYER 5: Campaign Structure Concentration (structural) ===
+  const channels = new Map<string, number>();
+  significantCampaigns.forEach(c => {
+    channels.set(c.channel, (channels.get(c.channel) || 0) + 1);
+  });
+  const totalCampaigns = significantCampaigns.length;
+  channels.forEach((count, channel) => {
+    const pct = (count / totalCampaigns) * 100;
+    if (pct > 70) {
+      recs.push({
+        issue: `${channel} channel accounts for ${pct.toFixed(0)}% of all significant campaigns (${count}/${totalCampaigns}), indicating over-concentration on a single campaign type.`,
+        recommendation: `Diversify campaign mix by introducing transactional triggers, lifecycle journeys, and re-engagement automations alongside ${channel} campaigns. Target <50% concentration per channel type.`,
+        priority: "P2", severity: 2,
+      });
+    }
+  });
 
   // === LAYER 8: Postmaster Delivery Error Patterns (global) ===
   if (postmasterData && postmasterData.length > 0) {
