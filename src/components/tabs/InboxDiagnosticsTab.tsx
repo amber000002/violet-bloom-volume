@@ -1465,19 +1465,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             />
           </CollapsibleSection>
 
-          {/* ============= REPUTATION SCORECARD ============= */}
-          <CollapsibleSection
-            title="Reputation Scorecard"
-            icon={<Shield className="w-5 h-5 text-primary" />}
-            isOpen={expandedSections.signalHealth}
-            onToggle={() => toggleSection("signalHealth")}
-          >
-            <SignalHealthTable
-              postmasterData={postmasterData}
-              campaignData={diagnostics.rawData}
-            />
-          </CollapsibleSection>
-
           {/* ============= REPUTATION TRENDS (SMALL MULTIPLES) ============= */}
           <CollapsibleSection
             title="Reputation Trends"
@@ -1503,44 +1490,6 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               />
             </div>
           </CollapsibleSection>
-
-
-          {postmasterData && postmasterData.length > 0 && (
-            <CollapsibleSection
-              title="Reputation Trends (Combined)"
-              icon={<Activity className="w-5 h-5 text-primary" />}
-              isOpen={expandedSections.reputationTrends}
-              onToggle={() => toggleSection("reputationTrends")}
-            >
-              <ReputationTrendChart
-                postmasterData={postmasterData}
-                onBreachDetected={setThresholdBreaches}
-              />
-            </CollapsibleSection>
-          )}
-
-          {/* ============= ROOT CAUSE SUMMARY ============= */}
-          {thresholdBreaches.length > 0 && (
-            <CollapsibleSection
-              title="Root Cause Summary"
-              icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
-              isOpen={expandedSections.rootCause}
-              onToggle={() => toggleSection("rootCause")}
-            >
-              {(() => {
-                const rcEntries = analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches);
-                const tactical = generateTacticalFindings(diagnostics.rawData, rcEntries, postmasterData);
-                return (
-                  <RootCauseCorrelation
-                    postmasterData={postmasterData}
-                    campaignData={diagnostics.rawData}
-                    breaches={thresholdBreaches}
-                    tacticalFindings={tactical}
-                  />
-                );
-              })()}
-            </CollapsibleSection>
-          )}
 
           {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
           <CollapsibleSection
