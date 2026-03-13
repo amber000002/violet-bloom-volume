@@ -1241,14 +1241,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 variant="default" 
                 size="sm" 
                 onClick={() => {
-                  const signalHealth = calculateSignalHealth(postmasterData, diagnostics.rawData);
-                  const rootCauses = thresholdBreaches.length > 0 ? analyzeRootCauses(postmasterData, diagnostics.rawData, thresholdBreaches) : [];
-                  const learnings = generateIntelligentLearnings(diagnostics.rawData, diagnostics.analysisReport, signalHealth, rootCauses, postmasterData);
+                  const learnings = generateIntelligentLearnings(diagnostics.rawData, diagnostics.analysisReport, postmasterData);
                   exportDiagnosticsToPPT({
                     diagnostics,
                     brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
                     brandProfile: brandProfile || null,
-                    signalHealthData: signalHealth.map(s => ({ metric: s.signal, currentValue: s.latestValue?.toString() || "N/A", status: s.status, trend: s.trend })),
+                    signalHealthData: [],
                     intelligentLearnings: learnings,
                     industry,
                     sourceFileName: campaignFileName,
