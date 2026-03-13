@@ -34,10 +34,10 @@ const industryOptions = Object.entries(industryConfigs).map(([key, config]) => (
 }));
 
 const tabs = [
-  { id: "inbox-potential", label: "Inbox Potential", icon: Mail },
-  { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
-  { id: "amp-email-studio", label: "AMP Email Studio", icon: Zap },
   { id: "inbox-diagnostics", label: "Inbox Diagnostics", icon: Activity },
+  { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
+  { id: "amp-email-studio", label: "AMP Email Studio (In Progress)", icon: Zap },
+  { id: "inbox-potential", label: "Inbox Potential", icon: Mail },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];

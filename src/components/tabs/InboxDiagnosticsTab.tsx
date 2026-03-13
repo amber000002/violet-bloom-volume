@@ -2126,14 +2126,13 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
         </motion.div>
       )}
 
-      {/* Reputation Repair View - Enhanced Structure */}
-      {activeReport === "reputation" && diagnostics?.reputationReport && (
+      {/* Reputation Repair View - REMOVED */}
+      {false && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {/* Header */}
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl font-bold text-gradient-magic">Reputation Repair Analysis</h2>
             <div className="flex gap-2">
