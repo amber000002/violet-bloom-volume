@@ -1,7 +1,26 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe, ChevronDown, ChevronUp, Plus, RefreshCw, Upload, FileText, X, Database } from "lucide-react";
 import { BrandInputs, emptyBrandInputs, additionalContextFields } from "@/types/brandProfile";
+
+const URL_HISTORY_KEY = "brand-url-history";
+const MAX_URL_HISTORY = 20;
+
+function loadUrlHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(URL_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveUrlToHistory(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) return;
+  const existing = loadUrlHistory();
+  const filtered = existing.filter((u) => u.toLowerCase() !== trimmed.toLowerCase());
+  const updated = [trimmed, ...filtered].slice(0, MAX_URL_HISTORY);
+  localStorage.setItem(URL_HISTORY_KEY, JSON.stringify(updated));
+}
 
 interface BrandInputsPanelProps {
   inputs: BrandInputs;
