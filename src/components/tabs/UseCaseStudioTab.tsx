@@ -429,7 +429,7 @@ const UseCaseCard: React.FC<{
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 };
 
