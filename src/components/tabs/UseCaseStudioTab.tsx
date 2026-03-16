@@ -273,8 +273,10 @@ const UseCaseCard: React.FC<{
         </button>
       </div>
 
-      {/* Objective */}
-      <p className="text-sm text-muted-foreground">{useCase.objective}</p>
+      {/* Objective - AI only */}
+      {!isInternal && (
+        <p className="text-sm text-muted-foreground">{useCase.objective}</p>
+      )}
 
       {/* Channels Used */}
       <div className="flex items-center gap-1.5 flex-wrap">
