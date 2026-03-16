@@ -1524,6 +1524,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   confidence={confidence}
                   isExpanded={expandedCard === useCase.id}
                   onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                  stageLabel={availableStages.find(s => normalizeStage(s.id) === normalizeStage(useCase.stage))?.label}
                 />
               ))}
             </div>
