@@ -204,7 +204,7 @@ function getMetricsForStage(brand: CoreBrandJSON | null, stage: string): string[
 }
 
 export function personalizeUseCase(
-  useCaseData: { name: string; stage: string; triggerType?: string; description?: string; source: "internal" | "native"; sourceLabel?: string },
+  useCaseData: { name: string; stage: string; triggerType?: string; description?: string; source: "internal" | "native"; sourceLabel?: string; rawResourceData?: Record<string, any> },
   brand: CoreBrandJSON | null,
   selectedChannels: string[],
 ): PersonalizedUseCase {
@@ -226,6 +226,6 @@ export function personalizeUseCase(
     source: useCaseData.source,
     sourceLabel: useCaseData.sourceLabel,
     triggerType: useCaseData.triggerType,
-    originalData: useCaseData,
+    originalData: useCaseData.rawResourceData || useCaseData,
   };
 }
