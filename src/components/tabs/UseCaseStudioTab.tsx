@@ -28,7 +28,7 @@ import {
   loadAllRecentBrandVersions,
   BrandProfileVersion,
 } from "@/lib/brandProfileVersionService";
-import { computeCompletenessScore } from "@/lib/brandEnrichmentEngine";
+import { computeCompletenessScore, countPopulatedFields } from "@/lib/brandEnrichmentEngine";
 import {
   industryConfigs,
   JourneyUseCase,
@@ -112,7 +112,8 @@ const BrandGroupCollapsible: React.FC<{
   onView: (v: BrandProfileVersion) => void;
   countSignals: (p: CoreBrandJSON | null) => number;
   computeCompleteness: (p: CoreBrandJSON | null) => number;
-}> = ({ brandName, host, versions, activeBrandVersionId, onSelect, onView, countSignals, computeCompleteness }) => {
+  countPopulatedFields: (p: CoreBrandJSON | null) => number;
+}> = ({ brandName, host, versions, activeBrandVersionId, onSelect, onView, countSignals, computeCompleteness, countPopulatedFields }) => {
   const [open, setOpen] = useState(false);
   const hasActive = versions.some(v => v.brandProfileVersionId === activeBrandVersionId);
 
@@ -149,6 +150,7 @@ const BrandGroupCollapsible: React.FC<{
               {versions.map((v, idx) => {
                 const signals = countSignals(v.brandProfileJson);
                 const completeness = computeCompleteness(v.brandProfileJson);
+                const populatedFields = countPopulatedFields(v.brandProfileJson);
                 const isActive = activeBrandVersionId === v.brandProfileVersionId;
                 return (
                   <div key={v.brandProfileVersionId} className={`px-4 py-2.5 hover:bg-muted/10 transition-colors ${isActive ? "bg-primary/5" : ""}`}>
@@ -183,7 +185,7 @@ const BrandGroupCollapsible: React.FC<{
                           </span>
                           <span className="flex items-center gap-1">
                             <BarChart3 className="w-3 h-3" />
-                            {completeness}% complete
+                            {completeness}% ({populatedFields} -- fields detected)
                           </span>
                           <span>{new Date(v.generatedAt).toLocaleDateString()}</span>
                         </div>
@@ -1102,6 +1104,10 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                       return computeCompletenessScore(profile);
                     };
 
+                    const getPopulatedFields = (profile: CoreBrandJSON | null): number => {
+                      return countPopulatedFields(profile);
+                    };
+
                     return Array.from(grouped.entries()).map(([host, group]) => (
                       <BrandGroupCollapsible
                         key={host}
@@ -1113,6 +1119,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                         onView={(v) => setViewingProfileJson(v.brandProfileJson)}
                         countSignals={countSignals}
                         computeCompleteness={computeCompleteness}
+                        countPopulatedFields={getPopulatedFields}
                       />
                     ));
                   })()}
