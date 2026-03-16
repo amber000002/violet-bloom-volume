@@ -556,14 +556,23 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     });
   }, [resources, industry]);
 
-  const internalStages = useMemo(() => {
-    const stagesSet = new Set<string>();
+  // Build a map of normalized stage -> original label from resources
+  const internalStageLabels = useMemo(() => {
+    const labelMap = new Map<string, string>();
     for (const resource of industryFilteredResources) {
-      resource.journeys?.forEach(j => { if (j.stage) stagesSet.add(normalizeStage(j.stage)); });
-      resource.campaigns?.forEach(c => { if (c.stage) stagesSet.add(normalizeStage(c.stage)); });
+      resource.journeys?.forEach(j => {
+        if (j.stage) labelMap.set(normalizeStage(j.stage), j.stage);
+      });
+      resource.campaigns?.forEach(c => {
+        if (c.stage) labelMap.set(normalizeStage(c.stage), c.stage);
+      });
     }
-    return Array.from(stagesSet);
+    return labelMap;
   }, [industryFilteredResources]);
+
+  const internalStages = useMemo(() => {
+    return Array.from(internalStageLabels.keys());
+  }, [internalStageLabels]);
 
   // Debug data for Data Integrity panel
   const debugData = useMemo(() => {
