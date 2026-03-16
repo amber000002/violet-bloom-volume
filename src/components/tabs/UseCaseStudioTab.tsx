@@ -112,7 +112,8 @@ const BrandGroupCollapsible: React.FC<{
   onView: (v: BrandProfileVersion) => void;
   countSignals: (p: CoreBrandJSON | null) => number;
   computeCompleteness: (p: CoreBrandJSON | null) => number;
-}> = ({ brandName, host, versions, activeBrandVersionId, onSelect, onView, countSignals, computeCompleteness }) => {
+  countPopulatedFields: (p: CoreBrandJSON | null) => number;
+}> = ({ brandName, host, versions, activeBrandVersionId, onSelect, onView, countSignals, computeCompleteness, countPopulatedFields }) => {
   const [open, setOpen] = useState(false);
   const hasActive = versions.some(v => v.brandProfileVersionId === activeBrandVersionId);
 
