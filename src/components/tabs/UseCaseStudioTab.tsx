@@ -227,62 +227,8 @@ const UseCaseCard: React.FC<{
   const isInternal = useCase.source === "internal";
 
   return (
-    <div
-      className={`px-5 py-4 space-y-3 ${isInternal ? "" : ""}`}
-    >
-      {/* Header: Title + Badges */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-2 flex-1 min-w-0">
-          <h4 className="font-display font-semibold text-foreground">{useCase.title}</h4>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Stage badge */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
-              {stageToLabel(useCase.stage)}
-            </span>
-            {/* Confidence badge - hide exploratory */}
-            {confidence.level !== "exploratory" && (
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium ${confidenceColorClass}`}>
-              {confidence.level === "high" && <CheckCircle2 className="w-3 h-3" />}
-              {confidence.level === "medium" && <AlertTriangle className="w-3 h-3" />}
-              {getConfidenceLabel(confidence.level)}
-            </span>
-            )}
-            {/* Source badge - native only */}
-            {!isInternal && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
-              <Sparkles className="w-3 h-3" />
-              Native
-            </span>
-            )}
-            {/* Trigger type */}
-            {useCase.triggerType && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 text-xs text-muted-foreground">
-                <Zap className="w-3 h-3" />
-                {useCase.triggerType}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Objective - AI only */}
-      {!isInternal && (
-        <p className="text-sm text-muted-foreground">{useCase.objective}</p>
-      )}
-
-      {/* Channels Used */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {useCase.channelsUsed.map(ch => {
-          const Icon = channelIcons[ch];
-          const label = CHANNEL_DISPLAY_LABELS[ch] || ch;
-          return (
-            <span key={ch} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/50 text-xs text-muted-foreground">
-              {Icon && <Icon className="w-3 h-3" />}
-              {label}
-            </span>
-          );
-        })}
-      </div>
+    <div className="px-5 py-3">
+      <h4 className="font-display font-semibold text-foreground text-sm">{useCase.title}</h4>
 
       {/* Expandable Details */}
       <AnimatePresence>
