@@ -635,15 +635,21 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   const availableStages = useMemo(() => {
     const predefinedIds = new Set(predefinedStages.map(s => normalizeStage(s.id)));
-    const merged = [...predefinedStages];
+    // Use internal resource labels to override predefined labels
+    const merged = predefinedStages.map(s => {
+      const normalizedId = normalizeStage(s.id);
+      const internalLabel = internalStageLabels.get(normalizedId);
+      return internalLabel ? { id: s.id, label: internalLabel } : s;
+    });
     for (const stage of internalStages) {
       if (!predefinedIds.has(stage)) {
-        merged.push({ id: stage, label: stageToLabel(stage) });
+        const label = internalStageLabels.get(stage) || stageToLabel(stage);
+        merged.push({ id: stage, label });
       }
     }
     // Filter to only stages that have content
     return merged.filter(s => stagesWithContent.has(normalizeStage(s.id)));
-  }, [predefinedStages, internalStages, stagesWithContent]);
+  }, [predefinedStages, internalStages, stagesWithContent, internalStageLabels]);
 
   // Reset selected stage when framework or industry changes
   React.useEffect(() => {
