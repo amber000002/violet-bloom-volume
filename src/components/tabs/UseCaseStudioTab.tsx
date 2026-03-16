@@ -222,7 +222,8 @@ const UseCaseCard: React.FC<{
   confidence: ConfidenceResult;
   isExpanded: boolean;
   onToggle: () => void;
-}> = ({ useCase, confidence, isExpanded, onToggle }) => {
+  stageLabel?: string;
+}> = ({ useCase, confidence, isExpanded, onToggle, stageLabel }) => {
   const confidenceColorClass = getConfidenceColor(confidence.level);
   const isInternal = useCase.source === "internal";
 
@@ -239,7 +240,7 @@ const UseCaseCard: React.FC<{
           <div className="flex items-center gap-2 flex-wrap">
             {/* Stage badge */}
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
-              {stageToLabel(useCase.stage)}
+              {stageLabel || stageToLabel(useCase.stage)}
             </span>
             {/* Confidence badge */}
             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium ${confidenceColorClass}`}>
@@ -1523,6 +1524,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   confidence={confidence}
                   isExpanded={expandedCard === useCase.id}
                   onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                  stageLabel={availableStages.find(s => normalizeStage(s.id) === normalizeStage(useCase.stage))?.label}
                 />
               ))}
             </div>
@@ -1542,6 +1544,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   confidence={confidence}
                   isExpanded={expandedCard === useCase.id}
                   onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                  stageLabel={availableStages.find(s => normalizeStage(s.id) === normalizeStage(useCase.stage))?.label}
                 />
               ))}
             </div>
