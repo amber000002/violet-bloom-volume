@@ -324,7 +324,8 @@ const UseCaseCard: React.FC<{
               </div>
             </div>
 
-            {/* Personalization Layers */}
+            {/* Personalization Layers - only for AI-augmented use cases */}
+            {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
                 <Layers className="w-3.5 h-3.5 text-accent" />
@@ -339,6 +340,7 @@ const UseCaseCard: React.FC<{
                 ))}
               </div>
             </div>
+            )}
 
             {/* Campaign Logic Structure */}
             <div>
