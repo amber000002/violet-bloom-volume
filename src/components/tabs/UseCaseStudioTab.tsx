@@ -247,13 +247,13 @@ const UseCaseCard: React.FC<{
               {getConfidenceLabel(confidence.level)}
             </span>
             )}
-            {/* Source badge */}
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
-              isInternal ? "bg-emerald-500/10 text-emerald-400" : "bg-muted text-muted-foreground"
-            }`}>
-              {isInternal ? <BookOpen className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
-              {isInternal ? (useCase.sourceLabel || "Internal") : "Native"}
+            {/* Source badge - native only */}
+            {!isInternal && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
+              <Sparkles className="w-3 h-3" />
+              Native
             </span>
+            )}
             {/* Trigger type */}
             {useCase.triggerType && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 text-xs text-muted-foreground">
