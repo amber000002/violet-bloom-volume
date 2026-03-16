@@ -299,7 +299,8 @@ const UseCaseCard: React.FC<{
             exit={{ opacity: 0, height: 0 }}
             className="border-t border-border pt-4 mt-3 space-y-5"
           >
-            {/* Why It Matters */}
+            {/* Why It Matters - AI only */}
+            {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
                 <Brain className="w-3.5 h-3.5 text-primary" />
@@ -307,8 +308,10 @@ const UseCaseCard: React.FC<{
               </div>
               <p className="text-sm text-muted-foreground">{useCase.whyItMatters}</p>
             </div>
+            )}
 
-            {/* Execution Strategy */}
+            {/* Execution Strategy - AI only */}
+            {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
                 <Crosshair className="w-3.5 h-3.5 text-secondary" />
@@ -323,8 +326,9 @@ const UseCaseCard: React.FC<{
                 ))}
               </div>
             </div>
+            )}
 
-            {/* Personalization Layers - only for AI-augmented use cases */}
+            {/* Personalization Layers - AI only */}
             {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
@@ -342,7 +346,8 @@ const UseCaseCard: React.FC<{
             </div>
             )}
 
-            {/* Campaign Logic Structure */}
+            {/* Campaign Logic - AI only */}
+            {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
                 <Workflow className="w-3.5 h-3.5 text-primary" />
@@ -367,8 +372,10 @@ const UseCaseCard: React.FC<{
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Metrics to Impact */}
+            {/* Metrics to Impact - AI only */}
+            {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
                 <BarChart3 className="w-3.5 h-3.5 text-secondary" />
@@ -387,8 +394,10 @@ const UseCaseCard: React.FC<{
                 ))}
               </div>
             </div>
+            )}
 
-            {/* Why This Fits Your Brand */}
+            {/* Why This Fits Your Brand - AI only */}
+            {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
                 <Target className="w-3.5 h-3.5 text-emerald-400" />
@@ -398,8 +407,10 @@ const UseCaseCard: React.FC<{
                 {useCase.whyThisFitsYourBrand}
               </p>
             </div>
+            )}
 
-            {/* Confidence Breakdown */}
+            {/* Confidence Breakdown - AI only */}
+            {!isInternal && (
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
                 <Shield className="w-3.5 h-3.5 text-muted-foreground" />
@@ -413,6 +424,7 @@ const UseCaseCard: React.FC<{
                 ))}
               </div>
             </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
