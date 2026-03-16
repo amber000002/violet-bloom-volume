@@ -227,10 +227,8 @@ const UseCaseCard: React.FC<{
   const isInternal = useCase.source === "internal";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`magic-card rounded-xl p-5 space-y-3 ${isInternal ? "ring-1 ring-emerald-500/30" : ""}`}
+    <div
+      className={`px-5 py-4 space-y-3 ${isInternal ? "" : ""}`}
     >
       {/* Header: Title + Badges */}
       <div className="flex items-start justify-between gap-3">
@@ -241,13 +239,14 @@ const UseCaseCard: React.FC<{
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
               {stageToLabel(useCase.stage)}
             </span>
-            {/* Confidence badge */}
+            {/* Confidence badge - hide exploratory */}
+            {confidence.level !== "exploratory" && (
             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium ${confidenceColorClass}`}>
               {confidence.level === "high" && <CheckCircle2 className="w-3 h-3" />}
               {confidence.level === "medium" && <AlertTriangle className="w-3 h-3" />}
-              {confidence.level === "exploratory" && <Lightbulb className="w-3 h-3" />}
               {getConfidenceLabel(confidence.level)}
             </span>
+            )}
             {/* Source badge */}
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
               isInternal ? "bg-emerald-500/10 text-emerald-400" : "bg-muted text-muted-foreground"
@@ -430,7 +429,7 @@ const UseCaseCard: React.FC<{
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 };
 
@@ -1542,41 +1541,54 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
             </div>
           )}
 
-          {/* Internal Use Cases */}
-          {internalUseCases.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs text-emerald-400">
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>From Internal Resources</span>
-              </div>
-              {internalUseCases.map(({ useCase, confidence }) => (
-                <UseCaseCard
-                  key={useCase.id}
-                  useCase={useCase}
-                  confidence={confidence}
-                  isExpanded={expandedCard === useCase.id}
-                  onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
-                />
-              ))}
-            </div>
-          )}
+          {/* All Use Cases in Single Card */}
+          {personalizedUseCases.length > 0 && (
+            <div className="magic-card rounded-xl overflow-hidden">
+              {/* Internal Use Cases Section */}
+              {internalUseCases.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/5 border-b border-border">
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-xs font-medium text-emerald-400">From Internal Resources</span>
+                    <span className="text-xs text-muted-foreground">({internalUseCases.length})</span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {internalUseCases.map(({ useCase, confidence }) => (
+                      <UseCaseCard
+                        key={useCase.id}
+                        useCase={useCase}
+                        confidence={confidence}
+                        isExpanded={expandedCard === useCase.id}
+                        onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Native Use Cases */}
-          {nativeUseCases.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}</span>
-              </div>
-              {nativeUseCases.map(({ useCase, confidence }) => (
-                <UseCaseCard
-                  key={useCase.id}
-                  useCase={useCase}
-                  confidence={confidence}
-                  isExpanded={expandedCard === useCase.id}
-                  onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
-                />
-              ))}
+              {/* Native Use Cases Section */}
+              {nativeUseCases.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 px-5 py-3 bg-muted/30 border-b border-t border-border">
+                    <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({nativeUseCases.length})</span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {nativeUseCases.map(({ useCase, confidence }) => (
+                      <UseCaseCard
+                        key={useCase.id}
+                        useCase={useCase}
+                        confidence={confidence}
+                        isExpanded={expandedCard === useCase.id}
+                        onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
