@@ -222,7 +222,8 @@ const UseCaseCard: React.FC<{
   confidence: ConfidenceResult;
   isExpanded: boolean;
   onToggle: () => void;
-}> = ({ useCase, confidence, isExpanded, onToggle }) => {
+  stageLabel?: string;
+}> = ({ useCase, confidence, isExpanded, onToggle, stageLabel }) => {
   const confidenceColorClass = getConfidenceColor(confidence.level);
   const isInternal = useCase.source === "internal";
 
