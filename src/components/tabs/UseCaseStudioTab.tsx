@@ -712,6 +712,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         description: campaign.purpose,
         source: "internal",
         sourceLabel: campaign.sourceResource,
+        rawResourceData: campaign.rawData,
       }, brandProfile || null, selectedChannels);
 
       const confidence = calculateConfidence({
