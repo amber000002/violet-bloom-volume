@@ -241,13 +241,14 @@ const UseCaseCard: React.FC<{
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
               {stageToLabel(useCase.stage)}
             </span>
-            {/* Confidence badge */}
+            {/* Confidence badge - hide exploratory */}
+            {confidence.level !== "exploratory" && (
             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium ${confidenceColorClass}`}>
               {confidence.level === "high" && <CheckCircle2 className="w-3 h-3" />}
               {confidence.level === "medium" && <AlertTriangle className="w-3 h-3" />}
-              {confidence.level === "exploratory" && <Lightbulb className="w-3 h-3" />}
               {getConfidenceLabel(confidence.level)}
             </span>
+            )}
             {/* Source badge */}
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
               isInternal ? "bg-emerald-500/10 text-emerald-400" : "bg-muted text-muted-foreground"
