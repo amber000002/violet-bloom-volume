@@ -1103,6 +1103,10 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                       return computeCompletenessScore(profile);
                     };
 
+                    const getPopulatedFields = (profile: CoreBrandJSON | null): number => {
+                      return countPopulatedFields(profile);
+                    };
+
                     return Array.from(grouped.entries()).map(([host, group]) => (
                       <BrandGroupCollapsible
                         key={host}
@@ -1114,6 +1118,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                         onView={(v) => setViewingProfileJson(v.brandProfileJson)}
                         countSignals={countSignals}
                         computeCompleteness={computeCompleteness}
+                        countPopulatedFields={getPopulatedFields}
                       />
                     ));
                   })()}
