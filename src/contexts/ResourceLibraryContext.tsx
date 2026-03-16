@@ -210,6 +210,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
           clevertap_solution: (useCase as any).clevertap_solution,
           metrics_impacted: (useCase as any).metrics_impacted,
           business_impact: (useCase as any).business_impact,
+          rawData: { ...useCase } as Record<string, any>,
         };
         resourceData.journeys.push(journey);
       } else {
