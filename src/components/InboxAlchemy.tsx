@@ -615,6 +615,7 @@ const InboxAlchemyContent: React.FC = () => {
   );
 };
 
+// Wrap content in providers
 export const InboxAlchemy: React.FC = () => {
   return (
     <ResourceLibraryProvider>
