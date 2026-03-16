@@ -699,7 +699,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     for (const journey of internalJourneys) {
       const uc = personalizeUseCase({
         name: journey.name,
-        stage: selectedStage,
+        stage: journey.stage || selectedStage,
         triggerType: journey.triggerType,
         description: journey.description,
         source: "internal",
@@ -721,7 +721,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     for (const campaign of internalCampaigns) {
       const uc = personalizeUseCase({
         name: campaign.name,
-        stage: selectedStage,
+        stage: campaign.stage || selectedStage,
         description: campaign.purpose,
         source: "internal",
         sourceLabel: campaign.sourceResource,
