@@ -1543,41 +1543,54 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
             </div>
           )}
 
-          {/* Internal Use Cases */}
-          {internalUseCases.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs text-emerald-400">
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>From Internal Resources</span>
-              </div>
-              {internalUseCases.map(({ useCase, confidence }) => (
-                <UseCaseCard
-                  key={useCase.id}
-                  useCase={useCase}
-                  confidence={confidence}
-                  isExpanded={expandedCard === useCase.id}
-                  onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
-                />
-              ))}
-            </div>
-          )}
+          {/* All Use Cases in Single Card */}
+          {personalizedUseCases.length > 0 && (
+            <div className="magic-card rounded-xl overflow-hidden">
+              {/* Internal Use Cases Section */}
+              {internalUseCases.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/5 border-b border-border">
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-xs font-medium text-emerald-400">From Internal Resources</span>
+                    <span className="text-xs text-muted-foreground">({internalUseCases.length})</span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {internalUseCases.map(({ useCase, confidence }) => (
+                      <UseCaseCard
+                        key={useCase.id}
+                        useCase={useCase}
+                        confidence={confidence}
+                        isExpanded={expandedCard === useCase.id}
+                        onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Native Use Cases */}
-          {nativeUseCases.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}</span>
-              </div>
-              {nativeUseCases.map(({ useCase, confidence }) => (
-                <UseCaseCard
-                  key={useCase.id}
-                  useCase={useCase}
-                  confidence={confidence}
-                  isExpanded={expandedCard === useCase.id}
-                  onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
-                />
-              ))}
+              {/* Native Use Cases Section */}
+              {nativeUseCases.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 px-5 py-3 bg-muted/30 border-b border-t border-border">
+                    <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({nativeUseCases.length})</span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {nativeUseCases.map(({ useCase, confidence }) => (
+                      <UseCaseCard
+                        key={useCase.id}
+                        useCase={useCase}
+                        confidence={confidence}
+                        isExpanded={expandedCard === useCase.id}
+                        onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
