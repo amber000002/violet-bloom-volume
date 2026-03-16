@@ -1549,18 +1549,29 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
             </div>
           )}
 
-          {/* All Use Cases in Single Card */}
+          {/* Two-Column Layout */}
           {personalizedUseCases.length > 0 && (
-            <div className="magic-card rounded-xl overflow-hidden">
-              {/* Internal Use Cases Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Column 1: Internal Resources */}
               {internalUseCases.length > 0 && (
-                <div>
+                <div className="magic-card rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/5 border-b border-border">
                     <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
                     <span className="text-xs font-medium text-emerald-400">From Internal Resources</span>
                     <span className="text-xs text-muted-foreground">({internalUseCases.length})</span>
+                    {(() => {
+                      const resourceNames = new Set(internalUseCases.map(u => u.useCase.sourceLabel).filter(Boolean));
+                      if (resourceNames.size > 0) {
+                        return (
+                          <span className="text-xs text-emerald-400/70 ml-auto truncate max-w-[200px]" title={Array.from(resourceNames).join(", ")}>
+                            {Array.from(resourceNames).join(", ")}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
-                  <div className="divide-y divide-border">
+                  <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
                     {internalUseCases.map(({ useCase, confidence }) => (
                       <UseCaseCard
                         key={useCase.id}
@@ -1574,17 +1585,17 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                 </div>
               )}
 
-              {/* Native Use Cases Section */}
+              {/* Column 2: Native Intelligence */}
               {nativeUseCases.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 px-5 py-3 bg-muted/30 border-b border-t border-border">
+                <div className="magic-card rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-2 px-5 py-3 bg-muted/30 border-b border-border">
                     <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-xs font-medium text-muted-foreground">
                       {hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}
                     </span>
                     <span className="text-xs text-muted-foreground">({nativeUseCases.length})</span>
                   </div>
-                  <div className="divide-y divide-border">
+                  <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
                     {nativeUseCases.map(({ useCase, confidence }) => (
                       <UseCaseCard
                         key={useCase.id}
