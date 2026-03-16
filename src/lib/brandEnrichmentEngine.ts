@@ -179,7 +179,7 @@ export function computeCompletenessScore(profile: CoreBrandJSON): number {
   return Math.round((populated / ALL_FIELDS.length) * 100);
 }
 
-/** Count how many of the 55 fields are actually populated */
+/** Count how many of the 80 tracked fields are actually populated */
 export function countPopulatedFields(profile: CoreBrandJSON | null): number {
   if (!profile) return 0;
   let populated = 0;

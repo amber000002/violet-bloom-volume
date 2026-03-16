@@ -185,7 +185,7 @@ const BrandGroupCollapsible: React.FC<{
                           </span>
                           <span className="flex items-center gap-1">
                             <BarChart3 className="w-3 h-3" />
-                            {completeness}% ({populatedFields} -- fields detected)
+                            {completeness}% ({populatedFields}/80 fields detected)
                           </span>
                           <span>{new Date(v.generatedAt).toLocaleDateString()}</span>
                         </div>
