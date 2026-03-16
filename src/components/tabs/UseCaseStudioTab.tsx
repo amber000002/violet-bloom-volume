@@ -227,10 +227,8 @@ const UseCaseCard: React.FC<{
   const isInternal = useCase.source === "internal";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`magic-card rounded-xl p-5 space-y-3 ${isInternal ? "ring-1 ring-emerald-500/30" : ""}`}
+    <div
+      className={`px-5 py-4 space-y-3 ${isInternal ? "" : ""}`}
     >
       {/* Header: Title + Badges */}
       <div className="flex items-start justify-between gap-3">
