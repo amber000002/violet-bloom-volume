@@ -89,6 +89,7 @@ export interface ResourceCampaign {
   clevertap_solution?: string;
   metrics_impacted?: string[];
   business_impact?: string;
+  rawData?: Record<string, any>; // Full raw JSON use case for display
 }
 
 export interface Resource {
