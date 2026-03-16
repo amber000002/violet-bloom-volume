@@ -600,6 +600,38 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     return getFrameworkStages(framework, industry);
   }, [industry, framework]);
 
+  // Compute which stages actually have use cases (internal or native)
+  const stagesWithContent = useMemo(() => {
+    const stageSet = new Set<string>();
+    // Internal resource stages
+    for (const resource of industryFilteredResources) {
+      resource.journeys?.forEach(j => {
+        if (j.stage && (!j.channels || channelsOverlap(j.channels, selectedChannels))) {
+          stageSet.add(normalizeStage(j.stage));
+        }
+      });
+      resource.campaigns?.forEach(c => {
+        if (c.stage && (!c.channels || channelsOverlap(c.channels, selectedChannels))) {
+          stageSet.add(normalizeStage(c.stage));
+        }
+      });
+    }
+    // Native/predefined stages with content
+    for (const stage of predefinedStages) {
+      const stageId = normalizeStage(stage.id);
+      if (framework === "aida" || framework === "4p" || framework === "7p") {
+        if (getFrameworkJourneys(framework, stageId).length > 0 || getFrameworkCampaigns(framework, stageId).length > 0) {
+          stageSet.add(stageId);
+        }
+      } else if (config) {
+        if ((config.journeys[stageId] && config.journeys[stageId].length > 0) || (config.campaigns[stageId] && config.campaigns[stageId].length > 0)) {
+          stageSet.add(stageId);
+        }
+      }
+    }
+    return stageSet;
+  }, [industryFilteredResources, predefinedStages, framework, config, selectedChannels]);
+
   const availableStages = useMemo(() => {
     const predefinedIds = new Set(predefinedStages.map(s => normalizeStage(s.id)));
     const merged = [...predefinedStages];
@@ -608,8 +640,9 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         merged.push({ id: stage, label: stageToLabel(stage) });
       }
     }
-    return merged;
-  }, [predefinedStages, internalStages]);
+    // Filter to only stages that have content
+    return merged.filter(s => stagesWithContent.has(normalizeStage(s.id)));
+  }, [predefinedStages, internalStages, stagesWithContent]);
 
   // Reset selected stage when framework or industry changes
   React.useEffect(() => {
