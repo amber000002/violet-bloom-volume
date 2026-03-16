@@ -217,6 +217,66 @@ const BrandGroupCollapsible: React.FC<{
 };
 
 // ===== PERSONALIZED USE CASE CARD =====
+const RAW_FIELD_LABELS: Record<string, string> = {
+  objective: "Objective",
+  why_it_matters: "Why It Matters",
+  channels: "Channels",
+  user_segment: "User Segment",
+  trigger_event: "Trigger Event",
+  personalization_used: "Personalization Used",
+  communication_strategy_bmat: "Communication Strategy (BMAT)",
+  do_it_with_clevertap: "Do It With CleverTap",
+  analytics: "Analytics",
+  segmentation: "Segmentation",
+  engagement: "Engagement",
+  more_notes: "More Notes",
+  metrics_to_impact: "Metrics to Impact",
+  ecommerce_kpis_impacted: "E-commerce KPIs Impacted",
+  business_goal: "Business Goal",
+  business_challenge: "Business Challenge",
+  clevertap_solution: "CleverTap Solution",
+  metrics_impacted: "Metrics Impacted",
+  business_impact: "Business Impact",
+  description: "Description",
+  purpose: "Purpose",
+  timing: "Timing",
+  suppression: "Suppression",
+  stage: "Stage",
+  framework: "Framework",
+  events: "Events",
+  segments: "Segments",
+  trigger_type: "Trigger Type",
+};
+
+// Fields to skip in the raw data display (metadata / already shown in title)
+const SKIP_FIELDS = new Set(["use_case_id", "name", "type", "is_primary", "tabs", "industry"]);
+
+const RawDataValue: React.FC<{ value: any }> = ({ value }) => {
+  if (value == null || value === "") return <span className="text-muted-foreground italic text-xs">—</span>;
+  if (Array.isArray(value)) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {value.map((v, i) => (
+          <span key={i} className="px-2 py-0.5 rounded-full bg-primary/10 text-xs text-primary">{String(v)}</span>
+        ))}
+      </div>
+    );
+  }
+  if (typeof value === "object") {
+    return (
+      <div className="space-y-1.5 pl-3 border-l-2 border-border">
+        {Object.entries(value).map(([k, v]) => (
+          <div key={k}>
+            <span className="text-xs font-medium text-foreground">{RAW_FIELD_LABELS[k] || k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}:</span>
+            <div className="mt-0.5"><RawDataValue value={v} /></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <span className="text-xs text-muted-foreground">{String(value)}</span>;
+};
+
 const UseCaseCard: React.FC<{
   useCase: PersonalizedUseCase;
   confidence: ConfidenceResult;
@@ -225,10 +285,45 @@ const UseCaseCard: React.FC<{
 }> = ({ useCase, confidence, isExpanded, onToggle }) => {
   const confidenceColorClass = getConfidenceColor(confidence.level);
   const isInternal = useCase.source === "internal";
+  const rawData = useCase.originalData;
+
+  // Collect displayable fields from raw data for internal use cases
+  const displayFields = useMemo(() => {
+    if (!isInternal || !rawData || typeof rawData !== "object") return [];
+    return Object.entries(rawData)
+      .filter(([key]) => !SKIP_FIELDS.has(key))
+      .filter(([, val]) => val != null && val !== "" && !(Array.isArray(val) && val.length === 0))
+      .map(([key, val]) => ({
+        key,
+        label: RAW_FIELD_LABELS[key] || key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+        value: val,
+      }));
+  }, [isInternal, rawData]);
 
   return (
     <div className="px-5 py-3">
-      <h4 className="font-display font-semibold text-foreground text-sm">{useCase.title}</h4>
+      <div className="flex items-center justify-between">
+        <h4 className="font-display font-semibold text-foreground text-sm flex-1">{useCase.title}</h4>
+        {isInternal && displayFields.length > 0 && (
+          <button
+            onClick={onToggle}
+            className="ml-2 p-1 rounded-md hover:bg-muted/50 transition-colors flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            title={isExpanded ? "Hide details" : "Show details"}
+          >
+            <Info className="w-3.5 h-3.5" />
+            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        )}
+        {!isInternal && (
+          <button
+            onClick={onToggle}
+            className="ml-2 p-1 rounded-md hover:bg-muted/50 transition-colors flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            title={isExpanded ? "Hide details" : "Show details"}
+          >
+            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        )}
+      </div>
 
       {/* Expandable Details */}
       <AnimatePresence>
@@ -237,133 +332,129 @@ const UseCaseCard: React.FC<{
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="border-t border-border pt-4 mt-3 space-y-5"
+            className="border-t border-border pt-4 mt-3 space-y-3 overflow-hidden"
           >
-            {/* Why It Matters - AI only */}
-            {!isInternal && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                <Brain className="w-3.5 h-3.5 text-primary" />
-                Why It Matters
-              </div>
-              <p className="text-sm text-muted-foreground">{useCase.whyItMatters}</p>
-            </div>
-            )}
-
-            {/* Execution Strategy - AI only */}
-            {!isInternal && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                <Crosshair className="w-3.5 h-3.5 text-secondary" />
-                Execution Strategy
-              </div>
-              <div className="space-y-2">
-                {useCase.executionStrategy.map((strategy, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-muted/20 border border-border">
-                    <span className="text-xs font-medium text-primary">{strategy.channel}</span>
-                    <p className="text-xs text-muted-foreground mt-1">{strategy.direction}</p>
+            {/* Internal: Show raw JSON attributes */}
+            {isInternal && displayFields.length > 0 && (
+              <div className="space-y-3">
+                {displayFields.map(({ key, label, value }) => (
+                  <div key={key}>
+                    <div className="text-xs font-medium text-foreground mb-1">{label}</div>
+                    <RawDataValue value={value} />
                   </div>
                 ))}
               </div>
-            </div>
             )}
 
-            {/* Personalization Layers - AI only */}
+            {/* Native: existing details */}
             {!isInternal && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                <Layers className="w-3.5 h-3.5 text-accent" />
-                Personalization Layers Applied
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {useCase.personalizationLayers.map((layer, i) => (
-                  <div key={i} className="p-2 rounded bg-muted/30">
-                    <span className="text-xs font-medium text-foreground">{layer.layer}</span>
-                    <p className="text-xs text-muted-foreground mt-0.5">{layer.value}</p>
+              <>
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                    <Brain className="w-3.5 h-3.5 text-primary" />
+                    Why It Matters
                   </div>
-                ))}
-              </div>
-            </div>
-            )}
-
-            {/* Campaign Logic - AI only */}
-            {!isInternal && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                <Workflow className="w-3.5 h-3.5 text-primary" />
-                Campaign Logic
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2 rounded bg-muted/20">
-                  <span className="text-muted-foreground">Trigger:</span>
-                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.triggerEvent}</p>
+                  <p className="text-sm text-muted-foreground">{useCase.whyItMatters}</p>
                 </div>
-                <div className="p-2 rounded bg-muted/20">
-                  <span className="text-muted-foreground">Segmentation:</span>
-                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.segmentationRule}</p>
-                </div>
-                <div className="p-2 rounded bg-muted/20">
-                  <span className="text-muted-foreground">Channel Flow:</span>
-                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.channelFlow}</p>
-                </div>
-                <div className="p-2 rounded bg-muted/20">
-                  <span className="text-muted-foreground">Content Theme:</span>
-                  <p className="text-foreground mt-0.5">{useCase.campaignLogic.contentTheme}</p>
-                </div>
-              </div>
-            </div>
-            )}
 
-            {/* Metrics to Impact - AI only */}
-            {!isInternal && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                <BarChart3 className="w-3.5 h-3.5 text-secondary" />
-                Metrics to Impact
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {useCase.metricsToImpact.map((metric, i) => (
-                  <span key={i} className="px-2 py-1 rounded-full bg-secondary/10 text-xs text-secondary">
-                    {metric}
-                  </span>
-                ))}
-                {useCase.businessKPIs.map((kpi, i) => (
-                  <span key={`kpi-${i}`} className="px-2 py-1 rounded-full bg-primary/10 text-xs text-primary">
-                    {kpi}
-                  </span>
-                ))}
-              </div>
-            </div>
-            )}
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                    <Crosshair className="w-3.5 h-3.5 text-secondary" />
+                    Execution Strategy
+                  </div>
+                  <div className="space-y-2">
+                    {useCase.executionStrategy.map((strategy, i) => (
+                      <div key={i} className="p-3 rounded-lg bg-muted/20 border border-border">
+                        <span className="text-xs font-medium text-primary">{strategy.channel}</span>
+                        <p className="text-xs text-muted-foreground mt-1">{strategy.direction}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Why This Fits Your Brand - AI only */}
-            {!isInternal && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                <Target className="w-3.5 h-3.5 text-emerald-400" />
-                Why This Fits Your Brand
-              </div>
-              <p className="text-sm text-muted-foreground p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                {useCase.whyThisFitsYourBrand}
-              </p>
-            </div>
-            )}
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                    <Layers className="w-3.5 h-3.5 text-accent" />
+                    Personalization Layers Applied
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {useCase.personalizationLayers.map((layer, i) => (
+                      <div key={i} className="p-2 rounded bg-muted/30">
+                        <span className="text-xs font-medium text-foreground">{layer.layer}</span>
+                        <p className="text-xs text-muted-foreground mt-0.5">{layer.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Confidence Breakdown - AI only */}
-            {!isInternal && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
-                <Shield className="w-3.5 h-3.5 text-muted-foreground" />
-                Confidence Breakdown
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                {confidence.reasons.map((reason, i) => (
-                  <span key={i} className="px-2 py-1 rounded bg-muted/30 text-muted-foreground">
-                    {reason}
-                  </span>
-                ))}
-              </div>
-            </div>
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                    <Workflow className="w-3.5 h-3.5 text-primary" />
+                    Campaign Logic
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 rounded bg-muted/20">
+                      <span className="text-muted-foreground">Trigger:</span>
+                      <p className="text-foreground mt-0.5">{useCase.campaignLogic.triggerEvent}</p>
+                    </div>
+                    <div className="p-2 rounded bg-muted/20">
+                      <span className="text-muted-foreground">Segmentation:</span>
+                      <p className="text-foreground mt-0.5">{useCase.campaignLogic.segmentationRule}</p>
+                    </div>
+                    <div className="p-2 rounded bg-muted/20">
+                      <span className="text-muted-foreground">Channel Flow:</span>
+                      <p className="text-foreground mt-0.5">{useCase.campaignLogic.channelFlow}</p>
+                    </div>
+                    <div className="p-2 rounded bg-muted/20">
+                      <span className="text-muted-foreground">Content Theme:</span>
+                      <p className="text-foreground mt-0.5">{useCase.campaignLogic.contentTheme}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                    <BarChart3 className="w-3.5 h-3.5 text-secondary" />
+                    Metrics to Impact
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {useCase.metricsToImpact.map((metric, i) => (
+                      <span key={i} className="px-2 py-1 rounded-full bg-secondary/10 text-xs text-secondary">
+                        {metric}
+                      </span>
+                    ))}
+                    {useCase.businessKPIs.map((kpi, i) => (
+                      <span key={`kpi-${i}`} className="px-2 py-1 rounded-full bg-primary/10 text-xs text-primary">
+                        {kpi}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                    <Target className="w-3.5 h-3.5" style={{ color: "hsl(var(--primary))" }} />
+                    Why This Fits Your Brand
+                  </div>
+                  <p className="text-sm text-muted-foreground p-3 rounded-lg bg-primary/5 border border-primary/20">
+                    {useCase.whyThisFitsYourBrand}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                    <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                    Confidence Breakdown
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {confidence.reasons.map((reason, i) => (
+                      <span key={i} className="px-2 py-1 rounded bg-muted/30 text-muted-foreground">
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </motion.div>
         )}
