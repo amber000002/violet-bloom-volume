@@ -28,7 +28,7 @@ import {
   loadAllRecentBrandVersions,
   BrandProfileVersion,
 } from "@/lib/brandProfileVersionService";
-import { computeCompletenessScore } from "@/lib/brandEnrichmentEngine";
+import { computeCompletenessScore, countPopulatedFields } from "@/lib/brandEnrichmentEngine";
 import {
   industryConfigs,
   JourneyUseCase,
