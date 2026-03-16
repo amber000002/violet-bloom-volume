@@ -240,7 +240,7 @@ const UseCaseCard: React.FC<{
           <div className="flex items-center gap-2 flex-wrap">
             {/* Stage badge */}
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
-              {stageToLabel(useCase.stage)}
+              {stageLabel || stageToLabel(useCase.stage)}
             </span>
             {/* Confidence badge */}
             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium ${confidenceColorClass}`}>
