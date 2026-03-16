@@ -690,6 +690,7 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         description: journey.description,
         source: "internal",
         sourceLabel: journey.sourceResource,
+        rawResourceData: journey.rawData,
       }, brandProfile || null, selectedChannels);
 
       const confidence = calculateConfidence({
