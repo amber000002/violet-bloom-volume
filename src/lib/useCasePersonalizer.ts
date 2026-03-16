@@ -226,6 +226,6 @@ export function personalizeUseCase(
     source: useCaseData.source,
     sourceLabel: useCaseData.sourceLabel,
     triggerType: useCaseData.triggerType,
-    originalData: useCaseData,
+    originalData: useCaseData.rawResourceData || useCaseData,
   };
 }
