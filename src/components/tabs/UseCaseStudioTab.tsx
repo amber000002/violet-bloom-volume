@@ -263,13 +263,6 @@ const UseCaseCard: React.FC<{
             )}
           </div>
         </div>
-        <button onClick={onToggle} className="p-1 hover:bg-muted rounded flex-shrink-0">
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          )}
-        </button>
       </div>
 
       {/* Objective - AI only */}
