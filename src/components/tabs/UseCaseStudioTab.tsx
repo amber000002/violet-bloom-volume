@@ -1363,16 +1363,22 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   if (!industry) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-            <span className="text-2xl">📧</span>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            Select an industry above to discover hyper-personalized use cases.
-          </p>
+      <div className="flex gap-6">
+        {/* Left: History Panel */}
+        <div className="w-72 flex-shrink-0 sticky top-0 self-start max-h-screen overflow-y-auto space-y-3">
+          {renderHistoryPanel()}
         </div>
-        {renderHistoryPanel()}
+        {/* Right: Placeholder */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+              <span className="text-2xl">📧</span>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              Select an industry above to discover hyper-personalized use cases.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1418,361 +1424,365 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Read-only Industry Badge */}
-      {config && (
-        <div className="flex items-center justify-center gap-2">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-            <CheckCircle2 className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">
-              Industry: {config.name}
-            </span>
-            {brandProfile && (
-              <span className="text-xs text-muted-foreground">
-                • {brandProfile.brand_identity.brand_name}
+    <div className="flex gap-6">
+      {/* Left: Static History Panel */}
+      <div className="w-72 flex-shrink-0 sticky top-0 self-start max-h-screen overflow-y-auto space-y-3 pr-2">
+        {/* Read-only Industry Badge */}
+        {config && (
+          <div className="flex items-center gap-2 mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 w-full">
+              <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              <span className="text-xs font-medium text-foreground truncate">
+                {config.name}
               </span>
-            )}
+              {brandProfile && (
+                <span className="text-xs text-muted-foreground truncate">
+                  • {brandProfile.brand_identity.brand_name}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Always-visible History Panel */}
-      {renderHistoryPanel()}
-
-      {/* Channel Multi-Select */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-sm font-medium text-foreground">Channels</span>
-          <button
-            onClick={selectAllChannels}
-            className="text-xs text-primary hover:underline"
-          >
-            Select All
-          </button>
-        </div>
-        <div className="flex flex-wrap justify-center gap-2">
-          {CHANNEL_OPTIONS.map((ch) => {
-            const isSelected = selectedChannels.includes(ch.id);
-            const Icon = channelIcons[ch.id] || Globe;
-            return (
-              <motion.button
-                key={ch.id}
-                onClick={() => toggleChannel(ch.id)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                  isSelected
-                    ? "bg-primary/20 text-primary border border-primary/40"
-                    : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted/50"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {ch.label}
-              </motion.button>
-            );
-          })}
-        </div>
+        )}
+        {renderHistoryPanel()}
       </div>
 
-      {/* Data Integrity Panel (collapsible debug) */}
-      <details className="mx-auto max-w-xl">
-        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-          <Shield className="w-3 h-3" />
-          Data Integrity
-        </summary>
-        <div className="mt-2 p-3 rounded-lg bg-muted/20 border border-border text-xs text-muted-foreground space-y-1">
-          <div><span className="font-medium text-foreground">Selected Industry:</span> {debugData.selectedIndustry}</div>
-          <div><span className="font-medium text-foreground">Total resources loaded:</span> {debugData.resourceCount} ({debugData.totalLoaded} use cases)</div>
-          <div><span className="font-medium text-foreground">After industry filter:</span> {debugData.filteredResourceCount} resources ({debugData.afterFilter} use cases)</div>
-          <div><span className="font-medium text-foreground">Industries in loaded resources:</span> [{debugData.industriesFound.join(", ")}]</div>
-          {debugData.afterFilter === 0 && debugData.totalLoaded > 0 && (
-            <div className="text-yellow-500 mt-1">
-              ⚠ No use cases match "{debugData.selectedIndustry}". Available: [{debugData.industriesFound.join(", ")}]
-            </div>
-          )}
-        </div>
-      </details>
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <span className="text-sm font-medium text-foreground">Insight Framework</span>
-          <div className="group relative">
-            <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64 text-xs text-muted-foreground z-10">
-              Frameworks help structure insights — they don't change the underlying data.
-            </div>
+      {/* Right: Scrollable Main Content */}
+      <div className="flex-1 min-w-0 space-y-8 overflow-y-auto">
+        {/* Channel Multi-Select */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-sm font-medium text-foreground">Channels</span>
+            <button
+              onClick={selectAllChannels}
+              className="text-xs text-primary hover:underline"
+            >
+              Select All
+            </button>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            {CHANNEL_OPTIONS.map((ch) => {
+              const isSelected = selectedChannels.includes(ch.id);
+              const Icon = channelIcons[ch.id] || Globe;
+              return (
+                <motion.button
+                  key={ch.id}
+                  onClick={() => toggleChannel(ch.id)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                    isSelected
+                      ? "bg-primary/20 text-primary border border-primary/40"
+                      : "bg-muted/30 text-muted-foreground border border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {ch.label}
+                </motion.button>
+              );
+            })}
           </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-2">
-          {frameworkOptions.map((option) => (
+
+        {/* Data Integrity Panel (collapsible debug) */}
+        <details className="mx-auto max-w-xl">
+          <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
+            <Shield className="w-3 h-3" />
+            Data Integrity
+          </summary>
+          <div className="mt-2 p-3 rounded-lg bg-muted/20 border border-border text-xs text-muted-foreground space-y-1">
+            <div><span className="font-medium text-foreground">Selected Industry:</span> {debugData.selectedIndustry}</div>
+            <div><span className="font-medium text-foreground">Total resources loaded:</span> {debugData.resourceCount} ({debugData.totalLoaded} use cases)</div>
+            <div><span className="font-medium text-foreground">After industry filter:</span> {debugData.filteredResourceCount} resources ({debugData.afterFilter} use cases)</div>
+            <div><span className="font-medium text-foreground">Industries in loaded resources:</span> [{debugData.industriesFound.join(", ")}]</div>
+            {debugData.afterFilter === 0 && debugData.totalLoaded > 0 && (
+              <div className="text-yellow-500 mt-1">
+                ⚠ No use cases match "{debugData.selectedIndustry}". Available: [{debugData.industriesFound.join(", ")}]
+              </div>
+            )}
+          </div>
+        </details>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="text-sm font-medium text-foreground">Insight Framework</span>
+            <div className="group relative">
+              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64 text-xs text-muted-foreground z-10">
+                Frameworks help structure insights — they don't change the underlying data.
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            {frameworkOptions.map((option) => (
+              <motion.button
+                key={option.id}
+                onClick={() => setFramework(option.id)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  framework === option.id
+                    ? "bg-gradient-magic text-primary-foreground shadow-magic"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
+                }`}
+              >
+                {option.label}
+              </motion.button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground text-center max-w-xl mx-auto">
+            {frameworkReason}
+          </p>
+        </div>
+
+        {/* Stage Selector */}
+        <div className="flex flex-wrap gap-2 justify-center">
+          {availableStages.map((stage) => (
             <motion.button
-              key={option.id}
-              onClick={() => setFramework(option.id)}
+              key={stage.id}
+              onClick={() => setSelectedStage(stage.id)}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                framework === option.id
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                selectedStage === stage.id
                   ? "bg-gradient-magic text-primary-foreground shadow-magic"
                   : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
               }`}
             >
-              {option.label}
+              {stage.label}
             </motion.button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground text-center max-w-xl mx-auto">
-          {frameworkReason}
-        </p>
-      </div>
 
-      {/* Stage Selector */}
-      <div className="flex flex-wrap gap-2 justify-center">
-        {availableStages.map((stage) => (
-          <motion.button
-            key={stage.id}
-            onClick={() => setSelectedStage(stage.id)}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-              selectedStage === stage.id
-                ? "bg-gradient-magic text-primary-foreground shadow-magic"
-                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
-            }`}
+        {/* Use Case Cards */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`${framework}-${selectedStage}-${selectedChannels.join(",")}`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
           >
-            {stage.label}
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Use Case Cards */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${framework}-${selectedStage}-${selectedChannels.join(",")}`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-6"
-        >
-          {/* Summary */}
-          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span>{personalizedUseCases.length} use cases</span>
-            <span>•</span>
-            <span>{internalUseCases.length} from internal resources</span>
-            <span>•</span>
-            <span>{nativeUseCases.length} native intelligence</span>
-          </div>
-
-          {/* Channel Debug Info */}
-          {personalizedUseCases.length === 0 && internalUseCases.length === 0 && resourceMatches.length > 0 && (
-            <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-2">
-              <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto" />
-              <p className="text-sm font-medium text-foreground">
-                No use cases support selected channel(s).
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Selected: {selectedChannels.map(c => CHANNEL_DISPLAY_LABELS[c] || c).join(", ")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Available channels in this industry:{" "}
-                {(() => {
-                  const allCh = new Set<string>();
-                  for (const match of resourceMatches) {
-                    match.resource.journeys?.forEach(j => j.channels?.forEach(c => allCh.add(c)));
-                    match.resource.campaigns?.forEach(ca => ca.channels?.forEach(c => allCh.add(c)));
-                  }
-                  const normalized = normalizeChannels(Array.from(allCh));
-                  return normalized.map(c => CHANNEL_DISPLAY_LABELS[c] || c).join(", ") || "None detected";
-                })()}
-              </p>
+            {/* Summary */}
+            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+              <span>{personalizedUseCases.length} use cases</span>
+              <span>•</span>
+              <span>{internalUseCases.length} from internal resources</span>
+              <span>•</span>
+              <span>{nativeUseCases.length} native intelligence</span>
             </div>
-          )}
 
-          {/* Two-Column Layout */}
-          {personalizedUseCases.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Column 1: Internal Resources */}
-              {internalUseCases.length > 0 && (
-                <div className="magic-card rounded-xl overflow-hidden">
-                  <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/5 border-b border-border">
-                    <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-xs font-medium text-emerald-400">From Internal Resources</span>
-                    <span className="text-xs text-muted-foreground">({internalUseCases.length})</span>
-                    {(() => {
-                      const resourceNames = new Set(internalUseCases.map(u => u.useCase.sourceLabel).filter(Boolean));
-                      if (resourceNames.size > 0) {
-                        return (
-                          <span className="text-xs text-emerald-400/70 ml-auto truncate max-w-[200px]" title={Array.from(resourceNames).join(", ")}>
-                            {Array.from(resourceNames).join(", ")}
+            {/* Channel Debug Info */}
+            {personalizedUseCases.length === 0 && internalUseCases.length === 0 && resourceMatches.length > 0 && (
+              <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-2">
+                <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto" />
+                <p className="text-sm font-medium text-foreground">
+                  No use cases support selected channel(s).
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Selected: {selectedChannels.map(c => CHANNEL_DISPLAY_LABELS[c] || c).join(", ")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Available channels in this industry:{" "}
+                  {(() => {
+                    const allCh = new Set<string>();
+                    for (const match of resourceMatches) {
+                      match.resource.journeys?.forEach(j => j.channels?.forEach(c => allCh.add(c)));
+                      match.resource.campaigns?.forEach(ca => ca.channels?.forEach(c => allCh.add(c)));
+                    }
+                    const normalized = normalizeChannels(Array.from(allCh));
+                    return normalized.map(c => CHANNEL_DISPLAY_LABELS[c] || c).join(", ") || "None detected";
+                  })()}
+                </p>
+              </div>
+            )}
+
+            {/* Two-Column Layout */}
+            {personalizedUseCases.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Column 1: Internal Resources */}
+                {internalUseCases.length > 0 && (
+                  <div className="magic-card rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-5 py-3 bg-emerald-500/5 border-b border-border">
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-xs font-medium text-emerald-400">From Internal Resources</span>
+                      <span className="text-xs text-muted-foreground">({internalUseCases.length})</span>
+                      {(() => {
+                        const resourceNames = new Set(internalUseCases.map(u => u.useCase.sourceLabel).filter(Boolean));
+                        if (resourceNames.size > 0) {
+                          return (
+                            <span className="text-xs text-emerald-400/70 ml-auto truncate max-w-[200px]" title={Array.from(resourceNames).join(", ")}>
+                              {Array.from(resourceNames).join(", ")}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                    <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
+                      {internalUseCases.map(({ useCase, confidence }) => (
+                        <UseCaseCard
+                          key={useCase.id}
+                          useCase={useCase}
+                          confidence={confidence}
+                          isExpanded={expandedCard === useCase.id}
+                          onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Column 2: Native Intelligence */}
+                {nativeUseCases.length > 0 && (
+                  <div className="magic-card rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-5 py-3 bg-muted/30 border-b border-border">
+                      <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">({nativeUseCases.length})</span>
+                    </div>
+                    <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
+                      {nativeUseCases.map(({ useCase, confidence }) => (
+                        <UseCaseCard
+                          key={useCase.id}
+                          useCase={useCase}
+                          confidence={confidence}
+                          isExpanded={expandedCard === useCase.id}
+                          onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* No internal resource found for industry */}
+            {noResourceForIndustry && internalUseCases.length === 0 && (
+              <div className="p-6 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-2">
+                <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto" />
+                <p className="text-sm font-medium text-foreground">
+                  No internal resource JSON found for this industry in Resource Library.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Upload a JSON resource via the Resource Library to see internal use cases here.
+                </p>
+              </div>
+            )}
+
+            {/* No matches */}
+            {personalizedUseCases.length === 0 && !noResourceForIndustry && (
+              <div className="p-8 rounded-xl bg-muted/30 border border-border text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  No direct lifecycle match found for the selected channels. Showing closest aligned use cases.
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Try selecting more channels or changing the lifecycle stage.
+                </p>
+              </div>
+            )}
+
+            {/* AI Augmentation Section */}
+            {personalizedUseCases.length > 0 && (
+              <div className="pt-4 border-t border-border space-y-4">
+                {/* Status Header — shown when a run is loaded */}
+                {cachedRunMeta && augmentedUseCases && (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        cacheSource === "saved"
+                          ? "bg-primary/10 text-primary"
+                          : "bg-emerald-500/10 text-emerald-400"
+                      }`}>
+                        {cacheSource === "saved" ? <Cloud className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                        {cacheSource === "saved" ? "Saved" : "Newly Generated"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Generated on: {new Date(cachedRunMeta.generatedAt).toLocaleString()}
+                      </span>
+                      {(() => {
+                        const daysOld = (Date.now() - new Date(cachedRunMeta.generatedAt).getTime()) / (1000 * 60 * 60 * 24);
+                        if (daysOld > 30) return (
+                          <span className="text-xs text-amber-400 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> Consider regenerating
                           </span>
                         );
-                      }
-                      return null;
-                    })()}
+                        return null;
+                      })()}
+                    </div>
                   </div>
-                  <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
-                    {internalUseCases.map(({ useCase, confidence }) => (
-                      <UseCaseCard
-                        key={useCase.id}
-                        useCase={useCase}
-                        confidence={confidence}
-                        isExpanded={expandedCard === useCase.id}
-                        onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
-                      />
-                    ))}
-                  </div>
+                )}
+
+                {/* Augment / Regenerate buttons */}
+                <div className="flex items-center justify-center gap-3">
+                  <motion.button
+                    onClick={handleAugmentWithAI}
+                    disabled={isAugmenting}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium bg-gradient-magic text-primary-foreground shadow-magic disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {isAugmenting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Augmenting All Use Cases with AI...
+                      </>
+                    ) : augmentedUseCases ? (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        Regenerate AI Results
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4" />
+                        Augment All {allInternalUseCasesForAI.length} Use Cases with AI
+                      </>
+                    )}
+                  </motion.button>
                 </div>
-              )}
 
-              {/* Column 2: Native Intelligence */}
-              {nativeUseCases.length > 0 && (
-                <div className="magic-card rounded-xl overflow-hidden">
-                  <div className="flex items-center gap-2 px-5 py-3 bg-muted/30 border-b border-border">
-                    <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {hasInternalContent ? "Supplemental (Native Intelligence)" : "Native Intelligence"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">({nativeUseCases.length})</span>
+                {isAugmenting && (
+                  <div className="text-center space-y-2 py-4">
+                    <p className="text-xs text-muted-foreground">
+                      AI is augmenting all {allInternalUseCasesForAI.length} internal use cases across {internalStages.length} lifecycle stages + generating {internalStages.length * 2} AI-native expansions...
+                    </p>
+                    <p className="text-xs text-muted-foreground/50">This may take 30-60 seconds for comprehensive coverage</p>
                   </div>
-                  <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
-                    {nativeUseCases.map(({ useCase, confidence }) => (
-                      <UseCaseCard
-                        key={useCase.id}
-                        useCase={useCase}
-                        confidence={confidence}
-                        isExpanded={expandedCard === useCase.id}
-                        onToggle={() => setExpandedCard(expandedCard === useCase.id ? null : useCase.id)}
-                      />
-                    ))}
+                )}
+
+                {augmentedUseCases && augmentedUseCases.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Wand2 className="w-4 h-4 text-primary" />
+                      AI-Augmented Output — Full Coverage
+                    </div>
+                    <AugmentedUseCaseTable
+                      useCases={augmentedUseCases}
+                      onExportCSV={() => exportAugmentedCSV(augmentedUseCases)}
+                      onExportXLSX={() => exportAugmentedXLSX(augmentedUseCases)}
+                    />
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* No internal resource found for industry */}
-          {noResourceForIndustry && internalUseCases.length === 0 && (
-            <div className="p-6 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center space-y-2">
-              <AlertTriangle className="w-5 h-5 text-amber-400 mx-auto" />
-              <p className="text-sm font-medium text-foreground">
-                No internal resource JSON found for this industry in Resource Library.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Upload a JSON resource via the Resource Library to see internal use cases here.
-              </p>
-            </div>
-          )}
-
-          {/* No matches */}
-          {personalizedUseCases.length === 0 && !noResourceForIndustry && (
-            <div className="p-8 rounded-xl bg-muted/30 border border-border text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
-                No direct lifecycle match found for the selected channels. Showing closest aligned use cases.
-              </p>
-              <p className="text-xs text-muted-foreground/70">
-                Try selecting more channels or changing the lifecycle stage.
-              </p>
-            </div>
-          )}
-
-          {/* AI Augmentation Section */}
-          {personalizedUseCases.length > 0 && (
-            <div className="pt-4 border-t border-border space-y-4">
-              {/* Status Header — shown when a run is loaded */}
-              {cachedRunMeta && augmentedUseCases && (
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      cacheSource === "saved"
-                        ? "bg-primary/10 text-primary"
-                        : "bg-emerald-500/10 text-emerald-400"
-                    }`}>
-                      {cacheSource === "saved" ? <Cloud className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                      {cacheSource === "saved" ? "Saved" : "Newly Generated"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Generated on: {new Date(cachedRunMeta.generatedAt).toLocaleString()}
-                    </span>
-                    {(() => {
-                      const daysOld = (Date.now() - new Date(cachedRunMeta.generatedAt).getTime()) / (1000 * 60 * 60 * 24);
-                      if (daysOld > 30) return (
-                        <span className="text-xs text-amber-400 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> Consider regenerating
-                        </span>
-                      );
-                      return null;
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* Augment / Regenerate buttons */}
-              <div className="flex items-center justify-center gap-3">
-                <motion.button
-                  onClick={handleAugmentWithAI}
-                  disabled={isAugmenting}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium bg-gradient-magic text-primary-foreground shadow-magic disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  {isAugmenting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Augmenting All Use Cases with AI...
-                    </>
-                  ) : augmentedUseCases ? (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      Regenerate AI Results
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-4 h-4" />
-                      Augment All {allInternalUseCasesForAI.length} Use Cases with AI
-                    </>
-                  )}
-                </motion.button>
+                )}
               </div>
+            )}
 
-              {isAugmenting && (
-                <div className="text-center space-y-2 py-4">
-                  <p className="text-xs text-muted-foreground">
-                    AI is augmenting all {allInternalUseCasesForAI.length} internal use cases across {internalStages.length} lifecycle stages + generating {internalStages.length * 2} AI-native expansions...
-                  </p>
-                  <p className="text-xs text-muted-foreground/50">This may take 30-60 seconds for comprehensive coverage</p>
-                </div>
-              )}
-
-              {augmentedUseCases && augmentedUseCases.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <Wand2 className="w-4 h-4 text-primary" />
-                    AI-Augmented Output — Full Coverage
-                  </div>
-                  <AugmentedUseCaseTable
-                    useCases={augmentedUseCases}
-                    onExportCSV={() => exportAugmentedCSV(augmentedUseCases)}
-                    onExportXLSX={() => exportAugmentedXLSX(augmentedUseCases)}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Resource Citations */}
-          {resourceMatches.length > 0 && (
-            <ResourceCitations
-              citations={resourceMatches.map(m => ({
-                resourceId: m.resource.id,
-                resourceTitle: m.resource.title,
-                matchType: hasInternalContent ? "exact" as const : "partial" as const,
-              }))}
-              confidenceLevel={hasInternalContent ? "high" : resourceMatches.length > 0 ? "medium" : "low"}
-              usedNativeIntelligence={!hasInternalContent}
-            />
-          )}
-        </motion.div>
-      </AnimatePresence>
+            {/* Resource Citations */}
+            {resourceMatches.length > 0 && (
+              <ResourceCitations
+                citations={resourceMatches.map(m => ({
+                  resourceId: m.resource.id,
+                  resourceTitle: m.resource.title,
+                  matchType: hasInternalContent ? "exact" as const : "partial" as const,
+                }))}
+                confidenceLevel={hasInternalContent ? "high" : resourceMatches.length > 0 ? "medium" : "low"}
+                usedNativeIntelligence={!hasInternalContent}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
