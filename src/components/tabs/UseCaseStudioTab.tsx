@@ -1363,16 +1363,22 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
 
   if (!industry) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-            <span className="text-2xl">📧</span>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            Select an industry above to discover hyper-personalized use cases.
-          </p>
+      <div className="flex gap-6">
+        {/* Left: History Panel */}
+        <div className="w-72 flex-shrink-0 sticky top-0 self-start max-h-screen overflow-y-auto space-y-3">
+          {renderHistoryPanel()}
         </div>
-        {renderHistoryPanel()}
+        {/* Right: Placeholder */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+              <span className="text-2xl">📧</span>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              Select an industry above to discover hyper-personalized use cases.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
