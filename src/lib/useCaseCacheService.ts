@@ -5,7 +5,9 @@ import { AugmentedUseCase } from "@/types/augmentedUseCase";
 
 function normalizeHost(url: string): string {
   try {
-    let host = url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").toLowerCase().trim();
+    let host = url.replace(/^https?:\/\//, "").replace(/^www\./, "").toLowerCase().trim();
+    // Strip path, query, and fragment — keep only the hostname
+    host = host.split("/")[0].split("?")[0].split("#")[0];
     return host || url.toLowerCase().trim();
   } catch {
     return url.toLowerCase().trim();
