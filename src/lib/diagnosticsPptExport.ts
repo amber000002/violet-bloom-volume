@@ -998,7 +998,25 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addSlideHeader(s, "Reputation Trends", theme, undefined, slideNum);
 
     if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
-      const pmData = diagnostics.postmasterData;
+      // Sort postmaster data chronologically (oldest first) to match app display
+      const MONTH_MAP_PPT: Record<string, number> = {
+        Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+        Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+      };
+      const parsePmDate = (dateStr: string): Date | null => {
+        if (!dateStr) return null;
+        const match = dateStr.trim().match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
+        if (!match) return null;
+        const mi = MONTH_MAP_PPT[match[1]];
+        if (mi === undefined) return null;
+        return new Date(parseInt(match[3], 10), mi, parseInt(match[2], 10));
+      };
+      const pmData = [...diagnostics.postmasterData].sort((a, b) => {
+        const da = parsePmDate(a.date);
+        const db = parsePmDate(b.date);
+        if (!da || !db) return 0;
+        return da.getTime() - db.getTime();
+      });
       const pmDates = pmData.map(p => sanitizeText(p.date));
       const spamData = pmData.map(p => (p.spamRatio || 0) * 100);
       const errorData = pmData.map(p => (p.errorRatio || 0) * 100);
