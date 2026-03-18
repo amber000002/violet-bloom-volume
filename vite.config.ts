@@ -14,5 +14,6 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ["@swc/core", "react", "react-dom"],
   },
 }));
