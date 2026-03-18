@@ -1044,10 +1044,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
 
       const chartConfigs = [
-        { name: "IP Reputation", data: ipRepData, color: theme.primary, min: 0, max: 3, isReputation: true },
-        { name: "Domain Reputation", data: domainRepData, color: theme.secondary, min: 0, max: 3, isReputation: true },
-        { name: "Spam Ratio %", data: spamData, color: theme.red, isReputation: false },
-        { name: "Error Ratio %", data: errorData, color: theme.amber, isReputation: false },
+        { name: "IP Reputation", data: ipRepData, labels: ipRepDates, color: theme.primary, min: 0, max: 3, isReputation: true },
+        { name: "Domain Reputation", data: domainRepData, labels: domainRepDates, color: theme.secondary, min: 0, max: 3, isReputation: true },
+        { name: "Spam Ratio %", data: spamData, labels: pmDates, color: theme.red, isReputation: false },
+        { name: "Error Ratio %", data: errorData, labels: pmDates, color: theme.amber, isReputation: false },
       ];
 
       chartConfigs.forEach((cfg, i) => {
@@ -1072,7 +1072,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           opts.valAxisLabelColor = theme.slideBg; // make invisible
         }
 
-        s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: pmDates, values: cfg.data }], opts);
+        s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
 
         // Add reputation level labels as text overlays for reputation charts
         if (cfg.isReputation) {
