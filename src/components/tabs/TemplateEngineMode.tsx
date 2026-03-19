@@ -288,6 +288,55 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
         )}
       </AnimatePresence>
 
+      {/* Footer Reference Upload */}
+      <div className="max-w-4xl mx-auto">
+        <div className="magic-card rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-1 flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-primary" />
+            Footer Reference Upload
+          </h3>
+          <p className="text-xs text-muted-foreground mb-3">
+            Upload any email creative from the brand to extract and replicate its footer design, structure, and elements.
+          </p>
+
+          {footerImageBase64 ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+              <img
+                src={footerImageBase64}
+                alt="Footer reference"
+                className="w-20 h-14 object-cover rounded-md border border-border"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{footerImageName}</p>
+                <p className="text-xs text-muted-foreground">Footer will be extracted and replicated during personalization</p>
+              </div>
+              <button
+                onClick={removeFooterImage}
+                className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => footerInputRef.current?.click()}
+              className="w-full flex flex-col items-center gap-2 p-6 rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/20 transition-all cursor-pointer"
+            >
+              <Upload className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Click to upload email creative (PNG, JPG)</span>
+              <span className="text-xs text-muted-foreground/70">The footer section will be detected and replicated</span>
+            </button>
+          )}
+          <input
+            ref={footerInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            onChange={handleFooterImageUpload}
+            className="hidden"
+          />
+        </div>
+      </div>
+
       {/* Output Section */}
       {generatedContent && (
         <motion.div
