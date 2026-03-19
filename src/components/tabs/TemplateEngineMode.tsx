@@ -46,6 +46,9 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
   const [copied, setCopied] = useState(false);
   const [customTemplate, setCustomTemplate] = useState<string>("");
   const [showCustomUpload, setShowCustomUpload] = useState(false);
+  const [footerImageBase64, setFooterImageBase64] = useState<string>("");
+  const [footerImageName, setFooterImageName] = useState<string>("");
+  const footerInputRef = useRef<HTMLInputElement>(null);
 
   // Reset stage if industry changes
   React.useEffect(() => {
