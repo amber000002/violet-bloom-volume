@@ -2,22 +2,27 @@ import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, RefreshCw, User, ArrowRight, Star, Gift,
-  ChevronLeft, ChevronRight, Globe, Check, Percent, Trophy
+  ChevronLeft, ChevronRight, Globe, Check, Percent, Trophy,
+  Layout, Wand2
 } from "lucide-react";
 import { MagicSelect } from "../ui/MagicSelect";
 import { MagicInput } from "../ui/MagicInput";
 import { industryConfigs, AMPUseCase, getInferredBusinessModel, FrameworkType } from "@/data/industryConfig";
+import { CoreBrandJSON } from "@/types/brandProfile";
 
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
+import { TemplateEngineMode } from "./TemplateEngineMode";
 
 interface AMPEmailStudioTabProps {
   industry: string;
   viewMode?: ViewMode;
   onDataChange?: (data: any) => void;
+  brandProfile?: CoreBrandJSON | null;
 }
 
 type TemplateStyle = "brand-carousel" | "gamified";
+type StudioMode = "interactive" | "template-engine";
 
 const templateStyleOptions = [
   { id: "brand-carousel" as const, label: "Brand-led Carousel" },
@@ -31,7 +36,9 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   industry,
   viewMode = "app",
   onDataChange,
+  brandProfile = null,
 }) => {
+  const [studioMode, setStudioMode] = useState<StudioMode>("template-engine");
   const [selectedUseCase, setSelectedUseCase] = useState("");
   const [templateStyle, setTemplateStyle] = useState<TemplateStyle>("brand-carousel");
   const [websiteUrl, setWebsiteUrl] = useState("");
