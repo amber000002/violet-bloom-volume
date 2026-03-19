@@ -46,7 +46,7 @@ ${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""
 
     // If a custom template is provided, use AI to rewrite its content in-place
     if (customTemplate) {
-      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, allBrandImages, LOVABLE_API_KEY);
+      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, heroImages, productImages, LOVABLE_API_KEY);
     }
 
     // Standard flow: generate content tokens for built-in templates
