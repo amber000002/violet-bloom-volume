@@ -66,6 +66,7 @@ async function handleCustomTemplate(
   tone: string,
   brandColors: Record<string, string>,
   logo: string,
+  brandImages: string[],
   apiKey: string,
 ) {
   const systemPrompt = `You are an expert email marketing copywriter and HTML email developer.
@@ -79,9 +80,15 @@ CRITICAL RULES:
 4. Make content specific to the brand's industry, products, and value propositions
 5. Subject line must be under 60 characters
 6. Keep the same general content structure (if there's a headline, write a headline; if there's a list, keep it a list)
-7. Replace placeholder/generic image URLs with relevant ones if possible, but keep the img tag structure
-8. If the template has a logo image, update src to the brand's logo if available
-9. Update any color values in inline styles to match the brand colors if they appear as primary accent colors
+7. CRITICAL — IMAGE REPLACEMENT: Replace ALL placeholder/generic image src URLs with the brand's actual images listed below. Use hero images for hero/banner/header sections. Use product images for product showcase sections. If there are multiple image slots, distribute the brand images across them. Keep the img tag structure intact but update the src attribute.
+8. If the template has a logo image, update src to the brand's logo URL if available
+9. CRITICAL — BRAND COLORS: Update ALL color values in inline styles throughout the template to match brand colors:
+   - Buttons, links, CTA backgrounds → Primary color
+   - Section accents, borders, dividers → Secondary or Accent color
+   - Page/section backgrounds → Background color  
+   - Body text → Text color
+   - FOOTER SECTION: MUST use Primary color as the background-color with white (#ffffff) text. This is mandatory — never leave footer with generic/default colors.
+   - HEADER SECTION: Should reflect brand colors in background or accent elements
 10. Return ONLY the complete rewritten HTML - no explanation, no markdown code blocks
 
 Brand colors available:
@@ -90,12 +97,18 @@ Brand colors available:
 - Accent: ${brandColors.accent || "#f59e0b"}
 - Background: ${brandColors.background || "#ffffff"}
 - Text: ${brandColors.text_primary || "#1f2937"}
-${logo ? `Brand logo URL: ${logo}` : ""}`;
+${logo ? `Brand logo URL: ${logo}` : ""}
+${brandImages.length ? `\nBrand images (USE THESE to replace placeholder/stock images in the template):\n${brandImages.map((url, i) => `  ${i + 1}. ${url}`).join("\n")}` : ""}`;
 
   const userPrompt = `Here is the brand context:
 ${brandContext}
 
-Here is the HTML email template to personalize. Rewrite all text content for this brand while keeping the HTML structure identical:
+Here is the HTML email template to personalize:
+- Replace ALL text content for this brand
+- Replace ALL placeholder/stock image URLs with the brand images listed in the system prompt
+- Apply brand colors to ALL inline styles (especially buttons, headers, and footer)
+- The footer MUST have brand primary color as background
+- Keep HTML structure identical
 
 ${customTemplate}`;
 
