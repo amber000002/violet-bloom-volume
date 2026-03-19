@@ -367,6 +367,8 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
         </motion.div>
       )}
     </div>
+      )}
+    </div>
   );
 };
 
