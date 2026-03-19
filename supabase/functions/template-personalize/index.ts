@@ -27,7 +27,134 @@ serve(async (req) => {
     const brandColors = brandProfile?.brand_colors || brandProfile?.brand_design_profile?.colors || {};
     const logo = brandProfile?.brand_design_profile?.logo?.logo_url || "";
 
-    const systemPrompt = `You are an expert email marketing copywriter. Generate personalized email content for a brand.
+    const brandContext = `Brand: ${brandName}
+Industry: ${industry}
+Lifecycle Stage: ${stage}
+${tagline ? `Tagline: ${tagline}` : ""}
+${positioning ? `Positioning: ${positioning}` : ""}
+${valueProps.length ? `Value Propositions: ${valueProps.join(", ")}` : ""}
+${differentiators.length ? `Differentiators: ${differentiators.join(", ")}` : ""}
+${industryVocab.length ? `Industry Vocabulary: ${industryVocab.join(", ")}` : ""}
+${coreProducts.length ? `Core Products: ${coreProducts.join(", ")}` : ""}
+${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""}`;
+
+    // If a custom template is provided, use AI to rewrite its content in-place
+    if (customTemplate) {
+      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, LOVABLE_API_KEY);
+    }
+
+    // Standard flow: generate content tokens for built-in templates
+    return await handleBuiltInTemplate(brandContext, brandName, tone, brandColors, logo, LOVABLE_API_KEY);
+  } catch (e) {
+    console.error("template-personalize error:", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+async function handleCustomTemplate(
+  customTemplate: string,
+  brandContext: string,
+  brandName: string,
+  tone: string,
+  brandColors: Record<string, string>,
+  logo: string,
+  apiKey: string,
+) {
+  const systemPrompt = `You are an expert email marketing copywriter and HTML email developer.
+
+You will receive an HTML email template and brand context. Your job is to REWRITE the text content inside the HTML to be personalized for this brand, while PRESERVING the exact HTML structure, CSS styles, layout, and all markup.
+
+CRITICAL RULES:
+1. Keep ALL HTML tags, attributes, styles, classes, and structure EXACTLY as they are
+2. Only replace text content (headlines, body copy, button text, alt text, footer text)
+3. Write in the brand's tone of voice: "${tone}"
+4. Make content specific to the brand's industry, products, and value propositions
+5. Subject line must be under 60 characters
+6. Keep the same general content structure (if there's a headline, write a headline; if there's a list, keep it a list)
+7. Replace placeholder/generic image URLs with relevant ones if possible, but keep the img tag structure
+8. If the template has a logo image, update src to the brand's logo if available
+9. Update any color values in inline styles to match the brand colors if they appear as primary accent colors
+10. Return ONLY the complete rewritten HTML - no explanation, no markdown code blocks
+
+Brand colors available:
+- Primary: ${brandColors.primary || "#6366f1"}
+- Secondary: ${brandColors.secondary || "#8b5cf6"}
+- Accent: ${brandColors.accent || "#f59e0b"}
+- Background: ${brandColors.background || "#ffffff"}
+- Text: ${brandColors.text_primary || "#1f2937"}
+${logo ? `Brand logo URL: ${logo}` : ""}`;
+
+  const userPrompt = `Here is the brand context:
+${brandContext}
+
+Here is the HTML email template to personalize. Rewrite all text content for this brand while keeping the HTML structure identical:
+
+${customTemplate}`;
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    return handleAIError(response);
+  }
+
+  const aiResult = await response.json();
+  const rawContent = aiResult.choices?.[0]?.message?.content || "";
+
+  // Strip markdown code fences if present
+  let personalizedHtml = rawContent
+    .replace(/^```html?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
+
+  // Extract a summary of what was changed for the content summary panel
+  const contentSummary = {
+    subject: extractTextContent(personalizedHtml, "title") || `${brandName} — Personalized Email`,
+    preheader: extractPreheader(personalizedHtml) || "",
+    headline: extractFirstHeading(personalizedHtml) || "",
+    subheadline: "",
+    bodyText: "Custom template personalized with brand content",
+    ctaText: extractCTAText(personalizedHtml) || "",
+    ctaUrl: "#",
+    supportingText: "",
+    footerNote: "",
+  };
+
+  return new Response(JSON.stringify({
+    content: contentSummary,
+    brandColors,
+    logo,
+    personalizedHtml,
+    personalizedAmp: null,
+    isCustomTemplate: true,
+  }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handleBuiltInTemplate(
+  brandContext: string,
+  brandName: string,
+  tone: string,
+  brandColors: Record<string, string>,
+  logo: string,
+  apiKey: string,
+) {
+  const systemPrompt = `You are an expert email marketing copywriter. Generate personalized email content for a brand.
 
 CRITICAL RULES:
 - Write in the brand's tone of voice: "${tone}"
@@ -52,156 +179,123 @@ Return a JSON object with this EXACT structure:
   "footerNote": "string"
 }`;
 
-    const userPrompt = `Generate personalized email content for:
+  const userPrompt = `Generate personalized email content for:
 
-Brand: ${brandName}
-Industry: ${industry}
-Lifecycle Stage: ${stage}
-Template Type: ${templateType || "html"}
-${tagline ? `Tagline: ${tagline}` : ""}
-${positioning ? `Positioning: ${positioning}` : ""}
-${valueProps.length ? `Value Propositions: ${valueProps.join(", ")}` : ""}
-${differentiators.length ? `Differentiators: ${differentiators.join(", ")}` : ""}
-${industryVocab.length ? `Industry Vocabulary: ${industryVocab.join(", ")}` : ""}
-${coreProducts.length ? `Core Products: ${coreProducts.join(", ")}` : ""}
-${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""}
+${brandContext}
 
-The content should be specifically tailored to the "${stage}" lifecycle stage. Make it feel like it was written by the brand's own marketing team.`;
+The content should be specifically tailored to the lifecycle stage mentioned above. Make it feel like it was written by the brand's own marketing team.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_email_content",
-              description: "Generate personalized email content for the brand",
-              parameters: {
-                type: "object",
-                properties: {
-                  subject: { type: "string", description: "Email subject line (under 60 chars)" },
-                  preheader: { type: "string", description: "Email preheader text (under 100 chars)" },
-                  headline: { type: "string", description: "Main headline in the email" },
-                  subheadline: { type: "string", description: "Supporting subheadline" },
-                  bodyText: { type: "string", description: "Body copy (2-3 sentences)" },
-                  ctaText: { type: "string", description: "CTA button text" },
-                  ctaUrl: { type: "string", description: "CTA URL" },
-                  supportingText: { type: "string", description: "Text below the CTA" },
-                  footerNote: { type: "string", description: "Footer note text" },
-                },
-                required: ["subject", "preheader", "headline", "subheadline", "bodyText", "ctaText", "ctaUrl", "supportingText", "footerNote"],
-                additionalProperties: false,
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "generate_email_content",
+            description: "Generate personalized email content for the brand",
+            parameters: {
+              type: "object",
+              properties: {
+                subject: { type: "string", description: "Email subject line (under 60 chars)" },
+                preheader: { type: "string", description: "Email preheader text (under 100 chars)" },
+                headline: { type: "string", description: "Main headline in the email" },
+                subheadline: { type: "string", description: "Supporting subheadline" },
+                bodyText: { type: "string", description: "Body copy (2-3 sentences)" },
+                ctaText: { type: "string", description: "CTA button text" },
+                ctaUrl: { type: "string", description: "CTA URL" },
+                supportingText: { type: "string", description: "Text below the CTA" },
+                footerNote: { type: "string", description: "Footer note text" },
               },
+              required: ["subject", "preheader", "headline", "subheadline", "bodyText", "ctaText", "ctaUrl", "supportingText", "footerNote"],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "generate_email_content" } },
-      }),
-    });
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "generate_email_content" } },
+    }),
+  });
 
-    if (!response.ok) {
-      const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "Usage credits exhausted. Please top up." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errText = await response.text();
-      console.error("AI gateway error:", status, errText);
-      throw new Error(`AI gateway returned ${status}`);
-    }
+  if (!response.ok) {
+    return handleAIError(response);
+  }
 
-    const aiResult = await response.json();
-    const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
-    
-    let content;
-    if (toolCall?.function?.arguments) {
-      content = typeof toolCall.function.arguments === "string" 
-        ? JSON.parse(toolCall.function.arguments) 
-        : toolCall.function.arguments;
+  const aiResult = await response.json();
+  const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
+
+  let content;
+  if (toolCall?.function?.arguments) {
+    content = typeof toolCall.function.arguments === "string"
+      ? JSON.parse(toolCall.function.arguments)
+      : toolCall.function.arguments;
+  } else {
+    const raw = aiResult.choices?.[0]?.message?.content || "";
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      content = JSON.parse(jsonMatch[0]);
     } else {
-      // Fallback: try to parse from message content
-      const raw = aiResult.choices?.[0]?.message?.content || "";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        content = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("Failed to extract content from AI response");
-      }
+      throw new Error("Failed to extract content from AI response");
     }
-
-    // Build personalized template if custom template provided
-    let personalizedHtml = null;
-    let personalizedAmp = null;
-
-    if (customTemplate) {
-      personalizedHtml = applyTokens(customTemplate, content, brandColors, logo, brandName);
-    }
-
-    return new Response(JSON.stringify({
-      content,
-      brandColors,
-      logo,
-      personalizedHtml,
-      personalizedAmp,
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    console.error("template-personalize error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-});
-
-function applyTokens(
-  template: string,
-  content: Record<string, string>,
-  colors: Record<string, string>,
-  logo: string,
-  brandName: string,
-): string {
-  let result = template;
-  
-  // Content tokens
-  const tokenMap: Record<string, string> = {
-    "{{subject}}": content.subject || "",
-    "{{preheader}}": content.preheader || "",
-    "{{headline}}": content.headline || "",
-    "{{subheadline}}": content.subheadline || "",
-    "{{body_text}}": content.bodyText || "",
-    "{{cta_text}}": content.ctaText || "",
-    "{{cta_url}}": content.ctaUrl || "#",
-    "{{supporting_text}}": content.supportingText || "",
-    "{{footer_note}}": content.footerNote || "",
-    "{{brand_name}}": brandName,
-    "{{logo_url}}": logo,
-    "{{primary_color}}": colors.primary || "#6366f1",
-    "{{secondary_color}}": colors.secondary || "#8b5cf6",
-    "{{accent_color}}": colors.accent || "#f59e0b",
-    "{{background_color}}": colors.background || "#ffffff",
-    "{{text_color}}": colors.text_primary || "#1f2937",
-  };
-
-  for (const [token, value] of Object.entries(tokenMap)) {
-    result = result.replaceAll(token, value);
   }
 
-  return result;
+  return new Response(JSON.stringify({
+    content,
+    brandColors,
+    logo,
+    personalizedHtml: null,
+    personalizedAmp: null,
+    isCustomTemplate: false,
+  }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handleAIError(response: Response) {
+  const status = response.status;
+  if (status === 429) {
+    return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }), {
+      status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (status === 402) {
+    return new Response(JSON.stringify({ error: "Usage credits exhausted. Please top up." }), {
+      status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const errText = await response.text();
+  console.error("AI gateway error:", status, errText);
+  throw new Error(`AI gateway returned ${status}`);
+}
+
+// Helper functions to extract content from personalized HTML for the summary panel
+function extractTextContent(html: string, tag: string): string {
+  const match = html.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`, "i"));
+  return match?.[1]?.trim() || "";
+}
+
+function extractPreheader(html: string): string {
+  const match = html.match(/preheader[^>]*>([^<]+)</i) ||
+    html.match(/display:\s*none[^>]*>([^<]+)</i);
+  return match?.[1]?.trim() || "";
+}
+
+function extractFirstHeading(html: string): string {
+  const match = html.match(/<h[12][^>]*>([^<]+)</i);
+  return match?.[1]?.trim() || "";
+}
+
+function extractCTAText(html: string): string {
+  const match = html.match(/<a[^>]*(?:class|style)[^>]*button[^>]*>([^<]+)</i) ||
+    html.match(/<a[^>]*>([^<]{2,30})<\/a>/i);
+  return match?.[1]?.trim() || "";
 }
