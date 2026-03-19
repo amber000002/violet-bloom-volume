@@ -66,7 +66,8 @@ async function handleCustomTemplate(
   tone: string,
   brandColors: Record<string, string>,
   logo: string,
-  brandImages: string[],
+  heroImages: string[],
+  productImages: string[],
   apiKey: string,
 ) {
   const systemPrompt = `You are an expert email marketing copywriter and HTML email developer.
