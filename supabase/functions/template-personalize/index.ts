@@ -371,6 +371,7 @@ The content should be specifically tailored to the lifecycle stage mentioned abo
     personalizedHtml: null,
     personalizedAmp: null,
     isCustomTemplate: false,
+    footerHtml: footerHtml || null,
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
