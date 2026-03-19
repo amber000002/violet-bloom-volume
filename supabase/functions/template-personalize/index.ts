@@ -267,6 +267,7 @@ async function handleBuiltInTemplate(
   brandColors: Record<string, string>,
   logo: string,
   brandImages: string[],
+  footerHtml: string,
   apiKey: string,
 ) {
   const systemPrompt = `You are an expert email marketing copywriter. Generate personalized email content for a brand.
