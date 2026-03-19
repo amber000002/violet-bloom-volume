@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Code, Eye, FileText, Loader2, Copy, Check, Upload,
-  Sparkles, AlertCircle, ChevronDown
+  Sparkles, AlertCircle, ChevronDown, ImageIcon, X
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CoreBrandJSON } from "@/types/brandProfile";
