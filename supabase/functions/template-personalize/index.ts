@@ -27,6 +27,12 @@ serve(async (req) => {
     const brandColors = brandProfile?.brand_colors || brandProfile?.brand_design_profile?.colors || {};
     const logo = brandProfile?.brand_design_profile?.logo?.logo_url || "";
 
+    // Extract visual assets
+    const visualAssets = brandProfile?.brand_visual_assets || {};
+    const heroImages = (visualAssets?.hero_images || []).filter((u: string) => u?.startsWith("http")).slice(0, 3);
+    const productImages = (visualAssets?.product_imagery || []).filter((u: string) => u?.startsWith("http")).slice(0, 3);
+    const allBrandImages = [...heroImages, ...productImages].slice(0, 5);
+
     const brandContext = `Brand: ${brandName}
 Industry: ${industry}
 Lifecycle Stage: ${stage}
