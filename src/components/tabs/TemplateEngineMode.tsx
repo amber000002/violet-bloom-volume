@@ -324,13 +324,13 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
                       {templateType.toUpperCase()} Email Preview — {selectedStage}
                     </span>
                   </div>
-                  <div className="bg-background">
-                    <iframe
-                      srcDoc={templateType === "amp" ? personalizedAmp : personalizedHtml}
-                      className="w-full border-0"
+                  <div className="bg-background p-0">
+                    <div
+                      className="w-full"
                       style={{ minHeight: 600 }}
-                      title="Email Preview"
-                      sandbox="allow-same-origin allow-popups"
+                      dangerouslySetInnerHTML={{
+                        __html: templateType === "amp" ? personalizedAmp : personalizedHtml,
+                      }}
                     />
                   </div>
                 </div>
