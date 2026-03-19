@@ -90,7 +90,7 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
       "{{text_color}}": brandColors.text_primary,
     };
     for (const [token, value] of Object.entries(tokens)) {
-      result = result.replaceAll(token, value);
+      result = result.split(token).join(value);
     }
     return result;
   }, [brandName, logoUrl, brandColors]);
