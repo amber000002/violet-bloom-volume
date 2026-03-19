@@ -144,15 +144,25 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
       const content = data.content as GeneratedContent;
       setGeneratedContent(content);
 
+      const appendFooter = (html: string, footer: string | null) => {
+        if (!footer) return html;
+        // Try to insert before </body>, or append at end
+        if (html.includes("</body>")) {
+          return html.replace("</body>", `${footer}\n</body>`);
+        }
+        return html + "\n" + footer;
+      };
+
       if (data.isCustomTemplate && data.personalizedHtml) {
         setPersonalizedHtml(data.personalizedHtml);
         setPersonalizedAmp("");
       } else {
+        const footerHtmlFromServer = data.footerHtml || null;
         const htmlTemplate = getTemplateForStage(selectedStage, "html").html;
-        setPersonalizedHtml(applyContentToTemplate(content, htmlTemplate));
+        setPersonalizedHtml(appendFooter(applyContentToTemplate(content, htmlTemplate), footerHtmlFromServer));
 
         const ampTemplate = getTemplateForStage(selectedStage, "amp").html;
-        setPersonalizedAmp(applyContentToTemplate(content, ampTemplate));
+        setPersonalizedAmp(appendFooter(applyContentToTemplate(content, ampTemplate), footerHtmlFromServer));
       }
 
       toast.success("Template personalized successfully!");
