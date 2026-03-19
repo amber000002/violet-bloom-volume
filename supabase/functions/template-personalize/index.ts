@@ -80,7 +80,13 @@ CRITICAL RULES:
 4. Make content specific to the brand's industry, products, and value propositions
 5. Subject line must be under 60 characters
 6. Keep the same general content structure (if there's a headline, write a headline; if there's a list, keep it a list)
-7. CRITICAL — IMAGE REPLACEMENT: Replace ALL placeholder/generic image src URLs with the brand's actual images listed below. Use hero images for hero/banner/header sections. Use product images for product showcase sections. If there are multiple image slots, distribute the brand images across them. Keep the img tag structure intact but update the src attribute.
+7. CRITICAL — IMAGE REPLACEMENT RULES:
+   a) Categorized brand images are provided below (hero vs product). Match them to the correct template sections.
+   b) HERO/BANNER images: Use ONLY for large full-width banner/hero sections at the top of the email. These must be set to width:100% and display:block to fill the container edge-to-edge. Do NOT use product images in hero sections.
+   c) PRODUCT images: Use ONLY for product showcase/grid/card sections. These should PRESERVE the original template's image sizing, alignment (centered), and layout style. If the template shows products in a grid or centered cards, keep that exact layout — just swap the src URL.
+   d) If the template has more image slots than available brand images, you may reuse images or keep the original placeholder.
+   e) NEVER insert images that break the template layout. If an image slot is small (icon-sized), do NOT replace it with a large product photo.
+   f) Update alt text on all replaced images to describe the brand content accurately.
 8. If the template has a logo image, update src to the brand's logo URL if available
 9. CRITICAL — BRAND COLORS: Update ALL color values in inline styles throughout the template to match brand colors:
    - Buttons, links, CTA backgrounds → Primary color
@@ -98,7 +104,8 @@ Brand colors available:
 - Background: ${brandColors.background || "#ffffff"}
 - Text: ${brandColors.text_primary || "#1f2937"}
 ${logo ? `Brand logo URL: ${logo}` : ""}
-${brandImages.length ? `\nBrand images (USE THESE to replace placeholder/stock images in the template):\n${brandImages.map((url, i) => `  ${i + 1}. ${url}`).join("\n")}` : ""}`;
+${heroImages.length ? `\nHERO/BANNER images (use ONLY for full-width hero/banner sections, set width:100%; display:block):\n${heroImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}
+${productImages.length ? `\nPRODUCT images (use for product cards/grids, preserve original template sizing & centering):\n${productImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}`;
 
   const userPrompt = `Here is the brand context:
 ${brandContext}
