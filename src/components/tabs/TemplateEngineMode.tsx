@@ -330,7 +330,7 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
                       className="w-full border-0"
                       style={{ minHeight: 600 }}
                       title="Email Preview"
-                      sandbox="allow-same-origin"
+                      sandbox="allow-same-origin allow-popups"
                     />
                   </div>
                 </div>
