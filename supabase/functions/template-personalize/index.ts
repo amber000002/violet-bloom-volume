@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { brandProfile, industry, stage, templateType, customTemplate } = await req.json();
+    const { brandProfile, industry, stage, templateType, customTemplate, footerImageBase64 } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -44,13 +44,19 @@ ${industryVocab.length ? `Industry Vocabulary: ${industryVocab.join(", ")}` : ""
 ${coreProducts.length ? `Core Products: ${coreProducts.join(", ")}` : ""}
 ${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""}`;
 
+    // Extract footer HTML from uploaded image if provided
+    let footerHtml = "";
+    if (footerImageBase64) {
+      footerHtml = await extractFooterFromImage(footerImageBase64, brandName, brandColors, logo, LOVABLE_API_KEY);
+    }
+
     // If a custom template is provided, use AI to rewrite its content in-place
     if (customTemplate) {
-      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, heroImages, productImages, LOVABLE_API_KEY);
+      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, heroImages, productImages, footerHtml, LOVABLE_API_KEY);
     }
 
     // Standard flow: generate content tokens for built-in templates
-    return await handleBuiltInTemplate(brandContext, brandName, tone, brandColors, logo, allBrandImages, LOVABLE_API_KEY);
+    return await handleBuiltInTemplate(brandContext, brandName, tone, brandColors, logo, allBrandImages, footerHtml, LOVABLE_API_KEY);
   } catch (e) {
     console.error("template-personalize error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
