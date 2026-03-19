@@ -46,11 +46,11 @@ ${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""
 
     // If a custom template is provided, use AI to rewrite its content in-place
     if (customTemplate) {
-      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, LOVABLE_API_KEY);
+      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, allBrandImages, LOVABLE_API_KEY);
     }
 
     // Standard flow: generate content tokens for built-in templates
-    return await handleBuiltInTemplate(brandContext, brandName, tone, brandColors, logo, LOVABLE_API_KEY);
+    return await handleBuiltInTemplate(brandContext, brandName, tone, brandColors, logo, allBrandImages, LOVABLE_API_KEY);
   } catch (e) {
     console.error("template-personalize error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
