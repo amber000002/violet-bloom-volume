@@ -173,9 +173,16 @@ CRITICAL RULES:
    - Section accents, borders, dividers → Secondary or Accent color
    - Page/section backgrounds → Background color  
    - Body text → Text color
-   - FOOTER SECTION: MUST use Primary color as the background-color with white (#ffffff) text. This is mandatory — never leave footer with generic/default colors.
-   - HEADER SECTION: Should reflect brand colors in background or accent elements
+    - FOOTER SECTION: MUST use Primary color as the background-color with white (#ffffff) text. This is mandatory — never leave footer with generic/default colors.
+    - HEADER SECTION: Should reflect brand colors in background or accent elements
 10. Return ONLY the complete rewritten HTML - no explanation, no markdown code blocks
+${footerHtml ? `
+11. CRITICAL — FOOTER REPLACEMENT: A brand-accurate footer HTML has been extracted from a reference creative and is provided below. You MUST:
+    a) REMOVE the existing footer section from the template entirely
+    b) INSERT the provided footer HTML in its place, right before the closing </body> or at the bottom of the email content
+    c) Do NOT modify the provided footer HTML structure — use it exactly as given
+    d) The provided footer already has correct brand styling — do not override its styles
+` : ""}
 
 Brand colors available:
 - Primary: ${brandColors.primary || "#6366f1"}
@@ -185,7 +192,8 @@ Brand colors available:
 - Text: ${brandColors.text_primary || "#1f2937"}
 ${logo ? `Brand logo URL: ${logo}` : ""}
 ${heroImages.length ? `\nHERO/BANNER images (use ONLY for full-width hero/banner sections, set width:100%; display:block):\n${heroImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}
-${productImages.length ? `\nPRODUCT images (use for product cards/grids, preserve original template sizing & centering):\n${productImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}`;
+${productImages.length ? `\nPRODUCT images (use for product cards/grids, preserve original template sizing & centering):\n${productImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}
+${footerHtml ? `\n--- BRAND FOOTER HTML (extracted from reference creative — insert this as the footer) ---\n${footerHtml}\n--- END FOOTER HTML ---` : ""}`;
 
   const userPrompt = `Here is the brand context:
 ${brandContext}
@@ -194,7 +202,7 @@ Here is the HTML email template to personalize:
 - Replace ALL text content for this brand
 - Replace ALL placeholder/stock image URLs with the brand images listed in the system prompt
 - Apply brand colors to ALL inline styles (especially buttons, headers, and footer)
-- The footer MUST have brand primary color as background
+${footerHtml ? "- REPLACE the existing footer with the provided brand footer HTML" : "- The footer MUST have brand primary color as background"}
 - Keep HTML structure identical
 
 ${customTemplate}`;
