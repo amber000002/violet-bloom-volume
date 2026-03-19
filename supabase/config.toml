@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.creative-analyze]
 verify_jwt = false
+
+[functions.template-personalize]
+verify_jwt = false

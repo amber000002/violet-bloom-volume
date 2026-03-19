@@ -2,22 +2,27 @@ import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, RefreshCw, User, ArrowRight, Star, Gift,
-  ChevronLeft, ChevronRight, Globe, Check, Percent, Trophy
+  ChevronLeft, ChevronRight, Globe, Check, Percent, Trophy,
+  Layout, Wand2
 } from "lucide-react";
 import { MagicSelect } from "../ui/MagicSelect";
 import { MagicInput } from "../ui/MagicInput";
 import { industryConfigs, AMPUseCase, getInferredBusinessModel, FrameworkType } from "@/data/industryConfig";
+import { CoreBrandJSON } from "@/types/brandProfile";
 
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
+import { TemplateEngineMode } from "./TemplateEngineMode";
 
 interface AMPEmailStudioTabProps {
   industry: string;
   viewMode?: ViewMode;
   onDataChange?: (data: any) => void;
+  brandProfile?: CoreBrandJSON | null;
 }
 
 type TemplateStyle = "brand-carousel" | "gamified";
+type StudioMode = "interactive" | "template-engine";
 
 const templateStyleOptions = [
   { id: "brand-carousel" as const, label: "Brand-led Carousel" },
@@ -31,7 +36,9 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   industry,
   viewMode = "app",
   onDataChange,
+  brandProfile = null,
 }) => {
+  const [studioMode, setStudioMode] = useState<StudioMode>("template-engine");
   const [selectedUseCase, setSelectedUseCase] = useState("");
   const [templateStyle, setTemplateStyle] = useState<TemplateStyle>("brand-carousel");
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -164,6 +171,43 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
 
   return (
     <div className="space-y-8">
+      {/* Mode Toggle */}
+      <div className="flex justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-md mx-auto">
+        <button
+          onClick={() => setStudioMode("template-engine")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            studioMode === "template-engine"
+              ? "bg-gradient-magic text-primary-foreground shadow-magic"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Wand2 className="w-4 h-4" />
+          Template Engine
+        </button>
+        <button
+          onClick={() => setStudioMode("interactive")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            studioMode === "interactive"
+              ? "bg-gradient-magic text-primary-foreground shadow-magic"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Layout className="w-4 h-4" />
+          Interactive Preview
+        </button>
+      </div>
+
+      {/* Template Engine Mode */}
+      {studioMode === "template-engine" && (
+        <TemplateEngineMode
+          industry={industry}
+          brandProfile={brandProfile}
+        />
+      )}
+
+      {/* Interactive Preview Mode (existing) */}
+      {studioMode === "interactive" && (
+      <div className="space-y-8">
       {/* Controls */}
       <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
         {/* Use Case Dropdown */}
@@ -321,6 +365,8 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
             </div>
           ))}
         </motion.div>
+      )}
+    </div>
       )}
     </div>
   );
