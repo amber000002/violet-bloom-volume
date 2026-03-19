@@ -98,6 +98,31 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
     return result;
   }, [brandName, logoUrl, brandColors]);
 
+  const handleFooterImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      toast.error("Only PNG and JPEG images are supported");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5MB");
+      return;
+    }
+    setFooterImageName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFooterImageBase64(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const removeFooterImage = useCallback(() => {
+    setFooterImageBase64("");
+    setFooterImageName("");
+    if (footerInputRef.current) footerInputRef.current.value = "";
+  }, []);
+
   const handleGenerate = useCallback(async () => {
     if (!industry) return;
     setIsGenerating(true);
@@ -109,6 +134,7 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
           stage: selectedStage,
           templateType,
           customTemplate: customTemplate || undefined,
+          footerImageBase64: footerImageBase64 || undefined,
         },
       });
 
@@ -119,11 +145,9 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
       setGeneratedContent(content);
 
       if (data.isCustomTemplate && data.personalizedHtml) {
-        // Custom template: use the AI-rewritten HTML directly
         setPersonalizedHtml(data.personalizedHtml);
         setPersonalizedAmp("");
       } else {
-        // Built-in template: apply token replacement
         const htmlTemplate = getTemplateForStage(selectedStage, "html").html;
         setPersonalizedHtml(applyContentToTemplate(content, htmlTemplate));
 
@@ -138,7 +162,7 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [industry, brandProfile, selectedStage, templateType, customTemplate, applyContentToTemplate]);
+  }, [industry, brandProfile, selectedStage, templateType, customTemplate, footerImageBase64, applyContentToTemplate]);
 
   const handleCopyCode = useCallback(() => {
     const code = viewTab === "amp-code" ? personalizedAmp : personalizedHtml;
