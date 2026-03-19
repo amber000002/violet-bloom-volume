@@ -115,13 +115,18 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
       const content = data.content as GeneratedContent;
       setGeneratedContent(content);
 
-      // Apply to HTML template
-      const htmlTemplate = customTemplate || getTemplateForStage(selectedStage, "html").html;
-      setPersonalizedHtml(applyContentToTemplate(content, htmlTemplate));
+      if (data.isCustomTemplate && data.personalizedHtml) {
+        // Custom template: use the AI-rewritten HTML directly
+        setPersonalizedHtml(data.personalizedHtml);
+        setPersonalizedAmp("");
+      } else {
+        // Built-in template: apply token replacement
+        const htmlTemplate = getTemplateForStage(selectedStage, "html").html;
+        setPersonalizedHtml(applyContentToTemplate(content, htmlTemplate));
 
-      // Apply to AMP template
-      const ampTemplate = getTemplateForStage(selectedStage, "amp").html;
-      setPersonalizedAmp(applyContentToTemplate(content, ampTemplate));
+        const ampTemplate = getTemplateForStage(selectedStage, "amp").html;
+        setPersonalizedAmp(applyContentToTemplate(content, ampTemplate));
+      }
 
       toast.success("Template personalized successfully!");
     } catch (err: any) {
