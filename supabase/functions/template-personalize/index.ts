@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { brandProfile, industry, stage, templateType, customTemplate } = await req.json();
+    const { brandProfile, industry, stage, templateType, customTemplate, footerImageBase64 } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -44,13 +44,19 @@ ${industryVocab.length ? `Industry Vocabulary: ${industryVocab.join(", ")}` : ""
 ${coreProducts.length ? `Core Products: ${coreProducts.join(", ")}` : ""}
 ${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""}`;
 
+    // Extract footer HTML from uploaded image if provided
+    let footerHtml = "";
+    if (footerImageBase64) {
+      footerHtml = await extractFooterFromImage(footerImageBase64, brandName, brandColors, logo, LOVABLE_API_KEY);
+    }
+
     // If a custom template is provided, use AI to rewrite its content in-place
     if (customTemplate) {
-      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, heroImages, productImages, LOVABLE_API_KEY);
+      return await handleCustomTemplate(customTemplate, brandContext, brandName, tone, brandColors, logo, heroImages, productImages, footerHtml, LOVABLE_API_KEY);
     }
 
     // Standard flow: generate content tokens for built-in templates
-    return await handleBuiltInTemplate(brandContext, brandName, tone, brandColors, logo, allBrandImages, LOVABLE_API_KEY);
+    return await handleBuiltInTemplate(brandContext, brandName, tone, brandColors, logo, allBrandImages, footerHtml, LOVABLE_API_KEY);
   } catch (e) {
     console.error("template-personalize error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
@@ -58,6 +64,78 @@ ${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""
     });
   }
 });
+
+async function extractFooterFromImage(
+  imageBase64: string,
+  brandName: string,
+  brandColors: Record<string, string>,
+  logo: string,
+  apiKey: string,
+): Promise<string> {
+  try {
+    const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+
+    const systemPrompt = `You are an expert email HTML developer specializing in footer replication.
+
+You will receive a screenshot of an email creative. Your job is to:
+1. Identify the FOOTER section (the bottom portion of the email)
+2. Extract every element you see: logo, social media icons/links, unsubscribe text, privacy/terms links, company address, app download badges, copyright text, and any other footer elements
+3. Recreate the footer as TABLE-BASED HTML with INLINE CSS that is email-client compatible
+
+CRITICAL RULES:
+- Replicate the footer structure, alignment, element order, and spacing as closely as possible to the original
+- Use TABLE-based layout (not divs) for email client compatibility
+- ALL styles must be inline CSS
+- If you see social media icons, use Unicode/text representations or simple styled links: [FB] [IG] [TW] [LI] [YT]
+- If you detect a logo in the footer, use this URL: ${logo || "{{logo_url}}"}
+- Apply brand colors: Primary=${brandColors.primary || "#333"}, Secondary=${brandColors.secondary || "#666"}, Background for footer=${brandColors.primary || "#333"}, Text=#ffffff
+- For any links that aren't clearly readable, use placeholders like "#" for href and descriptive text
+- Do NOT hallucinate elements that aren't visible in the image
+- Do NOT simplify — preserve the original complexity and structure
+- Include ALL visible text (legal disclaimers, addresses, copyright notices)
+- Return ONLY the HTML for the footer section — no explanation, no markdown fences
+
+Brand name: ${brandName}`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: imageUrl } },
+              { type: "text", text: "Extract and replicate the footer exactly as seen in this email creative. Return only the footer HTML." },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Footer extraction AI error:", response.status);
+      return "";
+    }
+
+    const result = await response.json();
+    const rawContent = result.choices?.[0]?.message?.content || "";
+
+    // Strip markdown fences if present
+    return rawContent
+      .replace(/^```html?\s*\n?/i, "")
+      .replace(/\n?```\s*$/i, "")
+      .trim();
+  } catch (e) {
+    console.error("Footer extraction failed:", e);
+    return "";
+  }
+}
 
 async function handleCustomTemplate(
   customTemplate: string,
@@ -68,6 +146,7 @@ async function handleCustomTemplate(
   logo: string,
   heroImages: string[],
   productImages: string[],
+  footerHtml: string,
   apiKey: string,
 ) {
   const systemPrompt = `You are an expert email marketing copywriter and HTML email developer.
@@ -94,9 +173,16 @@ CRITICAL RULES:
    - Section accents, borders, dividers → Secondary or Accent color
    - Page/section backgrounds → Background color  
    - Body text → Text color
-   - FOOTER SECTION: MUST use Primary color as the background-color with white (#ffffff) text. This is mandatory — never leave footer with generic/default colors.
-   - HEADER SECTION: Should reflect brand colors in background or accent elements
+    - FOOTER SECTION: MUST use Primary color as the background-color with white (#ffffff) text. This is mandatory — never leave footer with generic/default colors.
+    - HEADER SECTION: Should reflect brand colors in background or accent elements
 10. Return ONLY the complete rewritten HTML - no explanation, no markdown code blocks
+${footerHtml ? `
+11. CRITICAL — FOOTER REPLACEMENT: A brand-accurate footer HTML has been extracted from a reference creative and is provided below. You MUST:
+    a) REMOVE the existing footer section from the template entirely
+    b) INSERT the provided footer HTML in its place, right before the closing </body> or at the bottom of the email content
+    c) Do NOT modify the provided footer HTML structure — use it exactly as given
+    d) The provided footer already has correct brand styling — do not override its styles
+` : ""}
 
 Brand colors available:
 - Primary: ${brandColors.primary || "#6366f1"}
@@ -106,7 +192,8 @@ Brand colors available:
 - Text: ${brandColors.text_primary || "#1f2937"}
 ${logo ? `Brand logo URL: ${logo}` : ""}
 ${heroImages.length ? `\nHERO/BANNER images (use ONLY for full-width hero/banner sections, set width:100%; display:block):\n${heroImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}
-${productImages.length ? `\nPRODUCT images (use for product cards/grids, preserve original template sizing & centering):\n${productImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}`;
+${productImages.length ? `\nPRODUCT images (use for product cards/grids, preserve original template sizing & centering):\n${productImages.map((url: string, i: number) => `  ${i + 1}. ${url}`).join("\n")}` : ""}
+${footerHtml ? `\n--- BRAND FOOTER HTML (extracted from reference creative — insert this as the footer) ---\n${footerHtml}\n--- END FOOTER HTML ---` : ""}`;
 
   const userPrompt = `Here is the brand context:
 ${brandContext}
@@ -115,7 +202,7 @@ Here is the HTML email template to personalize:
 - Replace ALL text content for this brand
 - Replace ALL placeholder/stock image URLs with the brand images listed in the system prompt
 - Apply brand colors to ALL inline styles (especially buttons, headers, and footer)
-- The footer MUST have brand primary color as background
+${footerHtml ? "- REPLACE the existing footer with the provided brand footer HTML" : "- The footer MUST have brand primary color as background"}
 - Keep HTML structure identical
 
 ${customTemplate}`;
@@ -180,6 +267,7 @@ async function handleBuiltInTemplate(
   brandColors: Record<string, string>,
   logo: string,
   brandImages: string[],
+  footerHtml: string,
   apiKey: string,
 ) {
   const systemPrompt = `You are an expert email marketing copywriter. Generate personalized email content for a brand.
@@ -283,6 +371,7 @@ The content should be specifically tailored to the lifecycle stage mentioned abo
     personalizedHtml: null,
     personalizedAmp: null,
     isCustomTemplate: false,
+    footerHtml: footerHtml || null,
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
