@@ -223,7 +223,7 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
 
       {/* Brand profile warning */}
       {!brandProfile && (
-        <div className="flex items-center gap-2 justify-center text-sm text-amber-500">
+        <div className="flex items-center gap-2 justify-center text-sm text-destructive">
           <AlertCircle className="w-4 h-4" />
           Generate a brand profile first to enable template personalization.
         </div>
