@@ -324,7 +324,7 @@ export const TemplateEngineMode: React.FC<TemplateEngineModeProps> = ({
                       {templateType.toUpperCase()} Email Preview — {selectedStage}
                     </span>
                   </div>
-                  <div className="bg-white">
+                  <div className="bg-background">
                     <iframe
                       srcDoc={templateType === "amp" ? personalizedAmp : personalizedHtml}
                       className="w-full border-0"
