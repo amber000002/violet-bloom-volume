@@ -65,6 +65,78 @@ ${primarySegments.length ? `Target Segments: ${primarySegments.join(", ")}` : ""
   }
 });
 
+async function extractFooterFromImage(
+  imageBase64: string,
+  brandName: string,
+  brandColors: Record<string, string>,
+  logo: string,
+  apiKey: string,
+): Promise<string> {
+  try {
+    const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+
+    const systemPrompt = `You are an expert email HTML developer specializing in footer replication.
+
+You will receive a screenshot of an email creative. Your job is to:
+1. Identify the FOOTER section (the bottom portion of the email)
+2. Extract every element you see: logo, social media icons/links, unsubscribe text, privacy/terms links, company address, app download badges, copyright text, and any other footer elements
+3. Recreate the footer as TABLE-BASED HTML with INLINE CSS that is email-client compatible
+
+CRITICAL RULES:
+- Replicate the footer structure, alignment, element order, and spacing as closely as possible to the original
+- Use TABLE-based layout (not divs) for email client compatibility
+- ALL styles must be inline CSS
+- If you see social media icons, use Unicode/text representations or simple styled links: [FB] [IG] [TW] [LI] [YT]
+- If you detect a logo in the footer, use this URL: ${logo || "{{logo_url}}"}
+- Apply brand colors: Primary=${brandColors.primary || "#333"}, Secondary=${brandColors.secondary || "#666"}, Background for footer=${brandColors.primary || "#333"}, Text=#ffffff
+- For any links that aren't clearly readable, use placeholders like "#" for href and descriptive text
+- Do NOT hallucinate elements that aren't visible in the image
+- Do NOT simplify — preserve the original complexity and structure
+- Include ALL visible text (legal disclaimers, addresses, copyright notices)
+- Return ONLY the HTML for the footer section — no explanation, no markdown fences
+
+Brand name: ${brandName}`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: imageUrl } },
+              { type: "text", text: "Extract and replicate the footer exactly as seen in this email creative. Return only the footer HTML." },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Footer extraction AI error:", response.status);
+      return "";
+    }
+
+    const result = await response.json();
+    const rawContent = result.choices?.[0]?.message?.content || "";
+
+    // Strip markdown fences if present
+    return rawContent
+      .replace(/^```html?\s*\n?/i, "")
+      .replace(/\n?```\s*$/i, "")
+      .trim();
+  } catch (e) {
+    console.error("Footer extraction failed:", e);
+    return "";
+  }
+}
+
 async function handleCustomTemplate(
   customTemplate: string,
   brandContext: string,
@@ -74,6 +146,7 @@ async function handleCustomTemplate(
   logo: string,
   heroImages: string[],
   productImages: string[],
+  footerHtml: string,
   apiKey: string,
 ) {
   const systemPrompt = `You are an expert email marketing copywriter and HTML email developer.
