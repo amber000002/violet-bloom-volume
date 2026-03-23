@@ -126,7 +126,10 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
         if (data) {
           const urls = data
             .map((d) => d.website_url || `https://${d.website_host_normalized}`)
-            .filter(Boolean);
+            .filter((u) => {
+              try { return u && new URL(u).hostname.includes('.'); }
+              catch { return false; }
+            });
           setSavedBrandUrls(urls);
         }
       } catch {
