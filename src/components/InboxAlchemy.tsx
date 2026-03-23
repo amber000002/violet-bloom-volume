@@ -140,16 +140,29 @@ const InboxAlchemyContent: React.FC = () => {
         let profile: CoreBrandJSON = data.data;
 
         // === ENRICHMENT: merge with existing if available AND same brand ===
-        const existingBrandHost = brandProfile?.brand_identity?.brand_name?.toLowerCase().trim();
+        // First try in-memory brandProfile, then fall back to latest DB version
+        let existingProfile = brandProfile;
+        if (!existingProfile) {
+          try {
+            const dbVersions = await loadBrandProfileVersions({ websiteUrl: brandInputs.websiteUrl, industry });
+            if (dbVersions.length > 0) {
+              existingProfile = dbVersions[0].brandProfileJson as CoreBrandJSON;
+            }
+          } catch {
+            // Silent - proceed without enrichment
+          }
+        }
+
+        const existingBrandHost = existingProfile?.brand_identity?.brand_name?.toLowerCase().trim();
         const newBrandHost = profile?.brand_identity?.brand_name?.toLowerCase().trim();
         const isSameBrand = existingBrandHost && newBrandHost && existingBrandHost === newBrandHost;
-        if (brandProfile && isSameBrand) {
+        if (existingProfile && isSameBrand) {
           profile = await enrichBrandProfile({
             brandId: "",
-            existingProfile: brandProfile,
+            existingProfile,
             newProfile: profile,
           });
-        } else if (brandProfile && !isSameBrand) {
+        } else if (existingProfile && !isSameBrand) {
           console.log(`Skipping enrichment: existing brand "${existingBrandHost}" differs from new brand "${newBrandHost}"`);
         }
         setBrandProfile(profile);
