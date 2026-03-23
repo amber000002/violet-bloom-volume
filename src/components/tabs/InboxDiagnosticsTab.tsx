@@ -1366,6 +1366,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <p className="text-xs text-muted-foreground mt-3">
               * Percentages calculated using {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator
             </p>
+            <SectionInsightBanner insight={sectionInsights?.campaignOverview ?? null} />
           </CollapsibleSection>
 
           {/* Report 1b: Monthly Overview with correct date parsing */}
