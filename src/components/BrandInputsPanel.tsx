@@ -158,13 +158,27 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     originalOnGenerate();
   }, [inputs.websiteUrl, originalOnGenerate]);
 
+  // Merge localStorage history with saved brand URLs (deduplicated)
+  const mergedHistory = React.useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const u of [...urlHistory, ...savedBrandUrls]) {
+      const key = u.toLowerCase().replace(/\/+$/, "");
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(u);
+      }
+    }
+    return result;
+  }, [urlHistory, savedBrandUrls]);
+
   const displayHistory = showAllHistory
-    ? urlHistory
+    ? mergedHistory
     : inputs.websiteUrl.trim()
-      ? urlHistory.filter(
+      ? mergedHistory.filter(
           (u) => u.toLowerCase().includes(inputs.websiteUrl.toLowerCase()) && u.toLowerCase() !== inputs.websiteUrl.toLowerCase()
         )
-      : urlHistory;
+      : mergedHistory;
 
   return (
     <div className="flex-1 space-y-3">
