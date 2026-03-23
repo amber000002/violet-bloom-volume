@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { Globe, ChevronDown, ChevronUp, Plus, RefreshCw, Upload, FileText, X, Database } from "lucide-react";
 import { BrandInputs, emptyBrandInputs, additionalContextFields } from "@/types/brandProfile";
@@ -107,13 +108,32 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     : 0;
 
   const [urlHistory, setUrlHistory] = useState<string[]>([]);
+  const [savedBrandUrls, setSavedBrandUrls] = useState<string[]>([]);
   const [showUrlDropdown, setShowUrlDropdown] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const urlWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Load history on mount
+  // Load history on mount + fetch saved brand URLs from DB
   useEffect(() => {
     setUrlHistory(loadUrlHistory());
+
+    const fetchSavedUrls = async () => {
+      try {
+        const { data } = await supabase
+          .from("brand_profiles")
+          .select("website_url, website_host_normalized, brand_name")
+          .order("updated_at", { ascending: false });
+        if (data) {
+          const urls = data
+            .map((d) => d.website_url || `https://${d.website_host_normalized}`)
+            .filter(Boolean);
+          setSavedBrandUrls(urls);
+        }
+      } catch {
+        // Silent
+      }
+    };
+    fetchSavedUrls();
   }, []);
 
   // Close dropdown on outside click
@@ -138,13 +158,27 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     originalOnGenerate();
   }, [inputs.websiteUrl, originalOnGenerate]);
 
+  // Merge localStorage history with saved brand URLs (deduplicated)
+  const mergedHistory = React.useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const u of [...urlHistory, ...savedBrandUrls]) {
+      const key = u.toLowerCase().replace(/\/+$/, "");
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(u);
+      }
+    }
+    return result;
+  }, [urlHistory, savedBrandUrls]);
+
   const displayHistory = showAllHistory
-    ? urlHistory
+    ? mergedHistory
     : inputs.websiteUrl.trim()
-      ? urlHistory.filter(
+      ? mergedHistory.filter(
           (u) => u.toLowerCase().includes(inputs.websiteUrl.toLowerCase()) && u.toLowerCase() !== inputs.websiteUrl.toLowerCase()
         )
-      : urlHistory;
+      : mergedHistory;
 
   return (
     <div className="flex-1 space-y-3">
@@ -167,7 +201,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
             placeholder="https://www.yourbrand.com"
             className="w-full h-10 px-3 pr-8 rounded-lg border border-border bg-muted/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300 text-sm"
           />
-          {urlHistory.length > 0 && (
+          {mergedHistory.length > 0 && (
             <button
               type="button"
               onClick={() => {
