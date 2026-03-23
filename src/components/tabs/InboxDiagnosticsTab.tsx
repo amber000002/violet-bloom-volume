@@ -56,6 +56,7 @@ import { parseEventSchemaCSV, parseUserPropertyCSV, EventSchemaRow, UserProperty
 import { generateExtendedInsights, ExtendedInsightsData, CoverageDataForRevenue } from "@/lib/strategicInsightsExtendedEngine";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { OpportunityRefreshEngine } from "../OpportunityRefreshEngine";
+import { generateSectionInsights, SectionInsights } from "@/lib/sectionInsightEngine";
 import { ActiveUseCaseInfo } from "@/lib/opportunityEngine";
 import {
   EmailMetricsTrendChart,
@@ -409,6 +410,17 @@ const ColoredPercent: React.FC<{ value: number; metricType: MetricType }> = ({ v
   );
 };
 
+// Section Insight Banner — renders a concise data-backed insight below each section
+const SectionInsightBanner: React.FC<{ insight: string | null }> = ({ insight }) => {
+  if (!insight) return null;
+  return (
+    <div className="mt-3 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
+      <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+      <p className="text-sm text-foreground/80 leading-relaxed">{insight}</p>
+    </div>
+  );
+};
+
 // Wrapper component for extended insights that computes coverage data
 const StrategicInsightsExtendedWrapper: React.FC<{
   campaignData: CampaignRow[];
@@ -564,6 +576,18 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     infrastructure: true,
     emailMetricsTrend: true,
   });
+
+  // Section-wise insights (memoized)
+  const sectionInsights = useMemo<SectionInsights | null>(() => {
+    if (!diagnostics?.analysisReport) return null;
+    return generateSectionInsights(
+      diagnostics.rawData,
+      diagnostics.analysisReport,
+      postmasterData,
+      null, // extendedData computed elsewhere
+      null, // lifecycleCoverageStats — computed by child components
+    );
+  }, [diagnostics, postmasterData]);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -1342,6 +1366,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <p className="text-xs text-muted-foreground mt-3">
               * Percentages calculated using {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator
             </p>
+            <SectionInsightBanner insight={sectionInsights?.campaignOverview ?? null} />
           </CollapsibleSection>
 
           {/* Report 1b: Monthly Overview with correct date parsing */}
@@ -1409,6 +1434,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <p className="text-xs text-muted-foreground mt-3">
               * Dates parsed as DD/MM/YY or DD/MM/YYYY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
             </p>
+            <SectionInsightBanner insight={sectionInsights?.monthlyOverview ?? null} />
           </CollapsibleSection>
 
           {/* ============= EMAIL METRICS TREND CHART ============= */}
@@ -1432,6 +1458,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <div ref={emailMetricsRef}>
               <EmailMetricsTrendChart campaignData={diagnostics.rawData} />
             </div>
+            <SectionInsightBanner insight={sectionInsights?.emailMetricsTrend ?? null} />
           </CollapsibleSection>
 
           {/* ============= INFRASTRUCTURE DETAILS ============= */}
@@ -1445,6 +1472,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               campaignData={diagnostics.rawData}
               postmasterData={postmasterData}
             />
+            <SectionInsightBanner insight={sectionInsights?.infrastructureReputation ?? null} />
           </CollapsibleSection>
 
           {/* ============= REPUTATION TRENDS (SMALL MULTIPLES) ============= */}
@@ -1471,6 +1499,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 campaignData={diagnostics.rawData}
               />
             </div>
+            <SectionInsightBanner insight={sectionInsights?.reputationTrends ?? null} />
           </CollapsibleSection>
 
           {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
@@ -1582,6 +1611,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
+            <SectionInsightBanner insight={sectionInsights?.bestPerformingCTR ?? null} />
           </CollapsibleSection>
 
           {/* ============= UNDER-PERFORMING CAMPAIGNS ============= */}
@@ -1693,6 +1723,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
+            <SectionInsightBanner insight={sectionInsights?.underperformingCTR ?? null} />
           </CollapsibleSection>
 
           {/* ============= CREATIVE & CONTENT EFFECTIVENESS ANALYZER ============= */}
@@ -1885,6 +1916,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </div>
               );
             })()}
+            <SectionInsightBanner insight={sectionInsights?.keyLearnings ?? null} />
           </CollapsibleSection>
         </motion.div>
       )}
