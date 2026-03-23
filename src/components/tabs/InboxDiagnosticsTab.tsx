@@ -410,6 +410,17 @@ const ColoredPercent: React.FC<{ value: number; metricType: MetricType }> = ({ v
   );
 };
 
+// Section Insight Banner — renders a concise data-backed insight below each section
+const SectionInsightBanner: React.FC<{ insight: string | null }> = ({ insight }) => {
+  if (!insight) return null;
+  return (
+    <div className="mt-3 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
+      <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+      <p className="text-sm text-foreground/80 leading-relaxed">{insight}</p>
+    </div>
+  );
+};
+
 // Wrapper component for extended insights that computes coverage data
 const StrategicInsightsExtendedWrapper: React.FC<{
   campaignData: CampaignRow[];
