@@ -169,7 +169,10 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
           {urlHistory.length > 0 && (
             <button
               type="button"
-              onClick={() => setShowUrlDropdown(!showUrlDropdown)}
+              onClick={() => {
+                setShowAllHistory(true);
+                setShowUrlDropdown(!showUrlDropdown);
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
             >
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showUrlDropdown ? "rotate-180" : ""}`} />
@@ -177,7 +180,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
           )}
         </div>
         <AnimatePresence>
-          {showUrlDropdown && (inputs.websiteUrl ? filteredHistory : urlHistory).length > 0 && (
+          {showUrlDropdown && displayHistory.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
