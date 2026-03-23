@@ -1458,6 +1458,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <div ref={emailMetricsRef}>
               <EmailMetricsTrendChart campaignData={diagnostics.rawData} />
             </div>
+            <SectionInsightBanner insight={sectionInsights?.emailMetricsTrend ?? null} />
           </CollapsibleSection>
 
           {/* ============= INFRASTRUCTURE DETAILS ============= */}
