@@ -1499,6 +1499,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 campaignData={diagnostics.rawData}
               />
             </div>
+            <SectionInsightBanner insight={sectionInsights?.reputationTrends ?? null} />
           </CollapsibleSection>
 
           {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
