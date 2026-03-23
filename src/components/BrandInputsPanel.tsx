@@ -106,15 +106,22 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     ? inputs.userPropertiesCSV.trim().split("\n").length - 1
     : 0;
 
-  const [urlHistory, setUrlHistory] = useState<string[]>(loadUrlHistory);
+  const [urlHistory, setUrlHistory] = useState<string[]>([]);
   const [showUrlDropdown, setShowUrlDropdown] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const urlWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Load history on mount
+  useEffect(() => {
+    setUrlHistory(loadUrlHistory());
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (urlWrapperRef.current && !urlWrapperRef.current.contains(e.target as Node)) {
         setShowUrlDropdown(false);
+        setShowAllHistory(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -131,9 +138,13 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     originalOnGenerate();
   }, [inputs.websiteUrl, originalOnGenerate]);
 
-  const filteredHistory = urlHistory.filter(
-    (u) => u.toLowerCase().includes(inputs.websiteUrl.toLowerCase()) && u.toLowerCase() !== inputs.websiteUrl.toLowerCase()
-  );
+  const displayHistory = showAllHistory
+    ? urlHistory
+    : inputs.websiteUrl.trim()
+      ? urlHistory.filter(
+          (u) => u.toLowerCase().includes(inputs.websiteUrl.toLowerCase()) && u.toLowerCase() !== inputs.websiteUrl.toLowerCase()
+        )
+      : urlHistory;
 
   return (
     <div className="flex-1 space-y-3">
@@ -149,6 +160,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
             value={inputs.websiteUrl}
             onChange={(e) => {
               onChange({ ...inputs, websiteUrl: e.target.value });
+              setShowAllHistory(false);
               setShowUrlDropdown(true);
             }}
             onFocus={() => setShowUrlDropdown(true)}
@@ -158,7 +170,10 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
           {urlHistory.length > 0 && (
             <button
               type="button"
-              onClick={() => setShowUrlDropdown(!showUrlDropdown)}
+              onClick={() => {
+                setShowAllHistory(true);
+                setShowUrlDropdown(!showUrlDropdown);
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
             >
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showUrlDropdown ? "rotate-180" : ""}`} />
@@ -166,7 +181,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
           )}
         </div>
         <AnimatePresence>
-          {showUrlDropdown && (inputs.websiteUrl ? filteredHistory : urlHistory).length > 0 && (
+          {showUrlDropdown && displayHistory.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
@@ -174,7 +189,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
               transition={{ duration: 0.15 }}
               className="absolute z-50 w-full mt-1 rounded-lg border border-border bg-card shadow-lg overflow-hidden max-h-[200px] overflow-y-auto"
             >
-              {(inputs.websiteUrl ? filteredHistory : urlHistory).map((url) => (
+              {displayHistory.map((url) => (
                 <button
                   key={url}
                   type="button"
