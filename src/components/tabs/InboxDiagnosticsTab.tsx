@@ -566,6 +566,18 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     emailMetricsTrend: true,
   });
 
+  // Section-wise insights (memoized)
+  const sectionInsights = useMemo<SectionInsights | null>(() => {
+    if (!diagnostics?.analysisReport) return null;
+    return generateSectionInsights(
+      diagnostics.rawData,
+      diagnostics.analysisReport,
+      postmasterData,
+      null, // extendedData computed elsewhere
+      null, // lifecycleCoverageStats — computed by child components
+    );
+  }, [diagnostics, postmasterData]);
+
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
