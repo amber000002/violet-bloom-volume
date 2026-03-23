@@ -1916,6 +1916,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </div>
               );
             })()}
+            <SectionInsightBanner insight={sectionInsights?.keyLearnings ?? null} />
           </CollapsibleSection>
         </motion.div>
       )}
