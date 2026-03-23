@@ -201,7 +201,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
             placeholder="https://www.yourbrand.com"
             className="w-full h-10 px-3 pr-8 rounded-lg border border-border bg-muted/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300 text-sm"
           />
-          {urlHistory.length > 0 && (
+          {mergedHistory.length > 0 && (
             <button
               type="button"
               onClick={() => {
