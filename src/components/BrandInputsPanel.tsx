@@ -108,13 +108,32 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     : 0;
 
   const [urlHistory, setUrlHistory] = useState<string[]>([]);
+  const [savedBrandUrls, setSavedBrandUrls] = useState<string[]>([]);
   const [showUrlDropdown, setShowUrlDropdown] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const urlWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Load history on mount
+  // Load history on mount + fetch saved brand URLs from DB
   useEffect(() => {
     setUrlHistory(loadUrlHistory());
+
+    const fetchSavedUrls = async () => {
+      try {
+        const { data } = await supabase
+          .from("brand_profiles")
+          .select("website_url, website_host_normalized, brand_name")
+          .order("updated_at", { ascending: false });
+        if (data) {
+          const urls = data
+            .map((d) => d.website_url || `https://${d.website_host_normalized}`)
+            .filter(Boolean);
+          setSavedBrandUrls(urls);
+        }
+      } catch {
+        // Silent
+      }
+    };
+    fetchSavedUrls();
   }, []);
 
   // Close dropdown on outside click
