@@ -1723,6 +1723,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
+            <SectionInsightBanner insight={sectionInsights?.underperformingCTR ?? null} />
           </CollapsibleSection>
 
           {/* ============= CREATIVE & CONTENT EFFECTIVENESS ANALYZER ============= */}
