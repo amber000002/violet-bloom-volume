@@ -188,7 +188,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
               transition={{ duration: 0.15 }}
               className="absolute z-50 w-full mt-1 rounded-lg border border-border bg-card shadow-lg overflow-hidden max-h-[200px] overflow-y-auto"
             >
-              {(inputs.websiteUrl ? filteredHistory : urlHistory).map((url) => (
+              {displayHistory.map((url) => (
                 <button
                   key={url}
                   type="button"
