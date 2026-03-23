@@ -1472,6 +1472,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               campaignData={diagnostics.rawData}
               postmasterData={postmasterData}
             />
+            <SectionInsightBanner insight={sectionInsights?.infrastructureReputation ?? null} />
           </CollapsibleSection>
 
           {/* ============= REPUTATION TRENDS (SMALL MULTIPLES) ============= */}
