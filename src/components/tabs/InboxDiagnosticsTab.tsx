@@ -1611,6 +1611,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
+            <SectionInsightBanner insight={sectionInsights?.bestPerformingCTR ?? null} />
           </CollapsibleSection>
 
           {/* ============= UNDER-PERFORMING CAMPAIGNS ============= */}
