@@ -160,6 +160,7 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
             value={inputs.websiteUrl}
             onChange={(e) => {
               onChange({ ...inputs, websiteUrl: e.target.value });
+              setShowAllHistory(false);
               setShowUrlDropdown(true);
             }}
             onFocus={() => setShowUrlDropdown(true)}
