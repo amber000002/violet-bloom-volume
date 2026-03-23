@@ -106,15 +106,22 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     ? inputs.userPropertiesCSV.trim().split("\n").length - 1
     : 0;
 
-  const [urlHistory, setUrlHistory] = useState<string[]>(loadUrlHistory);
+  const [urlHistory, setUrlHistory] = useState<string[]>([]);
   const [showUrlDropdown, setShowUrlDropdown] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const urlWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Load history on mount
+  useEffect(() => {
+    setUrlHistory(loadUrlHistory());
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (urlWrapperRef.current && !urlWrapperRef.current.contains(e.target as Node)) {
         setShowUrlDropdown(false);
+        setShowAllHistory(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -131,9 +138,13 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
     originalOnGenerate();
   }, [inputs.websiteUrl, originalOnGenerate]);
 
-  const filteredHistory = urlHistory.filter(
-    (u) => u.toLowerCase().includes(inputs.websiteUrl.toLowerCase()) && u.toLowerCase() !== inputs.websiteUrl.toLowerCase()
-  );
+  const displayHistory = showAllHistory
+    ? urlHistory
+    : inputs.websiteUrl.trim()
+      ? urlHistory.filter(
+          (u) => u.toLowerCase().includes(inputs.websiteUrl.toLowerCase()) && u.toLowerCase() !== inputs.websiteUrl.toLowerCase()
+        )
+      : urlHistory;
 
   return (
     <div className="flex-1 space-y-3">
