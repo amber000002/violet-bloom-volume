@@ -400,7 +400,8 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
         <span>Grand Total Avg:</span>
         <span>Open Rate: <strong className="text-foreground">{avgRates.openRate.toFixed(1)}%</strong></span>
         <span>Click Rate: <strong className="text-foreground">{avgRates.clickRate.toFixed(1)}%</strong></span>
-        <span>Bounce Rate: <strong className="text-foreground">{avgRates.bounceRate.toFixed(2)}%</strong></span>
+        <span>Hard Bounce Rate: <strong className="text-foreground">{(avgRates.hardBounceRate || 0).toFixed(2)}%</strong></span>
+        <span>Soft Bounce Rate: <strong className="text-foreground">{(avgRates.softBounceRate || 0).toFixed(2)}%</strong></span>
         <span>Unsub Rate: <strong className="text-foreground">{avgRates.unsubRate.toFixed(2)}%</strong></span>
       </div>
 
