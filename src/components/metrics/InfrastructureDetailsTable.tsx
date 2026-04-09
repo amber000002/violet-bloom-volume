@@ -17,13 +17,11 @@
    postmasterData: PostmasterRow[] | null;
  }
  
- interface DomainInfo {
-   domain: string;
-   source: "campaign" | "postmaster" | "both";
-   serviceProvider?: string;
-   latestReputation?: string;
-   reputationDate?: string;
- }
+interface DomainInfo {
+  domain: string;
+  latestReputation?: string;
+  reputationDate?: string;
+}
  
  interface IPInfo {
    ip: string;
@@ -81,17 +79,16 @@
         if (name) providerNames.add(name);
       });
 
-      // Process postmaster data for domains and IPs
+      // Build latest domain reputation map from postmaster data
+      const latestDomainRep = new Map<string, { reputation: string; date: string }>();
+      const latestIPRep = new Map<string, { reputation: string; date: string }>();
+
       if (postmasterData && postmasterData.length > 0) {
-        // Sort by date descending to find latest reputation per domain
         const sorted = [...postmasterData].sort((a, b) => {
           const dateA = new Date(a.date);
           const dateB = new Date(b.date);
           return dateB.getTime() - dateA.getTime();
         });
-
-        const latestDomainRep = new Map<string, { reputation: string; date: string }>();
-        const latestIPRep = new Map<string, { reputation: string; date: string }>();
 
         sorted.forEach((row) => {
           const domainKey = row.domain?.toLowerCase().trim();
@@ -107,20 +104,6 @@
               date: row.date,
             });
           }
-        });
-
-        // Build domain entries from postmaster data with latest reputation
-        latestDomainRep.forEach((rep, domainKey) => {
-          const originalRow = postmasterData.find(
-            (r) => r.domain?.toLowerCase().trim() === domainKey
-          );
-          domainMap.set(domainKey, {
-            domain: originalRow?.domain || domainKey,
-            source: "postmaster",
-            serviceProvider: Array.from(providerNames).join(", ") || undefined,
-            latestReputation: rep.reputation,
-            reputationDate: rep.date,
-          });
         });
 
         // Extract IPs
@@ -145,16 +128,41 @@
         });
       }
 
-      // If no postmaster data but we have campaign providers, show them
-      if (domainMap.size === 0 && providerNames.size > 0) {
-        providerNames.forEach((name) => {
-          domainMap.set(name.toLowerCase(), {
-            domain: "—",
-            source: "campaign",
-            serviceProvider: name,
-          });
+      // List each campaign provider as a domain row, match reputation from postmaster
+      providerNames.forEach((provider) => {
+        const providerLower = provider.toLowerCase().trim();
+        // Try to find matching domain reputation from postmaster data
+        let matchedRep: { reputation: string; date: string } | undefined;
+        latestDomainRep.forEach((rep, domainKey) => {
+          if (domainKey.includes(providerLower) || providerLower.includes(domainKey)) {
+            matchedRep = rep;
+          }
         });
-      }
+        // If no fuzzy match, try exact
+        if (!matchedRep) {
+          matchedRep = latestDomainRep.get(providerLower);
+        }
+
+        domainMap.set(providerLower, {
+          domain: provider,
+          latestReputation: matchedRep?.reputation,
+          reputationDate: matchedRep?.date,
+        });
+      });
+
+      // Also add any postmaster domains not already covered by providers
+      latestDomainRep.forEach((rep, domainKey) => {
+        if (!domainMap.has(domainKey)) {
+          const originalRow = postmasterData?.find(
+            (r) => r.domain?.toLowerCase().trim() === domainKey
+          );
+          domainMap.set(domainKey, {
+            domain: originalRow?.domain || domainKey,
+            latestReputation: rep.reputation,
+            reputationDate: rep.date,
+          });
+        }
+      });
 
       return {
         domains: Array.from(domainMap.values()),
@@ -187,7 +195,6 @@
               <TableHeader>
                 <TableRow>
                   <TableHead>Domain</TableHead>
-                  <TableHead>Service Provider</TableHead>
                   <TableHead>Domain Reputation</TableHead>
                 </TableRow>
               </TableHeader>
@@ -199,7 +206,6 @@
                   return (
                     <TableRow key={i}>
                       <TableCell className="font-medium">{d.domain}</TableCell>
-                      <TableCell>{d.serviceProvider || "—"}</TableCell>
                       <TableCell>
                         {d.latestReputation ? (
                           <Badge variant={badge.variant} className={badge.className}>
