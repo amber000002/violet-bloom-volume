@@ -30,6 +30,7 @@ export interface CampaignRow {
   // Calculated rates
   openRate: number;
   clickRate: number;
+  uniqueCTR: number;
   unsubscribeRate: number;
   hardBounceRate: number;
   softBounceRate: number;
@@ -153,6 +154,7 @@ export interface ProviderAggregate {
   useDeliveredAsDenominator: boolean;
   viewPercent: number;
   clickPercent: number;
+  uniqueCTR: number;
   unsubscribePercent: number;
   hardBouncePercent: number;
   softBouncePercent: number;
@@ -177,6 +179,7 @@ export interface MonthlyOverview {
   useDeliveredAsDenominator: boolean;
   viewPercent: number;
   clickPercent: number;
+  uniqueCTR: number;
   unsubscribePercent: number;
   hardBouncePercent: number;
   softBouncePercent: number;
