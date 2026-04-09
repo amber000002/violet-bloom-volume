@@ -1077,6 +1077,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
       m.clickRate = denominator > 0 ? (m.uniqueClicked / denominator) * 100 : 0;
       m.viewPercent = m.openRate;
       m.clickPercent = m.clickRate;
+      m.uniqueCTR = m.uniqueViewed > 0 ? (m.uniqueClicked / m.uniqueViewed) * 100 : 0;
       m.unsubscribePercent = denominator > 0 ? (m.unsubscribes / denominator) * 100 : 0;
       m.hardBouncePercent = denominator > 0 ? (m.hardBounces / denominator) * 100 : 0;
       m.softBouncePercent = denominator > 0 ? (m.softBounces / denominator) * 100 : 0;
