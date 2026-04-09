@@ -1194,6 +1194,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
   return {
     providerAggregates,
     monthlyOverview,
+    monthlyOverviewByProvider,
     bestCampaigns,
     worstCampaigns,
     bestSummary,
