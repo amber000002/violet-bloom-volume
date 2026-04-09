@@ -1297,6 +1297,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
@@ -1320,6 +1321,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       <td className="text-right py-2 px-3"><ColoredPercent value={p.viewPercent} metricType="openRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(p.uniqueClicked)}</td>
                       <td className="text-right py-2 px-3"><ColoredPercent value={p.clickPercent} metricType="clickRate" /></td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={p.uniqueCTR} metricType="clickRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(p.unsubscribes)}</td>
                       <td className="text-right py-2 px-3"><ColoredPercent value={p.unsubscribePercent} metricType="unsubscribeRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(p.hardBounces)}</td>
@@ -1351,6 +1353,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.uniqueViewed / denom) * 100 : 0} metricType="openRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(totals.uniqueClicked)}</td>
                         <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.uniqueClicked / denom) * 100 : 0} metricType="clickRate" /></td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={totals.uniqueViewed > 0 ? (totals.uniqueClicked / totals.uniqueViewed) * 100 : 0} metricType="clickRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(totals.unsubscribes)}</td>
                         <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.unsubscribes / denom) * 100 : 0} metricType="unsubscribeRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(totals.hardBounces)}</td>
@@ -1391,6 +1394,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
                     <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
@@ -1420,6 +1424,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       <td className="text-right py-2 px-3"><ColoredPercent value={m.viewPercent} metricType="openRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.uniqueClicked)}</td>
                       <td className="text-right py-2 px-3"><ColoredPercent value={m.clickPercent} metricType="clickRate" /></td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={m.uniqueCTR} metricType="clickRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.unsubscribes)}</td>
                       <td className="text-right py-2 px-3"><ColoredPercent value={m.unsubscribePercent} metricType="unsubscribeRate" /></td>
                       <td className="text-right py-2 px-3">{formatNumber(m.hardBounces)}</td>
