@@ -195,7 +195,6 @@ interface DomainInfo {
               <TableHeader>
                 <TableRow>
                   <TableHead>Domain</TableHead>
-                  <TableHead>Service Provider</TableHead>
                   <TableHead>Domain Reputation</TableHead>
                 </TableRow>
               </TableHeader>
@@ -207,7 +206,6 @@ interface DomainInfo {
                   return (
                     <TableRow key={i}>
                       <TableCell className="font-medium">{d.domain}</TableCell>
-                      <TableCell>{d.serviceProvider || "—"}</TableCell>
                       <TableCell>
                         {d.latestReputation ? (
                           <Badge variant={badge.variant} className={badge.className}>
