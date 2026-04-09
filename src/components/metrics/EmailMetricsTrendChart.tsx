@@ -100,7 +100,7 @@ const METRIC_CONFIG = {
   totalDelivered: { label: "Delivered", color: "#06b6d4", defaultVisible: false },
   uniqueViewed: { label: "Unique Opens", color: "hsl(var(--secondary))", defaultVisible: true },
   uniqueClicked: { label: "Unique Clicks", color: "#22c55e", defaultVisible: true },
-  hardBounces: { label: "Hard Bounce", color: "#ef4444", defaultVisible: false },
+  hardBounces: { label: "Hard Bounce", color: "#eab308", defaultVisible: false },
   softBounces: { label: "Soft Bounce", color: "#f97316", defaultVisible: false },
   unsubscribes: { label: "Unsubscribes", color: "#8b5cf6", defaultVisible: false },
 };
