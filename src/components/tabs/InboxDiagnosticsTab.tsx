@@ -550,6 +550,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
    // Campaign sort toggles (independent per table)
    const [bestSortBy, setBestSortBy] = useState<"openRate" | "clickRate">("openRate");
    const [worstSortBy, setWorstSortBy] = useState<"openRate" | "clickRate">("openRate");
+   const [monthlyProviderTab, setMonthlyProviderTab] = useState<string | null>(null);
 
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
