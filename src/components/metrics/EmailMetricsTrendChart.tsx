@@ -443,7 +443,10 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
               <Line type="monotone" dataKey="uniqueClicked" name="Unique Clicks" stroke={METRIC_CONFIG.uniqueClicked.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.hardBounces && (
-              <Line type="monotone" dataKey="hardBounces" name="Bounces" stroke={METRIC_CONFIG.hardBounces.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="hardBounces" name="Hard Bounce" stroke={METRIC_CONFIG.hardBounces.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            )}
+            {visibleMetrics.softBounces && (
+              <Line type="monotone" dataKey="softBounces" name="Soft Bounce" stroke={METRIC_CONFIG.softBounces.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.unsubscribes && (
               <Line type="monotone" dataKey="unsubscribes" name="Unsubscribes" stroke={METRIC_CONFIG.unsubscribes.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
