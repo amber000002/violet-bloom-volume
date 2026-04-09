@@ -253,7 +253,8 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     const clickRate = calcRate(point.uniqueClicked, point.totalSent);
     const openTrend = calcTrendVsAvg(openRate, avgRates.openRate, point.totalSent);
     const clickTrend = calcTrendVsAvg(clickRate, avgRates.clickRate, point.totalSent);
-    const bounceRate = calcRate(point.hardBounces + point.softBounces, point.totalSent);
+    const hardBounceRate = calcRate(point.hardBounces, point.totalSent);
+    const softBounceRate = calcRate(point.softBounces, point.totalSent);
     const unsubRate = calcRate(point.unsubscribes, point.totalSent);
 
     const TrendIndicator = ({ trend }: { trend: ReturnType<typeof calcTrendVsAvg> }) => {
@@ -318,15 +319,28 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
           </div>
         </div>
 
-        {/* Bounce */}
-        {(point.hardBounces + point.softBounces) > 0 && (
+        {/* Hard Bounce */}
+        {point.hardBounces > 0 && (
           <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.hardBounces.color }} />
-              <span className="text-muted-foreground">Bounce</span>
+              <span className="text-muted-foreground">Hard Bounce</span>
             </div>
             <span className="font-medium">
-              {(point.hardBounces + point.softBounces).toLocaleString()} ({bounceRate.toFixed(2)}%)
+              {point.hardBounces.toLocaleString()} ({hardBounceRate.toFixed(2)}%)
+            </span>
+          </div>
+        )}
+
+        {/* Soft Bounce */}
+        {point.softBounces > 0 && (
+          <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.softBounces.color }} />
+              <span className="text-muted-foreground">Soft Bounce</span>
+            </div>
+            <span className="font-medium">
+              {point.softBounces.toLocaleString()} ({softBounceRate.toFixed(2)}%)
             </span>
           </div>
         )}
