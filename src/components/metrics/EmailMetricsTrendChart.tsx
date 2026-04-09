@@ -21,6 +21,8 @@ interface EmailMetricsTrendChartProps {
     openRate: number;
     clickRate: number;
     bounceRate: number;
+    hardBounceRate?: number;
+    softBounceRate?: number;
     unsubRate: number;
   };
 }
@@ -98,7 +100,8 @@ const METRIC_CONFIG = {
   totalDelivered: { label: "Delivered", color: "#06b6d4", defaultVisible: false },
   uniqueViewed: { label: "Unique Opens", color: "hsl(var(--secondary))", defaultVisible: true },
   uniqueClicked: { label: "Unique Clicks", color: "#22c55e", defaultVisible: true },
-  hardBounces: { label: "Bounces", color: "#ef4444", defaultVisible: false },
+  hardBounces: { label: "Hard Bounce", color: "#ef4444", defaultVisible: false },
+  softBounces: { label: "Soft Bounce", color: "#f97316", defaultVisible: false },
   unsubscribes: { label: "Unsubscribes", color: "#8b5cf6", defaultVisible: false },
 };
 
@@ -113,6 +116,7 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     uniqueViewed: true,
     uniqueClicked: true,
     hardBounces: false,
+    softBounces: false,
     unsubscribes: false,
   });
 
@@ -123,12 +127,15 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
     const totalViewed = campaignData.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
     const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
-    const totalBounces = campaignData.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
+    const totalHardBounces = campaignData.reduce((s, c) => s + c.hardBounces, 0);
+    const totalSoftBounces = campaignData.reduce((s, c) => s + c.softBounces, 0);
     const totalUnsubs = campaignData.reduce((s, c) => s + c.totalUnsubscribes, 0);
     return {
       openRate: totalSent > 0 ? (totalViewed / totalSent) * 100 : 0,
       clickRate: totalSent > 0 ? (totalClicked / totalSent) * 100 : 0,
-      bounceRate: totalSent > 0 ? (totalBounces / totalSent) * 100 : 0,
+      bounceRate: totalSent > 0 ? ((totalHardBounces + totalSoftBounces) / totalSent) * 100 : 0,
+      hardBounceRate: totalSent > 0 ? (totalHardBounces / totalSent) * 100 : 0,
+      softBounceRate: totalSent > 0 ? (totalSoftBounces / totalSent) * 100 : 0,
       unsubRate: totalSent > 0 ? (totalUnsubs / totalSent) * 100 : 0,
     };
   }, [campaignData, grandTotalAverages]);
@@ -248,7 +255,8 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     const clickRate = calcRate(point.uniqueClicked, point.totalSent);
     const openTrend = calcTrendVsAvg(openRate, avgRates.openRate, point.totalSent);
     const clickTrend = calcTrendVsAvg(clickRate, avgRates.clickRate, point.totalSent);
-    const bounceRate = calcRate(point.hardBounces + point.softBounces, point.totalSent);
+    const hardBounceRate = calcRate(point.hardBounces, point.totalSent);
+    const softBounceRate = calcRate(point.softBounces, point.totalSent);
     const unsubRate = calcRate(point.unsubscribes, point.totalSent);
 
     const TrendIndicator = ({ trend }: { trend: ReturnType<typeof calcTrendVsAvg> }) => {
@@ -313,15 +321,28 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
           </div>
         </div>
 
-        {/* Bounce */}
-        {(point.hardBounces + point.softBounces) > 0 && (
+        {/* Hard Bounce */}
+        {point.hardBounces > 0 && (
           <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.hardBounces.color }} />
-              <span className="text-muted-foreground">Bounce</span>
+              <span className="text-muted-foreground">Hard Bounce</span>
             </div>
             <span className="font-medium">
-              {(point.hardBounces + point.softBounces).toLocaleString()} ({bounceRate.toFixed(2)}%)
+              {point.hardBounces.toLocaleString()} ({hardBounceRate.toFixed(2)}%)
+            </span>
+          </div>
+        )}
+
+        {/* Soft Bounce */}
+        {point.softBounces > 0 && (
+          <div className="flex items-center justify-between gap-4 py-1 border-b border-border/30">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: METRIC_CONFIG.softBounces.color }} />
+              <span className="text-muted-foreground">Soft Bounce</span>
+            </div>
+            <span className="font-medium">
+              {point.softBounces.toLocaleString()} ({softBounceRate.toFixed(2)}%)
             </span>
           </div>
         )}
@@ -381,7 +402,8 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
         <span>Grand Total Avg:</span>
         <span>Open Rate: <strong className="text-foreground">{avgRates.openRate.toFixed(1)}%</strong></span>
         <span>Click Rate: <strong className="text-foreground">{avgRates.clickRate.toFixed(1)}%</strong></span>
-        <span>Bounce Rate: <strong className="text-foreground">{avgRates.bounceRate.toFixed(2)}%</strong></span>
+        <span>Hard Bounce Rate: <strong className="text-foreground">{(avgRates.hardBounceRate || 0).toFixed(2)}%</strong></span>
+        <span>Soft Bounce Rate: <strong className="text-foreground">{(avgRates.softBounceRate || 0).toFixed(2)}%</strong></span>
         <span>Unsub Rate: <strong className="text-foreground">{avgRates.unsubRate.toFixed(2)}%</strong></span>
       </div>
 
@@ -421,7 +443,10 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
               <Line type="monotone" dataKey="uniqueClicked" name="Unique Clicks" stroke={METRIC_CONFIG.uniqueClicked.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.hardBounces && (
-              <Line type="monotone" dataKey="hardBounces" name="Bounces" stroke={METRIC_CONFIG.hardBounces.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="hardBounces" name="Hard Bounce" stroke={METRIC_CONFIG.hardBounces.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            )}
+            {visibleMetrics.softBounces && (
+              <Line type="monotone" dataKey="softBounces" name="Soft Bounce" stroke={METRIC_CONFIG.softBounces.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             )}
             {visibleMetrics.unsubscribes && (
               <Line type="monotone" dataKey="unsubscribes" name="Unsubscribes" stroke={METRIC_CONFIG.unsubscribes.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
