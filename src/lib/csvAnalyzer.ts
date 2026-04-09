@@ -745,6 +745,11 @@ export const parseCSV = (csvText: string): ValidationResult => {
       labels: getValue("labels") || "",
       openRate: baseForRates > 0 ? (uniqueViewed / baseForRates) * 100 : 0,
       clickRate: baseForRates > 0 ? (uniqueClicked / baseForRates) * 100 : 0,
+      uniqueCTR: (() => {
+        const csvCTR = getNumericValue("unique ctr");
+        if (csvCTR > 0) return csvCTR;
+        return uniqueViewed > 0 ? (uniqueClicked / uniqueViewed) * 100 : 0;
+      })(),
       unsubscribeRate: baseForRates > 0 ? (unsubscribes / baseForRates) * 100 : 0,
       hardBounceRate: totalSent > 0 ? (hardBounces / totalSent) * 100 : 0,
       softBounceRate: totalSent > 0 ? (softBounces / totalSent) * 100 : 0,
@@ -963,6 +968,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
         useDeliveredAsDenominator: true,
         viewPercent: 0,
         clickPercent: 0,
+        uniqueCTR: 0,
         unsubscribePercent: 0,
         hardBouncePercent: 0,
         softBouncePercent: 0,
@@ -989,6 +995,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     agg.useDeliveredAsDenominator = useDelivered;
     agg.viewPercent = denominator > 0 ? (agg.uniqueViewed / denominator) * 100 : 0;
     agg.clickPercent = denominator > 0 ? (agg.uniqueClicked / denominator) * 100 : 0;
+    agg.uniqueCTR = agg.uniqueViewed > 0 ? (agg.uniqueClicked / agg.uniqueViewed) * 100 : 0;
     agg.unsubscribePercent = denominator > 0 ? (agg.unsubscribes / denominator) * 100 : 0;
     agg.hardBouncePercent = denominator > 0 ? (agg.hardBounces / denominator) * 100 : 0;
     agg.softBouncePercent = denominator > 0 ? (agg.softBounces / denominator) * 100 : 0;
