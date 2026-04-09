@@ -218,6 +218,7 @@ export interface KeyLearning {
 export interface AnalysisReport {
   providerAggregates: ProviderAggregate[];
   monthlyOverview: MonthlyOverview[];
+  monthlyOverviewByProvider: MonthlyOverview[];
   bestCampaigns: TopCampaign[];
   worstCampaigns: TopCampaign[];
   bestSummary: string;
