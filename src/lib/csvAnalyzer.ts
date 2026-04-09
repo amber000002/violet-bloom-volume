@@ -1043,6 +1043,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
         useDeliveredAsDenominator: true,
         viewPercent: 0,
         clickPercent: 0,
+        uniqueCTR: 0,
         unsubscribePercent: 0,
         hardBouncePercent: 0,
         softBouncePercent: 0,
