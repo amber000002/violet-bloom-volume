@@ -1024,11 +1024,15 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
       monthName = monthResult.monthName;
       monthSortKey = monthResult.monthSortKey;
     }
+
+    const provider = row.providerName || row.serviceProvider || "Unknown";
+    const key = `${monthName}|${provider}`;
     
-    if (!monthMap[monthName]) {
-      monthMap[monthName] = {
+    if (!monthMap[key]) {
+      monthMap[key] = {
         month: monthName,
         monthSortKey,
+        provider,
         totalSentUsers: 0,
         totalDeliveredUsers: 0,
         uniqueSentUsers: 0,
@@ -1050,7 +1054,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
         softBouncePercent: 0,
       };
     }
-    const m = monthMap[monthName];
+    const m = monthMap[key];
     m.totalSentUsers += row.totalSentUsers;
     m.totalDeliveredUsers += row.totalDeliveredUsers;
     m.uniqueSentUsers += row.uniqueSentUsers;
