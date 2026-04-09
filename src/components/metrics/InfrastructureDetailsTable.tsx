@@ -70,109 +70,97 @@
    postmasterData,
  }) => {
    // Extract unique domains and IPs
-   const { domains, ips } = useMemo(() => {
-     const domainMap = new Map<string, DomainInfo>();
-     const ipMap = new Map<string, IPInfo>();
- 
-     // Extract domains from campaign data (from "Title" or any from address field)
-     // Using serviceProvider as the domain source since it often contains sender info
-     campaignData.forEach((row) => {
-       // Check various fields for domain info
-       const fromDomain = extractDomainFromEmail(row.title) || 
-                          extractDomainFromEmail(row.campaignName);
-       
-       if (row.serviceProvider) {
-         const existingDomain = domainMap.get(row.serviceProvider.toLowerCase());
-         if (!existingDomain) {
-           domainMap.set(row.serviceProvider.toLowerCase(), {
-             domain: row.serviceProvider,
-             source: "campaign",
-             serviceProvider: row.providerName || undefined,
-           });
-         }
-       }
-     });
- 
-     // Extract domains from postmaster data and get latest reputation
-     if (postmasterData && postmasterData.length > 0) {
-       // Sort by date to get latest
+    const { domains, ips } = useMemo(() => {
+      const domainMap = new Map<string, DomainInfo>();
+      const ipMap = new Map<string, IPInfo>();
+
+      // Collect unique provider names from campaign CSV
+      const providerNames = new Set<string>();
+      campaignData.forEach((row) => {
+        const name = (row.providerName || row.serviceProvider || "").trim();
+        if (name) providerNames.add(name);
+      });
+
+      // Process postmaster data for domains and IPs
+      if (postmasterData && postmasterData.length > 0) {
+        // Sort by date descending to find latest reputation per domain
         const sorted = [...postmasterData].sort((a, b) => {
-          // Parse "MMM D, YYYY" format for sorting
           const dateA = new Date(a.date);
           const dateB = new Date(b.date);
           return dateB.getTime() - dateA.getTime();
         });
- 
-       // Get latest reputation for each domain
-       const latestDomainRep = new Map<string, { reputation: string; date: string }>();
-       const latestIPRep = new Map<string, { reputation: string; date: string }>();
- 
-       sorted.forEach((row) => {
-         const domainKey = row.domain?.toLowerCase().trim();
-         if (domainKey && !latestDomainRep.has(domainKey)) {
-           latestDomainRep.set(domainKey, {
-             reputation: row.domainReputation,
-             date: row.date,
-           });
-         }
- 
-         // Get IP reputation
-         if (row.sampleIps && !latestIPRep.has(row.sampleIps)) {
-           latestIPRep.set(row.sampleIps, {
-             reputation: row.ipReputation,
-             date: row.date,
-           });
-         }
-       });
- 
-       // Add postmaster domains
-       postmasterData.forEach((row) => {
-         if (row.domain) {
-           const domainKey = row.domain.toLowerCase().trim();
-           const existing = domainMap.get(domainKey);
-           const latestRep = latestDomainRep.get(domainKey);
- 
-           if (existing) {
-             existing.source = "both";
-             existing.latestReputation = latestRep?.reputation;
-             existing.reputationDate = latestRep?.date;
-           } else {
-             domainMap.set(domainKey, {
-               domain: row.domain,
-               source: "postmaster",
-               latestReputation: latestRep?.reputation,
-               reputationDate: latestRep?.date,
-             });
-           }
-         }
- 
-         // Extract IPs
-         if (row.sampleIps) {
-           const ips = row.sampleIps.split(/[,;]/).map(ip => ip.trim()).filter(Boolean);
-           ips.forEach((ip) => {
-             const existing = ipMap.get(ip);
-             const latestRep = latestIPRep.get(row.sampleIps);
-             
-             if (existing) {
-               existing.count = Math.max(existing.count, row.ipCount || 1);
-             } else {
-               ipMap.set(ip, {
-                 ip,
-                 count: row.ipCount || 1,
-                 latestReputation: latestRep?.reputation,
-                 reputationDate: latestRep?.date,
-               });
-             }
-           });
-         }
-       });
-     }
- 
-     return {
-       domains: Array.from(domainMap.values()),
-       ips: Array.from(ipMap.values()),
-     };
-   }, [campaignData, postmasterData]);
+
+        const latestDomainRep = new Map<string, { reputation: string; date: string }>();
+        const latestIPRep = new Map<string, { reputation: string; date: string }>();
+
+        sorted.forEach((row) => {
+          const domainKey = row.domain?.toLowerCase().trim();
+          if (domainKey && !latestDomainRep.has(domainKey)) {
+            latestDomainRep.set(domainKey, {
+              reputation: row.domainReputation,
+              date: row.date,
+            });
+          }
+          if (row.sampleIps && !latestIPRep.has(row.sampleIps)) {
+            latestIPRep.set(row.sampleIps, {
+              reputation: row.ipReputation,
+              date: row.date,
+            });
+          }
+        });
+
+        // Build domain entries from postmaster data with latest reputation
+        latestDomainRep.forEach((rep, domainKey) => {
+          const originalRow = postmasterData.find(
+            (r) => r.domain?.toLowerCase().trim() === domainKey
+          );
+          domainMap.set(domainKey, {
+            domain: originalRow?.domain || domainKey,
+            source: "postmaster",
+            serviceProvider: Array.from(providerNames).join(", ") || undefined,
+            latestReputation: rep.reputation,
+            reputationDate: rep.date,
+          });
+        });
+
+        // Extract IPs
+        postmasterData.forEach((row) => {
+          if (row.sampleIps) {
+            const ipList = row.sampleIps.split(/[,;]/).map(ip => ip.trim()).filter(Boolean);
+            ipList.forEach((ip) => {
+              const existing = ipMap.get(ip);
+              const latestRep = latestIPRep.get(row.sampleIps);
+              if (existing) {
+                existing.count = Math.max(existing.count, row.ipCount || 1);
+              } else {
+                ipMap.set(ip, {
+                  ip,
+                  count: row.ipCount || 1,
+                  latestReputation: latestRep?.reputation,
+                  reputationDate: latestRep?.date,
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // If no postmaster data but we have campaign providers, show them
+      if (domainMap.size === 0 && providerNames.size > 0) {
+        providerNames.forEach((name) => {
+          domainMap.set(name.toLowerCase(), {
+            domain: "—",
+            source: "campaign",
+            serviceProvider: name,
+          });
+        });
+      }
+
+      return {
+        domains: Array.from(domainMap.values()),
+        ips: Array.from(ipMap.values()),
+      };
+    }, [campaignData, postmasterData]);
  
    if (domains.length === 0 && ips.length === 0) {
      return (
