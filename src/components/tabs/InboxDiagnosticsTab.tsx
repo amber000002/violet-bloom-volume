@@ -1380,63 +1380,92 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             isOpen={expandedSections.monthly}
             onToggle={() => toggleSection("monthly")}
           >
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Month</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Campaigns</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
-                    {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator && (
-                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Delivered</th>
-                    )}
-                    
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {diagnostics.analysisReport.monthlyOverview
-                    .filter((m) => {
-                      if (m.month !== "Unknown Date") return true;
-                      const eb = processingSummary?.exclusionBreakdown;
-                      const totalDateIssues = eb ? (eb.invalidStartDateFormat + eb.invalidStartDateCalendar + eb.missingStartDate) : 0;
-                      return totalDateIssues > 0;
-                    })
-                    .map((m, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
-                      <td className="py-2 px-3 font-medium">{m.month}</td>
-                      <td className="text-right py-2 px-3">{m.campaignCount}</td>
-                      <td className="text-right py-2 px-3">{formatNumber(m.totalSentUsers)}</td>
-                      {m.useDeliveredAsDenominator && (
-                        <td className="text-right py-2 px-3">{formatNumber(m.totalDeliveredUsers)}</td>
-                      )}
-                      
-                      <td className="text-right py-2 px-3">{formatNumber(m.uniqueViewed)}</td>
-                      <td className="text-right py-2 px-3"><ColoredPercent value={m.viewPercent} metricType="openRate" /></td>
-                      <td className="text-right py-2 px-3">{formatNumber(m.uniqueClicked)}</td>
-                      <td className="text-right py-2 px-3"><ColoredPercent value={m.clickPercent} metricType="clickRate" /></td>
-                      <td className="text-right py-2 px-3"><ColoredPercent value={m.uniqueCTR} metricType="clickRate" /></td>
-                      <td className="text-right py-2 px-3">{formatNumber(m.unsubscribes)}</td>
-                      <td className="text-right py-2 px-3"><ColoredPercent value={m.unsubscribePercent} metricType="unsubscribeRate" /></td>
-                      <td className="text-right py-2 px-3">{formatNumber(m.hardBounces)}</td>
-                      <td className="text-right py-2 px-3"><ColoredPercent value={m.hardBouncePercent} metricType="bounceRate" /></td>
-                      <td className="text-right py-2 px-3">{formatNumber(m.softBounces)}</td>
-                      <td className="text-right py-2 px-3"><ColoredPercent value={m.softBouncePercent} metricType="bounceRate" /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const allMonthly = diagnostics.analysisReport.monthlyOverview;
+              const uniqueProviders = [...new Set(allMonthly.map(m => m.provider))];
+              const showTabs = uniqueProviders.length > 1;
+              const activeProvider = monthlyProviderTab ?? uniqueProviders[0] ?? "";
+              const filteredMonthly = showTabs
+                ? allMonthly.filter(m => m.provider === activeProvider)
+                : allMonthly;
+
+              return (
+                <>
+                  {showTabs && (
+                    <div className="flex gap-2 mb-4 flex-wrap">
+                      {uniqueProviders.map(provider => (
+                        <button
+                          key={provider}
+                          onClick={() => setMonthlyProviderTab(provider)}
+                          className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+                            activeProvider === provider
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          }`}
+                        >
+                          {provider}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Month</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Campaigns</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                          {filteredMonthly[0]?.useDeliveredAsDenominator && (
+                            <th className="text-right py-2 px-3 font-medium text-muted-foreground">Delivered</th>
+                          )}
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard Bounce</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft Bounce</th>
+                          <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMonthly
+                          .filter((m) => {
+                            if (m.month !== "Unknown Date") return true;
+                            const eb = processingSummary?.exclusionBreakdown;
+                            const totalDateIssues = eb ? (eb.invalidStartDateFormat + eb.invalidStartDateCalendar + eb.missingStartDate) : 0;
+                            return totalDateIssues > 0;
+                          })
+                          .map((m, i) => (
+                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="py-2 px-3 font-medium">{m.month}</td>
+                            <td className="text-right py-2 px-3">{m.campaignCount}</td>
+                            <td className="text-right py-2 px-3">{formatNumber(m.totalSentUsers)}</td>
+                            {m.useDeliveredAsDenominator && (
+                              <td className="text-right py-2 px-3">{formatNumber(m.totalDeliveredUsers)}</td>
+                            )}
+                            <td className="text-right py-2 px-3">{formatNumber(m.uniqueViewed)}</td>
+                            <td className="text-right py-2 px-3"><ColoredPercent value={m.viewPercent} metricType="openRate" /></td>
+                            <td className="text-right py-2 px-3">{formatNumber(m.uniqueClicked)}</td>
+                            <td className="text-right py-2 px-3"><ColoredPercent value={m.clickPercent} metricType="clickRate" /></td>
+                            <td className="text-right py-2 px-3"><ColoredPercent value={m.uniqueCTR} metricType="clickRate" /></td>
+                            <td className="text-right py-2 px-3">{formatNumber(m.unsubscribes)}</td>
+                            <td className="text-right py-2 px-3"><ColoredPercent value={m.unsubscribePercent} metricType="unsubscribeRate" /></td>
+                            <td className="text-right py-2 px-3">{formatNumber(m.hardBounces)}</td>
+                            <td className="text-right py-2 px-3"><ColoredPercent value={m.hardBouncePercent} metricType="bounceRate" /></td>
+                            <td className="text-right py-2 px-3">{formatNumber(m.softBounces)}</td>
+                            <td className="text-right py-2 px-3"><ColoredPercent value={m.softBouncePercent} metricType="bounceRate" /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
             <p className="text-xs text-muted-foreground mt-3">
               * Dates parsed as DD/MM/YY or DD/MM/YYYY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
             </p>
