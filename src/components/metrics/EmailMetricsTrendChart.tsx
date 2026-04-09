@@ -21,6 +21,8 @@ interface EmailMetricsTrendChartProps {
     openRate: number;
     clickRate: number;
     bounceRate: number;
+    hardBounceRate?: number;
+    softBounceRate?: number;
     unsubRate: number;
   };
 }
