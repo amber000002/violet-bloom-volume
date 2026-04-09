@@ -125,12 +125,15 @@ export const EmailMetricsTrendChart: React.FC<EmailMetricsTrendChartProps> = ({
     const totalSent = campaignData.reduce((s, c) => s + c.totalSentUsers, 0);
     const totalViewed = campaignData.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
     const totalClicked = campaignData.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
-    const totalBounces = campaignData.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
+    const totalHardBounces = campaignData.reduce((s, c) => s + c.hardBounces, 0);
+    const totalSoftBounces = campaignData.reduce((s, c) => s + c.softBounces, 0);
     const totalUnsubs = campaignData.reduce((s, c) => s + c.totalUnsubscribes, 0);
     return {
       openRate: totalSent > 0 ? (totalViewed / totalSent) * 100 : 0,
       clickRate: totalSent > 0 ? (totalClicked / totalSent) * 100 : 0,
-      bounceRate: totalSent > 0 ? (totalBounces / totalSent) * 100 : 0,
+      bounceRate: totalSent > 0 ? ((totalHardBounces + totalSoftBounces) / totalSent) * 100 : 0,
+      hardBounceRate: totalSent > 0 ? (totalHardBounces / totalSent) * 100 : 0,
+      softBounceRate: totalSent > 0 ? (totalSoftBounces / totalSent) * 100 : 0,
       unsubRate: totalSent > 0 ? (totalUnsubs / totalSent) * 100 : 0,
     };
   }, [campaignData, grandTotalAverages]);
