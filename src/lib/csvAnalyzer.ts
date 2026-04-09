@@ -163,6 +163,7 @@ export interface ProviderAggregate {
 export interface MonthlyOverview {
   month: string;
   monthSortKey: string;
+  provider: string;
   totalSentUsers: number;
   totalDeliveredUsers: number;
   uniqueSentUsers: number;
@@ -217,6 +218,7 @@ export interface KeyLearning {
 export interface AnalysisReport {
   providerAggregates: ProviderAggregate[];
   monthlyOverview: MonthlyOverview[];
+  monthlyOverviewByProvider: MonthlyOverview[];
   bestCampaigns: TopCampaign[];
   worstCampaigns: TopCampaign[];
   bestSummary: string;
@@ -1006,6 +1008,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
   // Report 1b: Monthly Overview - dynamically groups campaigns by calendar month from Start Date
   // CRITICAL: Every row MUST be included - invalid dates go to "Unknown Date" bucket
   const monthMap: Record<string, MonthlyOverview> = {};
+  const monthProviderMap: Record<string, MonthlyOverview> = {};
   const monthParsingErrors: string[] = [];
   
   data.filter(row => row.totalSentUsers > 0).forEach(row => {
@@ -1023,43 +1026,61 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
       monthName = monthResult.monthName;
       monthSortKey = monthResult.monthSortKey;
     }
-    
+
+    const provider = row.providerName || row.serviceProvider || "Unknown";
+
+    // Aggregate by month only (for backward compatibility)
     if (!monthMap[monthName]) {
       monthMap[monthName] = {
         month: monthName,
         monthSortKey,
-        totalSentUsers: 0,
-        totalDeliveredUsers: 0,
-        uniqueSentUsers: 0,
-        uniqueViewed: 0,
-        uniqueClicked: 0,
-        conversions: 0,
-        unsubscribes: 0,
-        hardBounces: 0,
-        softBounces: 0,
-        campaignCount: 0,
-        openRate: 0,
-        clickRate: 0,
-        useDeliveredAsDenominator: true,
-        viewPercent: 0,
-        clickPercent: 0,
-        uniqueCTR: 0,
-        unsubscribePercent: 0,
-        hardBouncePercent: 0,
-        softBouncePercent: 0,
+        provider: "All",
+        totalSentUsers: 0, totalDeliveredUsers: 0, uniqueSentUsers: 0,
+        uniqueViewed: 0, uniqueClicked: 0, conversions: 0,
+        unsubscribes: 0, hardBounces: 0, softBounces: 0,
+        campaignCount: 0, openRate: 0, clickRate: 0,
+        useDeliveredAsDenominator: true, viewPercent: 0, clickPercent: 0,
+        uniqueCTR: 0, unsubscribePercent: 0, hardBouncePercent: 0, softBouncePercent: 0,
       };
     }
-    const m = monthMap[monthName];
-    m.totalSentUsers += row.totalSentUsers;
-    m.totalDeliveredUsers += row.totalDeliveredUsers;
-    m.uniqueSentUsers += row.uniqueSentUsers;
-    m.uniqueViewed += row.uniqueViewedWithinConversion;
-    m.uniqueClicked += row.uniqueClickedWithinConversion;
-    m.conversions += row.clickThroughConversions;
-    m.unsubscribes += row.totalUnsubscribes;
-    m.hardBounces += row.hardBounces;
-    m.softBounces += row.softBounces;
-    m.campaignCount++;
+    const ma = monthMap[monthName];
+    ma.totalSentUsers += row.totalSentUsers;
+    ma.totalDeliveredUsers += row.totalDeliveredUsers;
+    ma.uniqueSentUsers += row.uniqueSentUsers;
+    ma.uniqueViewed += row.uniqueViewedWithinConversion;
+    ma.uniqueClicked += row.uniqueClickedWithinConversion;
+    ma.conversions += row.clickThroughConversions;
+    ma.unsubscribes += row.totalUnsubscribes;
+    ma.hardBounces += row.hardBounces;
+    ma.softBounces += row.softBounces;
+    ma.campaignCount++;
+
+    // Aggregate by month + provider (for provider toggle)
+    const provKey = `${monthName}|${provider}`;
+    if (!monthProviderMap[provKey]) {
+      monthProviderMap[provKey] = {
+        month: monthName,
+        monthSortKey,
+        provider,
+        totalSentUsers: 0, totalDeliveredUsers: 0, uniqueSentUsers: 0,
+        uniqueViewed: 0, uniqueClicked: 0, conversions: 0,
+        unsubscribes: 0, hardBounces: 0, softBounces: 0,
+        campaignCount: 0, openRate: 0, clickRate: 0,
+        useDeliveredAsDenominator: true, viewPercent: 0, clickPercent: 0,
+        uniqueCTR: 0, unsubscribePercent: 0, hardBouncePercent: 0, softBouncePercent: 0,
+      };
+    }
+    const mp = monthProviderMap[provKey];
+    mp.totalSentUsers += row.totalSentUsers;
+    mp.totalDeliveredUsers += row.totalDeliveredUsers;
+    mp.uniqueSentUsers += row.uniqueSentUsers;
+    mp.uniqueViewed += row.uniqueViewedWithinConversion;
+    mp.uniqueClicked += row.uniqueClickedWithinConversion;
+    mp.conversions += row.clickThroughConversions;
+    mp.unsubscribes += row.totalUnsubscribes;
+    mp.hardBounces += row.hardBounces;
+    mp.softBounces += row.softBounces;
+    mp.campaignCount++;
   });
 
   // Log parsing errors if any occurred (for debugging)
@@ -1067,22 +1088,27 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     console.warn(`[Monthly Overview] Date parsing errors (${monthParsingErrors.length} rows skipped):`, monthParsingErrors.slice(0, 5));
   }
 
+  const computeMonthlyPercents = (m: MonthlyOverview): MonthlyOverview => {
+    const useDelivered = m.totalDeliveredUsers > 0;
+    const denominator = useDelivered ? m.totalDeliveredUsers : m.totalSentUsers;
+    m.useDeliveredAsDenominator = useDelivered;
+    m.openRate = denominator > 0 ? (m.uniqueViewed / denominator) * 100 : 0;
+    m.clickRate = denominator > 0 ? (m.uniqueClicked / denominator) * 100 : 0;
+    m.viewPercent = m.openRate;
+    m.clickPercent = m.clickRate;
+    m.uniqueCTR = m.uniqueViewed > 0 ? (m.uniqueClicked / m.uniqueViewed) * 100 : 0;
+    m.unsubscribePercent = denominator > 0 ? (m.unsubscribes / denominator) * 100 : 0;
+    m.hardBouncePercent = denominator > 0 ? (m.hardBounces / denominator) * 100 : 0;
+    m.softBouncePercent = denominator > 0 ? (m.softBounces / denominator) * 100 : 0;
+    return m;
+  };
+
   const monthlyOverview = Object.values(monthMap)
-    .map(m => {
-      const useDelivered = m.totalDeliveredUsers > 0;
-      const denominator = useDelivered ? m.totalDeliveredUsers : m.totalSentUsers;
-      
-      m.useDeliveredAsDenominator = useDelivered;
-      m.openRate = denominator > 0 ? (m.uniqueViewed / denominator) * 100 : 0;
-      m.clickRate = denominator > 0 ? (m.uniqueClicked / denominator) * 100 : 0;
-      m.viewPercent = m.openRate;
-      m.clickPercent = m.clickRate;
-      m.uniqueCTR = m.uniqueViewed > 0 ? (m.uniqueClicked / m.uniqueViewed) * 100 : 0;
-      m.unsubscribePercent = denominator > 0 ? (m.unsubscribes / denominator) * 100 : 0;
-      m.hardBouncePercent = denominator > 0 ? (m.hardBounces / denominator) * 100 : 0;
-      m.softBouncePercent = denominator > 0 ? (m.softBounces / denominator) * 100 : 0;
-      return m;
-    })
+    .map(computeMonthlyPercents)
+    .sort((a, b) => a.monthSortKey.localeCompare(b.monthSortKey));
+
+  const monthlyOverviewByProvider = Object.values(monthProviderMap)
+    .map(computeMonthlyPercents)
     .sort((a, b) => a.monthSortKey.localeCompare(b.monthSortKey));
 
   // ============= DETERMINISTIC CAMPAIGN RANKING =============
@@ -1168,6 +1194,7 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
   return {
     providerAggregates,
     monthlyOverview,
+    monthlyOverviewByProvider,
     bestCampaigns,
     worstCampaigns,
     bestSummary,
