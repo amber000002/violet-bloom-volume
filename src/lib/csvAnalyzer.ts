@@ -163,6 +163,7 @@ export interface ProviderAggregate {
 export interface MonthlyOverview {
   month: string;
   monthSortKey: string;
+  provider: string;
   totalSentUsers: number;
   totalDeliveredUsers: number;
   uniqueSentUsers: number;
