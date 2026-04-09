@@ -98,7 +98,9 @@ interface DomainInfo {
               date: row.date,
             });
           }
-          if (row.sampleIps && !latestIPRep.has(row.sampleIps)) {
+          const ipRep = row.ipReputation?.trim().toLowerCase();
+          const isValidIpRep = ipRep && ipRep !== "" && ipRep !== "n/a";
+          if (row.sampleIps && isValidIpRep && !latestIPRep.has(row.sampleIps)) {
             latestIPRep.set(row.sampleIps, {
               reputation: row.ipReputation,
               date: row.date,
