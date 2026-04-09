@@ -1381,13 +1381,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             onToggle={() => toggleSection("monthly")}
           >
             {(() => {
-              const allMonthly = diagnostics.analysisReport.monthlyOverview;
-              const uniqueProviders = [...new Set(allMonthly.map(m => m.provider))];
+              const byProvider = diagnostics.analysisReport.monthlyOverviewByProvider;
+              const uniqueProviders = [...new Set(byProvider.map(m => m.provider))];
               const showTabs = uniqueProviders.length > 1;
               const activeProvider = monthlyProviderTab ?? uniqueProviders[0] ?? "";
+              // When single provider, use aggregated monthlyOverview; when multiple, filter by provider
               const filteredMonthly = showTabs
-                ? allMonthly.filter(m => m.provider === activeProvider)
-                : allMonthly;
+                ? byProvider.filter(m => m.provider === activeProvider)
+                : diagnostics.analysisReport.monthlyOverview;
 
               return (
                 <>
