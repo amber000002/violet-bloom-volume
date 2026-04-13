@@ -410,13 +410,30 @@ const ColoredPercent: React.FC<{ value: number; metricType: MetricType }> = ({ v
   );
 };
 
-// Section Insight Banner — renders a concise data-backed insight below each section
-const SectionInsightBanner: React.FC<{ insight: string | null }> = ({ insight }) => {
-  if (!insight) return null;
+// Section Insights Block — renders severity-classified, source-attributed insights below each section
+const SEVERITY_STYLES: Record<InsightSeverity, { border: string; icon: string }> = {
+  critical: { border: "border-l-red-500", icon: "🔴" },
+  warning: { border: "border-l-amber-500", icon: "🟡" },
+  info: { border: "border-l-blue-500", icon: "🔵" },
+  positive: { border: "border-l-green-500", icon: "🟢" },
+};
+
+const SectionInsightsBlock: React.FC<{ insights: TableInsight[] | null }> = ({ insights }) => {
+  if (!insights || insights.length === 0) return null;
   return (
-    <div className="mt-3 flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
-      <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-      <p className="text-sm text-foreground/80 leading-relaxed">{insight}</p>
+    <div className="mt-3 space-y-1.5">
+      {insights.map((insight, i) => {
+        const style = SEVERITY_STYLES[insight.severity];
+        return (
+          <div key={i} className={`border-l-4 ${style.border} pl-3 py-1.5 bg-muted/30 rounded-r-md`}>
+            <p className="text-xs text-foreground/80 leading-relaxed">
+              <span className="mr-1.5">{style.icon}</span>
+              {insight.text}
+            </p>
+            <p className="text-[10px] text-muted-foreground italic mt-0.5">Source: {insight.source}</p>
+          </div>
+        );
+      })}
     </div>
   );
 };
