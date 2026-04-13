@@ -15,6 +15,13 @@ import { PostmasterRow } from "@/lib/csvAnalyzer";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle, TrendingUp } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ReputationTrendChartProps {
   postmasterData: PostmasterRow[];
@@ -32,6 +39,7 @@ export interface ThresholdBreach {
 interface ChartDataPoint {
   date: string;
   dateObj: Date;
+  domain: string;
   ipReputation: number;
   domainReputation: number;
   spamRatio: number;
@@ -81,27 +89,20 @@ const MONTH_MAP: Record<string, number> = {
 const parseReputationDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
   const trimmed = dateStr.trim();
-
-  // Match "MMM D, YYYY" or "MMM DD, YYYY"
   const match = trimmed.match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
   if (!match) return null;
-
   const monthIndex = MONTH_MAP[match[1]];
   if (monthIndex === undefined) return null;
-
   const day = parseInt(match[2], 10);
   const year = parseInt(match[3], 10);
-
   const date = new Date(year, monthIndex, day);
   if (isNaN(date.getTime())) return null;
-
   return date;
 };
 
 const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreach[] => {
   const breaches: ThresholdBreach[] = [];
   
-  // Spam Ratio > 0.1%
   if (point.spamRatio > THRESHOLDS.spamRatio) {
     breaches.push({
       date: point.date,
@@ -112,7 +113,6 @@ const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreac
     });
   }
   
-  // Error Ratio > 0%
   if (point.errorRatio > THRESHOLDS.errorRatio) {
     breaches.push({
       date: point.date,
@@ -123,7 +123,6 @@ const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreac
     });
   }
   
-  // IP Reputation below Medium
   if (point.ipReputation !== null && point.ipReputation < THRESHOLDS.ipReputation) {
     breaches.push({
       date: point.date,
@@ -134,7 +133,6 @@ const detectBreaches = (point: Omit<ChartDataPoint, "breaches">): ThresholdBreac
     });
   }
   
-  // Domain Reputation below Medium
   if (point.domainReputation !== null && point.domainReputation < THRESHOLDS.domainReputation) {
     breaches.push({
       date: point.date,
@@ -158,10 +156,25 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
     spamRatio: true,
     errorRatio: true,
   });
+  const [selectedDomain, setSelectedDomain] = useState<string>("all");
 
-  // Process and sort data chronologically
+  // Extract unique domains
+  const uniqueDomains = React.useMemo(() => {
+    const domains = new Set<string>();
+    postmasterData.forEach((row) => {
+      const d = row.domain?.trim();
+      if (d) domains.add(d);
+    });
+    return Array.from(domains).sort();
+  }, [postmasterData]);
+
+  // Process and sort data chronologically, filtered by domain
   const chartData: ChartDataPoint[] = React.useMemo(() => {
-    const processed = postmasterData
+    const filtered = selectedDomain === "all"
+      ? postmasterData
+      : postmasterData.filter((row) => row.domain?.trim() === selectedDomain);
+
+    const processed = filtered
       .map((row) => {
         const dateObj = parseReputationDate(row.date);
         if (!dateObj) return null;
@@ -169,12 +182,12 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
         const ipRep = reputationToNumber(row.ipReputation);
         const domainRep = reputationToNumber(row.domainReputation);
         
-        // Exclude rows with invalid reputation values
         if (ipRep === null || domainRep === null) return null;
         
         const point = {
           date: row.date,
           dateObj,
+          domain: row.domain?.trim() || "",
           ipReputation: ipRep,
           domainReputation: domainRep,
           spamRatio: row.spamRatio || 0,
@@ -190,20 +203,18 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
       .filter((p): p is ChartDataPoint => p !== null)
       .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
     
-    // Notify parent of all breaches
     const allBreaches = processed.flatMap((p) => p.breaches);
     if (allBreaches.length > 0 && onBreachDetected) {
       onBreachDetected(allBreaches);
     }
     
     return processed;
-  }, [postmasterData, onBreachDetected]);
+  }, [postmasterData, onBreachDetected, selectedDomain]);
 
   const toggleMetric = (metric: keyof typeof visibleMetrics) => {
     setVisibleMetrics((prev) => ({ ...prev, [metric]: !prev[metric] }));
   };
 
-  // Check if there are any breaches to highlight
   const hasBreaches = chartData.some((d) => d.breaches.length > 0);
 
   if (chartData.length === 0) {
@@ -214,7 +225,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
     );
   }
 
-  // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
     
@@ -223,6 +233,9 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
     return (
       <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-xs">
         <p className="font-medium mb-2">{label}</p>
+        {point?.domain && (
+          <p className="text-muted-foreground mb-1 text-[10px]">{point.domain}</p>
+        )}
         {payload.map((entry: any, i: number) => (
           <div key={i} className="flex items-center gap-2 py-0.5">
             <div
@@ -260,8 +273,24 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
-      {/* Metric Toggles */}
-      <div className="flex flex-wrap gap-4">
+      {/* Domain Filter + Metric Toggles */}
+      <div className="flex flex-wrap items-center gap-4">
+        {uniqueDomains.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Domain:</Label>
+            <Select value={selectedDomain} onValueChange={setSelectedDomain}>
+              <SelectTrigger className="w-[200px] h-8 text-sm">
+                <SelectValue placeholder="All Domains" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Domains</SelectItem>
+                {uniqueDomains.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {[
           { key: "ipReputation", label: "IP Reputation", color: "hsl(var(--primary))" },
           { key: "domainReputation", label: "Domain Reputation", color: "hsl(var(--secondary))" },
@@ -312,7 +341,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
               className="fill-muted-foreground"
             />
             
-            {/* Left Y-axis for Reputation (1-4 scale) */}
             <YAxis
               yAxisId="reputation"
               domain={[0, 4]}
@@ -323,7 +351,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
               width={60}
             />
             
-            {/* Right Y-axis for Ratios (percentage) */}
             <YAxis
               yAxisId="ratio"
               orientation="right"
@@ -336,7 +363,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
             
             <Tooltip content={<CustomTooltip />} />
             
-            {/* Reference lines for thresholds */}
             <ReferenceLine
               yAxisId="reputation"
               y={2}
@@ -352,7 +378,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
               label={{ value: "0.1%", position: "right", fontSize: 10 }}
             />
             
-            {/* IP Reputation Line */}
             {visibleMetrics.ipReputation && (
               <Line
                 yAxisId="reputation"
@@ -377,7 +402,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
               />
             )}
             
-            {/* Domain Reputation Line */}
             {visibleMetrics.domainReputation && (
               <Line
                 yAxisId="reputation"
@@ -402,7 +426,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
               />
             )}
             
-            {/* Spam Ratio Line */}
             {visibleMetrics.spamRatio && (
               <Line
                 yAxisId="ratio"
@@ -427,7 +450,6 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
               />
             )}
             
-            {/* Error Ratio Line */}
             {visibleMetrics.errorRatio && (
               <Line
                 yAxisId="ratio"
