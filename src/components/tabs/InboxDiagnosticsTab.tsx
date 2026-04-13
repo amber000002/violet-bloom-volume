@@ -1387,7 +1387,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <p className="text-xs text-muted-foreground mt-3">
               * Percentages calculated using {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator
             </p>
-            <SectionInsightBanner insight={sectionInsights?.campaignOverview ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.campaignOverview ?? null} />
           </CollapsibleSection>
 
           {/* Report 1b: Monthly Overview with correct date parsing */}
@@ -1487,7 +1487,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <p className="text-xs text-muted-foreground mt-3">
               * Dates parsed as DD/MM/YY or DD/MM/YYYY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
             </p>
-            <SectionInsightBanner insight={sectionInsights?.monthlyOverview ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.monthlyOverview ?? null} />
           </CollapsibleSection>
 
           {/* ============= EMAIL METRICS TREND CHART ============= */}
@@ -1511,7 +1511,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <div ref={emailMetricsRef}>
               <EmailMetricsTrendChart campaignData={diagnostics.rawData} />
             </div>
-            <SectionInsightBanner insight={sectionInsights?.emailMetricsTrend ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.emailMetricsTrend ?? null} />
           </CollapsibleSection>
 
           {/* ============= INFRASTRUCTURE DETAILS ============= */}
@@ -1525,7 +1525,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               campaignData={diagnostics.rawData}
               postmasterData={postmasterData}
             />
-            <SectionInsightBanner insight={sectionInsights?.infrastructureReputation ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.infrastructureReputation ?? null} />
           </CollapsibleSection>
 
           {/* ============= REPUTATION TRENDS (SMALL MULTIPLES) ============= */}
@@ -1552,7 +1552,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 campaignData={diagnostics.rawData}
               />
             </div>
-            <SectionInsightBanner insight={sectionInsights?.reputationTrends ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.reputationTrends ?? null} />
           </CollapsibleSection>
 
           {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
@@ -1664,7 +1664,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
-            <SectionInsightBanner insight={sectionInsights?.bestPerformingCTR ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.bestPerformingCTR ?? null} />
           </CollapsibleSection>
 
           {/* ============= UNDER-PERFORMING CAMPAIGNS ============= */}
@@ -1776,7 +1776,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
-            <SectionInsightBanner insight={sectionInsights?.underperformingCTR ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.underperformingCTR ?? null} />
           </CollapsibleSection>
 
           {/* ============= CREATIVE & CONTENT EFFECTIVENESS ANALYZER ============= */}
@@ -1969,7 +1969,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </div>
               );
             })()}
-            <SectionInsightBanner insight={sectionInsights?.keyLearnings ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.keyLearnings ?? null} />
           </CollapsibleSection>
         </motion.div>
       )}
