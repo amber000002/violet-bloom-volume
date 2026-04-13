@@ -1,28 +1,61 @@
-// ============= SECTION-WISE INSIGHT GENERATION ENGINE =============
-// Generates concise, data-backed 1-2 line insights for each Inbox Diagnostics section.
-// Prioritizes CTR-driven observations. No generic statements.
+// ============= PER-TABLE INSIGHT ENGINE =============
+// Generates severity-classified, source-attributed insights for each Inbox Diagnostics section.
+// All thresholds grounded in CleverTap email best practices documentation.
+// Max 4 insights per section. Order: Critical → Warning → Info → Positive.
 
 import { CampaignRow, PostmasterRow, AnalysisReport } from "./csvAnalyzer";
 import { ExtendedInsightsData } from "./strategicInsightsExtendedEngine";
 
-export interface SectionInsights {
-  campaignOverview: string | null;
-  monthlyOverview: string | null;
-  emailMetricsTrend: string | null;
-  infrastructureReputation: string | null;
-  reputationTrends: string | null;
-  rootCauseSummary: string | null;
-  bestPerformingCTR: string | null;
-  underperformingCTR: string | null;
-  sendMixCoverage: string | null;
-  lifecycleCoverage: string | null;
-  keyLearnings: string | null;
+// ============= TYPES =============
+
+export type InsightSeverity = "critical" | "warning" | "info" | "positive";
+
+export interface TableInsight {
+  severity: InsightSeverity;
+  text: string;
+  source: string;
 }
 
-const fmt = (n: number, d = 2) => n.toFixed(d);
-const fmtK = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toFixed(0);
+export interface SectionInsights {
+  campaignOverview: TableInsight[];
+  monthlyOverview: TableInsight[];
+  emailMetricsTrend: TableInsight[];
+  infrastructureReputation: TableInsight[];
+  reputationTrends: TableInsight[];
+  bestPerformingCTR: TableInsight[];
+  underperformingCTR: TableInsight[];
+  sendMixCoverage: TableInsight[];
+  lifecycleCoverage: TableInsight[];
+  keyLearnings: TableInsight[];
+}
 
+// ============= HELPERS =============
+
+const fmt = (n: number, d = 2) => n.toFixed(d);
+const fmtK = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toFixed(0);
 const MIN_VOLUME = 1000;
+
+const SEVERITY_ORDER: Record<InsightSeverity, number> = { critical: 0, warning: 1, info: 2, positive: 3 };
+
+function sortAndCap(insights: TableInsight[], max = 4): TableInsight[] {
+  return insights
+    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+    .slice(0, max);
+}
+
+function parseDateDDMM(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const parts = dateStr.split("/");
+  if (parts.length < 3) return null;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  let year = parseInt(parts[2], 10);
+  if (year < 100) year += 2000;
+  const d = new Date(year, month, day);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// ============= MAIN GENERATOR =============
 
 export function generateSectionInsights(
   campaignData: CampaignRow[],
@@ -33,306 +66,584 @@ export function generateSectionInsights(
 ): SectionInsights {
   const sig = campaignData.filter(c => c.totalSentUsers >= MIN_VOLUME);
   const totalSent = sig.reduce((s, c) => s + c.totalSentUsers, 0);
+  const totalBounce = sig.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
+  const totalHardBounce = sig.reduce((s, c) => s + c.hardBounces, 0);
+  const totalUnsub = sig.reduce((s, c) => s + c.totalUnsubscribes, 0);
   const totalClicked = sig.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0);
   const totalViewed = sig.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0);
+  const bounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
+  const hardBounceRate = totalSent > 0 ? (totalHardBounce / totalSent) * 100 : 0;
+  const unsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
   const avgCTR = totalSent > 0 ? (totalClicked / totalSent) * 100 : 0;
   const avgOpen = totalSent > 0 ? (totalViewed / totalSent) * 100 : 0;
 
   return {
-    campaignOverview: generateCampaignOverviewInsight(analysisReport, avgCTR),
-    monthlyOverview: generateMonthlyOverviewInsight(analysisReport),
-    emailMetricsTrend: generateEmailMetricsTrendInsight(sig, avgCTR),
-    infrastructureReputation: generateInfrastructureInsight(postmasterData, avgCTR),
-    reputationTrends: generateReputationTrendsInsight(postmasterData),
-    rootCauseSummary: generateRootCauseInsight(sig, postmasterData),
-    bestPerformingCTR: generateBestCTRInsight(analysisReport, sig),
-    underperformingCTR: generateUnderperformingCTRInsight(analysisReport, sig),
-    sendMixCoverage: generateSendMixInsight(extendedData),
-    lifecycleCoverage: generateLifecycleCoverageInsight(lifecycleCoverageStats),
-    keyLearnings: generateKeyLearningsInsight(avgCTR, avgOpen, postmasterData, lifecycleCoverageStats),
+    campaignOverview: generateCampaignOverviewInsights(analysisReport, bounceRate, hardBounceRate, unsubRate),
+    monthlyOverview: generateMonthlyOverviewInsights(analysisReport, sig),
+    emailMetricsTrend: generateEmailMetricsTrendInsights(sig, bounceRate, avgCTR),
+    infrastructureReputation: generateInfrastructureInsights(postmasterData),
+    reputationTrends: generateReputationTrendsInsights(postmasterData),
+    bestPerformingCTR: generateBestCTRInsights(sig),
+    underperformingCTR: generateUnderperformingCTRInsights(sig),
+    sendMixCoverage: generateSendMixInsights(extendedData),
+    lifecycleCoverage: generateLifecycleCoverageInsights(lifecycleCoverageStats),
+    keyLearnings: generateKeyLearningsInsights(avgCTR, avgOpen, bounceRate, hardBounceRate, unsubRate, postmasterData, lifecycleCoverageStats),
   };
 }
 
-// === Campaign Overview (by Provider) ===
-function generateCampaignOverviewInsight(report: AnalysisReport, avgCTR: number): string | null {
+// ============= CAMPAIGN OVERVIEW (by Provider) =============
+
+function generateCampaignOverviewInsights(
+  report: AnalysisReport,
+  bounceRate: number,
+  hardBounceRate: number,
+  unsubRate: number,
+): TableInsight[] {
+  const insights: TableInsight[] = [];
   const providers = report.providerAggregates;
-  if (providers.length === 0) return null;
 
-  // Find provider with highest volume
-  const topByVolume = [...providers].sort((a, b) => b.totalSentUsers - a.totalSentUsers)[0];
-  const topByClick = [...providers].sort((a, b) => b.clickPercent - a.clickPercent)[0];
-
-  if (topByVolume && topByClick && topByVolume.serviceProvider !== topByClick.serviceProvider) {
-    return `${topByVolume.serviceProvider} dominates volume (${fmtK(topByVolume.totalSentUsers)} sent) but ${topByClick.serviceProvider} leads CTR at ${fmt(topByClick.clickPercent)}%, indicating a volume-engagement imbalance across providers.`;
+  // Hard bounce > 2% is critical — indicates unverified lists (IP Warmup doc: verify lists)
+  if (hardBounceRate > 2) {
+    insights.push({
+      severity: "critical",
+      text: `Hard bounce rate at ${fmt(hardBounceRate)}% — exceeds safe threshold. Verify and clean email lists before sending to protect sender reputation.`,
+      source: "IP Warmup",
+    });
+  } else if (bounceRate > 5) {
+    insights.push({
+      severity: "warning",
+      text: `Total bounce rate at ${fmt(bounceRate)}% — elevated levels suggest list hygiene issues. Regular list cleaning is recommended.`,
+      source: "Email Best Practices",
+    });
   }
 
-  if (topByVolume && topByVolume.clickPercent < avgCTR * 0.8) {
-    return `${topByVolume.serviceProvider} accounts for the highest send volume but its CTR (${fmt(topByVolume.clickPercent)}%) trails the program average (${fmt(avgCTR)}%), dragging overall engagement.`;
+  // Unsubscribe rate > 0.5% is a warning signal
+  if (unsubRate > 0.5) {
+    insights.push({
+      severity: "warning",
+      text: `Unsubscribe rate at ${fmt(unsubRate)}% — indicates potential content-audience mismatch or over-frequency. Review audience selection and engagement windows.`,
+      source: "Email Best Practices — Audience Selection",
+    });
   }
 
-  if (providers.length === 1) {
-    return `All volume concentrated through ${topByVolume.serviceProvider} with a ${fmt(topByVolume.clickPercent)}% CTR — single-provider dependency limits benchmarking against alternatives.`;
+  // Volume concentration: single provider > 90%
+  if (providers.length > 1) {
+    const total = providers.reduce((s, p) => s + p.totalSentUsers, 0);
+    const top = [...providers].sort((a, b) => b.totalSentUsers - a.totalSentUsers)[0];
+    if (top && total > 0 && (top.totalSentUsers / total) * 100 > 90) {
+      insights.push({
+        severity: "info",
+        text: `${top.serviceProvider} carries ${fmt((top.totalSentUsers / total) * 100, 0)}% of send volume — consider separating promotional and transactional sends across dedicated subdomains.`,
+        source: "IP Warmup",
+      });
+    }
   }
 
-  return `${providers.length} providers active with a blended CTR of ${fmt(avgCTR)}%. ${topByVolume.serviceProvider} carries the most volume at ${fmtK(topByVolume.totalSentUsers)} sent.`;
+  // Positive: low bounce + low unsub
+  if (hardBounceRate < 1 && unsubRate < 0.2) {
+    insights.push({
+      severity: "positive",
+      text: `Bounce rate (${fmt(hardBounceRate)}%) and unsubscribe rate (${fmt(unsubRate)}%) are within healthy thresholds — list quality is strong.`,
+      source: "Email Best Practices",
+    });
+  }
+
+  return sortAndCap(insights);
 }
 
-// === Monthly Overview ===
-function generateMonthlyOverviewInsight(report: AnalysisReport): string | null {
+// ============= MONTHLY OVERVIEW =============
+
+function generateMonthlyOverviewInsights(report: AnalysisReport, sig: CampaignRow[]): TableInsight[] {
+  const insights: TableInsight[] = [];
   const months = report.monthlyOverview.filter(m => m.month !== "Unknown Date");
-  if (months.length < 2) return months.length === 1 ? `Single-month data (${months[0].month}): ${fmt(months[0].clickPercent)}% CTR across ${fmtK(months[0].totalSentUsers)} sends.` : null;
+  if (months.length < 1) return [];
 
-  const first = months[0];
-  const last = months[months.length - 1];
-  const ctrDelta = last.clickPercent - first.clickPercent;
-  const volDelta = last.totalSentUsers - first.totalSentUsers;
-
-  if (Math.abs(ctrDelta) < 0.3 && Math.abs(volDelta) < first.totalSentUsers * 0.1) {
-    return `CTR remained stable at ~${fmt(last.clickPercent)}% across ${months.length} months with consistent volume, suggesting program maturity but limited optimization experimentation.`;
+  // Detect 30+ day send gaps (Email Best Practices — Sending Volume)
+  const dates = sig.map(c => parseDateDDMM(c.startDate)).filter(Boolean) as Date[];
+  dates.sort((a, b) => a.getTime() - b.getTime());
+  let maxGapDays = 0;
+  let gapStart = "";
+  let gapEnd = "";
+  for (let i = 1; i < dates.length; i++) {
+    const gap = (dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24);
+    if (gap > maxGapDays) {
+      maxGapDays = gap;
+      gapStart = dates[i - 1].toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      gapEnd = dates[i].toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    }
   }
 
-  if (ctrDelta > 0.5 && volDelta > 0) {
-    return `CTR improved from ${fmt(first.clickPercent)}% to ${fmt(last.clickPercent)}% while volume grew ${fmtK(first.totalSentUsers)}→${fmtK(last.totalSentUsers)}, indicating scalable engagement growth.`;
+  if (maxGapDays > 30) {
+    insights.push({
+      severity: maxGapDays > 60 ? "critical" : "warning",
+      text: `Send gap of ${Math.round(maxGapDays)} days detected between ${gapStart} and ${gapEnd} — ISPs re-evaluate sender reputation after 30 days of inactivity. Resume sending gradually.`,
+      source: "Email Best Practices — Sending Volume",
+    });
   }
 
-  if (ctrDelta < -0.5 && volDelta > 0) {
-    return `Volume increased from ${fmtK(first.totalSentUsers)} to ${fmtK(last.totalSentUsers)} but CTR declined ${fmt(first.clickPercent)}%→${fmt(last.clickPercent)}%, suggesting content relevance degradation at scale.`;
+  // Volume surge detection (IP Warmup violation)
+  if (months.length >= 2) {
+    for (let i = 1; i < months.length; i++) {
+      const prev = months[i - 1].totalSentUsers;
+      const curr = months[i].totalSentUsers;
+      if (prev > 0 && curr > prev * 3) {
+        insights.push({
+          severity: "warning",
+          text: `Volume surged ${fmt((curr / prev), 1)}x from ${months[i - 1].month} to ${months[i].month} (${fmtK(prev)}→${fmtK(curr)}) — rapid increases risk reputation drops. Follow a gradual warmup schedule.`,
+          source: "IP Warmup",
+        });
+        break;
+      }
+    }
   }
 
-  if (ctrDelta < -0.5) {
-    return `CTR declined from ${fmt(first.clickPercent)}% (${first.month}) to ${fmt(last.clickPercent)}% (${last.month}), a ${fmt(Math.abs(ctrDelta))}pp drop indicating deteriorating content engagement.`;
+  // CTR trend (first vs last month)
+  if (months.length >= 2) {
+    const first = months[0];
+    const last = months[months.length - 1];
+    const ctrDelta = last.clickPercent - first.clickPercent;
+    if (ctrDelta < -1) {
+      insights.push({
+        severity: "warning",
+        text: `CTR declined ${fmt(Math.abs(ctrDelta))}pp from ${first.month} to ${last.month} — review content relevance and audience engagement windows.`,
+        source: "Email Best Practices — Campaign Results",
+      });
+    } else if (ctrDelta > 1) {
+      insights.push({
+        severity: "positive",
+        text: `CTR improved by ${fmt(ctrDelta)}pp from ${first.month} to ${last.month} — engagement strategy is trending positively.`,
+        source: "Email Best Practices — Campaign Results",
+      });
+    }
   }
 
-  return `CTR shifted ${ctrDelta > 0 ? '+' : ''}${fmt(ctrDelta)}pp from ${first.month} to ${last.month} (${fmt(first.clickPercent)}%→${fmt(last.clickPercent)}%) across ${fmtK(last.totalSentUsers)} sends.`;
+  // Positive: no gaps
+  if (maxGapDays <= 30 && months.length >= 3) {
+    insights.push({
+      severity: "positive",
+      text: `Consistent sending cadence maintained across ${months.length} months with no gaps exceeding 30 days — supports stable sender reputation.`,
+      source: "Email Best Practices — Sending Volume",
+    });
+  }
+
+  return sortAndCap(insights);
 }
 
-// === Email Metrics Trend ===
-function generateEmailMetricsTrendInsight(sig: CampaignRow[], avgCTR: number): string | null {
-  if (sig.length < 3) return null;
+// ============= EMAIL METRICS TREND =============
 
-  // Calculate CTR per campaign and check volatility
+function generateEmailMetricsTrendInsights(sig: CampaignRow[], bounceRate: number, avgCTR: number): TableInsight[] {
+  if (sig.length < 3) return [];
+  const insights: TableInsight[] = [];
+
+  // CTR volatility
   const ctrs = sig.map(c => c.totalSentUsers > 0 ? (c.uniqueClickedWithinConversion / c.totalSentUsers) * 100 : 0);
   const mean = ctrs.reduce((s, v) => s + v, 0) / ctrs.length;
   const variance = ctrs.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / ctrs.length;
-  const stdDev = Math.sqrt(variance);
-  const cv = mean > 0 ? (stdDev / mean) * 100 : 0;
-
-  // Find spikes and drops
-  const highOutliers = ctrs.filter(v => v > mean + 2 * stdDev).length;
-  const lowOutliers = ctrs.filter(v => v < mean - stdDev && v < mean * 0.5).length;
+  const cv = mean > 0 ? (Math.sqrt(variance) / mean) * 100 : 0;
 
   if (cv > 80) {
-    return `CTR is highly volatile (CV ${fmt(cv, 0)}%) with ${highOutliers} spike(s) and ${lowOutliers} drop(s), indicating inconsistent content quality and targeting across campaigns.`;
+    insights.push({
+      severity: "warning",
+      text: `High CTR volatility (CV ${fmt(cv, 0)}%) — inconsistent engagement suggests uneven audience targeting or content quality across campaigns.`,
+      source: "Email Best Practices — Campaign Results",
+    });
   }
 
-  if (cv > 40) {
-    return `Moderate CTR volatility (CV ${fmt(cv, 0)}%) suggests inconsistent engagement — campaigns range from ${fmt(Math.min(...ctrs))}% to ${fmt(Math.max(...ctrs))}%, pointing to uneven content-audience alignment.`;
+  // Bounce spike detection
+  const bouncePer = sig.map(c => c.totalSentUsers > 0 ? ((c.hardBounces + c.softBounces) / c.totalSentUsers) * 100 : 0);
+  const maxBounce = Math.max(...bouncePer);
+  if (maxBounce > 5) {
+    insights.push({
+      severity: "critical",
+      text: `Bounce rate spike at ${fmt(maxBounce)}% detected in individual campaigns — clean invalid addresses and verify lists before next send.`,
+      source: "IP Warmup",
+    });
   }
 
-  return `CTR shows consistent performance (CV ${fmt(cv, 0)}%) averaging ${fmt(avgCTR)}%, indicating stable but potentially unoptimized engagement patterns.`;
+  // Consistent decline pattern (last 3)
+  if (ctrs.length >= 3) {
+    const last3 = ctrs.slice(-3);
+    if (last3[0] > last3[1] && last3[1] > last3[2] && last3[0] - last3[2] > 0.5) {
+      insights.push({
+        severity: "warning",
+        text: `CTR shows a declining trend over the last 3 campaigns — review campaign metrics within 12-24 hours of send and adjust content strategy.`,
+        source: "Email Best Practices — Campaign Results",
+      });
+    }
+  }
+
+  // Positive: stable and decent
+  if (cv < 30 && avgCTR > 2) {
+    insights.push({
+      severity: "positive",
+      text: `Engagement consistency is strong (CV ${fmt(cv, 0)}%) with ${fmt(avgCTR)}% average CTR — audience targeting and content are well-aligned.`,
+      source: "Email Best Practices",
+    });
+  }
+
+  return sortAndCap(insights);
 }
 
-// === Infrastructure + Reputation Scorecard (Combined) ===
-function generateInfrastructureInsight(postmasterData: PostmasterRow[] | null, avgCTR: number): string | null {
-  if (!postmasterData || postmasterData.length === 0) {
-    return `No Postmaster data available — infrastructure reputation cannot be assessed. CTR baseline at ${fmt(avgCTR)}% relies solely on campaign metrics.`;
-  }
+// ============= INFRASTRUCTURE & REPUTATION SCORECARD =============
+
+function generateInfrastructureInsights(postmasterData: PostmasterRow[] | null): TableInsight[] {
+  if (!postmasterData || postmasterData.length === 0) return [];
+  const insights: TableInsight[] = [];
 
   const domains = new Set(postmasterData.map(p => p.domain).filter(Boolean));
-  const latestByDomain = new Map<string, PostmasterRow>();
-  postmasterData.forEach(p => {
-    if (p.domain) {
-      const existing = latestByDomain.get(p.domain);
-      if (!existing) latestByDomain.set(p.domain, p);
-    }
-  });
-
   const repValues = postmasterData.map(p => p.domainReputation?.toLowerCase()).filter(Boolean);
   const lowRepDays = repValues.filter(r => r === "low" || r === "bad").length;
   const highRepDays = repValues.filter(r => r === "high").length;
 
   if (lowRepDays > repValues.length * 0.3) {
-    return `Domain reputation flagged as LOW/BAD on ${lowRepDays} of ${repValues.length} days across ${domains.size} domain(s), likely suppressing inbox placement and constraining CTR at ${fmt(avgCTR)}%.`;
+    insights.push({
+      severity: "critical",
+      text: `Domain reputation flagged LOW/BAD on ${lowRepDays} of ${repValues.length} observed days — this actively suppresses inbox placement. Reduce volume and focus on engaged audiences.`,
+      source: "Sender Reputation",
+    });
   }
 
-  if (highRepDays > repValues.length * 0.7) {
-    return `Domain reputation maintained HIGH on ${highRepDays} of ${repValues.length} days — infrastructure is healthy. CTR at ${fmt(avgCTR)}% reflects content/targeting factors, not deliverability.`;
+  // Mixed signals across domains
+  if (domains.size > 1 && lowRepDays > 0 && highRepDays > 0) {
+    insights.push({
+      severity: "warning",
+      text: `Mixed reputation signals across ${domains.size} domains — consider separating promotional and transactional traffic onto dedicated subdomains.`,
+      source: "IP Warmup",
+    });
   }
 
-  return `Mixed domain reputation across ${domains.size} domain(s) with ${highRepDays} HIGH vs ${lowRepDays} LOW/BAD days, creating inconsistent inbox placement that may contribute to CTR variability.`;
+  // IP reputation
+  const ipRepValues = postmasterData.map(p => p.ipReputation?.toLowerCase()).filter(r => r && r !== "" && r !== "n/a");
+  const lowIpDays = ipRepValues.filter(r => r === "low" || r === "bad").length;
+  if (lowIpDays > ipRepValues.length * 0.2 && ipRepValues.length > 0) {
+    insights.push({
+      severity: "warning",
+      text: `IP reputation dropped to LOW/BAD on ${lowIpDays} of ${ipRepValues.length} days — indicates potential blocklisting risk. Verify sending IPs and warm up gradually.`,
+      source: "IP Warmup",
+    });
+  }
+
+  // Positive
+  if (highRepDays > repValues.length * 0.8 && repValues.length > 0) {
+    insights.push({
+      severity: "positive",
+      text: `Domain reputation maintained HIGH on ${highRepDays} of ${repValues.length} days — infrastructure is healthy and supports strong inbox placement.`,
+      source: "Sender Reputation",
+    });
+  }
+
+  return sortAndCap(insights);
 }
 
-// === Reputation Trends ===
-function generateReputationTrendsInsight(postmasterData: PostmasterRow[] | null): string | null {
-  if (!postmasterData || postmasterData.length < 3) return null;
+// ============= REPUTATION TRENDS =============
 
-  const spamDays = postmasterData.filter(p => (p.spamRatio || 0) > 0.001).length;
-  const errorDays = postmasterData.filter(p => (p.errorRatio || 0) > 0).length;
+function generateReputationTrendsInsights(postmasterData: PostmasterRow[] | null): TableInsight[] {
+  if (!postmasterData || postmasterData.length < 3) return [];
+  const insights: TableInsight[] = [];
+
   const total = postmasterData.length;
-
+  const spamDays = postmasterData.filter(p => (p.spamRatio || 0) > 0.001).length;
+  const highSpamDays = postmasterData.filter(p => (p.spamRatio || 0) > 0.003).length;
+  const errorDays = postmasterData.filter(p => (p.errorRatio || 0) > 0).length;
   const repValues = postmasterData.map(p => p.domainReputation?.toLowerCase()).filter(Boolean);
-  const changes = repValues.filter((v, i) => i > 0 && v !== repValues[i - 1]).length;
+  const repChanges = repValues.filter((v, i) => i > 0 && v !== repValues[i - 1]).length;
 
-  if (changes === 0 && spamDays === 0) {
-    return `Reputation metrics stable across ${total} days with zero spam signals — deliverability posture is strong and consistent.`;
+  // Spam ratio > 0.3% is critical per CleverTap
+  if (highSpamDays > 0) {
+    insights.push({
+      severity: "critical",
+      text: `Spam ratio exceeded 0.3% on ${highSpamDays} day(s) — this directly damages sender reputation. Review list sources and add preference centers.`,
+      source: "Sender Reputation",
+    });
+  } else if (spamDays > total * 0.2) {
+    insights.push({
+      severity: "warning",
+      text: `Spam signals detected on ${spamDays} of ${total} days — persistent low-level spam complaints risk gradual reputation erosion.`,
+      source: "Sender Reputation",
+    });
   }
 
-  if (changes > repValues.length * 0.3) {
-    return `Domain reputation fluctuated ${changes} times across ${total} days, indicating instability. Spam signals detected on ${spamDays} days — inconsistent practices are impacting deliverability.`;
+  // Reputation instability
+  if (repChanges > repValues.length * 0.3 && repValues.length > 5) {
+    insights.push({
+      severity: "warning",
+      text: `Domain reputation fluctuated ${repChanges} times across ${total} days — instability indicates inconsistent sending practices. Maintain steady volume and audience quality.`,
+      source: "Email Best Practices — Sending Volume",
+    });
   }
 
-  if (spamDays > total * 0.2) {
-    return `Spam ratio exceeded threshold on ${spamDays} of ${total} days. Persistent spam signals risk long-term reputation degradation and reduced inbox placement.`;
+  // Error ratio persistence
+  if (errorDays > total * 0.3) {
+    insights.push({
+      severity: "info",
+      text: `Delivery errors present on ${errorDays} of ${total} days — monitor error patterns and investigate DNS/authentication issues.`,
+      source: "Email Best Practices",
+    });
   }
 
-  return `Reputation largely stable with ${changes} shift(s) over ${total} days. Error signals on ${errorDays} days — monitoring recommended to prevent escalation.`;
+  // Positive
+  if (spamDays === 0 && repChanges <= 1) {
+    insights.push({
+      severity: "positive",
+      text: `Zero spam signals and stable reputation across ${total} days — deliverability posture is strong and consistent.`,
+      source: "Sender Reputation",
+    });
+  }
+
+  return sortAndCap(insights);
 }
 
-// === Root Cause Summary ===
-function generateRootCauseInsight(sig: CampaignRow[], postmasterData: PostmasterRow[] | null): string | null {
-  const totalSent = sig.reduce((s, c) => s + c.totalSentUsers, 0);
-  const totalBounce = sig.reduce((s, c) => s + c.hardBounces + c.softBounces, 0);
-  const totalUnsub = sig.reduce((s, c) => s + c.totalUnsubscribes, 0);
-  const bounceRate = totalSent > 0 ? (totalBounce / totalSent) * 100 : 0;
-  const unsubRate = totalSent > 0 ? (totalUnsub / totalSent) * 100 : 0;
+// ============= BEST PERFORMING CAMPAIGNS (CTR) =============
 
-  const drivers: string[] = [];
-  if (bounceRate > 3) drivers.push(`high bounce rate (${fmt(bounceRate)}%)`);
-  if (unsubRate > 0.5) drivers.push(`elevated unsubscribes (${fmt(unsubRate)}%)`);
-  
-  if (postmasterData && postmasterData.length > 0) {
-    const spamDays = postmasterData.filter(p => (p.spamRatio || 0) > 0.001).length;
-    if (spamDays > postmasterData.length * 0.2) drivers.push(`spam signals on ${spamDays} days`);
-  }
-
-  if (drivers.length === 0) return `No critical root cause identified — performance drivers are within acceptable thresholds across bounce, unsubscribe, and spam metrics.`;
-  if (drivers.length === 1) return `Primary performance constraint: ${drivers[0]}. Addressing this single factor is the highest-leverage improvement available.`;
-  return `Top performance constraints: ${drivers.join(" and ")}. These compound to suppress CTR and overall engagement.`;
-}
-
-// === Best Performing Campaigns (CTR) ===
-function generateBestCTRInsight(report: AnalysisReport, sig: CampaignRow[]): string | null {
+function generateBestCTRInsights(sig: CampaignRow[]): TableInsight[] {
   const sorted = sig
     .filter(c => c.uniqueViewedWithinConversion > 0)
     .map(c => ({
       ...c,
       ctr: (c.uniqueClickedWithinConversion / c.uniqueViewedWithinConversion) * 100,
+      bounceRate: c.totalSentUsers > 0 ? ((c.hardBounces + c.softBounces) / c.totalSentUsers) * 100 : 0,
     }))
     .sort((a, b) => b.ctr - a.ctr);
 
-  if (sorted.length < 2) return null;
+  if (sorted.length < 2) return [];
+  const insights: TableInsight[] = [];
 
   const top5 = sorted.slice(0, 5);
   const avgTopCTR = top5.reduce((s, c) => s + c.ctr, 0) / top5.length;
-  const avgProgramCTR = sig.reduce((s, c) => s + c.uniqueClickedWithinConversion, 0) /
-    Math.max(sig.reduce((s, c) => s + c.uniqueViewedWithinConversion, 0), 1) * 100;
+  const avgTopBounce = top5.reduce((s, c) => s + c.bounceRate, 0) / top5.length;
 
-  const multiplier = avgProgramCTR > 0 ? avgTopCTR / avgProgramCTR : 0;
-
-  if (multiplier > 3) {
-    return `Top 5 campaigns by CTR achieve ${fmt(avgTopCTR)}% avg unique CTR — ${fmt(multiplier, 1)}x the program average, suggesting strong content-audience fit in these sends. Replicating their patterns could lift overall engagement.`;
+  // Top performers with low bounce = well-targeted engaged audience
+  if (avgTopBounce < 1) {
+    insights.push({
+      severity: "positive",
+      text: `Top performers maintain ${fmt(avgTopBounce)}% avg bounce rate alongside ${fmt(avgTopCTR)}% CTR — strong list quality correlates with high engagement.`,
+      source: "Email Best Practices — Audience Selection",
+    });
   }
 
-  return `Top 5 campaigns average ${fmt(avgTopCTR)}% unique CTR (${fmt(multiplier, 1)}x program average). Analyzing subject lines, timing, and audience segments of these campaigns can inform optimization.`;
+  // High CTR = content-audience fit
+  if (avgTopCTR > 5) {
+    insights.push({
+      severity: "positive",
+      text: `Top campaigns achieve ${fmt(avgTopCTR)}% unique CTR — content and CTA placement are driving strong click engagement. Replicate subject line and CTA patterns.`,
+      source: "Email Best Practices — Campaign Content",
+    });
+  }
+
+  // Info: analyze patterns
+  insights.push({
+    severity: "info",
+    text: `Review subject lines, send timing, and audience segments of top performers to identify replicable engagement patterns across the program.`,
+    source: "Email Best Practices — Campaign Results",
+  });
+
+  return sortAndCap(insights);
 }
 
-// === Underperforming Campaigns (CTR) ===
-function generateUnderperformingCTRInsight(report: AnalysisReport, sig: CampaignRow[]): string | null {
+// ============= UNDERPERFORMING CAMPAIGNS (CTR) =============
+
+function generateUnderperformingCTRInsights(sig: CampaignRow[]): TableInsight[] {
   const sorted = sig
     .filter(c => c.uniqueViewedWithinConversion > 0 && c.campaignName?.trim())
     .map(c => ({
       ...c,
       ctr: (c.uniqueClickedWithinConversion / c.uniqueViewedWithinConversion) * 100,
+      bounceRate: c.totalSentUsers > 0 ? ((c.hardBounces + c.softBounces) / c.totalSentUsers) * 100 : 0,
     }))
     .sort((a, b) => a.ctr - b.ctr);
 
-  if (sorted.length < 2) return null;
+  if (sorted.length < 2) return [];
+  const insights: TableInsight[] = [];
 
   const bottom5 = sorted.slice(0, 5);
   const avgBottomCTR = bottom5.reduce((s, c) => s + c.ctr, 0) / bottom5.length;
-  const totalBottomSent = bottom5.reduce((s, c) => s + c.totalSentUsers, 0);
+  const avgBottomBounce = bottom5.reduce((s, c) => s + c.bounceRate, 0) / bottom5.length;
 
   if (avgBottomCTR < 0.5) {
-    return `Bottom 5 campaigns average just ${fmt(avgBottomCTR)}% unique CTR across ${fmtK(totalBottomSent)} sends — near-zero click engagement suggests weak CTAs, poor targeting, or content-audience mismatch.`;
+    insights.push({
+      severity: "critical",
+      text: `Bottom campaigns average ${fmt(avgBottomCTR)}% unique CTR — near-zero click engagement suggests weak CTAs, irrelevant content, or inactive audience segments.`,
+      source: "Email Best Practices — Campaign Content",
+    });
+  } else if (avgBottomCTR < 1.5) {
+    insights.push({
+      severity: "warning",
+      text: `Underperformers average ${fmt(avgBottomCTR)}% unique CTR — review CTA placement (should be in top 20% of email) and content relevance.`,
+      source: "Email Best Practices — Campaign Content",
+    });
   }
 
-  return `Underperformers average ${fmt(avgBottomCTR)}% unique CTR with ${fmtK(totalBottomSent)} total sends. Low click-through despite opens indicates CTA visibility, content relevance, or landing page alignment issues.`;
+  if (avgBottomBounce > 3) {
+    insights.push({
+      severity: "warning",
+      text: `Underperforming campaigns show ${fmt(avgBottomBounce)}% avg bounce rate — these may be targeting stale or unverified segments. Apply sunsetting for users inactive > 6 months.`,
+      source: "Email Sunsetting",
+    });
+  }
+
+  // Sunsetting recommendation
+  insights.push({
+    severity: "info",
+    text: `Consider a re-engagement journey for users who haven't interacted with underperforming campaigns before permanently excluding them.`,
+    source: "Email Sunsetting",
+  });
+
+  return sortAndCap(insights);
 }
 
-// === Send Mix & Use Case Coverage ===
-function generateSendMixInsight(extendedData: ExtendedInsightsData | null): string | null {
-  if (!extendedData || extendedData.sendMix.length === 0) return null;
+// ============= SEND MIX & USE CASE COVERAGE =============
 
-  const top = extendedData.sendMix[0];
+function generateSendMixInsights(extendedData: ExtendedInsightsData | null): TableInsight[] {
+  if (!extendedData || extendedData.sendMix.length === 0) return [];
+  const insights: TableInsight[] = [];
+
   const total = extendedData.sendMix.reduce((s, e) => s + e.count, 0);
+  const top = extendedData.sendMix[0];
   const topPct = total > 0 ? (top.count / total) * 100 : 0;
 
+  // Heavy concentration on single type
   if (topPct > 70) {
-    return `"${top.deliveryType}" accounts for ${fmt(topPct, 0)}% of send volume — heavy concentration on a single delivery type limits lifecycle coverage and engagement diversification.`;
+    insights.push({
+      severity: "warning",
+      text: `"${top.deliveryType}" accounts for ${fmt(topPct, 0)}% of volume — heavy concentration limits lifecycle coverage. Diversify with triggered and transactional sends.`,
+      source: "Email Best Practices — Sending Volume",
+    });
   }
 
-  if (extendedData.sendMix.length <= 2) {
-    return `Only ${extendedData.sendMix.length} delivery type(s) detected. Limited send mix diversity indicates untapped automation and trigger-based campaign opportunities.`;
-  }
-
+  // Check for trigger/automation presence
   const triggered = extendedData.sendMix.filter(e =>
     e.deliveryType.toLowerCase().includes("action") ||
     e.deliveryType.toLowerCase().includes("trigger")
   );
   const triggerPct = triggered.reduce((s, e) => s + e.percentShare, 0);
 
-  if (triggerPct < 10) {
-    return `Trigger-based sends represent only ${fmt(triggerPct, 0)}% of the mix. Increasing behavioral triggers can improve CTR through higher relevance and timeliness.`;
+  if (triggerPct < 10 && extendedData.sendMix.length > 1) {
+    insights.push({
+      severity: "info",
+      text: `Trigger-based sends represent only ${fmt(triggerPct, 0)}% of the mix — behavioral triggers improve timeliness and relevance, boosting engagement.`,
+      source: "Email Best Practices",
+    });
   }
 
-  return `${extendedData.sendMix.length} delivery types active with "${top.deliveryType}" leading at ${fmt(topPct, 0)}%. ${triggerPct > 30 ? 'Strong automation maturity' : 'Moderate automation adoption'} observed.`;
+  // Subdomain separation signal
+  if (extendedData.sendMix.length >= 2) {
+    insights.push({
+      severity: "info",
+      text: `With ${extendedData.sendMix.length} delivery types active, ensure promotional and transactional emails are sent from separate subdomains to isolate reputation.`,
+      source: "IP Warmup",
+    });
+  }
+
+  // Positive: good mix
+  if (triggerPct > 30 && extendedData.sendMix.length >= 3) {
+    insights.push({
+      severity: "positive",
+      text: `Strong automation maturity with ${fmt(triggerPct, 0)}% trigger-based sends across ${extendedData.sendMix.length} delivery types — supports diverse lifecycle engagement.`,
+      source: "Email Best Practices",
+    });
+  }
+
+  return sortAndCap(insights);
 }
 
-// === Lifecycle Coverage Matrix ===
-function generateLifecycleCoverageInsight(stats?: { strongCount: number; partialCount: number; weakCount: number; totalStages: number } | null): string | null {
-  if (!stats || stats.totalStages === 0) return null;
+// ============= LIFECYCLE COVERAGE =============
 
+function generateLifecycleCoverageInsights(
+  stats?: { strongCount: number; partialCount: number; weakCount: number; totalStages: number } | null,
+): TableInsight[] {
+  if (!stats || stats.totalStages === 0) return [];
+  const insights: TableInsight[] = [];
   const { strongCount, partialCount, weakCount, totalStages } = stats;
 
   if (weakCount > totalStages * 0.5) {
-    return `${weakCount} of ${totalStages} lifecycle stages have weak coverage — significant engagement gaps exist in the customer journey, limiting CTR potential across under-served stages.`;
+    insights.push({
+      severity: "warning",
+      text: `${weakCount} of ${totalStages} lifecycle stages have weak coverage — users in these stages are not receiving engagement, increasing churn risk and sunsetting pressure.`,
+      source: "Email Sunsetting",
+    });
+  }
+
+  if (weakCount > 0) {
+    insights.push({
+      severity: "info",
+      text: `Weak lifecycle stages represent gaps where re-engagement journeys should be deployed before users become permanently inactive.`,
+      source: "Email Sunsetting",
+    });
   }
 
   if (strongCount === totalStages) {
-    return `All ${totalStages} lifecycle stages have strong coverage. Focus should shift to optimizing CTR within each stage rather than expanding use case breadth.`;
+    insights.push({
+      severity: "positive",
+      text: `All ${totalStages} lifecycle stages have strong coverage — focus on optimizing CTR within each stage through content personalization and CTA testing.`,
+      source: "Email Best Practices — Campaign Content",
+    });
+  } else if (strongCount > totalStages * 0.6) {
+    insights.push({
+      severity: "positive",
+      text: `${strongCount} of ${totalStages} stages have strong coverage — solid foundation with targeted expansion opportunities in ${weakCount + partialCount} remaining stages.`,
+      source: "Email Best Practices",
+    });
   }
 
-  if (weakCount > 0 && strongCount > 0) {
-    return `Coverage is uneven: ${strongCount} stages strong, ${weakCount} weak. Redirecting content investment to weak stages could unlock new CTR growth from under-served audience segments.`;
-  }
-
-  return `${strongCount} of ${totalStages} stages covered strongly, ${partialCount} partially. Incremental use case expansion in partial stages offers the best CTR uplift opportunity.`;
+  return sortAndCap(insights);
 }
 
-// === Key Learnings ===
-function generateKeyLearningsInsight(
+// ============= KEY LEARNINGS =============
+
+function generateKeyLearningsInsights(
   avgCTR: number,
   avgOpen: number,
+  bounceRate: number,
+  hardBounceRate: number,
+  unsubRate: number,
   postmasterData: PostmasterRow[] | null,
   lifecycleStats?: { strongCount: number; partialCount: number; weakCount: number; totalStages: number } | null,
-): string | null {
-  const signals: string[] = [];
+): TableInsight[] {
+  const insights: TableInsight[] = [];
 
-  if (avgCTR < 1.5) signals.push(`low CTR (${fmt(avgCTR)}%)`);
-  if (avgOpen < 10) signals.push(`weak open rates (${fmt(avgOpen)}%)`);
+  if (hardBounceRate > 2) {
+    insights.push({
+      severity: "critical",
+      text: `Hard bounce rate (${fmt(hardBounceRate)}%) is the top-priority fix — clean lists and verify addresses before sending. Reputation cannot recover while bounces persist.`,
+      source: "IP Warmup",
+    });
+  }
 
   if (postmasterData && postmasterData.length > 0) {
     const lowRep = postmasterData.filter(p => ["low", "bad"].includes(p.domainReputation?.toLowerCase() || "")).length;
-    if (lowRep > postmasterData.length * 0.2) signals.push("reputation instability");
+    if (lowRep > postmasterData.length * 0.2) {
+      insights.push({
+        severity: "critical",
+        text: `Domain reputation instability detected — reduce send volume, focus on 0-3 month engaged users, and avoid sending to inactive segments until reputation stabilizes.`,
+        source: "Email Best Practices — Audience Selection",
+      });
+    }
+  }
+
+  if (avgCTR < 1.5) {
+    insights.push({
+      severity: "warning",
+      text: `Program CTR at ${fmt(avgCTR)}% — review CTA placement, ensure CTAs are in the top 20% of email content, and A/B test subject lines to improve click-through.`,
+      source: "Email Best Practices — Campaign Content",
+    });
   }
 
   if (lifecycleStats && lifecycleStats.weakCount > lifecycleStats.totalStages * 0.3) {
-    signals.push("lifecycle coverage gaps");
+    insights.push({
+      severity: "info",
+      text: `Lifecycle gaps in ${lifecycleStats.weakCount} stages — deploy re-engagement journeys for at-risk users before applying sunsetting policies.`,
+      source: "Email Sunsetting",
+    });
   }
 
-  if (signals.length === 0) {
-    return `Program fundamentals are healthy across engagement, reputation, and coverage dimensions. Prioritize incremental CTR optimization through content personalization and send-time testing.`;
+  // Positive composite
+  if (hardBounceRate < 1 && unsubRate < 0.2 && avgCTR > 2) {
+    insights.push({
+      severity: "positive",
+      text: `Program fundamentals are healthy — low bounces, low unsubscribes, and solid CTR indicate good audience-content alignment. Focus on incremental optimization.`,
+      source: "Email Best Practices",
+    });
   }
 
-  return `Key improvement areas: ${signals.join(", ")}. Addressing these in sequence — infrastructure first, then content optimization — offers the most efficient path to sustained CTR improvement.`;
+  return sortAndCap(insights);
 }
