@@ -368,6 +368,37 @@ const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right"
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
 });
 
+// ============= INSIGHT BLOCK RENDERER =============
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "FF0000",
+  warning: "F59E0B",
+  info: "3B82F6",
+  positive: "22C55E",
+};
+
+const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, yPos: number, theme: BrandTheme): void => {
+  if (!insights || insights.length === 0) return;
+  insights.forEach((insight, i) => {
+    const y = yPos + i * 0.28;
+    // Severity dot
+    slide.addShape("ellipse" as any, {
+      x: 0.5, y: y + 0.04, w: 0.1, h: 0.1,
+      fill: { color: SEVERITY_COLORS[insight.severity] || "999999" },
+    });
+    // Insight text
+    slide.addText(sanitizeText(insight.text), {
+      x: 0.7, y, w: 7.5, h: 0.22,
+      fontSize: 7, fontFace: FONTS.body, color: theme.bodyColor, valign: "middle",
+    });
+    // Source tag
+    slide.addText(sanitizeText(`Source: ${insight.source}`), {
+      x: 8.3, y, w: 1.5, h: 0.22,
+      fontSize: 6, fontFace: FONTS.body, color: "999999", italic: true, valign: "middle",
+    });
+  });
+};
+
 // ============= INFRASTRUCTURE EXTRACTION =============
 
 const extractInfrastructure = (
