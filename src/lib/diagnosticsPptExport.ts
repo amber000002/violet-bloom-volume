@@ -1142,48 +1142,65 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   }
 
   // ==========================================
-  // SLIDE 7: Reputation Trends (2x2 chart grid)
-  // IP Reputation, Domain Reputation, Spam Ratio, Delivery Error Ratio
+  // SLIDES 7+: Reputation Trends — one slide per domain
+  // Each slide: 2x2 chart grid (IP Rep, Domain Rep, Spam, Error) + domain-specific insights
   // ==========================================
-  slideNum++;
-  {
-    const s = pptx.addSlide();
-    addSlideBackground(s, theme);
-    addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Reputation Trends", theme, undefined, slideNum);
 
-    if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
-      // Sort postmaster data chronologically (oldest first) to match app display
-      const MONTH_MAP_PPT: Record<string, number> = {
-        Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-        Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
-      };
-      const parsePmDate = (dateStr: string): Date | null => {
-        if (!dateStr) return null;
-        const match = dateStr.trim().match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
-        if (!match) return null;
-        const mi = MONTH_MAP_PPT[match[1]];
-        if (mi === undefined) return null;
-        return new Date(parseInt(match[3], 10), mi, parseInt(match[2], 10));
-      };
-      const pmData = [...diagnostics.postmasterData].sort((a, b) => {
+  if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
+    const MONTH_MAP_PPT: Record<string, number> = {
+      Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+      Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+    };
+    const parsePmDate = (dateStr: string): Date | null => {
+      if (!dateStr) return null;
+      const match = dateStr.trim().match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
+      if (!match) return null;
+      const mi = MONTH_MAP_PPT[match[1]];
+      if (mi === undefined) return null;
+      return new Date(parseInt(match[3], 10), mi, parseInt(match[2], 10));
+    };
+    const repToNum = (rep: string): number | null => {
+      if (!rep) return null;
+      const map: Record<string, number> = { "high": 3, "medium": 2, "low": 1, "bad": 0 };
+      const val = map[rep.trim().toLowerCase()];
+      return val !== undefined ? val : null;
+    };
+
+    // Group postmaster data by domain
+    const domainMap = new Map<string, typeof diagnostics.postmasterData>();
+    diagnostics.postmasterData.forEach((row) => {
+      const d = row.domain?.trim();
+      if (!d) return;
+      if (!domainMap.has(d)) domainMap.set(d, []);
+      domainMap.get(d)!.push(row);
+    });
+
+    // If no domain info, treat all data as one group
+    if (domainMap.size === 0) {
+      domainMap.set("All Domains", diagnostics.postmasterData);
+    }
+
+    const domainNames = Array.from(domainMap.keys()).sort();
+
+    for (const domainName of domainNames) {
+      const domainData = domainMap.get(domainName)!;
+      slideNum++;
+      const s = pptx.addSlide();
+      addSlideBackground(s, theme);
+      addDecorativeMotif(s, theme, "corner");
+      addSlideHeader(s, `Reputation Trends — ${sanitizeText(domainName)}`, theme, undefined, slideNum);
+
+      const pmData = [...domainData].sort((a, b) => {
         const da = parsePmDate(a.date);
         const db = parsePmDate(b.date);
         if (!da || !db) return 0;
         return da.getTime() - db.getTime();
       });
+
       const pmDates = pmData.map(p => sanitizeText(p.date));
       const spamData = pmData.map(p => (p.spamRatio || 0) * 100);
       const errorData = pmData.map(p => (p.errorRatio || 0) * 100);
 
-      const repToNum = (rep: string): number | null => {
-        if (!rep) return null;
-        const map: Record<string, number> = { "high": 3, "medium": 2, "low": 1, "bad": 0 };
-        const val = map[rep.trim().toLowerCase()];
-        return val !== undefined ? val : null;
-      };
-
-      // Filter data per metric to match app behavior — only include rows with valid values
       const ipRepEntries = pmData.filter(p => repToNum(p.ipReputation) !== null);
       const domainRepEntries = pmData.filter(p => repToNum(p.domainReputation) !== null);
       const ipRepDates = ipRepEntries.map(p => sanitizeText(p.date));
@@ -1206,6 +1223,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
 
       chartConfigs.forEach((cfg, i) => {
+        if (cfg.data.length === 0) return;
         const opts: any = {
           ...chartPositions[i],
           showLegend: false, lineSmooth: !cfg.isReputation, lineSize: 2,
@@ -1218,27 +1236,23 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         if (cfg.min !== undefined) opts.valAxisMinVal = cfg.min;
         if (cfg.max !== undefined) opts.valAxisMaxVal = cfg.max;
 
-        // For reputation charts, use custom labels: BAD(0), LOW(1), MEDIUM(2), HIGH(3)
         if (cfg.isReputation) {
           opts.valAxisMajorUnit = 1;
-          // Hide numeric axis labels — we overlay text labels instead
           opts.valAxisHidden = true;
           opts.valAxisLabelFontSize = 1;
-          opts.valAxisLabelColor = theme.slideBg; // make invisible
+          opts.valAxisLabelColor = theme.slideBg;
         }
 
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
 
-        // Add reputation level labels as text overlays for reputation charts
         if (cfg.isReputation) {
           const pos = chartPositions[i];
           const repLabels = ["BAD", "LOW", "MEDIUM", "HIGH"];
-          const chartAreaX = pos.x + 0.35; // left edge of chart area
-          const chartTop = pos.y + 0.35; // top of chart plot area (after title)
-          const chartBottom = pos.y + pos.h - 0.25; // bottom of chart plot area
+          const chartAreaX = pos.x + 0.35;
+          const chartTop = pos.y + 0.35;
+          const chartBottom = pos.y + pos.h - 0.25;
           const plotHeight = chartBottom - chartTop;
           repLabels.forEach((label, li) => {
-            // li=0 is BAD (val=0, bottom), li=3 is HIGH (val=3, top)
             const yPos = chartBottom - (li / 3) * plotHeight - 0.08;
             s.addText(label, {
               x: chartAreaX - 0.55, y: yPos, w: 0.55, h: 0.16,
@@ -1248,9 +1262,22 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           });
         }
       });
-    } else {
-      s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
+
+      // Domain-specific insights from the engine
+      const domainInsights = sectionInsights?.reputationTrendsByDomain?.[domainName]
+        || sectionInsights?.reputationTrends
+        || [];
+      addInsightBlock(s, domainInsights.length > 0 ? domainInsights : undefined, 0, theme);
+      addSlideFooter(s, theme, hasPostmasterData);
     }
+  } else {
+    // No postmaster data — single fallback slide
+    slideNum++;
+    const s = pptx.addSlide();
+    addSlideBackground(s, theme);
+    addDecorativeMotif(s, theme, "corner");
+    addSlideHeader(s, "Reputation Trends", theme, undefined, slideNum);
+    s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     addInsightBlock(s, sectionInsights?.reputationTrends, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
