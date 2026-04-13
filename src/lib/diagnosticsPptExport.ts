@@ -778,9 +778,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fontFace: FONTS.body,
     });
 
-    s.addText(`* Percentages use ${useDelivered ? "Delivered" : "Sent"} as denominator`, { x: 0.5, y: 4.9, w: 5, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
-    addInsightBlock(s, sectionInsights?.campaignOverview, 5.15, theme);
-    addInsightBlock(s, sectionInsights?.campaignOverviewByProvider, 5.15 + (sectionInsights?.campaignOverview?.length || 0) * 0.35, theme);
+    s.addText(`* Percentages use ${useDelivered ? "Delivered" : "Sent"} as denominator`, { x: 0.5, y: ZONE.INSIGHT_Y - 0.25, w: 5, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    // Merge both campaign overview + provider insights into a single block (max 4 total)
+    const mergedOverviewInsights = [
+      ...(sectionInsights?.campaignOverview || []),
+      ...(sectionInsights?.campaignOverviewByProvider || []),
+    ].slice(0, 4);
+    addInsightBlock(s, mergedOverviewInsights, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
