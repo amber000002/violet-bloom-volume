@@ -56,7 +56,7 @@ import { parseEventSchemaCSV, parseUserPropertyCSV, EventSchemaRow, UserProperty
 import { generateExtendedInsights, ExtendedInsightsData, CoverageDataForRevenue } from "@/lib/strategicInsightsExtendedEngine";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { OpportunityRefreshEngine } from "../OpportunityRefreshEngine";
-import { generateSectionInsights, SectionInsights } from "@/lib/sectionInsightEngine";
+import { generateSectionInsights, SectionInsights, TableInsight, InsightSeverity } from "@/lib/sectionInsightEngine";
 import { ActiveUseCaseInfo } from "@/lib/opportunityEngine";
 import {
   EmailMetricsTrendChart,
