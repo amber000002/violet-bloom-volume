@@ -908,6 +908,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     } else {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
+    addInsightBlock(s, sectionInsights?.emailMetricsTrend, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -976,6 +977,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     if (infra.domains.length === 0 && infra.ips.length === 0) {
       s.addText("No infrastructure details available", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
+    addInsightBlock(s, sectionInsights?.infrastructureReputation, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1132,6 +1134,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     } else {
       s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
+    addInsightBlock(s, sectionInsights?.reputationTrends, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1237,6 +1240,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
+    addInsightBlock(s, sectionInsights?.bestPerformingCTR, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1306,6 +1310,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
+    addInsightBlock(s, sectionInsights?.underperformingCTR, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
