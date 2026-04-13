@@ -444,6 +444,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     creativeAnalysis,
     creativeImage,
     lifecycleCoverage,
+    sectionInsights,
   } = opts;
 
   const theme = buildBrandTheme(brandProfile, industry);
