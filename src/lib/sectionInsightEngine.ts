@@ -25,6 +25,7 @@ export interface SectionInsights {
   emailMetricsTrend: TableInsight[];
   infrastructureReputation: TableInsight[];
   reputationTrends: TableInsight[];
+  reputationTrendsByDomain: Record<string, TableInsight[]>;
   bestPerformingOpenRate: TableInsight[];
   bestPerformingCTR: TableInsight[];
   underperformingOpenRate: TableInsight[];
@@ -103,6 +104,7 @@ export function generateSectionInsights(
     emailMetricsTrend: generateEmailMetricsTrendInsights(sig),
     infrastructureReputation: generateInfrastructureInsights(postmasterData),
     reputationTrends: generateReputationTrendsInsights(postmasterData),
+    reputationTrendsByDomain: generateReputationTrendsByDomain(postmasterData),
     bestPerformingOpenRate: generateBestOpenRateInsights(sig),
     bestPerformingCTR: generateBestCTRInsights(sig),
     underperformingOpenRate: generateUnderperformingOpenRateInsights(sig),
@@ -550,6 +552,27 @@ function generateReputationTrendsInsights(postmasterData: PostmasterRow[] | null
   }
 
   return sortAndCap(insights);
+}
+
+// ============= TABLE 6b: REPUTATION TRENDS BY DOMAIN =============
+
+function generateReputationTrendsByDomain(postmasterData: PostmasterRow[] | null): Record<string, TableInsight[]> {
+  if (!postmasterData || postmasterData.length === 0) return {};
+
+  const domainMap = new Map<string, PostmasterRow[]>();
+  postmasterData.forEach((row) => {
+    const d = row.domain?.trim();
+    if (!d) return;
+    if (!domainMap.has(d)) domainMap.set(d, []);
+    domainMap.get(d)!.push(row);
+  });
+
+  const result: Record<string, TableInsight[]> = {};
+  domainMap.forEach((rows, domain) => {
+    result[domain] = generateReputationTrendsInsights(rows);
+  });
+
+  return result;
 }
 
 // ============= TABLE 7: BEST PERFORMING CAMPAIGNS BY OPEN RATE =============
