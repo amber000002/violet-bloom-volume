@@ -180,80 +180,39 @@ interface DomainInfo {
      );
    }
  
-   return (
-     <motion.div
-       initial={{ opacity: 0, y: 10 }}
-       animate={{ opacity: 1, y: 0 }}
-       className="space-y-6"
-     >
-       {/* Domain Details */}
-       <div className="space-y-3">
-         <h4 className="text-sm font-medium flex items-center gap-2">
-           <Globe className="w-4 h-4 text-primary" />
-           Domain Details ({domains.length} unique)
-         </h4>
-         <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Domain</TableHead>
-                  <TableHead>Domain Reputation</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {domains.map((d, i) => {
-                  const badge = getReputationBadge(d.latestReputation || "");
-                  const IconComponent = badge.icon;
-                  
-                  return (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{d.domain}</TableCell>
-                      <TableCell>
-                        {d.latestReputation ? (
-                          <Badge variant={badge.variant} className={badge.className}>
-                            {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
-                            {d.latestReputation}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-         </div>
-       </div>
- 
-       {/* IP Details */}
-       {ips.length > 0 && (
-         <div className="space-y-3">
-           <h4 className="text-sm font-medium flex items-center gap-2">
-             <Server className="w-4 h-4 text-secondary" />
-             IP Details ({ips.length} unique)
-           </h4>
-           <div className="border rounded-lg overflow-hidden">
-            <Table>
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-4"
+      >
+        <div className={`grid gap-4 ${ips.length > 0 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+          {/* Domain Details */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" />
+              Domain Details ({domains.length} unique)
+            </h4>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>IP Address</TableHead>
-                    <TableHead>Latest Reputation</TableHead>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Reputation</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ips.map((ip, i) => {
-                    const badge = getReputationBadge(ip.latestReputation || "");
+                  {domains.map((d, i) => {
+                    const badge = getReputationBadge(d.latestReputation || "");
                     const IconComponent = badge.icon;
-                    
                     return (
                       <TableRow key={i}>
-                        <TableCell className="font-mono text-sm">{ip.ip}</TableCell>
+                        <TableCell className="font-medium">{d.domain}</TableCell>
                         <TableCell>
-                          {ip.latestReputation ? (
+                          {d.latestReputation ? (
                             <Badge variant={badge.variant} className={badge.className}>
                               {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
-                              {ip.latestReputation}
+                              {d.latestReputation}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -264,13 +223,54 @@ interface DomainInfo {
                   })}
                 </TableBody>
               </Table>
-           </div>
-         </div>
-       )}
- 
-       <p className="text-xs text-muted-foreground">
-         * Domain reputation from Postmaster CSV. IP details from Postmaster "Sample IPs" field.
-       </p>
-     </motion.div>
-   );
+            </div>
+          </div>
+
+          {/* IP Details */}
+          {ips.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <Server className="w-4 h-4 text-secondary" />
+                IP Details ({ips.length} unique)
+              </h4>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>IP Address</TableHead>
+                      <TableHead>Reputation</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ips.map((ip, i) => {
+                      const badge = getReputationBadge(ip.latestReputation || "");
+                      const IconComponent = badge.icon;
+                      return (
+                        <TableRow key={i}>
+                          <TableCell className="font-mono text-sm">{ip.ip}</TableCell>
+                          <TableCell>
+                            {ip.latestReputation ? (
+                              <Badge variant={badge.variant} className={badge.className}>
+                                {IconComponent && <IconComponent className="w-3 h-3 mr-1" />}
+                                {ip.latestReputation}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          * Domain reputation from Postmaster CSV. IP details from Postmaster "Sample IPs" field.
+        </p>
+      </motion.div>
+    );
  };
