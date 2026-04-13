@@ -21,6 +21,7 @@ export interface SectionInsights {
   campaignOverview: TableInsight[];
   campaignOverviewByProvider: TableInsight[];
   monthlyOverview: TableInsight[];
+  monthlyOverviewByProvider: Record<string, TableInsight[]>;
   emailMetricsTrend: TableInsight[];
   infrastructureReputation: TableInsight[];
   reputationTrends: TableInsight[];
