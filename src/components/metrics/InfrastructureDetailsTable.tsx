@@ -65,18 +65,28 @@ export const InfrastructureDetailsTable: React.FC<InfrastructureDetailsTableProp
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
-    // Domains: unique domains from postmaster CSV with latest domain reputation
+    // Domains: unique domains from postmaster CSV with latest *valid* domain reputation
+    // First pass: collect all unique domains
+    const domainNames = new Map<string, string>();
     sorted.forEach((row) => {
       const domainKey = row.domain?.toLowerCase().trim();
-      if (domainKey && !domainMap.has(domainKey)) {
-        const rep = row.domainReputation?.trim();
-        const isValid = rep && rep.toLowerCase() !== "n/a" && rep !== "";
-        domainMap.set(domainKey, {
-          domain: row.domain?.trim() || domainKey,
-          latestReputation: isValid ? rep : undefined,
-          reputationDate: row.date,
-        });
+      if (domainKey && !domainNames.has(domainKey)) {
+        domainNames.set(domainKey, row.domain?.trim() || domainKey);
       }
+    });
+
+    // Second pass: find latest valid reputation per domain
+    domainNames.forEach((displayName, domainKey) => {
+      const latestValid = sorted.find((row) => {
+        if (row.domain?.toLowerCase().trim() !== domainKey) return false;
+        const rep = row.domainReputation?.trim();
+        return rep && rep.toLowerCase() !== "n/a" && rep !== "";
+      });
+      domainMap.set(domainKey, {
+        domain: displayName,
+        latestReputation: latestValid?.domainReputation?.trim(),
+        reputationDate: latestValid?.date,
+      });
     });
 
     // IPs: all unique IPs from sampleIps, latest recorded reputation
