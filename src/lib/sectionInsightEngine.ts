@@ -25,6 +25,7 @@ export interface SectionInsights {
   emailMetricsTrend: TableInsight[];
   infrastructureReputation: TableInsight[];
   reputationTrends: TableInsight[];
+  reputationTrendsByDomain: Record<string, TableInsight[]>;
   bestPerformingOpenRate: TableInsight[];
   bestPerformingCTR: TableInsight[];
   underperformingOpenRate: TableInsight[];
