@@ -364,14 +364,14 @@ const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
 };
 
 const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, slideNumber?: number) => {
-  slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0.5, y: 0.95, w: 2.5, h: 0.04, fill: { color: theme.primary } });
-  slide.addText(title, { x: 0.5, y: 0.3, w: monthRange ? 6.5 : 8.5, h: 0.65, fontSize: 22, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
-  if (monthRange) slide.addText(monthRange, { x: 7, y: 0.4, w: 2.5, h: 0.4, fontSize: 11, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
-  if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: 5.2, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
+  slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0.5, y: ZONE.HEADER_Y + 0.95, w: 2.5, h: 0.04, fill: { color: theme.primary } });
+  slide.addText(title, { x: 0.5, y: ZONE.HEADER_Y + 0.3, w: monthRange ? 6.5 : 8.5, h: 0.65, fontSize: 22, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
+  if (monthRange) slide.addText(monthRange, { x: 7, y: ZONE.HEADER_Y + 0.4, w: 2.5, h: 0.4, fontSize: 11, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
+  if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: ZONE.FOOTER_Y + 0.05, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
 };
 
 const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, _hasPostmasterData: boolean = true) => {
-  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: 5.2, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
+  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: ZONE.FOOTER_Y + 0.05, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
