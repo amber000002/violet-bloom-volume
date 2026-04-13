@@ -744,6 +744,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText(`* Percentages use ${useDelivered ? "Delivered" : "Sent"} as denominator`, { x: 0.5, y: 4.9, w: 5, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     addInsightBlock(s, sectionInsights?.campaignOverview, 5.15, theme);
+    addInsightBlock(s, sectionInsights?.campaignOverviewByProvider, 5.15 + (sectionInsights?.campaignOverview?.length || 0) * 0.35, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1213,6 +1214,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         x: 0.3, y: 4.85, w: 9.0, h: 0.25, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
       });
     }
+    addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1277,6 +1279,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         x: 0.3, y: 4.85, w: 9.0, h: 0.25, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
       });
     }
+    addInsightBlock(s, sectionInsights?.underperformingOpenRate, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 

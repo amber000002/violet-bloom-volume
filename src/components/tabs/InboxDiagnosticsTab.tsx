@@ -1389,6 +1389,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               * Percentages calculated using {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator
             </p>
             <SectionInsightsBlock insights={sectionInsights?.campaignOverview ?? null} />
+            <SectionInsightsBlock insights={sectionInsights?.campaignOverviewByProvider ?? null} />
           </CollapsibleSection>
 
           {/* Report 1b: Monthly Overview with correct date parsing */}
@@ -1665,7 +1666,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
-            <SectionInsightsBlock insights={sectionInsights?.bestPerformingCTR ?? null} />
+            <SectionInsightsBlock insights={bestSortBy === "clickRate" ? (sectionInsights?.bestPerformingCTR ?? null) : (sectionInsights?.bestPerformingOpenRate ?? null)} />
           </CollapsibleSection>
 
           {/* ============= UNDER-PERFORMING CAMPAIGNS ============= */}
@@ -1777,7 +1778,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 return `Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`;
               })()}
             </p>
-            <SectionInsightsBlock insights={sectionInsights?.underperformingCTR ?? null} />
+            <SectionInsightsBlock insights={worstSortBy === "clickRate" ? (sectionInsights?.underperformingCTR ?? null) : (sectionInsights?.underperformingOpenRate ?? null)} />
           </CollapsibleSection>
 
           {/* ============= CREATIVE & CONTENT EFFECTIVENESS ANALYZER ============= */}
