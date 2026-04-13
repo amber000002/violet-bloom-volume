@@ -84,10 +84,22 @@ export function generateSectionInsights(
   const avgCTR = totalSent > 0 ? (totalClicked / totalSent) * 100 : 0;
   const avgOpen = totalSent > 0 ? (totalViewed / totalSent) * 100 : 0;
 
+  // Per-provider monthly insights
+  const monthlyByProvider: Record<string, TableInsight[]> = {};
+  const byProviderData = analysisReport.monthlyOverviewByProvider;
+  const uniqueProviders = [...new Set(byProviderData.map(m => m.provider))];
+  if (uniqueProviders.length > 1) {
+    for (const provider of uniqueProviders) {
+      const providerMonths = byProviderData.filter(m => m.provider === provider);
+      monthlyByProvider[provider] = generateMonthlyOverviewMoMInsights(providerMonths);
+    }
+  }
+
   return {
     campaignOverview: generateCampaignOverviewInsights(totalSent, totalDelivered, totalViewed, totalHardBounce, totalSoftBounce, totalUnsub, hardBounceRate, softBounceRate, unsubRate, avgOpen),
     campaignOverviewByProvider: generateProviderInsights(analysisReport.providerAggregates),
-    monthlyOverview: generateMonthlyOverviewInsights(analysisReport, sig),
+    monthlyOverview: generateMonthlyOverviewMoMInsights(analysisReport.monthlyOverview),
+    monthlyOverviewByProvider: monthlyByProvider,
     emailMetricsTrend: generateEmailMetricsTrendInsights(sig),
     infrastructureReputation: generateInfrastructureInsights(postmasterData),
     reputationTrends: generateReputationTrendsInsights(postmasterData),
