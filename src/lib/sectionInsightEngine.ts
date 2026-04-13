@@ -4,7 +4,7 @@
 // Max 4 insights per section. Order: Critical -> Warning -> Info -> Positive.
 // No em-dashes. No cross-table inference. No invented benchmarks.
 
-import { CampaignRow, PostmasterRow, AnalysisReport, ProviderAggregate } from "./csvAnalyzer";
+import { CampaignRow, PostmasterRow, AnalysisReport, ProviderAggregate, MonthlyOverview } from "./csvAnalyzer";
 import { ExtendedInsightsData } from "./strategicInsightsExtendedEngine";
 
 // ============= TYPES =============
