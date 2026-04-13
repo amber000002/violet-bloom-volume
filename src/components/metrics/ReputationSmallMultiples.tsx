@@ -1,4 +1,4 @@
- import React, { useMemo } from "react";
+ import React, { useMemo, useState } from "react";
  import { motion } from "framer-motion";
  import {
    LineChart,
@@ -11,8 +11,16 @@
    ReferenceLine,
  } from "recharts";
  import { CampaignRow, PostmasterRow } from "@/lib/csvAnalyzer";
- import { AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
- import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+  import { AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
+  import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+  import { Label } from "@/components/ui/label";
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
  
  interface ReputationSmallMultiplesProps {
    postmasterData: PostmasterRow[] | null;
@@ -369,31 +377,49 @@ const THRESHOLDS = {
    postmasterData,
    campaignData,
  }) => {
-    // Process data for all 4 charts
-    const { ipRepChart, domainRepChart, spamChart, errorChart, invalidDateCount } = useMemo(() => {
-      if (!postmasterData || postmasterData.length === 0) {
-        return {
-          ipRepChart: { data: [], observations: [] },
-          domainRepChart: { data: [], observations: [] },
-          spamChart: { data: [], observations: [] },
-          errorChart: { data: [], observations: [] },
-          invalidDateCount: 0,
-        };
-      }
+  const [selectedDomain, setSelectedDomain] = useState<string>("all");
 
-      // Sort postmaster data chronologically, track invalid dates
-      let invalidCount = 0;
-      const sorted = [...postmasterData]
-        .map((row) => {
-          const dateObj = parseReputationDate(row.date);
-          if (!dateObj) {
-            invalidCount++;
-            return null;
-          }
-          return { ...row, dateObj };
-        })
-        .filter((r): r is PostmasterRow & { dateObj: Date } => r !== null)
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+  // Extract unique domains
+  const uniqueDomains = useMemo(() => {
+    if (!postmasterData) return [];
+    const domains = new Set<string>();
+    postmasterData.forEach((row) => {
+      const d = row.domain?.trim();
+      if (d) domains.add(d);
+    });
+    return Array.from(domains).sort();
+  }, [postmasterData]);
+
+   // Process data for all 4 charts
+   const { ipRepChart, domainRepChart, spamChart, errorChart, invalidDateCount } = useMemo(() => {
+     if (!postmasterData || postmasterData.length === 0) {
+       return {
+         ipRepChart: { data: [], observations: [] },
+         domainRepChart: { data: [], observations: [] },
+         spamChart: { data: [], observations: [] },
+         errorChart: { data: [], observations: [] },
+         invalidDateCount: 0,
+       };
+     }
+
+     // Filter by selected domain
+     const filtered = selectedDomain === "all"
+       ? postmasterData
+       : postmasterData.filter((row) => row.domain?.trim() === selectedDomain);
+
+     // Sort postmaster data chronologically, track invalid dates
+     let invalidCount = 0;
+     const sorted = [...filtered]
+       .map((row) => {
+         const dateObj = parseReputationDate(row.date);
+         if (!dateObj) {
+           invalidCount++;
+           return null;
+         }
+         return { ...row, dateObj };
+       })
+       .filter((r): r is PostmasterRow & { dateObj: Date } => r !== null)
+       .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
       if (sorted.length === 0) {
         return {
@@ -503,7 +529,7 @@ const THRESHOLDS = {
         errorChart: { data: errorData, observations: errorObs },
         invalidDateCount: invalidCount,
       };
-    }, [postmasterData, campaignData]);
+    }, [postmasterData, campaignData, selectedDomain]);
  
    if (!postmasterData || postmasterData.length === 0) {
      return (
@@ -517,8 +543,25 @@ const THRESHOLDS = {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-4"
-      >
+       className="space-y-4"
+     >
+       {/* Domain Filter */}
+       {uniqueDomains.length >= 1 && (
+         <div className="flex items-center gap-2">
+           <Label className="text-sm font-medium">Domain:</Label>
+           <Select value={selectedDomain} onValueChange={setSelectedDomain}>
+             <SelectTrigger className="w-[240px] h-8 text-sm">
+               <SelectValue placeholder="All Domains" />
+             </SelectTrigger>
+             <SelectContent>
+               <SelectItem value="all">All Domains</SelectItem>
+               {uniqueDomains.map((d) => (
+                 <SelectItem key={d} value={d}>{d}</SelectItem>
+               ))}
+             </SelectContent>
+           </Select>
+         </div>
+       )}
         {/* Invalid Date Integrity Counter */}
         {invalidDateCount > 0 && (
           <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-600 text-sm">
