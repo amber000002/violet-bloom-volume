@@ -275,7 +275,7 @@ export const ReputationTrendChart: React.FC<ReputationTrendChartProps> = ({
     >
       {/* Domain Filter + Metric Toggles */}
       <div className="flex flex-wrap items-center gap-4">
-        {uniqueDomains.length > 1 && (
+        {uniqueDomains.length >= 1 && (
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium">Domain:</Label>
             <Select value={selectedDomain} onValueChange={setSelectedDomain}>

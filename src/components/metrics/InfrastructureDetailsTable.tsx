@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Globe, Server, Shield, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Globe, Server, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface InfrastructureDetailsTableProps {
@@ -20,31 +20,15 @@ interface InfrastructureDetailsTableProps {
 interface DomainInfo {
   domain: string;
   latestReputation?: string;
-  latestIpReputation?: string;
-  latestSpamRatio?: number;
-  latestErrorRatio?: number;
   reputationDate?: string;
 }
 
 interface IPInfo {
   ip: string;
-  count: number;
   latestReputation?: string;
   reputationDate?: string;
 }
 
-// Extract domain from email address (From field)
-const extractDomainFromEmail = (email: string): string | null => {
-  if (!email) return null;
-  const emailMatch = email.match(/<([^>]+)>/) || email.match(/([^\s]+@[^\s]+)/);
-  const emailPart = emailMatch ? emailMatch[1] : email;
-  const atIndex = emailPart.indexOf("@");
-  if (atIndex === -1) return null;
-  const domain = emailPart.substring(atIndex + 1).toLowerCase().trim();
-  return domain || null;
-};
-
-// Get reputation badge styling
 const getReputationBadge = (reputation: string) => {
   const normalized = reputation?.toLowerCase().trim() || "";
   switch (normalized) {
@@ -61,17 +45,8 @@ const getReputationBadge = (reputation: string) => {
   }
 };
 
-const getRatioColor = (value: number, type: "spam" | "error"): string => {
-  if (type === "spam") {
-    if (value > 0.003) return "text-red-600 font-medium";
-    if (value > 0.001) return "text-amber-600 font-medium";
-    return "text-green-600";
-  }
-  // error
-  if (value > 0.01) return "text-red-600 font-medium";
-  if (value > 0) return "text-amber-600 font-medium";
-  return "text-green-600";
-};
+// Strip brackets/parens from IP strings
+const cleanIP = (ip: string): string => ip.replace(/[[\](){}]/g, "").trim();
 
 export const InfrastructureDetailsTable: React.FC<InfrastructureDetailsTableProps> = ({
   campaignData,
@@ -81,101 +56,45 @@ export const InfrastructureDetailsTable: React.FC<InfrastructureDetailsTableProp
     const domainMap = new Map<string, DomainInfo>();
     const ipMap = new Map<string, IPInfo>();
 
-    const providerNames = new Set<string>();
-    campaignData.forEach((row) => {
-      const name = (row.providerName || row.serviceProvider || "").trim();
-      if (name) providerNames.add(name);
-    });
-
-    // Build latest domain data from postmaster (sorted newest first)
-    const latestDomainData = new Map<string, { reputation: string; ipReputation: string; spamRatio: number; errorRatio: number; date: string }>();
-    const latestIPRep = new Map<string, { reputation: string; date: string }>();
-
-    if (postmasterData && postmasterData.length > 0) {
-      const sorted = [...postmasterData].sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB.getTime() - dateA.getTime();
-      });
-
-      sorted.forEach((row) => {
-        const domainKey = row.domain?.toLowerCase().trim();
-        if (domainKey && !latestDomainData.has(domainKey)) {
-          latestDomainData.set(domainKey, {
-            reputation: row.domainReputation,
-            ipReputation: row.ipReputation,
-            spamRatio: row.spamRatio || 0,
-            errorRatio: row.errorRatio || 0,
-            date: row.date,
-          });
-        }
-        const ipRep = row.ipReputation?.trim().toLowerCase();
-        const isValidIpRep = ipRep && ipRep !== "" && ipRep !== "n/a";
-        if (row.sampleIps && isValidIpRep && !latestIPRep.has(row.sampleIps)) {
-          latestIPRep.set(row.sampleIps, {
-            reputation: row.ipReputation,
-            date: row.date,
-          });
-        }
-      });
-
-      postmasterData.forEach((row) => {
-        if (row.sampleIps) {
-          const ipList = row.sampleIps.split(/[,;]/).map(ip => ip.trim()).filter(Boolean);
-          ipList.forEach((ip) => {
-            const existing = ipMap.get(ip);
-            const latestRep = latestIPRep.get(row.sampleIps);
-            if (existing) {
-              existing.count = Math.max(existing.count, row.ipCount || 1);
-            } else {
-              ipMap.set(ip, {
-                ip,
-                count: row.ipCount || 1,
-                latestReputation: latestRep?.reputation,
-                reputationDate: latestRep?.date,
-              });
-            }
-          });
-        }
-      });
+    if (!postmasterData || postmasterData.length === 0) {
+      return { domains: [], ips: [] };
     }
 
-    providerNames.forEach((provider) => {
-      const providerLower = provider.toLowerCase().trim();
-      let matchedData: typeof latestDomainData extends Map<string, infer V> ? V : never | undefined;
-      latestDomainData.forEach((data, domainKey) => {
-        if (domainKey.includes(providerLower) || providerLower.includes(domainKey)) {
-          matchedData = data;
-        }
-      });
-      if (!matchedData) {
-        matchedData = latestDomainData.get(providerLower);
-      }
+    // Sort newest first for "latest" logic
+    const sorted = [...postmasterData].sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
 
-      domainMap.set(providerLower, {
-        domain: provider,
-        latestReputation: matchedData?.reputation,
-        latestIpReputation: matchedData?.ipReputation,
-        latestSpamRatio: matchedData?.spamRatio,
-        latestErrorRatio: matchedData?.errorRatio,
-        reputationDate: matchedData?.date,
-      });
-    });
-
-    latestDomainData.forEach((data, domainKey) => {
-      if (!domainMap.has(domainKey)) {
-        const originalRow = postmasterData?.find(
-          (r) => r.domain?.toLowerCase().trim() === domainKey
-        );
+    // Domains: unique domains from postmaster CSV with latest domain reputation
+    sorted.forEach((row) => {
+      const domainKey = row.domain?.toLowerCase().trim();
+      if (domainKey && !domainMap.has(domainKey)) {
+        const rep = row.domainReputation?.trim();
+        const isValid = rep && rep.toLowerCase() !== "n/a" && rep !== "";
         domainMap.set(domainKey, {
-          domain: originalRow?.domain || domainKey,
-          latestReputation: data.reputation,
-          latestIpReputation: data.ipReputation,
-          latestSpamRatio: data.spamRatio,
-          latestErrorRatio: data.errorRatio,
-          reputationDate: data.date,
+          domain: row.domain?.trim() || domainKey,
+          latestReputation: isValid ? rep : undefined,
+          reputationDate: row.date,
         });
       }
+    });
+
+    // IPs: all unique IPs from sampleIps, latest recorded reputation
+    const ipRepSeen = new Set<string>();
+    sorted.forEach((row) => {
+      if (!row.sampleIps) return;
+      const ipList = row.sampleIps.split(/[,;]/).map((s) => cleanIP(s)).filter(Boolean);
+      ipList.forEach((ip) => {
+        if (ipRepSeen.has(ip)) return;
+        ipRepSeen.add(ip);
+        const rep = row.ipReputation?.trim();
+        const isValid = rep && rep.toLowerCase() !== "n/a" && rep !== "";
+        ipMap.set(ip, {
+          ip,
+          latestReputation: isValid ? rep : undefined,
+          reputationDate: row.date,
+        });
+      });
     });
 
     return {
@@ -198,65 +117,47 @@ export const InfrastructureDetailsTable: React.FC<InfrastructureDetailsTableProp
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
-      <div className={`grid gap-4 ${ips.length > 0 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+      <div className={`grid gap-4 ${ips.length > 0 && domains.length > 0 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
         {/* Domain Details */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <Globe className="w-4 h-4 text-primary" />
-            Domain Details ({domains.length} unique)
-          </h4>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Domain</TableHead>
-                  <TableHead>IP Reputation</TableHead>
-                  <TableHead>Spam Ratio</TableHead>
-                  <TableHead>Error Ratio</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {domains.map((d, i) => {
-                  const ipBadge = getReputationBadge(d.latestIpReputation || "");
-                  const IpIcon = ipBadge.icon;
-                  return (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{d.domain}</TableCell>
-                      <TableCell>
-                        {d.latestIpReputation ? (
-                          <Badge variant={ipBadge.variant} className={ipBadge.className}>
-                            {IpIcon && <IpIcon className="w-3 h-3 mr-1" />}
-                            {d.latestIpReputation}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {d.latestSpamRatio !== undefined ? (
-                          <span className={getRatioColor(d.latestSpamRatio, "spam")}>
-                            {(d.latestSpamRatio * 100).toFixed(2)}%
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {d.latestErrorRatio !== undefined ? (
-                          <span className={getRatioColor(d.latestErrorRatio, "error")}>
-                            {(d.latestErrorRatio * 100).toFixed(2)}%
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+        {domains.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" />
+              Domain Details ({domains.length} unique)
+            </h4>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Domain Reputation</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {domains.map((d, i) => {
+                    const badge = getReputationBadge(d.latestReputation || "");
+                    const IconComp = badge.icon;
+                    return (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{d.domain}</TableCell>
+                        <TableCell>
+                          {d.latestReputation ? (
+                            <Badge variant={badge.variant} className={badge.className}>
+                              {IconComp && <IconComp className="w-3 h-3 mr-1" />}
+                              {d.latestReputation}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* IP Details */}
         {ips.length > 0 && (
@@ -301,7 +202,7 @@ export const InfrastructureDetailsTable: React.FC<InfrastructureDetailsTableProp
       </div>
 
       <p className="text-xs text-muted-foreground">
-        * Domain reputation from Postmaster CSV. IP details from Postmaster "Sample IPs" field.
+        * Domain and IP details sourced from Postmaster CSV data.
       </p>
     </motion.div>
   );
