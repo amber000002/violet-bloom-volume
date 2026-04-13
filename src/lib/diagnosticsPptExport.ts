@@ -392,10 +392,21 @@ const SEVERITY_COLORS: Record<string, string> = {
   positive: "22C55E",
 };
 
-const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, yPos: number, theme: BrandTheme): void => {
+const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, _yPosLegacy: number, theme: BrandTheme): void => {
   if (!insights || insights.length === 0) return;
-  insights.forEach((insight, i) => {
-    const y = yPos + i * 0.28;
+
+  // Fixed zone: insight block always starts at ZONE.INSIGHT_Y
+  const y0 = ZONE.INSIGHT_Y;
+  const rowH = ZONE.INSIGHT_ROW_H;
+  const availableH = ZONE.INSIGHT_H;
+  // How many complete insight rows fit (reserve space for "+N more" label if needed)
+  const maxRows = Math.floor(availableH / rowH);
+  const needsTruncation = insights.length > maxRows;
+  const visibleCount = needsTruncation ? Math.max(1, maxRows - 1) : insights.length;
+  const visibleInsights = insights.slice(0, visibleCount);
+
+  visibleInsights.forEach((insight, i) => {
+    const y = y0 + i * rowH;
     // Severity dot
     slide.addShape("ellipse" as any, {
       x: 0.5, y: y + 0.04, w: 0.1, h: 0.1,
@@ -403,15 +414,25 @@ const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefi
     });
     // Insight text
     slide.addText(sanitizeText(insight.text), {
-      x: 0.7, y, w: 7.5, h: 0.22,
+      x: 0.7, y, w: 7.5, h: rowH,
       fontSize: 7, fontFace: FONTS.body, color: theme.bodyColor, valign: "middle",
     });
     // Source tag
     slide.addText(sanitizeText(`Source: ${insight.source}`), {
-      x: 8.3, y, w: 1.5, h: 0.22,
+      x: 8.3, y, w: 1.5, h: rowH,
       fontSize: 6, fontFace: FONTS.body, color: "999999", italic: true, valign: "middle",
     });
   });
+
+  // "+N more" truncation label — lower-severity insights dropped first (already sorted)
+  if (needsTruncation) {
+    const remaining = insights.length - visibleCount;
+    const truncY = y0 + visibleCount * rowH;
+    slide.addText(`+${remaining} more insight${remaining > 1 ? "s" : ""}`, {
+      x: 0.7, y: truncY, w: 3, h: rowH,
+      fontSize: 6, fontFace: FONTS.body, color: "999999", italic: true, valign: "middle",
+    });
+  }
 };
 
 // ============= INFRASTRUCTURE EXTRACTION =============
