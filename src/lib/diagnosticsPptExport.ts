@@ -1252,7 +1252,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const avgOpen = byOpenRate.reduce((s, c) => s + c.openRate, 0) / byOpenRate.length;
       const avgClick = byOpenRate.reduce((s, c) => s + c.clickRate, 0) / byOpenRate.length;
       s.addText(sanitizeText(`Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`), {
-        x: 0.3, y: 4.85, w: 9.0, h: 0.25, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
+        x: 0.3, y: ZONE.INSIGHT_Y - 0.15, w: 9.0, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
       });
     }
     addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 0, theme);
@@ -1317,7 +1317,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const avgOpen = byOpenRate.reduce((s, c) => s + c.openRate, 0) / byOpenRate.length;
       const avgClick = byOpenRate.reduce((s, c) => s + c.clickRate, 0) / byOpenRate.length;
       s.addText(sanitizeText(`Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`), {
-        x: 0.3, y: 4.85, w: 9.0, h: 0.25, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
+        x: 0.3, y: ZONE.INSIGHT_Y - 0.15, w: 9.0, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
       });
     }
     addInsightBlock(s, sectionInsights?.underperformingOpenRate, 0, theme);
