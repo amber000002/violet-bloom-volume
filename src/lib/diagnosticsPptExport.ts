@@ -687,9 +687,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     else insight = "Campaign performance within expected ranges";
 
     s.addText(sanitizeText(insight), {
-      x: 0.5, y: 4.85, w: 9, h: 0.3,
+      x: 0.5, y: ZONE.INSIGHT_Y + 0.1, w: 9, h: 0.3,
       fontSize: 9, italic: true, color: theme.bodyColor, fontFace: FONTS.body, align: "center",
     });
+    addInsightBlock(s, sectionInsights?.campaignOverview, 0, theme);
 
     addSlideFooter(s, theme, hasPostmasterData);
   }
