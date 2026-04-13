@@ -529,7 +529,7 @@ const THRESHOLDS = {
         errorChart: { data: errorData, observations: errorObs },
         invalidDateCount: invalidCount,
       };
-    }, [postmasterData, campaignData]);
+    }, [postmasterData, campaignData, selectedDomain]);
  
    if (!postmasterData || postmasterData.length === 0) {
      return (
@@ -543,8 +543,25 @@ const THRESHOLDS = {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-4"
-      >
+       className="space-y-4"
+     >
+       {/* Domain Filter */}
+       {uniqueDomains.length >= 1 && (
+         <div className="flex items-center gap-2">
+           <Label className="text-sm font-medium">Domain:</Label>
+           <Select value={selectedDomain} onValueChange={setSelectedDomain}>
+             <SelectTrigger className="w-[240px] h-8 text-sm">
+               <SelectValue placeholder="All Domains" />
+             </SelectTrigger>
+             <SelectContent>
+               <SelectItem value="all">All Domains</SelectItem>
+               {uniqueDomains.map((d) => (
+                 <SelectItem key={d} value={d}>{d}</SelectItem>
+               ))}
+             </SelectContent>
+           </Select>
+         </div>
+       )}
         {/* Invalid Date Integrity Counter */}
         {invalidDateCount > 0 && (
           <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-600 text-sm">
