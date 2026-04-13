@@ -1,4 +1,4 @@
- import React, { useMemo } from "react";
+ import React, { useMemo, useState } from "react";
  import { motion } from "framer-motion";
  import {
    LineChart,
@@ -11,8 +11,16 @@
    ReferenceLine,
  } from "recharts";
  import { CampaignRow, PostmasterRow } from "@/lib/csvAnalyzer";
- import { AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
- import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+  import { AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
+  import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+  import { Label } from "@/components/ui/label";
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
  
  interface ReputationSmallMultiplesProps {
    postmasterData: PostmasterRow[] | null;
