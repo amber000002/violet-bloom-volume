@@ -1496,7 +1496,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               const activeProvider = monthlyProviderTab ?? providerList[0] ?? "";
               // Show provider-specific insights when multi-provider toggle is active, otherwise aggregated
               const providerInsights = hasMultiProvider && sectionInsights?.monthlyOverviewByProvider?.[activeProvider];
-              return <SectionInsightsBlock insights={providerInsights || sectionInsights?.monthlyOverview ?? null} />;
+              return <SectionInsightsBlock insights={(providerInsights ? providerInsights : sectionInsights?.monthlyOverview) ?? null} />;
             })()}
           </CollapsibleSection>
 
