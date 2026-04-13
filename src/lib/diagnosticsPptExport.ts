@@ -12,6 +12,7 @@ import {
   TopCampaign,
 } from "./csvAnalyzer";
 import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
+import { SectionInsights, TableInsight } from "./sectionInsightEngine";
 
 // ============= TYPES =============
 
@@ -62,8 +63,9 @@ export interface DiagnosticsDeckOptions {
   industry?: string;
   sourceFileName?: string;
   creativeAnalysis?: CreativeAnalysisExport | null;
-  creativeImage?: string | null; // base64 data URI of uploaded creative
+  creativeImage?: string | null;
   lifecycleCoverage?: LifecycleCoverageExport[];
+  sectionInsights?: SectionInsights;
 }
 
 // ============= BRAND COLOR ENGINE =============
