@@ -1489,7 +1489,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             <p className="text-xs text-muted-foreground mt-3">
               * Dates parsed as DD/MM/YY or DD/MM/YYYY format. Percentages calculated using {diagnostics.analysisReport.monthlyOverview[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator.
             </p>
-            <SectionInsightsBlock insights={sectionInsights?.monthlyOverview ?? null} />
+            {(() => {
+              const byProvider = diagnostics.analysisReport.monthlyOverviewByProvider;
+              const providerList = [...new Set(byProvider.map(m => m.provider))];
+              const hasMultiProvider = providerList.length > 1;
+              const activeProvider = monthlyProviderTab ?? providerList[0] ?? "";
+              // Show provider-specific insights when multi-provider toggle is active, otherwise aggregated
+              const providerInsights = hasMultiProvider && sectionInsights?.monthlyOverviewByProvider?.[activeProvider];
+              return <SectionInsightsBlock insights={providerInsights || sectionInsights?.monthlyOverview ?? null} />;
+            })()}
           </CollapsibleSection>
 
           {/* ============= EMAIL METRICS TREND CHART ============= */}
