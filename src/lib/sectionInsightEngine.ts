@@ -104,6 +104,7 @@ export function generateSectionInsights(
     emailMetricsTrend: generateEmailMetricsTrendInsights(sig),
     infrastructureReputation: generateInfrastructureInsights(postmasterData),
     reputationTrends: generateReputationTrendsInsights(postmasterData),
+    reputationTrendsByDomain: generateReputationTrendsByDomain(postmasterData),
     bestPerformingOpenRate: generateBestOpenRateInsights(sig),
     bestPerformingCTR: generateBestCTRInsights(sig),
     underperformingOpenRate: generateUnderperformingOpenRateInsights(sig),
