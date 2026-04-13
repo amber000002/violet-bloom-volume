@@ -205,6 +205,21 @@ const buildBrandTheme = (brandProfile?: CoreBrandJSON | null, industry?: string)
 
 const FONTS = { headline: "Calibri", body: "Calibri" };
 
+// ============= FIXED ZONE LAYOUT (EMU → inches) =============
+// Slide: 10" × 5.625" (9,144,000 × 5,143,500 EMU)
+// All data slides (2–11) use these four immovable zones.
+const ZONE = {
+  HEADER_Y: 0,                    // 0 EMU
+  HEADER_H: 0.625,               // 571,500 EMU
+  TABLE_Y: 0.625,                 // 571,500 EMU
+  TABLE_MAX_H: 3.538,             // 3,234,690 EMU — hard ceiling
+  INSIGHT_Y: 4.163,               // 3,806,190 EMU — fixed anchor
+  INSIGHT_H: 1.012,               // 925,830 EMU
+  INSIGHT_ROW_H: 0.22,            // single insight row height
+  FOOTER_Y: 5.175,                // 4,731,990 EMU — anchored to bottom
+  FOOTER_H: 0.45,                 // 411,480 EMU
+} as const;
+
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 8192;
