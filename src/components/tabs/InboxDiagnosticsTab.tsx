@@ -1276,6 +1276,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     sourceFileName: campaignFileName,
                     creativeAnalysis: creativeAnalysis || null,
                     creativeImage: creativeImage || null,
+                    sectionInsights: sectionInsights || undefined,
                   });
                 }}
                 className="gap-2"
