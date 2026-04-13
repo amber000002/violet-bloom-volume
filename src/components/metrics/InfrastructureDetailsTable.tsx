@@ -107,9 +107,16 @@ export const InfrastructureDetailsTable: React.FC<InfrastructureDetailsTableProp
       });
     });
 
+    const repOrder: Record<string, number> = { high: 0, medium: 1, low: 2, bad: 3 };
+    const sortedIps = Array.from(ipMap.values()).sort((a, b) => {
+      const ra = repOrder[(a.latestReputation || "").toLowerCase()] ?? 4;
+      const rb = repOrder[(b.latestReputation || "").toLowerCase()] ?? 4;
+      return ra - rb;
+    });
+
     return {
       domains: Array.from(domainMap.values()),
-      ips: Array.from(ipMap.values()),
+      ips: sortedIps,
     };
   }, [campaignData, postmasterData]);
 
