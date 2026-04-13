@@ -377,31 +377,49 @@ const THRESHOLDS = {
    postmasterData,
    campaignData,
  }) => {
-    // Process data for all 4 charts
-    const { ipRepChart, domainRepChart, spamChart, errorChart, invalidDateCount } = useMemo(() => {
-      if (!postmasterData || postmasterData.length === 0) {
-        return {
-          ipRepChart: { data: [], observations: [] },
-          domainRepChart: { data: [], observations: [] },
-          spamChart: { data: [], observations: [] },
-          errorChart: { data: [], observations: [] },
-          invalidDateCount: 0,
-        };
-      }
+  const [selectedDomain, setSelectedDomain] = useState<string>("all");
 
-      // Sort postmaster data chronologically, track invalid dates
-      let invalidCount = 0;
-      const sorted = [...postmasterData]
-        .map((row) => {
-          const dateObj = parseReputationDate(row.date);
-          if (!dateObj) {
-            invalidCount++;
-            return null;
-          }
-          return { ...row, dateObj };
-        })
-        .filter((r): r is PostmasterRow & { dateObj: Date } => r !== null)
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+  // Extract unique domains
+  const uniqueDomains = useMemo(() => {
+    if (!postmasterData) return [];
+    const domains = new Set<string>();
+    postmasterData.forEach((row) => {
+      const d = row.domain?.trim();
+      if (d) domains.add(d);
+    });
+    return Array.from(domains).sort();
+  }, [postmasterData]);
+
+   // Process data for all 4 charts
+   const { ipRepChart, domainRepChart, spamChart, errorChart, invalidDateCount } = useMemo(() => {
+     if (!postmasterData || postmasterData.length === 0) {
+       return {
+         ipRepChart: { data: [], observations: [] },
+         domainRepChart: { data: [], observations: [] },
+         spamChart: { data: [], observations: [] },
+         errorChart: { data: [], observations: [] },
+         invalidDateCount: 0,
+       };
+     }
+
+     // Filter by selected domain
+     const filtered = selectedDomain === "all"
+       ? postmasterData
+       : postmasterData.filter((row) => row.domain?.trim() === selectedDomain);
+
+     // Sort postmaster data chronologically, track invalid dates
+     let invalidCount = 0;
+     const sorted = [...filtered]
+       .map((row) => {
+         const dateObj = parseReputationDate(row.date);
+         if (!dateObj) {
+           invalidCount++;
+           return null;
+         }
+         return { ...row, dateObj };
+       })
+       .filter((r): r is PostmasterRow & { dateObj: Date } => r !== null)
+       .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
       if (sorted.length === 0) {
         return {
