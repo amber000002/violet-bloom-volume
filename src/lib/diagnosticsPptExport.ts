@@ -946,7 +946,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         chartColors: colors,
       });
 
-      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, { x: 0.5, y: 4.9, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
+      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, { x: 0.5, y: ZONE.INSIGHT_Y - 0.2, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     } else {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
