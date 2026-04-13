@@ -1557,6 +1557,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
 
+    addInsightBlock(s, sectionInsights?.sendMixCoverage, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1616,6 +1617,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         });
       }
     }
+    addInsightBlock(s, sectionInsights?.keyLearnings, 4.7, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
