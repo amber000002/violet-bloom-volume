@@ -847,59 +847,77 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   }
 
   // ==========================================
-  // SLIDE 3: Monthly Overview
-  // Columns match app: Month, Campaigns, Sent, [Delivered], Unique Sent, Viewed, View%, Clicked, Click%, Unsubs, Unsub%, Hard Bounce, Hard%, Soft Bounce, Soft%
+  // SLIDE 3+: Monthly Overview (per-provider when multi-provider)
   // ==========================================
-  slideNum++;
   {
-    const s = pptx.addSlide();
-    addSlideBackground(s, theme);
-    addDecorativeMotif(s, theme, "side");
-    addSlideHeader(s, "Monthly Overview", theme, monthRange, slideNum);
+    const byProvider = report.monthlyOverviewByProvider;
+    const uniqueProviders = [...new Set(byProvider.map(m => m.provider))];
+    const hasMultiProvider = uniqueProviders.length > 1;
 
-    const monthlyData = report.monthlyOverview.filter(m => m.month !== "Unknown Date" || m.totalSentUsers > 0);
-    const mUseDelivered = monthlyData[0]?.useDeliveredAsDenominator;
+    // Build list of slide configs: one per provider if multi, or one aggregate
+    const monthlySlideConfigs = hasMultiProvider
+      ? uniqueProviders.map(provider => ({
+          title: `Monthly Overview \u2014 ${provider}`,
+          data: byProvider.filter(m => m.provider === provider && (m.month !== "Unknown Date" || m.totalSentUsers > 0)),
+          insights: sectionInsights?.monthlyOverviewByProvider?.[provider] ?? sectionInsights?.monthlyOverview,
+        }))
+      : [{
+          title: "Monthly Overview",
+          data: report.monthlyOverview.filter(m => m.month !== "Unknown Date" || m.totalSentUsers > 0),
+          insights: sectionInsights?.monthlyOverview,
+        }];
 
-    const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
-    if (mUseDelivered) mHeaders.push("Delivered");
-    mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
+    for (const config of monthlySlideConfigs) {
+      slideNum++;
+      const s = pptx.addSlide();
+      addSlideBackground(s, theme);
+      addDecorativeMotif(s, theme, "side");
+      addSlideHeader(s, config.title, theme, monthRange, slideNum);
 
-    const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
-    const mRows: pptxgen.TableRow[] = [mHeaderRow];
+      const monthlyData = config.data;
+      const mUseDelivered = monthlyData[0]?.useDeliveredAsDenominator;
 
-    monthlyData.forEach((m, ri) => {
-      const row: pptxgen.TableCell[] = [
-        { text: sanitizeText(m.month), options: bodyCellOpts(theme, ri) },
-        { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "center") },
-        { text: formatNumber(m.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
-      ];
-      if (mUseDelivered) row.push({ text: formatNumber(m.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "center") });
-      row.push(
-        { text: formatNumber(m.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
-        { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.viewPercent, "openRate", theme)) },
-        { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
-        { text: formatPercent(m.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.clickPercent, "clickRate", theme)) },
-        { text: formatNumber(m.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
-        { text: formatPercent(m.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.unsubscribePercent, "unsubscribeRate", theme)) },
-        { text: formatNumber(m.hardBounces), options: bodyCellOpts(theme, ri, "center") },
-        { text: formatPercent(m.hardBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.hardBouncePercent, "bounceRate", theme)) },
-        { text: formatNumber(m.softBounces), options: bodyCellOpts(theme, ri, "center") },
-        { text: formatPercent(m.softBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.softBouncePercent, "bounceRate", theme)) },
-      );
-      mRows.push(row);
-    });
+      const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
+      if (mUseDelivered) mHeaders.push("Delivered");
+      mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
-    const mColW = mUseDelivered
-      ? [0.9, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.45, 0.5, 0.55, 0.5, 0.55, 0.5]
-      : [1.0, 0.6, 0.65, 0.6, 0.6, 0.6, 0.6, 0.55, 0.6, 0.6, 0.6, 0.6, 0.6];
+      const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
+      const mRows: pptxgen.TableRow[] = [mHeaderRow];
 
-    s.addTable(mRows, {
-      x: 0.3, y: 1.15, w: 9.4, colW: mColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
-      fontFace: FONTS.body,
-    });
-    addInsightBlock(s, sectionInsights?.monthlyOverview, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+      monthlyData.forEach((m, ri) => {
+        const row: pptxgen.TableCell[] = [
+          { text: sanitizeText(m.month), options: bodyCellOpts(theme, ri) },
+          { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatNumber(m.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
+        ];
+        if (mUseDelivered) row.push({ text: formatNumber(m.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "center") });
+        row.push(
+          { text: formatNumber(m.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.viewPercent, "openRate", theme)) },
+          { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(m.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.clickPercent, "clickRate", theme)) },
+          { text: formatNumber(m.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(m.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.unsubscribePercent, "unsubscribeRate", theme)) },
+          { text: formatNumber(m.hardBounces), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(m.hardBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.hardBouncePercent, "bounceRate", theme)) },
+          { text: formatNumber(m.softBounces), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(m.softBouncePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.softBouncePercent, "bounceRate", theme)) },
+        );
+        mRows.push(row);
+      });
+
+      const mColW = mUseDelivered
+        ? [0.9, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.45, 0.5, 0.55, 0.5, 0.55, 0.5]
+        : [1.0, 0.6, 0.65, 0.6, 0.6, 0.6, 0.6, 0.55, 0.6, 0.6, 0.6, 0.6, 0.6];
+
+      s.addTable(mRows, {
+        x: 0.3, y: 1.15, w: 9.4, colW: mColW,
+        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        fontFace: FONTS.body,
+      });
+      addInsightBlock(s, config.insights, 0, theme);
+      addSlideFooter(s, theme, hasPostmasterData);
+    }
   }
 
   // ==========================================
