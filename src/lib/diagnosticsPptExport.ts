@@ -384,53 +384,110 @@ const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right"
 });
 
 // ============= INSIGHT BLOCK RENDERER =============
+// Glassmorphism light design — frosted card rows, severity pips, no source tags
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "FF0000",
+const SEVERITY_PIP: Record<string, string> = {
+  critical: "EF4444",
   warning: "F59E0B",
   info: "3B82F6",
-  positive: "22C55E",
+  positive: "10B981",
 };
 
-const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, _yPosLegacy: number, theme: BrandTheme): void => {
+const SEVERITY_LABEL_COLOR: Record<string, string> = {
+  critical: "DC2626",
+  warning: "D97706",
+  info: "2563EB",
+  positive: "059669",
+};
+
+const SEVERITY_LABEL_TEXT: Record<string, string> = {
+  critical: "CRITICAL",
+  warning: "WARNING",
+  info: "INFO",
+  positive: "POSITIVE",
+};
+
+// Keep legacy alias for any external references
+const SEVERITY_COLORS = SEVERITY_PIP;
+
+const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, _yPosLegacy: number, _theme: BrandTheme): void => {
   if (!insights || insights.length === 0) return;
 
-  // Fixed zone: insight block always starts at ZONE.INSIGHT_Y
   const y0 = ZONE.INSIGHT_Y;
-  const rowH = ZONE.INSIGHT_ROW_H;
-  const availableH = ZONE.INSIGHT_H;
-  // How many complete insight rows fit (reserve space for "+N more" label if needed)
-  const maxRows = Math.floor(availableH / rowH);
-  const needsTruncation = insights.length > maxRows;
-  const visibleCount = needsTruncation ? Math.max(1, maxRows - 1) : insights.length;
+  const zoneW = 9.0; // content width
+  const zoneX = 0.5;
+  const labelH = 0.14; // "INSIGHTS" label height
+  const cardH = 0.185; // single card row height
+  const cardGap = 0.025; // vertical gap between cards
+  const cardUnit = cardH + cardGap;
+  const availableForCards = ZONE.INSIGHT_H - labelH - 0.04; // reserve top spacing
+  const maxCards = Math.floor(availableForCards / cardUnit);
+  const needsTruncation = insights.length > maxCards;
+  const visibleCount = needsTruncation ? Math.max(1, maxCards - 1) : Math.min(insights.length, maxCards);
   const visibleInsights = insights.slice(0, visibleCount);
 
+  // Divider line (0.5px, very light)
+  slide.addShape("rect" as any, {
+    x: zoneX, y: y0, w: zoneW, h: 0.005,
+    fill: { color: "000000", transparency: 94 },
+  });
+
+  // "INSIGHTS" zone label
+  slide.addText("INSIGHTS", {
+    x: zoneX, y: y0 + 0.01, w: 0.6, h: labelH,
+    fontSize: 6, fontFace: FONTS.body, color: "B8B8B8",
+    bold: true, valign: "middle",
+  });
+  // Extending line after label
+  slide.addShape("rect" as any, {
+    x: zoneX + 0.62, y: y0 + 0.01 + labelH / 2 - 0.0025, w: zoneW - 0.62, h: 0.005,
+    fill: { color: "000000", transparency: 94 },
+  });
+
+  const cardsStartY = y0 + labelH + 0.03;
+
   visibleInsights.forEach((insight, i) => {
-    const y = y0 + i * rowH;
-    // Severity dot
+    const cy = cardsStartY + i * cardUnit;
+
+    // Card background — frosted glass
+    slide.addShape("roundRect" as any, {
+      x: zoneX, y: cy, w: zoneW, h: cardH,
+      fill: { color: "FFFFFF", transparency: 35 },
+      line: { color: "000000", width: 0.4, transparency: 94 } as any,
+      rectRadius: 0.06,
+    });
+
+    // Severity pip (6px dot)
+    const pipColor = SEVERITY_PIP[insight.severity] || "999999";
     slide.addShape("ellipse" as any, {
-      x: 0.5, y: y + 0.04, w: 0.1, h: 0.1,
-      fill: { color: SEVERITY_COLORS[insight.severity] || "999999" },
+      x: zoneX + 0.12, y: cy + cardH / 2 - 0.035, w: 0.07, h: 0.07,
+      fill: { color: pipColor },
+      shadow: { type: "outer", blur: 4, offset: 0, color: pipColor, opacity: 0.25 },
     });
-    // Insight text
+
+    // Severity label (uppercase, colored)
+    const labelColor = SEVERITY_LABEL_COLOR[insight.severity] || "999999";
+    const labelText = SEVERITY_LABEL_TEXT[insight.severity] || "INFO";
+    slide.addText(labelText, {
+      x: zoneX + 0.24, y: cy, w: 0.55, h: cardH,
+      fontSize: 6, fontFace: FONTS.body, color: labelColor,
+      bold: true, valign: "middle",
+    });
+
+    // Insight text (no source tag)
     slide.addText(sanitizeText(insight.text), {
-      x: 0.7, y, w: 7.5, h: rowH,
-      fontSize: 7, fontFace: FONTS.body, color: theme.bodyColor, valign: "middle",
-    });
-    // Source tag
-    slide.addText(sanitizeText(`Source: ${insight.source}`), {
-      x: 8.3, y, w: 1.5, h: rowH,
-      fontSize: 6, fontFace: FONTS.body, color: "999999", italic: true, valign: "middle",
+      x: zoneX + 0.82, y: cy, w: zoneW - 0.95, h: cardH,
+      fontSize: 7.5, fontFace: FONTS.body, color: "616161", valign: "middle",
     });
   });
 
-  // "+N more" truncation label — lower-severity insights dropped first (already sorted)
+  // "+N more" truncation label
   if (needsTruncation) {
     const remaining = insights.length - visibleCount;
-    const truncY = y0 + visibleCount * rowH;
+    const truncY = cardsStartY + visibleCount * cardUnit;
     slide.addText(`+${remaining} more insight${remaining > 1 ? "s" : ""}`, {
-      x: 0.7, y: truncY, w: 3, h: rowH,
-      fontSize: 6, fontFace: FONTS.body, color: "999999", italic: true, valign: "middle",
+      x: zoneX + 0.12, y: truncY, w: 3, h: cardH,
+      fontSize: 6, fontFace: FONTS.body, color: "B8B8B8", italic: true, valign: "middle",
     });
   }
 };
