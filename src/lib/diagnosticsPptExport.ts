@@ -205,6 +205,21 @@ const buildBrandTheme = (brandProfile?: CoreBrandJSON | null, industry?: string)
 
 const FONTS = { headline: "Calibri", body: "Calibri" };
 
+// ============= FIXED ZONE LAYOUT (EMU → inches) =============
+// Slide: 10" × 5.625" (9,144,000 × 5,143,500 EMU)
+// All data slides (2–11) use these four immovable zones.
+const ZONE = {
+  HEADER_Y: 0,                    // 0 EMU
+  HEADER_H: 0.625,               // 571,500 EMU
+  TABLE_Y: 0.625,                 // 571,500 EMU
+  TABLE_MAX_H: 3.538,             // 3,234,690 EMU — hard ceiling
+  INSIGHT_Y: 4.163,               // 3,806,190 EMU — fixed anchor
+  INSIGHT_H: 1.012,               // 925,830 EMU
+  INSIGHT_ROW_H: 0.22,            // single insight row height
+  FOOTER_Y: 5.175,                // 4,731,990 EMU — anchored to bottom
+  FOOTER_H: 0.45,                 // 411,480 EMU
+} as const;
+
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 8192;
@@ -349,14 +364,14 @@ const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
 };
 
 const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, slideNumber?: number) => {
-  slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0.5, y: 0.95, w: 2.5, h: 0.04, fill: { color: theme.primary } });
-  slide.addText(title, { x: 0.5, y: 0.3, w: monthRange ? 6.5 : 8.5, h: 0.65, fontSize: 22, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
-  if (monthRange) slide.addText(monthRange, { x: 7, y: 0.4, w: 2.5, h: 0.4, fontSize: 11, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
-  if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: 5.2, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
+  slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0.5, y: ZONE.HEADER_Y + 0.95, w: 2.5, h: 0.04, fill: { color: theme.primary } });
+  slide.addText(title, { x: 0.5, y: ZONE.HEADER_Y + 0.3, w: monthRange ? 6.5 : 8.5, h: 0.65, fontSize: 22, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
+  if (monthRange) slide.addText(monthRange, { x: 7, y: ZONE.HEADER_Y + 0.4, w: 2.5, h: 0.4, fontSize: 11, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
+  if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: ZONE.FOOTER_Y + 0.05, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
 };
 
 const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, _hasPostmasterData: boolean = true) => {
-  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: 5.2, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
+  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: ZONE.FOOTER_Y + 0.05, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
@@ -377,10 +392,21 @@ const SEVERITY_COLORS: Record<string, string> = {
   positive: "22C55E",
 };
 
-const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, yPos: number, theme: BrandTheme): void => {
+const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, _yPosLegacy: number, theme: BrandTheme): void => {
   if (!insights || insights.length === 0) return;
-  insights.forEach((insight, i) => {
-    const y = yPos + i * 0.28;
+
+  // Fixed zone: insight block always starts at ZONE.INSIGHT_Y
+  const y0 = ZONE.INSIGHT_Y;
+  const rowH = ZONE.INSIGHT_ROW_H;
+  const availableH = ZONE.INSIGHT_H;
+  // How many complete insight rows fit (reserve space for "+N more" label if needed)
+  const maxRows = Math.floor(availableH / rowH);
+  const needsTruncation = insights.length > maxRows;
+  const visibleCount = needsTruncation ? Math.max(1, maxRows - 1) : insights.length;
+  const visibleInsights = insights.slice(0, visibleCount);
+
+  visibleInsights.forEach((insight, i) => {
+    const y = y0 + i * rowH;
     // Severity dot
     slide.addShape("ellipse" as any, {
       x: 0.5, y: y + 0.04, w: 0.1, h: 0.1,
@@ -388,15 +414,25 @@ const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefi
     });
     // Insight text
     slide.addText(sanitizeText(insight.text), {
-      x: 0.7, y, w: 7.5, h: 0.22,
+      x: 0.7, y, w: 7.5, h: rowH,
       fontSize: 7, fontFace: FONTS.body, color: theme.bodyColor, valign: "middle",
     });
     // Source tag
     slide.addText(sanitizeText(`Source: ${insight.source}`), {
-      x: 8.3, y, w: 1.5, h: 0.22,
+      x: 8.3, y, w: 1.5, h: rowH,
       fontSize: 6, fontFace: FONTS.body, color: "999999", italic: true, valign: "middle",
     });
   });
+
+  // "+N more" truncation label — lower-severity insights dropped first (already sorted)
+  if (needsTruncation) {
+    const remaining = insights.length - visibleCount;
+    const truncY = y0 + visibleCount * rowH;
+    slide.addText(`+${remaining} more insight${remaining > 1 ? "s" : ""}`, {
+      x: 0.7, y: truncY, w: 3, h: rowH,
+      fontSize: 6, fontFace: FONTS.body, color: "999999", italic: true, valign: "middle",
+    });
+  }
 };
 
 // ============= INFRASTRUCTURE EXTRACTION =============
@@ -651,9 +687,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     else insight = "Campaign performance within expected ranges";
 
     s.addText(sanitizeText(insight), {
-      x: 0.5, y: 4.85, w: 9, h: 0.3,
+      x: 0.5, y: ZONE.INSIGHT_Y + 0.1, w: 9, h: 0.3,
       fontSize: 9, italic: true, color: theme.bodyColor, fontFace: FONTS.body, align: "center",
     });
+    addInsightBlock(s, sectionInsights?.campaignOverview, 0, theme);
 
     addSlideFooter(s, theme, hasPostmasterData);
   }
@@ -742,9 +779,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fontFace: FONTS.body,
     });
 
-    s.addText(`* Percentages use ${useDelivered ? "Delivered" : "Sent"} as denominator`, { x: 0.5, y: 4.9, w: 5, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
-    addInsightBlock(s, sectionInsights?.campaignOverview, 5.15, theme);
-    addInsightBlock(s, sectionInsights?.campaignOverviewByProvider, 5.15 + (sectionInsights?.campaignOverview?.length || 0) * 0.35, theme);
+    s.addText(`* Percentages use ${useDelivered ? "Delivered" : "Sent"} as denominator`, { x: 0.5, y: ZONE.INSIGHT_Y - 0.25, w: 5, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
+    // Merge both campaign overview + provider insights into a single block (max 4 total)
+    const mergedOverviewInsights = [
+      ...(sectionInsights?.campaignOverview || []),
+      ...(sectionInsights?.campaignOverviewByProvider || []),
+    ].slice(0, 4);
+    addInsightBlock(s, mergedOverviewInsights, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -800,7 +841,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
-    addInsightBlock(s, sectionInsights?.monthlyOverview, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.monthlyOverview, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -905,11 +946,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         chartColors: colors,
       });
 
-      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, { x: 0.5, y: 4.9, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
+      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, { x: 0.5, y: ZONE.INSIGHT_Y - 0.2, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     } else {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
-    addInsightBlock(s, sectionInsights?.emailMetricsTrend, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.emailMetricsTrend, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -978,7 +1019,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     if (infra.domains.length === 0 && infra.ips.length === 0) {
       s.addText("No infrastructure details available", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
-    addInsightBlock(s, sectionInsights?.infrastructureReputation, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.infrastructureReputation, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1135,7 +1176,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     } else {
       s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
-    addInsightBlock(s, sectionInsights?.reputationTrends, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.reputationTrends, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1211,10 +1252,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const avgOpen = byOpenRate.reduce((s, c) => s + c.openRate, 0) / byOpenRate.length;
       const avgClick = byOpenRate.reduce((s, c) => s + c.clickRate, 0) / byOpenRate.length;
       s.addText(sanitizeText(`Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`), {
-        x: 0.3, y: 4.85, w: 9.0, h: 0.25, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
+        x: 0.3, y: ZONE.INSIGHT_Y - 0.15, w: 9.0, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
       });
     }
-    addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1242,7 +1283,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
-    addInsightBlock(s, sectionInsights?.bestPerformingCTR, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.bestPerformingCTR, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1276,10 +1317,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const avgOpen = byOpenRate.reduce((s, c) => s + c.openRate, 0) / byOpenRate.length;
       const avgClick = byOpenRate.reduce((s, c) => s + c.clickRate, 0) / byOpenRate.length;
       s.addText(sanitizeText(`Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`), {
-        x: 0.3, y: 4.85, w: 9.0, h: 0.25, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
+        x: 0.3, y: ZONE.INSIGHT_Y - 0.15, w: 9.0, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
       });
     }
-    addInsightBlock(s, sectionInsights?.underperformingOpenRate, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.underperformingOpenRate, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1313,7 +1354,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
       fontFace: FONTS.body,
     });
-    addInsightBlock(s, sectionInsights?.underperformingCTR, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.underperformingCTR, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1560,7 +1601,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
 
-    addInsightBlock(s, sectionInsights?.sendMixCoverage, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.sendMixCoverage, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
@@ -1620,7 +1661,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         });
       }
     }
-    addInsightBlock(s, sectionInsights?.keyLearnings, 4.7, theme);
+    addInsightBlock(s, sectionInsights?.keyLearnings, 0, theme);
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
