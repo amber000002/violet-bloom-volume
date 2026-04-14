@@ -830,7 +830,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       totals.soft += p.softBounces;
 
       const row: pptxgen.TableCell[] = [
-        { text: sanitizeText(`${p.serviceProvider} / ${p.providerName}`), options: bodyCellOpts(theme, ri) },
+        { text: sanitizeText(`${p.serviceProvider} / ${p.providerName}`), options: bodyCellOpts(theme, ri, "left", undefined, true) },
         { text: formatNumber(p.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       ];
       if (useDelivered) row.push({ text: formatNumber(p.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "center") });
@@ -851,7 +851,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     // Grand Total row
     const denom = useDelivered ? totals.delivered : totals.sent;
-    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 8, align, fill: { color: theme.headerBg }, fontFace: FONTS.body });
+    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 7, align, fill: { color: theme.headerBg }, fontFace: FONTS.body, valign: "middle", margin: [3, 4, 3, 4] });
     const gt: pptxgen.TableCell[] = [
       { text: "Grand Total", options: gtOpts("left") },
       { text: formatNumber(totals.sent), options: gtOpts() },
@@ -872,14 +872,14 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     rows.push(gt);
 
     const numCols = headers.length;
-    // Distribute widths proportionally
+    // Column widths — Provider is flex (wraps), all others no-wrap
     const baseW = useDelivered
-      ? [1.6, 0.6, 0.6, 0.55, 0.55, 0.55, 0.55, 0.5, 0.5, 0.55, 0.5, 0.55, 0.5]
-      : [1.8, 0.65, 0.6, 0.6, 0.6, 0.6, 0.55, 0.55, 0.6, 0.55, 0.6, 0.55];
+      ? [1.5, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.5, 0.55, 0.6, 0.55, 0.6, 0.55]
+      : [1.7, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55];
 
     s.addTable(rows, {
-      x: 0.3, y: 1.15, w: 9.4, colW: baseW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: baseW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
