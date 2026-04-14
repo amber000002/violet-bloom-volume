@@ -363,15 +363,51 @@ const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
   slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
 };
 
-const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, slideNumber?: number) => {
-  slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0.5, y: ZONE.HEADER_Y + 0.95, w: 2.5, h: 0.04, fill: { color: theme.primary } });
-  slide.addText(title, { x: 0.5, y: ZONE.HEADER_Y + 0.3, w: monthRange ? 6.5 : 8.5, h: 0.65, fontSize: 22, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
-  if (monthRange) slide.addText(monthRange, { x: 7, y: ZONE.HEADER_Y + 0.4, w: 2.5, h: 0.4, fontSize: 11, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
-  if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: ZONE.FOOTER_Y + 0.05, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
+/**
+ * Universal header — identical on every data slide.
+ * Elements: title (left), accent line (under title), date range (right).
+ * Not rendered on title/thank-you slides.
+ */
+const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, _slideNumber?: number) => {
+  // Title — left-aligned, sentence case, font-weight 600
+  const titleX = 0.35;
+  const titleY = ZONE.HEADER_Y + 0.12;
+  const titleW = 7.0; // max 70% of 10" slide
+  slide.addText(title, {
+    x: titleX, y: titleY, w: titleW, h: 0.42,
+    fontSize: 22, fontFace: FONTS.headline, color: theme.titleColor, bold: true,
+  });
+
+  // Accent line — short bar under title, ~40-50% of title text width
+  // Approximate: use a fixed fraction of titleW capped reasonably
+  const accentW = Math.min(title.length * 0.11, titleW * 0.5, 3.0);
+  slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+    x: titleX, y: titleY + 0.44, w: Math.max(accentW, 1.2), h: 0.035,
+    fill: { color: theme.primary },
+    rectRadius: 0.018,
+  });
+
+  // Date range — right-aligned
+  if (monthRange) {
+    slide.addText(sanitizeText(monthRange), {
+      x: 7.0, y: ZONE.HEADER_Y + 0.18, w: 2.65, h: 0.3,
+      fontSize: 11, fontFace: FONTS.body, color: "6B7280", align: "right",
+    });
+  }
 };
 
-const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, _hasPostmasterData: boolean = true) => {
-  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: ZONE.FOOTER_Y + 0.05, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
+/**
+ * Universal footer — identical on every data slide.
+ * Contains only the page number, right-aligned, italic.
+ * Not rendered on title/thank-you slides.
+ */
+const addSlideFooter = (slide: pptxgen.Slide, _theme: BrandTheme, slideNumber?: number | boolean) => {
+  // If slideNumber is a boolean (legacy call) or falsy, skip rendering
+  if (typeof slideNumber !== "number" || !slideNumber) return;
+  slide.addText(`${slideNumber}`, {
+    x: 9.2, y: ZONE.FOOTER_Y + 0.05, w: 0.5, h: 0.35,
+    fontSize: 9, fontFace: FONTS.body, color: "9CA3AF", align: "right", italic: true,
+  });
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
