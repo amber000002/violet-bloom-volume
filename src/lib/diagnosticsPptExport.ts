@@ -363,15 +363,51 @@ const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
   slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
 };
 
-const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, slideNumber?: number) => {
-  slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0.5, y: ZONE.HEADER_Y + 0.95, w: 2.5, h: 0.04, fill: { color: theme.primary } });
-  slide.addText(title, { x: 0.5, y: ZONE.HEADER_Y + 0.3, w: monthRange ? 6.5 : 8.5, h: 0.65, fontSize: 22, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
-  if (monthRange) slide.addText(monthRange, { x: 7, y: ZONE.HEADER_Y + 0.4, w: 2.5, h: 0.4, fontSize: 11, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
-  if (slideNumber) slide.addText(`${slideNumber}`, { x: 9.3, y: ZONE.FOOTER_Y + 0.05, w: 0.4, h: 0.3, fontSize: 9, color: theme.mutedColor, fontFace: FONTS.body, align: "right" });
+/**
+ * Universal header — identical on every data slide.
+ * Elements: title (left), accent line (under title), date range (right).
+ * Not rendered on title/thank-you slides.
+ */
+const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, _slideNumber?: number) => {
+  // Title — left-aligned, sentence case, font-weight 600
+  const titleX = 0.35;
+  const titleY = ZONE.HEADER_Y + 0.12;
+  const titleW = 7.0; // max 70% of 10" slide
+  slide.addText(title, {
+    x: titleX, y: titleY, w: titleW, h: 0.42,
+    fontSize: 22, fontFace: FONTS.headline, color: theme.titleColor, bold: true,
+  });
+
+  // Accent line — short bar under title, ~40-50% of title text width
+  // Approximate: use a fixed fraction of titleW capped reasonably
+  const accentW = Math.min(title.length * 0.11, titleW * 0.5, 3.0);
+  slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+    x: titleX, y: titleY + 0.44, w: Math.max(accentW, 1.2), h: 0.035,
+    fill: { color: theme.primary },
+    rectRadius: 0.018,
+  });
+
+  // Date range — right-aligned
+  if (monthRange) {
+    slide.addText(sanitizeText(monthRange), {
+      x: 7.0, y: ZONE.HEADER_Y + 0.18, w: 2.65, h: 0.3,
+      fontSize: 11, fontFace: FONTS.body, color: "6B7280", align: "right",
+    });
+  }
 };
 
-const addSlideFooter = (slide: pptxgen.Slide, theme: BrandTheme, _hasPostmasterData: boolean = true) => {
-  slide.addText("Company Confidential. Do not distribute.", { x: 5.5, y: ZONE.FOOTER_Y + 0.05, w: 4, h: 0.3, fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body, align: "right", italic: true });
+/**
+ * Universal footer — identical on every data slide.
+ * Contains only the page number, right-aligned, italic.
+ * Not rendered on title/thank-you slides.
+ */
+const addSlideFooter = (slide: pptxgen.Slide, _theme: BrandTheme, slideNumber?: number | boolean) => {
+  // If slideNumber is a boolean (legacy call) or falsy, skip rendering
+  if (typeof slideNumber !== "number" || !slideNumber) return;
+  slide.addText(`${slideNumber}`, {
+    x: 9.2, y: ZONE.FOOTER_Y + 0.05, w: 0.5, h: 0.35,
+    fontSize: 9, fontFace: FONTS.body, color: "9CA3AF", align: "right", italic: true,
+  });
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
@@ -621,22 +657,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     s.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
     addDecorativeMotif(s, theme, "corner");
 
-    // --- HEADER ZONE (0% – 11.11%, y=0 h=0.625") ---
-    // Title left, accent line, date range right
-    s.addText("Campaign Overview", {
-      x: 0.35, y: ZONE.HEADER_Y + 0.15, w: 6.5, h: 0.45,
-      fontSize: 22, fontFace: FONTS.headline, color: theme.titleColor, bold: true,
-    });
-    s.addShape("rect" as pptxgen.SHAPE_NAME, {
-      x: 0.35, y: ZONE.HEADER_Y + 0.58, w: 2.5, h: 0.04,
-      fill: { color: theme.primary },
-    });
-    if (monthRange) {
-      s.addText(sanitizeText(monthRange), {
-        x: 7, y: ZONE.HEADER_Y + 0.2, w: 2.65, h: 0.35,
-        fontSize: 11, fontFace: FONTS.body, color: theme.mutedColor, align: "right",
-      });
-    }
+    // --- HEADER ZONE --- (universal)
+    addSlideHeader(s, "Campaign overview", theme, monthRange);
 
     // --- Compute grand totals ---
     const gt = { sent: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0 };
@@ -689,7 +711,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const dividerH = 0.25;
     const availableForCards = contentH - dividerH - 0.15; // 0.15 top padding
     const cardH = availableForCards / 2;
-    const rowGap = 0.0;
+    
 
     const row1Y = contentY + 0.1;
     const dividerY = row1Y + cardH + 0.02;
@@ -762,12 +784,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addInsightBlock(s, sectionInsights?.campaignOverview, 0, theme);
 
     // --- FOOTER ZONE (92%+, y=5.175") ---
-    s.addText(`${slideNum}`, {
-      x: 9.3, y: ZONE.FOOTER_Y + 0.05, w: 0.4, h: 0.3,
-      fontSize: 9, fontFace: FONTS.body, color: theme.mutedColor,
-      align: "right", italic: true,
-    });
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -861,7 +878,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ...(sectionInsights?.campaignOverviewByProvider || []),
     ].slice(0, 4);
     addInsightBlock(s, mergedOverviewInsights, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -934,7 +951,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fontFace: FONTS.body,
       });
       addInsightBlock(s, config.insights, 0, theme);
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
   }
 
@@ -1044,7 +1061,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
     addInsightBlock(s, sectionInsights?.emailMetricsTrend, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1113,7 +1130,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       s.addText("No infrastructure details available", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
     addInsightBlock(s, sectionInsights?.infrastructureReputation, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1156,7 +1173,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     } else {
       s.addText("Signal health data not available. Generate from campaign + postmaster data.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1286,7 +1303,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         || sectionInsights?.reputationTrends
         || [];
       addInsightBlock(s, domainInsights.length > 0 ? domainInsights : undefined, 0, theme);
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
   } else {
     // No postmaster data — single fallback slide
@@ -1297,7 +1314,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addSlideHeader(s, "Reputation Trends", theme, undefined, slideNum);
     s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     addInsightBlock(s, sectionInsights?.reputationTrends, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1376,7 +1393,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
     addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // Best Performing — by CTR (separate slide)
@@ -1404,7 +1421,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.bestPerformingCTR, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // Underperforming — by Open Rate (separate slide)
@@ -1441,7 +1458,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
     addInsightBlock(s, sectionInsights?.underperformingOpenRate, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // Underperforming — by CTR (separate slide)
@@ -1475,7 +1492,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.underperformingCTR, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1555,7 +1572,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fontFace: FONTS.body,
       });
 
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
 
     // SLIDE 11: Creative Optimizations
@@ -1585,7 +1602,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         });
       });
 
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
   }
 
@@ -1722,7 +1739,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }
 
     addInsightBlock(s, sectionInsights?.sendMixCoverage, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1782,7 +1799,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       }
     }
     addInsightBlock(s, sectionInsights?.keyLearnings, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ============= GENERATE FILE =============
