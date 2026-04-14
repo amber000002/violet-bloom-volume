@@ -411,14 +411,12 @@ const addSlideFooter = (slide: pptxgen.Slide, _theme: BrandTheme, slideNumber?: 
 };
 
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
-  bold: true, fill: { color: theme.headerBg }, fontSize: 6.5, align, color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
-  margin: [1, 2, 1, 2],
+  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
 });
 
 const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string): pptxgen.TableCellProps => ({
-  fontSize: 6.5, align, color: color || theme.bodyColor, fontFace: FONTS.body, valign: "middle",
+  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body, valign: "middle",
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
-  margin: [1, 2, 1, 2],
 });
 
 // ============= INSIGHT BLOCK RENDERER =============
@@ -802,8 +800,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     const useDelivered = report.providerAggregates[0]?.useDeliveredAsDenominator;
     const headers: string[] = ["Provider", "Sent"];
-    if (useDelivered) headers.push("Dlvrd");
-    headers.push("Viewed", "View%", "Clicked", "Click%", "Unsubs", "Unsub%", "Hard Bnc", "Hard%", "Soft Bnc", "Soft%");
+    if (useDelivered) headers.push("Delivered");
+    headers.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
     const hRow: pptxgen.TableCell[] = headers.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
     const rows: pptxgen.TableRow[] = [hRow];
@@ -841,7 +839,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     // Grand Total row
     const denom = useDelivered ? totals.delivered : totals.sent;
-    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 6.5, align, fill: { color: theme.headerBg }, fontFace: FONTS.body, margin: [1, 2, 1, 2] });
+    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 8, align, fill: { color: theme.headerBg }, fontFace: FONTS.body });
     const gt: pptxgen.TableCell[] = [
       { text: "Grand Total", options: gtOpts("left") },
       { text: formatNumber(totals.sent), options: gtOpts() },
@@ -914,9 +912,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const monthlyData = config.data;
       const mUseDelivered = monthlyData[0]?.useDeliveredAsDenominator;
 
-      const mHeaders: string[] = ["Month", "Camps", "Sent"];
-      if (mUseDelivered) mHeaders.push("Dlvrd");
-      mHeaders.push("Viewed", "View%", "Clicked", "Click%", "Unsubs", "Unsub%", "Hard Bnc", "Hard%", "Soft Bnc", "Soft%");
+      const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
+      if (mUseDelivered) mHeaders.push("Delivered");
+      mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
       const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
       const mRows: pptxgen.TableRow[] = [mHeaderRow];
@@ -1324,7 +1322,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // Columns match app: Start Date, Campaign Name, Subject Line, Sent, Unique Open, Open%, Unique Clicked, Click%, Unique CTR, Unsubs, Unsub%, Hard Bounce, Hard%, Soft Bounce, Soft%
   // ==========================================
   const createFullCampaignHeader = (): pptxgen.TableRow =>
-    ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Clk%", "CTR", "Unsub", "Uns%", "Hard", "Hrd%", "Soft", "Sft%"]
+    ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
       .map((h, i) => ({ text: h, options: headerCellOpts(theme, i < 3 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
@@ -1352,7 +1350,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     ];
   };
 
-  const campaignColW = [0.6, 1.1, 1.3, 0.5, 0.5, 0.5, 0.45, 0.45, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4];
+  const campaignColW = [0.55, 1.1, 1.2, 0.45, 0.45, 0.5, 0.45, 0.45, 0.45, 0.4, 0.45, 0.4, 0.45, 0.4, 0.45];
 
   // Build full campaign list (≥1000 sends)
   const allCampaignsForSort: TopCampaign[] = diagnostics.rawData
