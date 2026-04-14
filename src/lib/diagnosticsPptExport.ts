@@ -1674,7 +1674,23 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addSlideFooter(s, theme, slideNum);
   }
 
-  // ============= GENERATE FILE =============
+  // ==========================================
+  // THANK YOU SLIDE (Last slide)
+  // Same background and decorations as Key Learnings slide
+  // ==========================================
+  {
+    const s = pptx.addSlide();
+    addSlideBackground(s, theme);
+    addDecorativeMotif(s, theme, "corner");
+
+    s.addText("Thank You", {
+      x: 0, y: 0, w: 10, h: 5.625,
+      fontSize: 44, bold: true, color: theme.titleColor,
+      fontFace: FONTS.headline, align: "center", valign: "middle",
+    });
+  }
+
+
   const safeMonthRange = monthRange.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_");
   const brandLabel = brandProfile?.brand_identity?.brand_name || brandName;
   const fallbackName = `${brandLabel}_Diagnostics_Executive_${safeMonthRange || "Report"}`;
