@@ -410,13 +410,25 @@ const addSlideFooter = (slide: pptxgen.Slide, _theme: BrandTheme, slideNumber?: 
   });
 };
 
+// Table border color per spec: #E5E7EB
+const TABLE_BORDER_COLOR = "E5E7EB";
+const TABLE_BORDER: pptxgen.BorderOptions = { type: "solid", color: TABLE_BORDER_COLOR, pt: 0.5 };
+
+// Table positions: full content zone width with 2% margins (0.2" each side on 10" slide)
+const TABLE_X = 0.2;
+const TABLE_W = 9.6;
+
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
-  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
+  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor,
+  fontFace: FONTS.body, valign: "middle",
+  margin: [3, 4, 3, 4], // tight cell padding (top, right, bottom, left in points)
 });
 
-const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string): pptxgen.TableCellProps => ({
-  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body, valign: "middle",
+const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string, wrap?: boolean): pptxgen.TableCellProps => ({
+  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body,
+  valign: wrap ? "top" : "middle",
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
+  margin: [3, 4, 3, 4],
 });
 
 // ============= INSIGHT BLOCK RENDERER =============
@@ -818,7 +830,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       totals.soft += p.softBounces;
 
       const row: pptxgen.TableCell[] = [
-        { text: sanitizeText(`${p.serviceProvider} / ${p.providerName}`), options: bodyCellOpts(theme, ri) },
+        { text: sanitizeText(`${p.serviceProvider} / ${p.providerName}`), options: bodyCellOpts(theme, ri, "left", undefined, true) },
         { text: formatNumber(p.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       ];
       if (useDelivered) row.push({ text: formatNumber(p.totalDeliveredUsers), options: bodyCellOpts(theme, ri, "center") });
@@ -839,7 +851,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     // Grand Total row
     const denom = useDelivered ? totals.delivered : totals.sent;
-    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 8, align, fill: { color: theme.headerBg }, fontFace: FONTS.body });
+    const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 7, align, fill: { color: theme.headerBg }, fontFace: FONTS.body, valign: "middle", margin: [3, 4, 3, 4] });
     const gt: pptxgen.TableCell[] = [
       { text: "Grand Total", options: gtOpts("left") },
       { text: formatNumber(totals.sent), options: gtOpts() },
@@ -860,14 +872,14 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     rows.push(gt);
 
     const numCols = headers.length;
-    // Distribute widths proportionally
+    // Column widths — Provider is flex (wraps), all others no-wrap
     const baseW = useDelivered
-      ? [1.6, 0.6, 0.6, 0.55, 0.55, 0.55, 0.55, 0.5, 0.5, 0.55, 0.5, 0.55, 0.5]
-      : [1.8, 0.65, 0.6, 0.6, 0.6, 0.6, 0.55, 0.55, 0.6, 0.55, 0.6, 0.55];
+      ? [1.5, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.5, 0.55, 0.6, 0.55, 0.6, 0.55]
+      : [1.7, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55];
 
     s.addTable(rows, {
-      x: 0.3, y: 1.15, w: 9.4, colW: baseW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: baseW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
@@ -941,13 +953,14 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         mRows.push(row);
       });
 
+      // Monthly overview column widths — Month is left-aligned, all numeric no-wrap
       const mColW = mUseDelivered
-        ? [0.9, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.45, 0.5, 0.55, 0.5, 0.55, 0.5]
-        : [1.0, 0.6, 0.65, 0.6, 0.6, 0.6, 0.6, 0.55, 0.6, 0.6, 0.6, 0.6, 0.6];
+        ? [0.85, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.6, 0.5, 0.6, 0.5]
+        : [0.95, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55];
 
       s.addTable(mRows, {
-        x: 0.3, y: 1.15, w: 9.4, colW: mColW,
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: mColW,
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
       addInsightBlock(s, config.insights, 0, theme);
@@ -1079,49 +1092,49 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const infra = extractInfrastructure(diagnostics.rawData, diagnostics.postmasterData);
 
     if (infra.domains.length > 0) {
-      s.addText("Domain Details", { x: 0.5, y: 1.1, w: 4, h: 0.3, fontSize: 12, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
+      s.addText("Domain Details", { x: 0.3, y: ZONE.TABLE_Y, w: 4, h: 0.3, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
 
       const domRows: pptxgen.TableRow[] = [
         [
-          { text: "Domain", options: headerCellOpts(theme) },
-          { text: "Service Provider", options: headerCellOpts(theme) },
+          { text: "Domain", options: headerCellOpts(theme, "center") },
+          { text: "Service Provider", options: headerCellOpts(theme, "center") },
           { text: "Reputation", options: headerCellOpts(theme, "center") },
         ],
       ];
       infra.domains.forEach((d, ri) => {
         domRows.push([
-          { text: sanitizeText(d.domain), options: bodyCellOpts(theme, ri) },
-          { text: sanitizeText(d.provider) || "—", options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(d.domain), options: bodyCellOpts(theme, ri, "center") },
+          { text: sanitizeText(d.provider) || "—", options: bodyCellOpts(theme, ri, "center") },
           { text: sanitizeText(d.reputation), options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
         ]);
       });
 
       s.addTable(domRows, {
-        x: 0.5, y: 1.5, w: 4.2, colW: [1.6, 1.4, 1.2],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 0.2, y: ZONE.TABLE_Y + 0.35, w: 4.5, colW: [1.7, 1.5, 1.3],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     }
 
     if (infra.ips.length > 0) {
-      s.addText("IP Details", { x: 5.3, y: 1.1, w: 4, h: 0.3, fontSize: 12, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
+      s.addText("IP Details", { x: 5.2, y: ZONE.TABLE_Y, w: 4, h: 0.3, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
 
       const ipRows: pptxgen.TableRow[] = [
         [
-          { text: "IP Address", options: headerCellOpts(theme) },
+          { text: "IP Address", options: headerCellOpts(theme, "center") },
           { text: "Reputation", options: headerCellOpts(theme, "center") },
         ],
       ];
       infra.ips.forEach((ip, ri) => {
         ipRows.push([
-          { text: ip.ip, options: bodyCellOpts(theme, ri) },
+          { text: ip.ip, options: bodyCellOpts(theme, ri, "center") },
           { text: ip.reputation, options: bodyCellOpts(theme, ri, "center", getReputationColor(ip.reputation, theme)) },
         ]);
       });
 
       s.addTable(ipRows, {
-        x: 5.3, y: 1.5, w: 4.2, colW: [2.5, 1.7],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 5.2, y: ZONE.TABLE_Y + 0.35, w: 4.6, colW: [2.8, 1.8],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     }
@@ -1166,8 +1179,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       s.addTable(shRows, {
-        x: 1, y: 1.15, w: 8, colW: [2.5, 2.0, 1.75, 1.75],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 0.5, y: ZONE.TABLE_Y, w: 9.0, colW: [2.8, 2.2, 2.0, 2.0],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     } else {
@@ -1323,7 +1336,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   const createFullCampaignHeader = (): pptxgen.TableRow =>
     ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
-      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i < 3 ? "left" : "center") }));
+      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 1 || i === 2 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
     const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
@@ -1332,9 +1345,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const hardPct = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
     const softPct = denom > 0 ? (c.softBounces / denom) * 100 : 0;
     return [
-      { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri) },
-      { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri) },
-      { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri) },
+      { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri, "center") },
+      { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+      { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
       { text: formatPercent(c.openRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(c.openRate, "openRate", theme)) },
@@ -1350,7 +1363,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     ];
   };
 
-  const campaignColW = [0.55, 1.1, 1.2, 0.45, 0.45, 0.5, 0.45, 0.45, 0.45, 0.4, 0.45, 0.4, 0.45, 0.4, 0.45];
+  // Campaign table column widths: Date(no-wrap), Campaign(flex), Subject(flex), then 12 numeric no-wrap cols
+  const campaignColW = [0.55, 1.15, 1.2, 0.5, 0.45, 0.5, 0.45, 0.5, 0.45, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5];
 
   // Build full campaign list (≥1000 sends)
   const allCampaignsForSort: TopCampaign[] = diagnostics.rawData
@@ -1379,8 +1393,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Top 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
@@ -1416,8 +1430,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Top 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.bestPerformingCTR, 0, theme);
@@ -1444,8 +1458,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Bottom 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
@@ -1487,8 +1501,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Bottom 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.underperformingCTR, 0, theme);
@@ -1526,7 +1540,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addTable(practiceRows, {
         x: 0.3, y: 1.35, w: 3.0, colW: [1.0, 2.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
 
@@ -1568,7 +1582,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addTable(riskRows, {
         x: 6.7, y: 1.35, w: 3.0, colW: [0.8, 1.2, 1.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
 
@@ -1650,8 +1664,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addText("Send Mix Analysis", { x: 0.5, y: 1.05, w: 4, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
       s.addTable(mixRows, {
-        x: 0.5, y: 1.35, w: 4, colW: [1.5, 1.25, 1.25],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 0.3, y: ZONE.TABLE_Y + 0.35, w: 4.2, colW: [1.6, 1.3, 1.3],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
       mixEndY = 1.35 + (mixRows.length) * 0.3;
@@ -1683,8 +1697,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addText("Lifecycle Coverage Matrix", { x: 5, y: 1.05, w: 4.5, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
       s.addTable(lcRows, {
-        x: 5, y: 1.35, w: 4.5, colW: [1.2, 0.7, 0.8, 0.8, 1.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 5.0, y: ZONE.TABLE_Y + 0.35, w: 4.8, colW: [1.3, 0.8, 0.9, 0.8, 1.0],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     } else {
@@ -1732,8 +1746,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addText("Lifecycle Coverage (Inferred)", { x: 5, y: 1.05, w: 4.5, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
       s.addTable(lcRows, {
-        x: 5, y: 1.35, w: 4.5, colW: [1.5, 1.0, 1.0, 1.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 5.0, y: ZONE.TABLE_Y + 0.35, w: 4.8, colW: [1.5, 1.1, 1.1, 1.1],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     }
@@ -1772,8 +1786,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       s.addTable(klRows, {
-        x: 0.5, y: 1.15, w: 9, colW: [3.2, 4.0, 1.8],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: [3.5, 4.3, 1.8],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     } else {
@@ -1792,8 +1806,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           ]);
         });
         s.addTable(klRows, {
-          x: 0.5, y: 1.15, w: 9, colW: [3.5, 5.5],
-          border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+          x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: [3.8, 5.8],
+          border: TABLE_BORDER,
           fontFace: FONTS.body,
         });
       }
