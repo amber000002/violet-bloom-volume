@@ -1540,7 +1540,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addTable(practiceRows, {
         x: 0.3, y: 1.35, w: 3.0, colW: [1.0, 2.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
 
@@ -1582,7 +1582,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addTable(riskRows, {
         x: 6.7, y: 1.35, w: 3.0, colW: [0.8, 1.2, 1.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
 
@@ -1664,8 +1664,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addText("Send Mix Analysis", { x: 0.5, y: 1.05, w: 4, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
       s.addTable(mixRows, {
-        x: 0.5, y: 1.35, w: 4, colW: [1.5, 1.25, 1.25],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 0.3, y: ZONE.TABLE_Y + 0.35, w: 4.2, colW: [1.6, 1.3, 1.3],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
       mixEndY = 1.35 + (mixRows.length) * 0.3;
@@ -1697,8 +1697,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addText("Lifecycle Coverage Matrix", { x: 5, y: 1.05, w: 4.5, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
       s.addTable(lcRows, {
-        x: 5, y: 1.35, w: 4.5, colW: [1.2, 0.7, 0.8, 0.8, 1.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 5.0, y: ZONE.TABLE_Y + 0.35, w: 4.8, colW: [1.3, 0.8, 0.9, 0.8, 1.0],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     } else {
