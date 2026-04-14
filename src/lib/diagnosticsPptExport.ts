@@ -657,22 +657,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     s.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
     addDecorativeMotif(s, theme, "corner");
 
-    // --- HEADER ZONE (0% – 11.11%, y=0 h=0.625") ---
-    // Title left, accent line, date range right
-    s.addText("Campaign Overview", {
-      x: 0.35, y: ZONE.HEADER_Y + 0.15, w: 6.5, h: 0.45,
-      fontSize: 22, fontFace: FONTS.headline, color: theme.titleColor, bold: true,
-    });
-    s.addShape("rect" as pptxgen.SHAPE_NAME, {
-      x: 0.35, y: ZONE.HEADER_Y + 0.58, w: 2.5, h: 0.04,
-      fill: { color: theme.primary },
-    });
-    if (monthRange) {
-      s.addText(sanitizeText(monthRange), {
-        x: 7, y: ZONE.HEADER_Y + 0.2, w: 2.65, h: 0.35,
-        fontSize: 11, fontFace: FONTS.body, color: theme.mutedColor, align: "right",
-      });
-    }
+    // --- HEADER ZONE --- (universal)
+    addSlideHeader(s, "Campaign overview", theme, monthRange);
 
     // --- Compute grand totals ---
     const gt = { sent: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0 };
@@ -798,11 +784,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addInsightBlock(s, sectionInsights?.campaignOverview, 0, theme);
 
     // --- FOOTER ZONE (92%+, y=5.175") ---
-    s.addText(`${slideNum}`, {
-      x: 9.3, y: ZONE.FOOTER_Y + 0.05, w: 0.4, h: 0.3,
-      fontSize: 9, fontFace: FONTS.body, color: theme.mutedColor,
-      align: "right", italic: true,
-    });
     addSlideFooter(s, theme, slideNum);
   }
 
