@@ -610,17 +610,35 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   }
 
   // ==========================================
-  // SLIDE 2: Executive Metric Cards (3×2 Grid)
-  // Visual glassmorphism cards for: Sent, Viewed, Clicked, Unsubs, Hard Bounce, Soft Bounce
+  // SLIDE 2: Campaign Overview — KPI Cards (3×2 Grid)
+  // Fixed four-zone layout with glassmorphism card styling per design spec
   // ==========================================
   slideNum++;
   {
     const s = pptx.addSlide();
-    addSlideBackground(s, theme);
+    // Background: #f8f8fa with existing decorative elements
+    s.background = { color: "F8F8FA" };
+    s.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
     addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Campaign Overview", theme, monthRange, slideNum);
 
-    // Compute grand totals from provider aggregates
+    // --- HEADER ZONE (0% – 11.11%, y=0 h=0.625") ---
+    // Title left, accent line, date range right
+    s.addText("Campaign Overview", {
+      x: 0.35, y: ZONE.HEADER_Y + 0.15, w: 6.5, h: 0.45,
+      fontSize: 22, fontFace: FONTS.headline, color: theme.titleColor, bold: true,
+    });
+    s.addShape("rect" as pptxgen.SHAPE_NAME, {
+      x: 0.35, y: ZONE.HEADER_Y + 0.58, w: 2.5, h: 0.04,
+      fill: { color: theme.primary },
+    });
+    if (monthRange) {
+      s.addText(sanitizeText(monthRange), {
+        x: 7, y: ZONE.HEADER_Y + 0.2, w: 2.65, h: 0.35,
+        fontSize: 11, fontFace: FONTS.body, color: theme.mutedColor, align: "right",
+      });
+    }
+
+    // --- Compute grand totals ---
     const gt = { sent: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0 };
     report.providerAggregates.forEach(p => {
       gt.sent += p.totalSentUsers;
@@ -630,7 +648,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       gt.hard += p.hardBounces;
       gt.soft += p.softBounces;
     });
-
     const denom = gt.sent || 1;
     const viewRate = (gt.viewed / denom) * 100;
     const clickRate = (gt.clicked / denom) * 100;
@@ -638,112 +655,118 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const hardRate = (gt.hard / denom) * 100;
     const softRate = (gt.soft / denom) * 100;
 
-    const getRiskColor = (rate: number, type: MetricType): string => {
-      return getMetricColor(rate, type, theme);
+    // --- Metric definitions with fixed accent colors per spec ---
+    const METRIC_COLORS = {
+      sent:      "534AB7",
+      viewed:    "1D9E75",
+      clicked:   "378ADD",
+      unsubs:    "D97706",
+      hardBounce:"D85A30",
+      softBounce:"993556",
     };
 
-    const metricCards: { label: string; value: string; percent: string | null; context: string; shape: string; accentColor: string }[] = [
-      { label: "SENT", value: formatNumber(gt.sent), percent: null, context: "Total emails dispatched", shape: "paperPlane", accentColor: theme.primary },
-      { label: "VIEWED", value: formatNumber(gt.viewed), percent: formatPercent(viewRate), context: "Unique opens recorded", shape: "eye", accentColor: theme.secondary },
-      { label: "CLICKED", value: formatNumber(gt.clicked), percent: formatPercent(clickRate), context: "Unique click-throughs", shape: "pointer", accentColor: theme.accent },
-      { label: "UNSUBS", value: formatNumber(gt.unsubs), percent: formatPercent(unsubRate), context: "Unsubscribe rate", shape: "noSign", accentColor: getRiskColor(unsubRate, "unsubscribeRate") },
-      { label: "HARD BOUNCE", value: formatNumber(gt.hard), percent: formatPercent(hardRate), context: "Hard bounce rate", shape: "warning", accentColor: getRiskColor(hardRate, "bounceRate") },
-      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), percent: formatPercent(softRate), context: "Soft bounce rate", shape: "refresh", accentColor: getRiskColor(softRate, "bounceRate") },
+    const engagementCards = [
+      { label: "SENT", value: formatNumber(gt.sent), percent: null, desc: "Total emails dispatched", accent: METRIC_COLORS.sent },
+      { label: "VIEWED", value: formatNumber(gt.viewed), percent: formatPercent(viewRate), desc: "Unique opens recorded", accent: METRIC_COLORS.viewed },
+      { label: "CLICKED", value: formatNumber(gt.clicked), percent: formatPercent(clickRate), desc: "Unique click-throughs", accent: METRIC_COLORS.clicked },
+    ];
+    const deliverabilityCards = [
+      { label: "UNSUBSCRIBES", value: formatNumber(gt.unsubs), percent: formatPercent(unsubRate), desc: "Unsubscribe rate", accent: METRIC_COLORS.unsubs },
+      { label: "HARD BOUNCE", value: formatNumber(gt.hard), percent: formatPercent(hardRate), desc: "Hard bounce rate", accent: METRIC_COLORS.hardBounce },
+      { label: "SOFT BOUNCE", value: formatNumber(gt.soft), percent: formatPercent(softRate), desc: "Soft bounce rate", accent: METRIC_COLORS.softBounce },
     ];
 
-    // 3 columns × 2 rows grid
-    const gridStartX = 0.6;
-    const gridStartY = 1.2;
-    const cardW = 2.7;
-    const cardH = 1.85;
-    const gapX = 0.35;
-    const gapY = 0.3;
+    // --- CONTENT ZONE (11.11% – 74%, y=0.625" h=3.538") ---
+    const contentY = ZONE.TABLE_Y;
+    const contentH = ZONE.TABLE_MAX_H;
+    const gridX = 0.35;
+    const gridW = 9.3;
+    const cols = 3;
+    const gapX = 0.12;
+    const cardW = (gridW - gapX * (cols - 1)) / cols;
 
-    metricCards.forEach((card, i) => {
-      const col = i % 3;
-      const row = Math.floor(i / 3);
-      const x = gridStartX + col * (cardW + gapX);
-      const y = gridStartY + row * (cardH + gapY);
+    // Row heights: two card rows + divider label between them
+    const dividerH = 0.25;
+    const availableForCards = contentH - dividerH - 0.15; // 0.15 top padding
+    const cardH = availableForCards / 2;
+    const rowGap = 0.0;
 
-      // Card background — frosted glass effect (more prominent)
+    const row1Y = contentY + 0.1;
+    const dividerY = row1Y + cardH + 0.02;
+    const row2Y = dividerY + dividerH;
+
+    // Helper: render a single KPI card
+    const renderCard = (card: typeof engagementCards[0], col: number, rowY: number) => {
+      const x = gridX + col * (cardW + gapX);
+      const y = rowY;
+
+      // Card background — glassmorphism
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x, y, w: cardW, h: cardH,
-        fill: { color: "FFFFFF", transparency: 40 },
-        line: { color: "CCCCCC", width: 0.75 },
-        rectRadius: 0.2,
-        shadow: { type: "outer", blur: 16, offset: 4, color: "999999", opacity: 0.25 },
+        fill: { color: "FFFFFF", transparency: 45 },
+        line: { color: "FFFFFF", width: 0.4 } as any,
+        rectRadius: 0.1,
       });
 
-      // Inner highlight shimmer (top portion, frosted)
-      s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: x, y: y, w: cardW, h: cardH * 0.35,
-        fill: { color: "FFFFFF", transparency: 60 },
-        line: { type: "none" } as any,
-        rectRadius: 0.2,
+      // Top accent bar (2.5px ≈ 0.025")
+      s.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x, y, w: cardW, h: 0.025,
+        fill: { color: card.accent },
       });
 
-      // Icon image (top right corner, watermark style) with per-icon sizing
-      const iconData = iconBase64Map[card.shape];
-      if (iconData) {
-        // Custom sizes: sent=0.64x0.64cm, viewed=0.8x0.44cm, others=0.5x0.5 inches
-        const cmToIn = (cm: number) => cm / 2.54;
-        let iconW = 0.5, iconH = 0.5;
-        if (card.shape === "paperPlane") { iconW = cmToIn(0.64); iconH = cmToIn(0.64); }
-        else if (card.shape === "eye") { iconW = cmToIn(0.8); iconH = cmToIn(0.44); }
-        else { iconW = 0.5; iconH = 0.5; }
-        s.addImage({
-          data: iconData,
-          x: x + cardW - iconW - 0.2, y: y + 0.15, w: iconW, h: iconH,
-          sizing: { type: "contain", w: iconW, h: iconH },
-          transparency: 50,
-        });
-      }
-
-      // Metric label (small, uppercase, single accent color)
+      // Label (uppercase, accent color)
       s.addText(card.label, {
-        x: x + 0.3, y: y + 0.25, w: cardW - 0.6, h: 0.3,
-        fontSize: 9, bold: true, color: theme.primary, fontFace: FONTS.body,
-        align: "left", valign: "middle",
+        x: x + 0.2, y: y + 0.15, w: cardW - 0.4, h: 0.22,
+        fontSize: 9, fontFace: FONTS.body, color: card.accent,
+        bold: true, align: "left", valign: "middle",
       });
 
-      // Metric value (large, normal weight, black)
+      // Value (dominant, primary text)
       s.addText(card.value, {
-        x: x + 0.15, y: y + (card.percent ? 0.5 : 0.6), w: cardW - 0.3, h: 0.65,
-        fontSize: 28, bold: false, color: "000000", fontFace: FONTS.headline,
-        align: "center", valign: "middle",
+        x: x + 0.15, y: y + (card.percent ? 0.4 : 0.5), w: cardW - 0.3, h: 0.55,
+        fontSize: 26, fontFace: FONTS.headline, color: theme.titleColor,
+        bold: false, align: "center", valign: "middle",
       });
 
-      // Percentage value (secondary, greyed out, below metric value)
+      // Percentage (secondary, muted)
       if (card.percent) {
         s.addText(card.percent, {
-          x: x + 0.15, y: y + 1.1, w: cardW - 0.3, h: 0.35,
-          fontSize: 14, color: "8E8E8E", fontFace: FONTS.body,
-          align: "center", valign: "middle", transparency: 35,
+          x: x + 0.15, y: y + 0.9, w: cardW - 0.3, h: 0.25,
+          fontSize: 12, fontFace: FONTS.body, color: "8E8E8E",
+          align: "center", valign: "middle",
         });
       }
 
-      // Context line (small, muted)
-      s.addText(card.context, {
-        x: x + 0.3, y: y + cardH - 0.45, w: cardW - 0.6, h: 0.3,
-        fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body,
-        align: "center", valign: "middle", italic: true,
+      // Description (tertiary)
+      s.addText(card.desc, {
+        x: x + 0.2, y: y + cardH - 0.35, w: cardW - 0.4, h: 0.22,
+        fontSize: 8, fontFace: FONTS.body, color: theme.mutedColor,
+        align: "left", valign: "middle",
       });
+    };
+
+    // Render engagement row
+    engagementCards.forEach((card, i) => renderCard(card, i, row1Y));
+
+    // Section divider label
+    s.addText("DELIVERABILITY", {
+      x: gridX, y: dividerY, w: 3, h: dividerH,
+      fontSize: 8, fontFace: FONTS.body, color: theme.mutedColor,
+      bold: true, align: "left", valign: "middle",
     });
 
-    // Optional insight headline at bottom
-    let insight = "";
-    if (unsubRate > 0.5) insight = "Campaign reach remains strong but unsubscribe signals are rising";
-    else if (hardRate > 2) insight = "Hard bounce rates indicate list hygiene attention needed";
-    else if (viewRate > 20) insight = "Strong open rates suggest healthy sender reputation";
-    else if (viewRate < 10) insight = "Open rates below benchmark — deliverability review recommended";
-    else insight = "Campaign performance within expected ranges";
+    // Render deliverability row
+    deliverabilityCards.forEach((card, i) => renderCard(card, i, row2Y));
 
-    s.addText(sanitizeText(insight), {
-      x: 0.5, y: ZONE.INSIGHT_Y + 0.1, w: 9, h: 0.3,
-      fontSize: 9, italic: true, color: theme.bodyColor, fontFace: FONTS.body, align: "center",
-    });
+    // --- INSIGHT ZONE (74% – 92%, y=4.163" h=1.012") ---
     addInsightBlock(s, sectionInsights?.campaignOverview, 0, theme);
 
+    // --- FOOTER ZONE (92%+, y=5.175") ---
+    s.addText(`${slideNum}`, {
+      x: 9.3, y: ZONE.FOOTER_Y + 0.05, w: 0.4, h: 0.3,
+      fontSize: 9, fontFace: FONTS.body, color: theme.mutedColor,
+      align: "right", italic: true,
+    });
     addSlideFooter(s, theme, hasPostmasterData);
   }
 
