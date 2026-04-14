@@ -1746,8 +1746,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       s.addText("Lifecycle Coverage (Inferred)", { x: 5, y: 1.05, w: 4.5, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
       s.addTable(lcRows, {
-        x: 5, y: 1.35, w: 4.5, colW: [1.5, 1.0, 1.0, 1.0],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 5.0, y: ZONE.TABLE_Y + 0.35, w: 4.8, colW: [1.5, 1.1, 1.1, 1.1],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     }
@@ -1786,8 +1786,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       s.addTable(klRows, {
-        x: 0.5, y: 1.15, w: 9, colW: [3.2, 4.0, 1.8],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: [3.5, 4.3, 1.8],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     } else {
@@ -1806,8 +1806,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           ]);
         });
         s.addTable(klRows, {
-          x: 0.5, y: 1.15, w: 9, colW: [3.5, 5.5],
-          border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+          x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: [3.8, 5.8],
+          border: TABLE_BORDER,
           fontFace: FONTS.body,
         });
       }
