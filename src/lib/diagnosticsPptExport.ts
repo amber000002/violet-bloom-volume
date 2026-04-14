@@ -1132,20 +1132,18 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const domRows: pptxgen.TableRow[] = [
         [
           { text: "Domain", options: headerCellOpts(theme, "center") },
-          { text: "Service Provider", options: headerCellOpts(theme, "center") },
-          { text: "Reputation", options: headerCellOpts(theme, "center") },
+          { text: "Domain Reputation", options: headerCellOpts(theme, "center") },
         ],
       ];
       infra.domains.forEach((d, ri) => {
         domRows.push([
           { text: sanitizeText(d.domain), options: bodyCellOpts(theme, ri, "center") },
-          { text: sanitizeText(d.provider) || "—", options: bodyCellOpts(theme, ri, "center") },
           { text: sanitizeText(d.reputation), options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
         ]);
       });
 
       s.addTable(domRows, {
-        x: 0.2, y: ZONE.TABLE_Y + 0.35, w: 4.5, colW: [1.7, 1.5, 1.3],
+        x: 0.2, y: ZONE.TABLE_Y + 0.35, w: 4.5, colW: [2.5, 2.0],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
@@ -1181,48 +1179,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addSlideFooter(s, theme, slideNum);
   }
 
-  // ==========================================
-  // SLIDE 6: Reputation Scorecard
-  // All signals from signalHealthData rendered as table
-  // ==========================================
-  slideNum++;
-  {
-    const s = pptx.addSlide();
-    addSlideBackground(s, theme);
-    addDecorativeMotif(s, theme, "dots");
-    addSlideHeader(s, "Reputation Scorecard", theme, undefined, slideNum);
 
-    if (signalHealthData && signalHealthData.length > 0) {
-      const shRows: pptxgen.TableRow[] = [
-        [
-          { text: "Signal", options: headerCellOpts(theme) },
-          { text: "Current Value", options: headerCellOpts(theme, "center") },
-          { text: "Status", options: headerCellOpts(theme, "center") },
-          { text: "Trend", options: headerCellOpts(theme, "center") },
-        ],
-      ];
-
-      signalHealthData.forEach((sig, ri) => {
-        const statusColor = sig.status === "healthy" ? theme.green : sig.status === "warning" ? theme.amber : theme.red;
-        const trendColor = sig.trend === "improving" ? theme.green : sig.trend === "stable" ? theme.mutedColor : theme.red;
-        shRows.push([
-          { text: sanitizeText(sig.metric), options: bodyCellOpts(theme, ri) },
-          { text: sanitizeText(sig.currentValue), options: bodyCellOpts(theme, ri, "center") },
-          { text: sanitizeText(sig.status), options: bodyCellOpts(theme, ri, "center", statusColor) },
-          { text: sanitizeText(sig.trend), options: bodyCellOpts(theme, ri, "center", trendColor) },
-        ]);
-      });
-
-      s.addTable(shRows, {
-        x: 0.5, y: ZONE.TABLE_Y, w: 9.0, colW: [2.8, 2.2, 2.0, 2.0],
-        border: TABLE_BORDER,
-        fontFace: FONTS.body,
-      });
-    } else {
-      s.addText("Signal health data not available. Generate from campaign + postmaster data.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
-    }
-    addSlideFooter(s, theme, slideNum);
-  }
 
   // ==========================================
   // SLIDES 7+: Reputation Trends — one slide per domain
@@ -1655,141 +1612,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }
   }
 
-  // ==========================================
-  // SLIDE 12: Send Mix & Lifecycle Coverage
-  // ==========================================
-  slideNum++;
-  {
-    const s = pptx.addSlide();
-    addSlideBackground(s, theme);
-    addDecorativeMotif(s, theme, "diagonal");
-    addSlideHeader(s, "Send Mix & Lifecycle Coverage", theme, undefined, slideNum);
 
-    // Send Mix Analysis from enhanced reputation report
-    const enhRep = diagnostics.reputationReport?.enhancedReport;
-    let mixEndY = 1.15;
-
-    if (enhRep?.sendMixAnalysis) {
-      const mix = enhRep.sendMixAnalysis;
-      const mixTypes = ["Transactional", "Lifecycle", "Promotional"];
-      const mixValues = [mix.transactionalPercent, mix.lifecyclePercent, mix.promotionalPercent];
-
-      const mixHeaderRow: pptxgen.TableCell[] = [
-        { text: "Delivery Type", options: headerCellOpts(theme) },
-        { text: "Share %", options: headerCellOpts(theme, "center") },
-        { text: "Status", options: headerCellOpts(theme, "center") },
-      ];
-
-      const getStatus = (type: string): { text: string; color: string } => {
-        const tl = type.toLowerCase();
-        if (mix.overweightedTypes.includes(tl)) return { text: "Overweighted", color: theme.red };
-        if (mix.underutilizedAbsorbers.includes(tl)) return { text: "Underutilized", color: theme.amber };
-        return { text: "Balanced", color: theme.green };
-      };
-
-      const mixRows: pptxgen.TableRow[] = [mixHeaderRow];
-      mixTypes.forEach((t, ri) => {
-        const st = getStatus(t);
-        mixRows.push([
-          { text: t, options: bodyCellOpts(theme, ri) },
-          { text: `${mixValues[ri].toFixed(1)}%`, options: bodyCellOpts(theme, ri, "center") },
-          { text: st.text, options: bodyCellOpts(theme, ri, "center", st.color) },
-        ]);
-      });
-
-      s.addText("Send Mix Analysis", { x: 0.5, y: 1.05, w: 4, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
-      s.addTable(mixRows, {
-        x: 0.3, y: ZONE.TABLE_Y + 0.35, w: 4.2, colW: [1.6, 1.3, 1.3],
-        border: TABLE_BORDER,
-        fontFace: FONTS.body,
-      });
-      mixEndY = 1.35 + (mixRows.length) * 0.3;
-    }
-
-    // Lifecycle Coverage Matrix
-    if (lifecycleCoverage && lifecycleCoverage.length > 0) {
-      const lcRows: pptxgen.TableRow[] = [
-        [
-          { text: "Lifecycle Stage", options: headerCellOpts(theme) },
-          { text: "Coverage", options: headerCellOpts(theme, "center") },
-          { text: "Active/Total", options: headerCellOpts(theme, "center") },
-          { text: "Campaigns", options: headerCellOpts(theme, "center") },
-          { text: "Status", options: headerCellOpts(theme, "center") },
-        ],
-      ];
-
-      lifecycleCoverage.forEach((lc, ri) => {
-        const statusColor = lc.coverage === "Strong" ? theme.green : lc.coverage === "Partial" ? theme.amber : theme.red;
-        const coveragePct = lc.totalUseCases > 0 ? ((lc.activeUseCases / lc.totalUseCases) * 100).toFixed(0) + "%" : "0%";
-        lcRows.push([
-          { text: lc.stage, options: bodyCellOpts(theme, ri) },
-          { text: coveragePct, options: bodyCellOpts(theme, ri, "center") },
-          { text: `${lc.activeUseCases}/${lc.totalUseCases}`, options: bodyCellOpts(theme, ri, "center") },
-          { text: String(lc.campaignCount), options: bodyCellOpts(theme, ri, "center") },
-          { text: lc.coverage, options: bodyCellOpts(theme, ri, "center", statusColor) },
-        ]);
-      });
-
-      s.addText("Lifecycle Coverage Matrix", { x: 5, y: 1.05, w: 4.5, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
-      s.addTable(lcRows, {
-        x: 5.0, y: ZONE.TABLE_Y + 0.35, w: 4.8, colW: [1.3, 0.8, 0.9, 0.8, 1.0],
-        border: TABLE_BORDER,
-        fontFace: FONTS.body,
-      });
-    } else {
-      // Fallback: keyword-based lifecycle from campaign data
-      const stageKeywords: Record<string, string[]> = {
-        Onboarding: ["welcome", "onboard", "getting started", "verify", "activation"],
-        Engagement: ["engage", "newsletter", "weekly", "digest", "update", "content"],
-        Conversion: ["offer", "discount", "promo", "sale", "deal", "buy", "purchase", "upgrade"],
-        Retention: ["retain", "renew", "comeback", "reactivate", "win-back", "winback", "miss you"],
-        Referral: ["refer", "invite", "share", "friend"],
-        Transactional: ["receipt", "confirm", "order", "invoice", "shipping", "deliver"],
-      };
-      const stageCounts: Record<string, number> = {};
-      Object.keys(stageKeywords).forEach(st => { stageCounts[st] = 0; });
-
-      diagnostics.rawData.forEach(c => {
-        const text = `${c.campaignName} ${c.subjectLine} ${c.title}`.toLowerCase();
-        let matched = false;
-        for (const [stage, keywords] of Object.entries(stageKeywords)) {
-          if (keywords.some(k => text.includes(k))) { stageCounts[stage]++; matched = true; break; }
-        }
-        if (!matched) stageCounts["Engagement"] = (stageCounts["Engagement"] || 0) + 1;
-      });
-
-      const total = diagnostics.rawData.length;
-      const lcRows: pptxgen.TableRow[] = [
-        [
-          { text: "Lifecycle Stage", options: headerCellOpts(theme) },
-          { text: "Campaign Count", options: headerCellOpts(theme, "center") },
-          { text: "Coverage %", options: headerCellOpts(theme, "center") },
-          { text: "Status", options: headerCellOpts(theme, "center") },
-        ],
-      ];
-      Object.entries(stageCounts).forEach(([stage, count], ri) => {
-        const pct = total > 0 ? (count / total) * 100 : 0;
-        const status = pct > 15 ? "Strong" : pct > 5 ? "Partial" : "Weak";
-        const statusColor = status === "Strong" ? theme.green : status === "Partial" ? theme.amber : theme.red;
-        lcRows.push([
-          { text: stage, options: bodyCellOpts(theme, ri) },
-          { text: String(count), options: bodyCellOpts(theme, ri, "center") },
-          { text: `${pct.toFixed(1)}%`, options: bodyCellOpts(theme, ri, "center") },
-          { text: status, options: bodyCellOpts(theme, ri, "center", statusColor) },
-        ]);
-      });
-
-      s.addText("Lifecycle Coverage (Inferred)", { x: 5, y: 1.05, w: 4.5, h: 0.25, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.body });
-      s.addTable(lcRows, {
-        x: 5.0, y: ZONE.TABLE_Y + 0.35, w: 4.8, colW: [1.5, 1.1, 1.1, 1.1],
-        border: TABLE_BORDER,
-        fontFace: FONTS.body,
-      });
-    }
-
-    addInsightBlock(s, sectionInsights?.sendMixCoverage, 0, theme);
-    addSlideFooter(s, theme, slideNum);
-  }
 
   // ==========================================
   // SLIDE 13: Key Learnings & Recommendations
