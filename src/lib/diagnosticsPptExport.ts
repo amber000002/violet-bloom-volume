@@ -953,13 +953,14 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         mRows.push(row);
       });
 
+      // Monthly overview column widths — Month is left-aligned, all numeric no-wrap
       const mColW = mUseDelivered
-        ? [0.9, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.45, 0.5, 0.55, 0.5, 0.55, 0.5]
-        : [1.0, 0.6, 0.65, 0.6, 0.6, 0.6, 0.6, 0.55, 0.6, 0.6, 0.6, 0.6, 0.6];
+        ? [0.85, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.6, 0.5, 0.6, 0.5]
+        : [0.95, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55];
 
       s.addTable(mRows, {
-        x: 0.3, y: 1.15, w: 9.4, colW: mColW,
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: mColW,
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
       addInsightBlock(s, config.insights, 0, theme);
@@ -1091,49 +1092,49 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const infra = extractInfrastructure(diagnostics.rawData, diagnostics.postmasterData);
 
     if (infra.domains.length > 0) {
-      s.addText("Domain Details", { x: 0.5, y: 1.1, w: 4, h: 0.3, fontSize: 12, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
+      s.addText("Domain Details", { x: 0.3, y: ZONE.TABLE_Y, w: 4, h: 0.3, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
 
       const domRows: pptxgen.TableRow[] = [
         [
-          { text: "Domain", options: headerCellOpts(theme) },
-          { text: "Service Provider", options: headerCellOpts(theme) },
+          { text: "Domain", options: headerCellOpts(theme, "center") },
+          { text: "Service Provider", options: headerCellOpts(theme, "center") },
           { text: "Reputation", options: headerCellOpts(theme, "center") },
         ],
       ];
       infra.domains.forEach((d, ri) => {
         domRows.push([
-          { text: sanitizeText(d.domain), options: bodyCellOpts(theme, ri) },
-          { text: sanitizeText(d.provider) || "—", options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(d.domain), options: bodyCellOpts(theme, ri, "center") },
+          { text: sanitizeText(d.provider) || "—", options: bodyCellOpts(theme, ri, "center") },
           { text: sanitizeText(d.reputation), options: bodyCellOpts(theme, ri, "center", getReputationColor(d.reputation, theme)) },
         ]);
       });
 
       s.addTable(domRows, {
-        x: 0.5, y: 1.5, w: 4.2, colW: [1.6, 1.4, 1.2],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 0.2, y: ZONE.TABLE_Y + 0.35, w: 4.5, colW: [1.7, 1.5, 1.3],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     }
 
     if (infra.ips.length > 0) {
-      s.addText("IP Details", { x: 5.3, y: 1.1, w: 4, h: 0.3, fontSize: 12, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
+      s.addText("IP Details", { x: 5.2, y: ZONE.TABLE_Y, w: 4, h: 0.3, fontSize: 10, bold: true, color: theme.titleColor, fontFace: FONTS.headline });
 
       const ipRows: pptxgen.TableRow[] = [
         [
-          { text: "IP Address", options: headerCellOpts(theme) },
+          { text: "IP Address", options: headerCellOpts(theme, "center") },
           { text: "Reputation", options: headerCellOpts(theme, "center") },
         ],
       ];
       infra.ips.forEach((ip, ri) => {
         ipRows.push([
-          { text: ip.ip, options: bodyCellOpts(theme, ri) },
+          { text: ip.ip, options: bodyCellOpts(theme, ri, "center") },
           { text: ip.reputation, options: bodyCellOpts(theme, ri, "center", getReputationColor(ip.reputation, theme)) },
         ]);
       });
 
       s.addTable(ipRows, {
-        x: 5.3, y: 1.5, w: 4.2, colW: [2.5, 1.7],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 5.2, y: ZONE.TABLE_Y + 0.35, w: 4.6, colW: [2.8, 1.8],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     }
@@ -1178,8 +1179,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       s.addTable(shRows, {
-        x: 1, y: 1.15, w: 8, colW: [2.5, 2.0, 1.75, 1.75],
-        border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+        x: 0.5, y: ZONE.TABLE_Y, w: 9.0, colW: [2.8, 2.2, 2.0, 2.0],
+        border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
     } else {
@@ -1335,7 +1336,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   const createFullCampaignHeader = (): pptxgen.TableRow =>
     ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
-      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i < 3 ? "left" : "center") }));
+      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 1 || i === 2 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
     const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
@@ -1344,9 +1345,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const hardPct = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
     const softPct = denom > 0 ? (c.softBounces / denom) * 100 : 0;
     return [
-      { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri) },
-      { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri) },
-      { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri) },
+      { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri, "center") },
+      { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+      { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
       { text: formatPercent(c.openRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(c.openRate, "openRate", theme)) },
@@ -1362,7 +1363,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     ];
   };
 
-  const campaignColW = [0.55, 1.1, 1.2, 0.45, 0.45, 0.5, 0.45, 0.45, 0.45, 0.4, 0.45, 0.4, 0.45, 0.4, 0.45];
+  // Campaign table column widths: Date(no-wrap), Campaign(flex), Subject(flex), then 12 numeric no-wrap cols
+  const campaignColW = [0.55, 1.15, 1.2, 0.5, 0.45, 0.5, 0.45, 0.5, 0.45, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5];
 
   // Build full campaign list (≥1000 sends)
   const allCampaignsForSort: TopCampaign[] = diagnostics.rawData
