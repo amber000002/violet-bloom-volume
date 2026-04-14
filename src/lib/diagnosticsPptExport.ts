@@ -803,7 +803,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fontSize: 9, fontFace: FONTS.body, color: theme.mutedColor,
       align: "right", italic: true,
     });
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -897,7 +897,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ...(sectionInsights?.campaignOverviewByProvider || []),
     ].slice(0, 4);
     addInsightBlock(s, mergedOverviewInsights, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -970,7 +970,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fontFace: FONTS.body,
       });
       addInsightBlock(s, config.insights, 0, theme);
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
   }
 
@@ -1080,7 +1080,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
     addInsightBlock(s, sectionInsights?.emailMetricsTrend, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1149,7 +1149,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       s.addText("No infrastructure details available", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
     addInsightBlock(s, sectionInsights?.infrastructureReputation, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1192,7 +1192,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     } else {
       s.addText("Signal health data not available. Generate from campaign + postmaster data.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1322,7 +1322,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         || sectionInsights?.reputationTrends
         || [];
       addInsightBlock(s, domainInsights.length > 0 ? domainInsights : undefined, 0, theme);
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
   } else {
     // No postmaster data — single fallback slide
@@ -1333,7 +1333,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addSlideHeader(s, "Reputation Trends", theme, undefined, slideNum);
     s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     addInsightBlock(s, sectionInsights?.reputationTrends, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1412,7 +1412,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
     addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // Best Performing — by CTR (separate slide)
@@ -1440,7 +1440,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.bestPerformingCTR, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // Underperforming — by Open Rate (separate slide)
@@ -1477,7 +1477,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
     addInsightBlock(s, sectionInsights?.underperformingOpenRate, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // Underperforming — by CTR (separate slide)
@@ -1511,7 +1511,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.underperformingCTR, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1591,7 +1591,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fontFace: FONTS.body,
       });
 
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
 
     // SLIDE 11: Creative Optimizations
@@ -1621,7 +1621,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         });
       });
 
-      addSlideFooter(s, theme, hasPostmasterData);
+      addSlideFooter(s, theme, slideNum);
     }
   }
 
@@ -1758,7 +1758,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }
 
     addInsightBlock(s, sectionInsights?.sendMixCoverage, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ==========================================
@@ -1818,7 +1818,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       }
     }
     addInsightBlock(s, sectionInsights?.keyLearnings, 0, theme);
-    addSlideFooter(s, theme, hasPostmasterData);
+    addSlideFooter(s, theme, slideNum);
   }
 
   // ============= GENERATE FILE =============
