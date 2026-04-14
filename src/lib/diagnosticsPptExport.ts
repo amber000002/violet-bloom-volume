@@ -413,17 +413,33 @@ const SEVERITY_COLORS = SEVERITY_PIP;
 const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefined, _yPosLegacy: number, _theme: BrandTheme): void => {
   if (!insights || insights.length === 0) return;
 
-  const y0 = ZONE.INSIGHT_Y;
-  const zoneW = 9.0; // content width
+  const zoneW = 9.0;
   const zoneX = 0.5;
-  const labelH = 0.14; // "INSIGHTS" label height
-  const cardH = 0.185; // single card row height
-  const cardGap = 0.025; // vertical gap between cards
+  const cardH = 0.185;
+  const cardGap = 0.025;
   const cardUnit = cardH + cardGap;
-  const availableForCards = ZONE.INSIGHT_H - labelH - 0.04; // reserve top spacing
-  const maxCards = Math.floor(availableForCards / cardUnit);
-  const needsTruncation = insights.length > maxCards;
-  const visibleCount = needsTruncation ? Math.max(1, maxCards - 1) : Math.min(insights.length, maxCards);
+
+  // Calculate how many cards fit in the default zone
+  const defaultAvailable = ZONE.INSIGHT_H - 0.02; // small top padding only (no label)
+  const defaultMaxCards = Math.floor(defaultAvailable / cardUnit);
+
+  // If insights exceed default zone, shift zone upward to accommodate more
+  const totalNeeded = insights.length;
+  let y0 = ZONE.INSIGHT_Y;
+  let maxCards = defaultMaxCards;
+
+  if (totalNeeded > defaultMaxCards) {
+    // Expand upward — up to 0.4" above the default zone start
+    const extraNeeded = (totalNeeded - defaultMaxCards) * cardUnit;
+    const maxShift = 0.4;
+    const shift = Math.min(extraNeeded, maxShift);
+    y0 = ZONE.INSIGHT_Y - shift;
+    const expandedAvailable = ZONE.INSIGHT_H + shift - 0.02;
+    maxCards = Math.floor(expandedAvailable / cardUnit);
+  }
+
+  const needsTruncation = totalNeeded > maxCards;
+  const visibleCount = needsTruncation ? Math.max(1, maxCards - 1) : Math.min(totalNeeded, maxCards);
   const visibleInsights = insights.slice(0, visibleCount);
 
   // Divider line (0.5px, very light)
@@ -432,19 +448,7 @@ const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefi
     fill: { color: "000000", transparency: 94 },
   });
 
-  // "INSIGHTS" zone label
-  slide.addText("INSIGHTS", {
-    x: zoneX, y: y0 + 0.01, w: 0.6, h: labelH,
-    fontSize: 6, fontFace: FONTS.body, color: "B8B8B8",
-    bold: true, valign: "middle",
-  });
-  // Extending line after label
-  slide.addShape("rect" as any, {
-    x: zoneX + 0.62, y: y0 + 0.01 + labelH / 2 - 0.0025, w: zoneW - 0.62, h: 0.005,
-    fill: { color: "000000", transparency: 94 },
-  });
-
-  const cardsStartY = y0 + labelH + 0.03;
+  const cardsStartY = y0 + 0.015;
 
   visibleInsights.forEach((insight, i) => {
     const cy = cardsStartY + i * cardUnit;
@@ -457,7 +461,7 @@ const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefi
       rectRadius: 0.06,
     });
 
-    // Severity pip (6px dot)
+    // Severity pip (6px dot) — color-coded, no text label
     const pipColor = SEVERITY_PIP[insight.severity] || "999999";
     slide.addShape("ellipse" as any, {
       x: zoneX + 0.12, y: cy + cardH / 2 - 0.035, w: 0.07, h: 0.07,
@@ -465,25 +469,16 @@ const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefi
       shadow: { type: "outer", blur: 4, offset: 0, color: pipColor, opacity: 0.25 },
     });
 
-    // Severity label (uppercase, colored)
-    const labelColor = SEVERITY_LABEL_COLOR[insight.severity] || "999999";
-    const labelText = SEVERITY_LABEL_TEXT[insight.severity] || "INFO";
-    slide.addText(labelText, {
-      x: zoneX + 0.24, y: cy, w: 0.55, h: cardH,
-      fontSize: 6, fontFace: FONTS.body, color: labelColor,
-      bold: true, valign: "middle",
-    });
-
-    // Insight text (no source tag)
+    // Insight text — starts right after the dot (no severity label)
     slide.addText(sanitizeText(insight.text), {
-      x: zoneX + 0.82, y: cy, w: zoneW - 0.95, h: cardH,
+      x: zoneX + 0.28, y: cy, w: zoneW - 0.40, h: cardH,
       fontSize: 7.5, fontFace: FONTS.body, color: "616161", valign: "middle",
     });
   });
 
   // "+N more" truncation label
   if (needsTruncation) {
-    const remaining = insights.length - visibleCount;
+    const remaining = totalNeeded - visibleCount;
     const truncY = cardsStartY + visibleCount * cardUnit;
     slide.addText(`+${remaining} more insight${remaining > 1 ? "s" : ""}`, {
       x: zoneX + 0.12, y: truncY, w: 3, h: cardH,
