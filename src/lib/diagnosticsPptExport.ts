@@ -1393,8 +1393,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Top 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
@@ -1430,8 +1430,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Top 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.bestPerformingCTR, 0, theme);
@@ -1458,8 +1458,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Bottom 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
@@ -1501,8 +1501,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     s.addText("Bottom 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: 0.2, y: 1.25, w: 9.6, colW: campaignColW,
-      border: { type: "solid", color: lighten(theme.primary, 0.85), pt: 0.5 },
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
     addInsightBlock(s, sectionInsights?.underperformingCTR, 0, theme);
