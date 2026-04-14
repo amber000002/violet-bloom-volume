@@ -711,7 +711,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const dividerH = 0.25;
     const availableForCards = contentH - dividerH - 0.15; // 0.15 top padding
     const cardH = availableForCards / 2;
-    const rowGap = 0.0;
+    
 
     const row1Y = contentY + 0.1;
     const dividerY = row1Y + cardH + 0.02;
