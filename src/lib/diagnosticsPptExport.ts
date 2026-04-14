@@ -410,13 +410,25 @@ const addSlideFooter = (slide: pptxgen.Slide, _theme: BrandTheme, slideNumber?: 
   });
 };
 
+// Table border color per spec: #E5E7EB
+const TABLE_BORDER_COLOR = "E5E7EB";
+const TABLE_BORDER: pptxgen.BorderOptions = { type: "solid", color: TABLE_BORDER_COLOR, pt: 0.5 };
+
+// Table positions: full content zone width with 2% margins (0.2" each side on 10" slide)
+const TABLE_X = 0.2;
+const TABLE_W = 9.6;
+
 const headerCellOpts = (theme: BrandTheme, align: "left" | "right" | "center" = "center"): pptxgen.TableCellProps => ({
-  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
+  bold: true, fill: { color: theme.headerBg }, fontSize: 7, align, color: theme.titleColor,
+  fontFace: FONTS.body, valign: "middle",
+  margin: [3, 4, 3, 4], // tight cell padding (top, right, bottom, left in points)
 });
 
-const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string): pptxgen.TableCellProps => ({
-  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body, valign: "middle",
+const bodyCellOpts = (theme: BrandTheme, rowIdx: number, align: "left" | "right" | "center" = "center", color?: string, wrap?: boolean): pptxgen.TableCellProps => ({
+  fontSize: 7, align, color: color || theme.bodyColor, fontFace: FONTS.body,
+  valign: wrap ? "top" : "middle",
   fill: rowIdx % 2 === 1 ? { color: theme.altRowBg } : undefined,
+  margin: [3, 4, 3, 4],
 });
 
 // ============= INSIGHT BLOCK RENDERER =============
