@@ -536,35 +536,70 @@ const addInsightBlock = (slide: pptxgen.Slide, insights: TableInsight[] | undefi
 };
 
 // ============= INFRASTRUCTURE EXTRACTION =============
+// Mirrors InfrastructureDetailsTable.tsx logic: latest valid reputation, cleaned IPs, sorted by reputation
+
+const cleanIP = (ip: string): string => ip.replace(/[[\](){}]/g, "").trim();
 
 const extractInfrastructure = (
   campaignData: CampaignRow[],
   postmasterData: PostmasterRow[] | null
 ): { domains: InfrastructureDomain[]; ips: InfrastructureIP[] } => {
-  const domainMap = new Map<string, InfrastructureDomain>();
-  const ipMap = new Map<string, InfrastructureIP>();
+  if (!postmasterData || postmasterData.length === 0) {
+    return { domains: [], ips: [] };
+  }
 
-  campaignData.forEach(c => {
-    const provider = c.providerName || c.serviceProvider || "";
-    if (provider && !domainMap.has(provider)) {
-      domainMap.set(provider, { domain: provider, provider: c.serviceProvider, reputation: "N/A" });
+  // Sort newest first for "latest valid" logic
+  const sorted = [...postmasterData].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  // Domains: collect unique domains, then find latest valid reputation per domain
+  const domainNames = new Map<string, string>();
+  sorted.forEach((row) => {
+    const domainKey = row.domain?.toLowerCase().trim();
+    if (domainKey && !domainNames.has(domainKey)) {
+      domainNames.set(domainKey, row.domain?.trim() || domainKey);
     }
   });
 
-  if (postmasterData) {
-    postmasterData.forEach(p => {
-      if (p.domain) {
-        domainMap.set(p.domain, { domain: p.domain, provider: domainMap.get(p.domain)?.provider || "", reputation: p.domainReputation || "N/A" });
-      }
-      if (p.sampleIps) {
-        p.sampleIps.split(",").map(ip => ip.trim()).filter(Boolean).forEach(ip => {
-          ipMap.set(ip, { ip, reputation: p.ipReputation || "N/A" });
-        });
-      }
+  const domains: InfrastructureDomain[] = [];
+  domainNames.forEach((displayName, domainKey) => {
+    const latestValid = sorted.find((row) => {
+      if (row.domain?.toLowerCase().trim() !== domainKey) return false;
+      const rep = row.domainReputation?.trim();
+      return rep && rep.toLowerCase() !== "n/a" && rep !== "";
     });
-  }
+    domains.push({
+      domain: displayName,
+      provider: "",
+      reputation: latestValid?.domainReputation?.trim() || "—",
+    });
+  });
 
-  return { domains: Array.from(domainMap.values()), ips: Array.from(ipMap.values()) };
+  // IPs: all unique IPs from sampleIps, latest recorded valid reputation, cleaned
+  const ipMap = new Map<string, InfrastructureIP>();
+  const ipSeen = new Set<string>();
+  sorted.forEach((row) => {
+    if (!row.sampleIps) return;
+    const ipList = row.sampleIps.split(/[,;]/).map((s) => cleanIP(s)).filter(Boolean);
+    ipList.forEach((ip) => {
+      if (ipSeen.has(ip)) return;
+      ipSeen.add(ip);
+      const rep = row.ipReputation?.trim();
+      const isValid = rep && rep.toLowerCase() !== "n/a" && rep !== "";
+      ipMap.set(ip, { ip, reputation: isValid ? rep! : "—" });
+    });
+  });
+
+  // Sort IPs by reputation: high → medium → low → bad → unknown
+  const repOrder: Record<string, number> = { high: 0, medium: 1, low: 2, bad: 3 };
+  const sortedIps = Array.from(ipMap.values()).sort((a, b) => {
+    const ra = repOrder[(a.reputation || "").toLowerCase()] ?? 4;
+    const rb = repOrder[(b.reputation || "").toLowerCase()] ?? 4;
+    return ra - rb;
+  });
+
+  return { domains, ips: sortedIps };
 };
 
 // ============= MAIN EXPORT FUNCTION =============
