@@ -1427,8 +1427,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   }
 
   // ==========================================
-  // SLIDES 8 & 9: Best & Underperforming Campaigns (Top 5 each)
-  // Columns match app: Start Date, Campaign Name, Subject Line, Sent, Unique Open, Open%, Unique Clicked, Click%, Unique CTR, Unsubs, Unsub%, Hard Bounce, Hard%, Soft Bounce, Soft%
+  // SLIDES 8-11: Best & Underperforming Campaigns (4 slides)
   // ==========================================
   const createFullCampaignHeader = (): pptxgen.TableRow =>
     ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
@@ -1441,7 +1440,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const hardPct = denom > 0 ? (c.hardBounces / denom) * 100 : 0;
     const softPct = denom > 0 ? (c.softBounces / denom) * 100 : 0;
     return [
-      { text: sanitizeText(c.startDate) || "—", options: bodyCellOpts(theme, ri, "center") },
+      { text: sanitizeText(c.startDate) || "\u2014", options: bodyCellOpts(theme, ri, "center") },
       { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
@@ -1459,8 +1458,14 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     ];
   };
 
-  // Campaign table column widths: Date(no-wrap), Campaign(flex), Subject(flex), then 12 numeric no-wrap cols
-  const campaignColW = [0.55, 1.15, 1.2, 0.5, 0.45, 0.5, 0.45, 0.5, 0.45, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5];
+  // Campaign table column widths: Date(fixed), Campaign(flex), Subject(flex), then 12 numeric fixed cols
+  // Fixed cols: Date=0.55, then 12 numeric cols at their natural widths
+  const fixedDateW = 0.55;
+  const numericWidths = [0.5, 0.45, 0.5, 0.45, 0.5, 0.45, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5]; // 12 cols
+  const totalFixedW = fixedDateW + numericWidths.reduce((s, w) => s + w, 0);
+  const remainingW = TABLE_W - totalFixedW;
+  const flexW = Math.min(remainingW / 2, 2.2); // cap at 220px equivalent (~2.2")
+  const campaignColW = [fixedDateW, flexW, flexW, ...numericWidths];
 
   // Build full campaign list (≥1000 sends)
   const allCampaignsForSort: TopCampaign[] = diagnostics.rawData
@@ -1475,44 +1480,93 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }));
   const worstFiltered = allCampaignsForSort.filter(c => (c.campaignName || "").trim() !== "");
 
-  // Best Performing — by Open Rate (separate slide)
+  // Open rate threshold for summary insight severity
+  const OPEN_RATE_THRESHOLD = 2.0;
+  // CTR thresholds: <1.5% poor (red), 1.5-5% average (amber), >5% excellent (green)
+  const CTR_THRESHOLD_POOR = 1.5;
+  const CTR_THRESHOLD_GOOD = 5.0;
+
+  // Helper: build summary insight for open rate slides
+  const buildOpenRateSummary = (campaigns: TopCampaign[], label: "Top" | "Under"): TableInsight => {
+    const avgOpen = campaigns.reduce((s, c) => s + c.openRate, 0) / campaigns.length;
+    const avgClick = campaigns.reduce((s, c) => s + c.clickRate, 0) / campaigns.length;
+    const severity = avgOpen >= OPEN_RATE_THRESHOLD ? "positive" : "critical";
+    return {
+      severity: severity as "positive" | "critical",
+      text: `${label}-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`,
+      source: "Sender Reputation",
+    };
+  };
+
+  // Helper: build summary insight for CTR slides
+  const buildCTRSummary = (campaigns: TopCampaign[], label: "Top" | "Under"): TableInsight => {
+    const avgCTR = campaigns.reduce((s, c) => {
+      const ctr = c.uniqueViewed > 0 ? (c.uniqueClicked / c.uniqueViewed) * 100 : 0;
+      return s + ctr;
+    }, 0) / campaigns.length;
+    const avgOpen = campaigns.reduce((s, c) => s + c.openRate, 0) / campaigns.length;
+    const severity = avgCTR >= CTR_THRESHOLD_GOOD ? "positive" : avgCTR >= CTR_THRESHOLD_POOR ? "warning" : "critical";
+    return {
+      severity: severity as "positive" | "critical" | "warning",
+      text: `${label}-performers averaged ${avgCTR.toFixed(1)}% CTR with ${avgOpen.toFixed(1)}% average open rate.`,
+      source: "Sender Reputation",
+    };
+  };
+
+  // Helper: assemble insights with summary replacing open-rate insights, sorted by severity
+  const SEVERITY_PRIORITY: Record<string, number> = { critical: 0, positive: 1, warning: 2, info: 3 };
+  const assembleInsights = (summary: TableInsight, rawInsights: TableInsight[] | undefined): TableInsight[] => {
+    // Filter out open-rate-specific insights that the summary replaces
+    const filtered = (rawInsights || []).filter(i =>
+      !(/open rate/i.test(i.text) && (/averaged|indicates|of \d+.*%/i.test(i.text))) &&
+      !(/CTR of \d+.*%/i.test(i.text) && /outperforms|indicates/i.test(i.text))
+    );
+    const all = [summary, ...filtered];
+    all.sort((a, b) => (SEVERITY_PRIORITY[a.severity] ?? 9) - (SEVERITY_PRIORITY[b.severity] ?? 9));
+    // Truncate to 4, dropping info (blue) first
+    if (all.length > 4) {
+      const nonInfo = all.filter(i => i.severity !== "info");
+      const info = all.filter(i => i.severity === "info");
+      return [...nonInfo, ...info].slice(0, 4);
+    }
+    return all;
+  };
+
+  // Best Performing \u2013 by Open Rate
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Best Performing Campaigns — by Open Rate", theme, undefined, slideNum);
+    addSlideHeader(s, "Best Performing Campaigns \u2013 by Open Rate", theme, undefined, slideNum);
 
     const byOpenRate = [...allCampaignsForSort].sort((a, b) => b.openRate - a.openRate).slice(0, 5);
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Top 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
-    // One-liner insight matching the app
     if (byOpenRate.length > 0) {
-      const avgOpen = byOpenRate.reduce((s, c) => s + c.openRate, 0) / byOpenRate.length;
-      const avgClick = byOpenRate.reduce((s, c) => s + c.clickRate, 0) / byOpenRate.length;
-      s.addText(sanitizeText(`Top performers achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`), {
-        x: 0.3, y: ZONE.INSIGHT_Y - 0.15, w: 9.0, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
-      });
+      const summary = buildOpenRateSummary(byOpenRate, "Top");
+      const assembled = assembleInsights(summary, sectionInsights?.bestPerformingOpenRate);
+      addInsightBlock(s, assembled, 0, theme);
+    } else {
+      addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 0, theme);
     }
-    addInsightBlock(s, sectionInsights?.bestPerformingOpenRate, 0, theme);
     addSlideFooter(s, theme, slideNum);
   }
 
-  // Best Performing — by CTR (separate slide)
+  // Best Performing \u2013 by CTR
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Best Performing Campaigns — by CTR", theme, undefined, slideNum);
+    addSlideHeader(s, "Best Performing Campaigns \u2013 by CTR", theme, undefined, slideNum);
 
     const byCTR = [...allCampaignsForSort]
       .sort((a, b) => {
@@ -1524,66 +1578,57 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Top 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
-    addInsightBlock(s, sectionInsights?.bestPerformingCTR, 0, theme);
+
+    if (byCTR.length > 0) {
+      const summary = buildCTRSummary(byCTR, "Top");
+      const assembled = assembleInsights(summary, sectionInsights?.bestPerformingCTR);
+      addInsightBlock(s, assembled, 0, theme);
+    } else {
+      addInsightBlock(s, sectionInsights?.bestPerformingCTR, 0, theme);
+    }
     addSlideFooter(s, theme, slideNum);
   }
 
-  // Underperforming — by Open Rate (separate slide)
+  // Underperforming \u2013 by Open Rate
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "side");
-    addSlideHeader(s, "Underperforming Campaigns — by Open Rate", theme, undefined, slideNum);
-
-    s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-      x: 0.1, y: 0.15, w: 9.8, h: 0.9,
-      fill: { color: theme.slideBg, transparency: 100 },
-      line: { color: theme.amber, width: 1 }, rectRadius: 0.06,
-    });
+    addSlideHeader(s, "Underperforming Campaigns \u2013 by Open Rate", theme, undefined, slideNum);
 
     const byOpenRate = [...worstFiltered].sort((a, b) => a.openRate - b.openRate).slice(0, 5);
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Bottom 5 by Unique Open Rate", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
 
-    // One-liner insight matching the app
     if (byOpenRate.length > 0) {
-      const avgOpen = byOpenRate.reduce((s, c) => s + c.openRate, 0) / byOpenRate.length;
-      const avgClick = byOpenRate.reduce((s, c) => s + c.clickRate, 0) / byOpenRate.length;
-      s.addText(sanitizeText(`Under-performers averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`), {
-        x: 0.3, y: ZONE.INSIGHT_Y - 0.15, w: 9.0, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body,
-      });
+      const summary = buildOpenRateSummary(byOpenRate, "Under");
+      const assembled = assembleInsights(summary, sectionInsights?.underperformingOpenRate);
+      addInsightBlock(s, assembled, 0, theme);
+    } else {
+      addInsightBlock(s, sectionInsights?.underperformingOpenRate, 0, theme);
     }
-    addInsightBlock(s, sectionInsights?.underperformingOpenRate, 0, theme);
     addSlideFooter(s, theme, slideNum);
   }
 
-  // Underperforming — by CTR (separate slide)
+  // Underperforming \u2013 by CTR
   slideNum++;
   {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "side");
-    addSlideHeader(s, "Underperforming Campaigns — by CTR", theme, undefined, slideNum);
-
-    s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-      x: 0.1, y: 0.15, w: 9.8, h: 0.9,
-      fill: { color: theme.slideBg, transparency: 100 },
-      line: { color: theme.amber, width: 1 }, rectRadius: 0.06,
-    });
+    addSlideHeader(s, "Underperforming Campaigns \u2013 by CTR", theme, undefined, slideNum);
 
     const byCTR = [...worstFiltered]
       .sort((a, b) => {
@@ -1595,13 +1640,19 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const rows: pptxgen.TableRow[] = [createFullCampaignHeader()];
     byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
-    s.addText("Bottom 5 by Unique CTR", { x: 0.5, y: 1.0, w: 5, h: 0.2, fontSize: 8, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.35, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
-    addInsightBlock(s, sectionInsights?.underperformingCTR, 0, theme);
+
+    if (byCTR.length > 0) {
+      const summary = buildCTRSummary(byCTR, "Under");
+      const assembled = assembleInsights(summary, sectionInsights?.underperformingCTR);
+      addInsightBlock(s, assembled, 0, theme);
+    } else {
+      addInsightBlock(s, sectionInsights?.underperformingCTR, 0, theme);
+    }
     addSlideFooter(s, theme, slideNum);
   }
 
