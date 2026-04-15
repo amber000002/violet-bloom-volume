@@ -1202,9 +1202,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
 
 
+
   // ==========================================
-  // SLIDES 7+: Reputation Trends — one slide per domain
-  // Each slide: 2x2 chart grid (IP Rep, Domain Rep, Spam, Error) + domain-specific insights
+  // SLIDES 7+: Google Postmaster Reputation — one slide per domain
+  // 2×2 chart grid: Domain Rep (TL), IP Rep (TR), Spam % (BL), Error % (BR)
   // ==========================================
 
   if (diagnostics.postmasterData && diagnostics.postmasterData.length > 0) {
@@ -1212,6 +1213,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
       Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
     };
+    const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const parsePmDate = (dateStr: string): Date | null => {
       if (!dateStr) return null;
       const match = dateStr.trim().match(/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{4})$/);
@@ -1226,6 +1228,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const val = map[rep.trim().toLowerCase()];
       return val !== undefined ? val : null;
     };
+    // Format date as "MMM D" (no year)
+    const fmtDateShort = (d: Date): string => `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
 
     // Group postmaster data by domain
     const domainMap = new Map<string, typeof diagnostics.postmasterData>();
@@ -1236,12 +1240,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       domainMap.get(d)!.push(row);
     });
 
-    // If no domain info, treat all data as one group
     if (domainMap.size === 0) {
       domainMap.set("All Domains", diagnostics.postmasterData);
     }
 
     const domainNames = Array.from(domainMap.keys()).sort();
+
+    // Reputation chart line colors per spec
+    const REP_COLORS = {
+      domain: "4A7CA5",  // steel blue
+      ip: "534AB7",      // purple
+      spam: "EF4444",    // red
+      error: "D97706",   // amber
+    };
+
+    // Y-axis label colors for reputation charts
+    const REP_LABEL_COLORS: Record<string, string> = {
+      High: "10B981",
+      Medium: "F59E0B",
+      Low: "F97316",
+      Bad: "EF4444",
+    };
 
     for (const domainName of domainNames) {
       const domainData = domainMap.get(domainName)!;
@@ -1249,7 +1268,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const s = pptx.addSlide();
       addSlideBackground(s, theme);
       addDecorativeMotif(s, theme, "corner");
-      addSlideHeader(s, `Reputation Trends — ${sanitizeText(domainName)}`, theme, undefined, slideNum);
+
+      // Title with en dash per spec
+      addSlideHeader(s, `Google Postmaster reputation \u2013 ${sanitizeText(domainName)}`, theme, undefined, slideNum);
 
       const pmData = [...domainData].sort((a, b) => {
         const da = parsePmDate(a.date);
@@ -1258,42 +1279,91 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         return da.getTime() - db.getTime();
       });
 
-      const pmDates = pmData.map(p => sanitizeText(p.date));
+      // Build date labels (MMM D, no year)
+      const allDateLabels = pmData.map(p => {
+        const d = parsePmDate(p.date);
+        return d ? fmtDateShort(d) : sanitizeText(p.date);
+      });
+
       const spamData = pmData.map(p => (p.spamRatio || 0) * 100);
       const errorData = pmData.map(p => (p.errorRatio || 0) * 100);
 
       const ipRepEntries = pmData.filter(p => repToNum(p.ipReputation) !== null);
       const domainRepEntries = pmData.filter(p => repToNum(p.domainReputation) !== null);
-      const ipRepDates = ipRepEntries.map(p => sanitizeText(p.date));
-      const domainRepDates = domainRepEntries.map(p => sanitizeText(p.date));
+
+      const ipRepLabels = ipRepEntries.map(p => {
+        const d = parsePmDate(p.date);
+        return d ? fmtDateShort(d) : sanitizeText(p.date);
+      });
+      const domainRepLabels = domainRepEntries.map(p => {
+        const d = parsePmDate(p.date);
+        return d ? fmtDateShort(d) : sanitizeText(p.date);
+      });
       const ipRepData = ipRepEntries.map(p => repToNum(p.ipReputation) as number);
       const domainRepData = domainRepEntries.map(p => repToNum(p.domainReputation) as number);
 
+      // 2×2 grid positions from ZONE constants
+      // Content area: ZONE.TABLE_Y to ZONE.INSIGHT_Y
+      const gridX = 0.35;
+      const gridW = 9.3;      // full content width
+      const colGap = 0.125;   // 12px
+      const rowGap = 0.125;   // 12px
+      const cellW = (gridW - colGap) / 2;
+      const totalH = ZONE.INSIGHT_Y - ZONE.TABLE_Y - 0.05; // small bottom padding
+      const cellH = (totalH - rowGap) / 2;
+
       const chartPositions = [
-        { x: 0.3, y: 1.1, w: 4.4, h: 2.0 },
-        { x: 5.3, y: 1.1, w: 4.4, h: 2.0 },
-        { x: 0.3, y: 3.2, w: 4.4, h: 2.0 },
-        { x: 5.3, y: 3.2, w: 4.4, h: 2.0 },
+        { x: gridX,                     y: ZONE.TABLE_Y,                w: cellW, h: cellH }, // TL: Domain
+        { x: gridX + cellW + colGap,    y: ZONE.TABLE_Y,                w: cellW, h: cellH }, // TR: IP
+        { x: gridX,                     y: ZONE.TABLE_Y + cellH + rowGap, w: cellW, h: cellH }, // BL: Spam
+        { x: gridX + cellW + colGap,    y: ZONE.TABLE_Y + cellH + rowGap, w: cellW, h: cellH }, // BR: Error
       ];
 
+      // Chart order per spec: Domain Rep (TL), IP Rep (TR), Spam (BL), Error (BR)
       const chartConfigs = [
-        { name: "IP Reputation", data: ipRepData, labels: ipRepDates, color: theme.primary, min: 0, max: 3, isReputation: true },
-        { name: "Domain Reputation", data: domainRepData, labels: domainRepDates, color: theme.secondary, min: 0, max: 3, isReputation: true },
-        { name: "Spam Ratio %", data: spamData, labels: pmDates, color: theme.red, isReputation: false },
-        { name: "Error Ratio %", data: errorData, labels: pmDates, color: theme.amber, isReputation: false },
+        { name: "Domain reputation",  data: domainRepData, labels: domainRepLabels, color: REP_COLORS.domain, min: 0, max: 3, isReputation: true },
+        { name: "IP reputation",      data: ipRepData,     labels: ipRepLabels,     color: REP_COLORS.ip,     min: 0, max: 3, isReputation: true },
+        { name: "Spam ratio %",       data: spamData,      labels: allDateLabels,   color: REP_COLORS.spam,   isReputation: false },
+        { name: "Error ratio %",      data: errorData,     labels: allDateLabels,   color: REP_COLORS.error,  isReputation: false },
       ];
 
       chartConfigs.forEach((cfg, i) => {
         if (cfg.data.length === 0) return;
+        const pos = chartPositions[i];
+
+        // Glassmorphism card container
+        s.addShape("roundRect" as any, {
+          x: pos.x, y: pos.y, w: pos.w, h: pos.h,
+          fill: { color: "FFFFFF", transparency: 45 },
+          line: { color: "FFFFFF", width: 0.5, transparency: 20 } as any,
+          rectRadius: 0.1,
+        });
+
+        // Chart title inside card
+        s.addText(cfg.name, {
+          x: pos.x + 0.16, y: pos.y + 0.06, w: pos.w - 0.32, h: 0.2,
+          fontSize: 9, fontFace: FONTS.body, color: theme.titleColor, bold: false,
+        });
+
+        // Chart area within card (below title, with padding)
+        const chartInnerX = pos.x + 0.08;
+        const chartInnerY = pos.y + 0.3;
+        const chartInnerW = pos.w - 0.16;
+        const chartInnerH = pos.h - 0.4;
+
         const opts: any = {
-          ...chartPositions[i],
+          x: chartInnerX, y: chartInnerY, w: chartInnerW, h: chartInnerH,
           showLegend: false, lineSmooth: !cfg.isReputation, lineSize: 2,
-          catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
+          lineDataSymbolSize: 4,
+          catAxisLabelFontSize: 6, valAxisLabelFontSize: 6,
+          catAxisLabelColor: theme.mutedColor,
           catGridLine: { style: "none" },
-          valGridLine: { color: lighten(theme.primary, 0.88), style: "dash" },
+          valGridLine: { color: "000000", width: 0.5, transparency: 94 },
           chartColors: [cfg.color],
-          showTitle: true, title: cfg.name, titleFontSize: 9, titleColor: theme.titleColor,
+          showTitle: false,
+          plotArea: { fill: { color: "FFFFFF", transparency: 100 } },
         };
+
         if (cfg.min !== undefined) opts.valAxisMinVal = cfg.min;
         if (cfg.max !== undefined) opts.valAxisMaxVal = cfg.max;
 
@@ -1302,29 +1372,31 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           opts.valAxisHidden = true;
           opts.valAxisLabelFontSize = 1;
           opts.valAxisLabelColor = theme.slideBg;
+        } else {
+          opts.valAxisLabelColor = theme.mutedColor;
+          opts.numFmt = "0.0\"%\"";
         }
 
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
 
+        // Custom Y-axis labels for reputation charts
         if (cfg.isReputation) {
-          const pos = chartPositions[i];
-          const repLabels = ["BAD", "LOW", "MEDIUM", "HIGH"];
-          const chartAreaX = pos.x + 0.35;
-          const chartTop = pos.y + 0.35;
-          const chartBottom = pos.y + pos.h - 0.25;
-          const plotHeight = chartBottom - chartTop;
+          const repLabels = ["Bad", "Low", "Medium", "High"];
+          const plotTop = chartInnerY + 0.05;
+          const plotBottom = chartInnerY + chartInnerH - 0.12;
+          const plotHeight = plotBottom - plotTop;
           repLabels.forEach((label, li) => {
-            const yPos = chartBottom - (li / 3) * plotHeight - 0.08;
+            const yPos = plotBottom - (li / 3) * plotHeight - 0.06;
             s.addText(label, {
-              x: chartAreaX - 0.55, y: yPos, w: 0.55, h: 0.16,
-              fontSize: 5, color: li >= 2 ? theme.green : li === 1 ? theme.amber : theme.red,
+              x: chartInnerX - 0.05, y: yPos, w: 0.55, h: 0.14,
+              fontSize: 6, color: REP_LABEL_COLORS[label] || theme.mutedColor,
               fontFace: FONTS.body, align: "right", bold: true,
             });
           });
         }
       });
 
-      // Domain-specific insights from the engine
+      // Domain-specific insights
       const domainInsights = sectionInsights?.reputationTrendsByDomain?.[domainName]
         || sectionInsights?.reputationTrends
         || [];
@@ -1337,7 +1409,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Reputation Trends", theme, undefined, slideNum);
+    addSlideHeader(s, "Google Postmaster reputation", theme, undefined, slideNum);
     s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     addInsightBlock(s, sectionInsights?.reputationTrends, 0, theme);
     addSlideFooter(s, theme, slideNum);
