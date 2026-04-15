@@ -1355,6 +1355,56 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         const chartInnerY = pos.y + 0.3;
         const chartInnerW = pos.w - 0.16;
         const chartInnerH = pos.h - 0.4;
+
+        const opts: any = {
+          x: chartInnerX, y: chartInnerY, w: chartInnerW, h: chartInnerH,
+          showLegend: false, lineSmooth: !cfg.isReputation, lineSize: 2,
+          lineDataSymbolSize: 4,
+          catAxisLabelFontSize: 6, valAxisLabelFontSize: 6,
+          catAxisLabelColor: theme.mutedColor,
+          catGridLine: { style: "none" },
+          valGridLine: { color: "000000", width: 0.5, transparency: 94 },
+          chartColors: [cfg.color],
+          showTitle: false,
+          plotArea: { fill: { color: "FFFFFF", transparency: 100 } },
+        };
+
+        opts.valAxisMinVal = 0;
+        if (cfg.max !== undefined) opts.valAxisMaxVal = cfg.max;
+
+        if (cfg.isReputation) {
+          opts.valAxisMajorUnit = 1;
+          opts.valAxisHidden = false;
+          opts.valAxisLineShow = false;
+          opts.valAxisLabelColor = theme.slideBg;
+          opts.valAxisLabelFontSize = 1;
+        } else {
+          opts.valAxisLabelColor = theme.mutedColor;
+          opts.numFmt = "0.0\"%\"";
+        }
+
+        s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
+
+        // Custom Y-axis labels for reputation charts — positioned right next to grid lines
+        if (cfg.isReputation) {
+          const repLabels = ["Bad", "Low", "Medium", "High"];
+          const plotTop = chartInnerY + chartInnerH * 0.04;
+          const plotBottom = chartInnerY + chartInnerH * 0.82;
+          const plotHeight = plotBottom - plotTop;
+          const labelH = 0.13;
+          // Place labels just left of chart, close to grid lines
+          const labelW = 0.6;
+          const labelX = chartInnerX - labelW - 0.01;
+          repLabels.forEach((label, li) => {
+            const gridLineY = plotBottom - (li / 3) * plotHeight;
+            s.addText(label, {
+              x: labelX, y: gridLineY - labelH / 2, w: labelW, h: labelH,
+              fontSize: 7, color: REP_LABEL_COLORS[label] || theme.mutedColor,
+              fontFace: FONTS.body, align: "right", bold: true,
+              valign: "middle", wrap: false,
+            });
+          });
+        }
       });
 
       // Domain-specific insights
