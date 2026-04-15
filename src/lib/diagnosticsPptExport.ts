@@ -1385,16 +1385,16 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
 
-        // Custom Y-axis labels for reputation charts — positioned right next to grid lines
+        // Custom Y-axis labels for reputation charts — overlapping chart edge, tight to grid lines
         if (cfg.isReputation) {
           const repLabels = ["Bad", "Low", "Medium", "High"];
           const plotTop = chartInnerY + chartInnerH * 0.04;
-          const plotBottom = chartInnerY + chartInnerH * 0.82;
+          const plotBottom = chartInnerY + chartInnerH * 0.78;
           const plotHeight = plotBottom - plotTop;
           const labelH = 0.13;
-          // Place labels just left of chart, close to grid lines
-          const labelW = 0.6;
-          const labelX = chartInnerX - labelW - 0.01;
+          // Labels overlap into chart area for tight grid-line alignment
+          const labelW = 0.55;
+          const labelX = chartInnerX - labelW + 0.06;
           repLabels.forEach((label, li) => {
             const gridLineY = plotBottom - (li / 3) * plotHeight;
             s.addText(label, {
