@@ -1545,7 +1545,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
@@ -1579,7 +1579,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
@@ -1607,7 +1607,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     byOpenRate.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
@@ -1641,7 +1641,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     byCTR.forEach((c, ri) => rows.push(createFullCampaignRow(c, ri)));
 
     s.addTable(rows, {
-      x: TABLE_X, y: ZONE.TABLE_Y + 0.16, w: TABLE_W, colW: campaignColW,
+      x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: campaignColW,
       border: TABLE_BORDER,
       fontFace: FONTS.body,
     });
