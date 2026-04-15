@@ -370,18 +370,21 @@ const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
  * Elements: title (left), accent line (under title), date range (right).
  * Not rendered on title/thank-you slides.
  */
-const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, _slideNumber?: number) => {
-  // Title — left-aligned, sentence case, font-weight 600
+const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, monthRange?: string, _slideNumber?: number, opts?: { titleMaxW?: number; titleFontSize?: number }) => {
+  // Title — left-aligned, font-weight 600, nowrap via fixed width
   const titleX = 0.35;
   const titleY = ZONE.HEADER_Y + 0.12;
-  const titleW = 7.0; // max 70% of 10" slide
+  const titleW = opts?.titleMaxW ?? 7.0; // default 70%, or 80% for long titles
+  const titleFontSize = opts?.titleFontSize ?? 22;
+  // Auto-reduce font for very long titles (> ~45 chars) to prevent wrapping
+  const effectiveFontSize = title.length > 50 ? Math.min(titleFontSize, 18) : title.length > 45 ? Math.min(titleFontSize, 20) : titleFontSize;
   slide.addText(title, {
     x: titleX, y: titleY, w: titleW, h: 0.42,
-    fontSize: 22, fontFace: FONTS.headline, color: theme.titleColor, bold: true,
+    fontSize: effectiveFontSize, fontFace: FONTS.headline, color: theme.titleColor, bold: true,
+    autoFit: true,
   });
 
   // Accent line — short bar under title, ~40-50% of title text width
-  // Approximate: use a fixed fraction of titleW capped reasonably
   const accentW = Math.min(title.length * 0.11, titleW * 0.5, 3.0);
   slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
     x: titleX, y: titleY + 0.44, w: Math.max(accentW, 1.2), h: 0.035,
@@ -1269,8 +1272,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       addSlideBackground(s, theme);
       addDecorativeMotif(s, theme, "corner");
 
-      // Title with en dash per spec
-      addSlideHeader(s, `Google Postmaster reputation \u2013 ${sanitizeText(domainName)}`, theme, undefined, slideNum);
+      // Title with en dash per spec — title case "Reputation", nowrap via width allocation
+      const pmTitle = `Google Postmaster Reputation \u2013 ${sanitizeText(domainName)}`;
+      // Use addSlideHeader but give title 80% width for long domains
+      addSlideHeader(s, pmTitle, theme, undefined, slideNum, { titleMaxW: 8.0 });
 
       const pmData = [...domainData].sort((a, b) => {
         const da = parsePmDate(a.date);
@@ -1364,7 +1369,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           plotArea: { fill: { color: "FFFFFF", transparency: 100 } },
         };
 
-        if (cfg.min !== undefined) opts.valAxisMinVal = cfg.min;
+        // Hard floor at 0 for all charts — never show negative Y-axis
+        opts.valAxisMinVal = 0;
         if (cfg.max !== undefined) opts.valAxisMaxVal = cfg.max;
 
         if (cfg.isReputation) {
@@ -1373,24 +1379,33 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           opts.valAxisLabelFontSize = 1;
           opts.valAxisLabelColor = theme.slideBg;
         } else {
+          // Ratio charts: min 0, format as percentage
           opts.valAxisLabelColor = theme.mutedColor;
           opts.numFmt = "0.0\"%\"";
         }
 
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
 
-        // Custom Y-axis labels for reputation charts
+        // Custom Y-axis labels for reputation charts — anchored to grid line Y-coordinates
         if (cfg.isReputation) {
           const repLabels = ["Bad", "Low", "Medium", "High"];
-          const plotTop = chartInnerY + 0.05;
-          const plotBottom = chartInnerY + chartInnerH - 0.12;
+          // pptxgenjs plot area positioning: the chart's plot area sits within chartInner bounds
+          // With valAxisMinVal=0, valAxisMaxVal=3, each unit = plotHeight/3
+          // Estimate plot area margins (pptxgenjs uses ~8% top/bottom padding within chart area)
+          const plotTopPad = chartInnerH * 0.08;
+          const plotBotPad = chartInnerH * 0.14; // bottom has axis labels
+          const plotTop = chartInnerY + plotTopPad;
+          const plotBottom = chartInnerY + chartInnerH - plotBotPad;
           const plotHeight = plotBottom - plotTop;
+          const labelH = 0.12;
           repLabels.forEach((label, li) => {
-            const yPos = plotBottom - (li / 3) * plotHeight - 0.06;
+            // Each label vertically centered on its grid line
+            const gridLineY = plotBottom - (li / 3) * plotHeight;
             s.addText(label, {
-              x: chartInnerX - 0.05, y: yPos, w: 0.55, h: 0.14,
+              x: chartInnerX - 0.05, y: gridLineY - labelH / 2, w: 0.55, h: labelH,
               fontSize: 6, color: REP_LABEL_COLORS[label] || theme.mutedColor,
               fontFace: FONTS.body, align: "right", bold: true,
+              valign: "middle",
             });
           });
         }
@@ -1409,7 +1424,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const s = pptx.addSlide();
     addSlideBackground(s, theme);
     addDecorativeMotif(s, theme, "corner");
-    addSlideHeader(s, "Google Postmaster reputation", theme, undefined, slideNum);
+    addSlideHeader(s, "Google Postmaster Reputation", theme, undefined, slideNum);
     s.addText("Postmaster data required for reputation trend charts.", { x: 1, y: 2.5, w: 8, h: 0.5, fontSize: 12, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     addInsightBlock(s, sectionInsights?.reputationTrends, 0, theme);
     addSlideFooter(s, theme, slideNum);
