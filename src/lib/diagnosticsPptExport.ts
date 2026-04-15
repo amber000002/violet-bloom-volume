@@ -208,11 +208,13 @@ const FONTS = { headline: "Calibri", body: "Calibri" };
 // ============= FIXED ZONE LAYOUT (EMU → inches) =============
 // Slide: 10" × 5.625" (9,144,000 × 5,143,500 EMU)
 // All data slides (2–11) use these four immovable zones.
+// Accent line bottom = titleY(0.12) + 0.44 + 0.035 = 0.595"
+// Fixed 16px (0.167") gap from accent line bottom to first content element.
 const ZONE = {
   HEADER_Y: 0,                    // 0 EMU
   HEADER_H: 0.625,               // 571,500 EMU
-  TABLE_Y: 0.625,                 // 571,500 EMU
-  TABLE_MAX_H: 3.538,             // 3,234,690 EMU — hard ceiling
+  TABLE_Y: 0.762,                 // accent bottom (0.595) + 16px gap (0.167)
+  TABLE_MAX_H: 3.401,             // from TABLE_Y to INSIGHT_Y
   INSIGHT_Y: 4.163,               // 3,806,190 EMU — fixed anchor
   INSIGHT_H: 1.012,               // 925,830 EMU
   INSIGHT_ROW_H: 0.22,            // single insight row height
