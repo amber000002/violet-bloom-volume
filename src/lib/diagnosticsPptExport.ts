@@ -1085,18 +1085,32 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         "8B5CF6", // purple for Unsubs
       );
 
-      // Grand Total Averages caption
+      // Grand Total Averages row — first content element, 16px gap from accent line
       const totalSent = sentData.reduce((a, b) => a + b, 0);
       const totalViewed = viewedData.reduce((a, b) => a + b, 0);
       const totalClicked = clickedData.reduce((a, b) => a + b, 0);
       const totalBounces = bouncesData.reduce((a, b) => a + b, 0);
       const totalUnsubs = unsubsData.reduce((a, b) => a + b, 0);
       const denom = totalSent || 1;
-      const avgLine = `Grand Total Avg:  Open Rate: ${((totalViewed / denom) * 100).toFixed(1)}%   Click Rate: ${((totalClicked / denom) * 100).toFixed(1)}%   Bounce Rate: ${((totalBounces / denom) * 100).toFixed(2)}%   Unsub Rate: ${((totalUnsubs / denom) * 100).toFixed(2)}%`;
-      s.addText(sanitizeText(avgLine), { x: 0.5, y: 1.0, w: 9, h: 0.25, fontSize: 7, color: theme.bodyColor, fontFace: FONTS.body });
 
+      const AVG_ROW_Y = ZONE.TABLE_Y; // first content element
+      const AVG_ROW_H = 0.22; // single line height
+      const GAP_AVG_CHART = 0.125; // 12px
+      const DATA_LABEL_H = 0.18; // data points label height
+      const GAP_CHART_LABEL = 0.083; // 8px
+      const CHART_Y = AVG_ROW_Y + AVG_ROW_H + GAP_AVG_CHART;
+      const DATA_LABEL_Y = ZONE.INSIGHT_Y - DATA_LABEL_H;
+      const CHART_H = DATA_LABEL_Y - GAP_CHART_LABEL - CHART_Y;
+
+      // Grand Total Avg line with bold prefix
+      s.addText([
+        { text: "Grand Total Avg:  ", options: { bold: true, fontSize: 8, color: theme.bodyColor, fontFace: FONTS.body } },
+        { text: `Open Rate: ${((totalViewed / denom) * 100).toFixed(1)}%   Click Rate: ${((totalClicked / denom) * 100).toFixed(1)}%   Bounce Rate: ${((totalBounces / denom) * 100).toFixed(2)}%   Unsub Rate: ${((totalUnsubs / denom) * 100).toFixed(2)}%`, options: { fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body } },
+      ], { x: 0.3, y: AVG_ROW_Y, w: 9.4, h: AVG_ROW_H, valign: "middle" });
+
+      // Chart — flex element filling remaining space
       s.addChart("line" as pptxgen.CHART_NAME, chartSeries, {
-        x: 0.3, y: 1.3, w: 9.4, h: 3.5,
+        x: 0.3, y: CHART_Y, w: 9.4, h: Math.max(CHART_H, 1.5),
         showLegend: true, legendPos: "t", legendFontSize: 8,
         lineSmooth: false, lineSize: 1.5, showValue: false,
         catAxisLabelFontSize: 6, valAxisLabelFontSize: 7,
@@ -1106,10 +1120,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         chartColors: colors,
       });
 
-      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, { x: 0.5, y: ZONE.INSIGHT_Y - 0.2, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
+      // Data points label — flush above insight zone
+      s.addText(`Showing ${chartLabels.length} data points (daily aggregation)`, {
+        x: 0.3, y: DATA_LABEL_Y, w: 9.4, h: DATA_LABEL_H,
+        fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body, align: "left",
+      });
     } else {
       s.addText("No data available for trend chart", { x: 2, y: 2.5, w: 6, h: 0.5, fontSize: 14, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
     }
+    // No divider line on this slide — data points label provides separation
     addInsightBlock(s, sectionInsights?.emailMetricsTrend, 0, theme);
     addSlideFooter(s, theme, slideNum);
   }
