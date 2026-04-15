@@ -1669,9 +1669,48 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       addDecorativeMotif(s, theme, "dots");
       addSlideHeader(s, "Creative & Content Effectiveness Analysis", theme, undefined, slideNum);
 
-      // Left column: Effective Practices table
-      s.addText("Effective Design & Content Practices", { x: 0.3, y: 1.05, w: 3, h: 0.25, fontSize: 9, bold: true, color: theme.green, fontFace: FONTS.body });
+      // Layout constants for three-panel grid
+      const padX = 0.35; // 3.5% of 10"
+      const contentTop = ZONE.TABLE_Y; // 16px below accent line
+      const contentBottom = ZONE.FOOTER_Y; // top of footer
+      const contentH = contentBottom - contentTop;
+      const gapBetween = 0.12; // 12px gap between panels
+      const totalW = 10 - padX * 2; // available width
 
+      // Center panel: creative image sizing (auto width from aspect ratio)
+      // Default to a reasonable center width; image will use contain
+      const centerW = creativeImage ? Math.max(1.5, Math.min(2.8, totalW * 0.28)) : 0;
+      const sidePanelW = centerW > 0
+        ? (totalW - centerW - gapBetween * 2) / 2
+        : totalW / 2 - gapBetween / 2;
+
+      const leftX = padX;
+      const centerX = leftX + sidePanelW + gapBetween;
+      const rightX = centerX + centerW + gapBetween;
+
+      // Section title height
+      const titleH = 0.22;
+      const titleGap = 0.08; // 8px below title
+      const tableTop = contentTop + titleH + titleGap;
+      const tableH = contentH - titleH - titleGap;
+
+      // --- Left panel: Effective Design & Content Practices ---
+      // Panel container (white card)
+      s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x: leftX, y: contentTop, w: sidePanelW, h: contentH,
+        fill: { color: "FFFFFF" },
+        line: { color: "000000", width: 0.375 },
+        rectRadius: 0.1,
+        shadow: { type: "outer", blur: 2, offset: 1, color: "000000", opacity: 0.06 },
+      });
+
+      // Section title
+      s.addText("Effective Design & Content Practices", {
+        x: leftX + 0.12, y: contentTop + 0.06, w: sidePanelW - 0.24, h: titleH,
+        fontSize: 9, bold: true, color: "1D9E75", fontFace: FONTS.body, wrap: false,
+      });
+
+      // Practices table
       const practiceRows: pptxgen.TableRow[] = [
         [
           { text: "Area", options: headerCellOpts(theme) },
@@ -1680,38 +1719,62 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.effectivePractices.forEach((p, ri) => {
         practiceRows.push([
-          { text: sanitizeText(p.area), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(p.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const } },
           { text: sanitizeText(p.practice), options: bodyCellOpts(theme, ri) },
         ]);
       });
 
+      // Dynamic font sizing for overflow
+      const practiceRowCount = practiceRows.length;
+      const practiceFontSize = practiceRowCount > 8 ? 6 : practiceRowCount > 6 ? 7 : 8;
+      const areaColW = 0.7;
+      const practiceColW = sidePanelW - 0.24 - areaColW;
+
       s.addTable(practiceRows, {
-        x: 0.3, y: 1.35, w: 3.0, colW: [1.0, 2.0],
+        x: leftX + 0.12, y: tableTop, w: sidePanelW - 0.24,
+        colW: [areaColW, practiceColW],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
+        fontSize: practiceFontSize,
+        autoPage: false,
       });
 
-      // Center: Creative image — use contain to preserve aspect ratio without stretching
+      // --- Center panel: Creative preview image ---
       if (creativeImage) {
+        // Light gray background card
+        s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+          x: centerX, y: contentTop, w: centerW, h: contentH,
+          fill: { color: "F8F8FA" },
+          line: { color: "000000", width: 0.375 },
+          rectRadius: 0.08,
+        });
+
+        // Image with contain sizing — preserves aspect ratio
         s.addImage({
           data: creativeImage,
-          x: 3.6, y: 1.35, w: 2.8, h: 3.2,
-          sizing: { type: "contain", w: 2.8, h: 3.2 },
+          x: centerX, y: contentTop,
+          w: centerW, h: contentH,
+          sizing: { type: "contain", w: centerW, h: contentH },
         });
-      } else if (false) {
-        // placeholder disabled
-        s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-          x: 3.8, y: 1.8, w: 2.4, h: 2.5,
-          fill: { color: theme.altRowBg },
-          line: { color: lighten(theme.primary, 0.8), width: 0.75, dashType: "dash" },
-          rectRadius: 0.1,
-        });
-        s.addText("Email Creative", { x: 3.8, y: 2.8, w: 2.4, h: 0.5, fontSize: 10, color: theme.mutedColor, fontFace: FONTS.body, align: "center" });
       }
 
-      // Right column: Risk Areas table
-      s.addText("Design & Content Risk Areas", { x: 6.7, y: 1.05, w: 3, h: 0.25, fontSize: 9, bold: true, color: theme.amber, fontFace: FONTS.body });
+      // --- Right panel: Design & Content Risk Areas ---
+      // Panel container (white card)
+      s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x: rightX, y: contentTop, w: sidePanelW, h: contentH,
+        fill: { color: "FFFFFF" },
+        line: { color: "000000", width: 0.375 },
+        rectRadius: 0.1,
+        shadow: { type: "outer", blur: 2, offset: 1, color: "000000", opacity: 0.06 },
+      });
 
+      // Section title
+      s.addText("Design & Content Risk Areas", {
+        x: rightX + 0.12, y: contentTop + 0.06, w: sidePanelW - 0.24, h: titleH,
+        fontSize: 9, bold: true, color: "D85A30", fontFace: FONTS.body, wrap: false,
+      });
+
+      // Risk Areas table
       const riskRows: pptxgen.TableRow[] = [
         [
           { text: "Area", options: headerCellOpts(theme) },
@@ -1721,16 +1784,25 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.riskAreas.forEach((r, ri) => {
         riskRows.push([
-          { text: sanitizeText(r.area), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const } },
           { text: sanitizeText(r.observation), options: bodyCellOpts(theme, ri) },
-          { text: sanitizeText(r.impact), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.impact), options: { ...bodyCellOpts(theme, ri), align: "center" as const } },
         ]);
       });
 
+      const riskRowCount = riskRows.length;
+      const riskFontSize = riskRowCount > 8 ? 6 : riskRowCount > 6 ? 7 : 8;
+      const riskAreaW = 0.65;
+      const riskImpactW = 0.65;
+      const riskObsW = sidePanelW - 0.24 - riskAreaW - riskImpactW;
+
       s.addTable(riskRows, {
-        x: 6.7, y: 1.35, w: 3.0, colW: [0.8, 1.2, 1.0],
+        x: rightX + 0.12, y: tableTop, w: sidePanelW - 0.24,
+        colW: [riskAreaW, riskObsW, riskImpactW],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
+        fontSize: riskFontSize,
+        autoPage: false,
       });
 
       addSlideFooter(s, theme, slideNum);
