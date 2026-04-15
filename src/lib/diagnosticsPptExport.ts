@@ -1350,11 +1350,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           fontSize: 9, fontFace: FONTS.body, color: theme.titleColor, bold: false,
         });
 
-        // For reputation charts: shift chart right to leave room for custom Y-axis labels
-        const labelColW = cfg.isReputation ? 0.55 : 0;
-        const chartInnerX = pos.x + 0.08 + labelColW;
+        // All charts use the same inner x/w so x-axis gridlines align across reputation and ratio charts
+        const chartInnerX = pos.x + 0.08;
         const chartInnerY = pos.y + 0.3;
-        const chartInnerW = pos.w - 0.16 - labelColW;
+        const chartInnerW = pos.w - 0.16;
         const chartInnerH = pos.h - 0.4;
 
         const opts: any = {
@@ -1370,50 +1369,39 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           plotArea: { fill: { color: "FFFFFF", transparency: 100 } },
         };
 
-        // Hard floor at 0 for all charts — never show negative Y-axis
         opts.valAxisMinVal = 0;
         if (cfg.max !== undefined) opts.valAxisMaxVal = cfg.max;
 
         if (cfg.isReputation) {
           opts.valAxisMajorUnit = 1;
-          // Show native axis but make labels invisible (match slide bg)
-          // This ensures grid lines are drawn at exact 0,1,2,3 positions
           opts.valAxisHidden = false;
-          opts.valAxisLabelFontSize = 1;
-          opts.valAxisLabelColor = theme.slideBg;
-          // Remove left-side axis line
           opts.valAxisLineShow = false;
+          opts.valAxisLabelColor = theme.slideBg;
+          opts.valAxisLabelFontSize = 1;
         } else {
-          // Ratio charts: min 0, format as percentage
           opts.valAxisLabelColor = theme.mutedColor;
           opts.numFmt = "0.0\"%\"";
         }
 
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
 
-        // Custom Y-axis labels for reputation charts
-        // Place them in the label column to the LEFT of the chart
-        // Use the chart's own Y bounds to derive grid line positions
+        // Custom Y-axis labels for reputation charts — positioned right next to grid lines
         if (cfg.isReputation) {
           const repLabels = ["Bad", "Low", "Medium", "High"];
-          // pptxgenjs plot area within the chart element:
-          // - top padding: ~5% (minimal, no title)
-          // - bottom padding: ~18% (category axis labels at fontSize 6)
-          // These are empirical values for pptxgenjs line charts
           const plotTop = chartInnerY + chartInnerH * 0.04;
           const plotBottom = chartInnerY + chartInnerH * 0.82;
           const plotHeight = plotBottom - plotTop;
-          const labelH = 0.14;
-          const labelX = pos.x + 0.04; // left edge of card, before chart
-          const labelW = labelColW - 0.02;
+          const labelH = 0.13;
+          // Place labels just left of chart, close to grid lines
+          const labelW = 0.6;
+          const labelX = chartInnerX - labelW - 0.01;
           repLabels.forEach((label, li) => {
-            // Grid line Y: Bad(0) at bottom, High(3) at top
             const gridLineY = plotBottom - (li / 3) * plotHeight;
             s.addText(label, {
               x: labelX, y: gridLineY - labelH / 2, w: labelW, h: labelH,
               fontSize: 7, color: REP_LABEL_COLORS[label] || theme.mutedColor,
               fontFace: FONTS.body, align: "right", bold: true,
-              valign: "middle",
+              valign: "middle", wrap: false,
             });
           });
         }
