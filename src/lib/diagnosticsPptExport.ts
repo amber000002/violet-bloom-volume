@@ -1350,10 +1350,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           fontSize: 9, fontFace: FONTS.body, color: theme.titleColor, bold: false,
         });
 
-        // Chart area within card (below title, with padding)
-        const chartInnerX = pos.x + 0.08;
+        // For reputation charts: shift chart right to leave room for custom Y-axis labels
+        const labelColW = cfg.isReputation ? 0.55 : 0;
+        const chartInnerX = pos.x + 0.08 + labelColW;
         const chartInnerY = pos.y + 0.3;
-        const chartInnerW = pos.w - 0.16;
+        const chartInnerW = pos.w - 0.16 - labelColW;
         const chartInnerH = pos.h - 0.4;
 
         const opts: any = {
@@ -1375,9 +1376,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
         if (cfg.isReputation) {
           opts.valAxisMajorUnit = 1;
-          opts.valAxisHidden = true;
+          // Show native axis but make labels invisible (match slide bg)
+          // This ensures grid lines are drawn at exact 0,1,2,3 positions
+          opts.valAxisHidden = false;
           opts.valAxisLabelFontSize = 1;
           opts.valAxisLabelColor = theme.slideBg;
+          // Remove left-side axis line
+          opts.valAxisLineShow = false;
         } else {
           // Ratio charts: min 0, format as percentage
           opts.valAxisLabelColor = theme.mutedColor;
@@ -1386,24 +1391,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
         s.addChart("line" as pptxgen.CHART_NAME, [{ name: cfg.name, labels: cfg.labels, values: cfg.data }], opts);
 
-        // Custom Y-axis labels for reputation charts — anchored to grid line Y-coordinates
+        // Custom Y-axis labels for reputation charts
+        // Place them in the label column to the LEFT of the chart
+        // Use the chart's own Y bounds to derive grid line positions
         if (cfg.isReputation) {
           const repLabels = ["Bad", "Low", "Medium", "High"];
-          // pptxgenjs plot area positioning: the chart's plot area sits within chartInner bounds
-          // With valAxisMinVal=0, valAxisMaxVal=3, each unit = plotHeight/3
-          // Estimate plot area margins (pptxgenjs uses ~8% top/bottom padding within chart area)
-          const plotTopPad = chartInnerH * 0.08;
-          const plotBotPad = chartInnerH * 0.14; // bottom has axis labels
-          const plotTop = chartInnerY + plotTopPad;
-          const plotBottom = chartInnerY + chartInnerH - plotBotPad;
+          // pptxgenjs plot area within the chart element:
+          // - top padding: ~5% (minimal, no title)
+          // - bottom padding: ~18% (category axis labels at fontSize 6)
+          // These are empirical values for pptxgenjs line charts
+          const plotTop = chartInnerY + chartInnerH * 0.04;
+          const plotBottom = chartInnerY + chartInnerH * 0.82;
           const plotHeight = plotBottom - plotTop;
-          const labelH = 0.12;
+          const labelH = 0.14;
+          const labelX = pos.x + 0.04; // left edge of card, before chart
+          const labelW = labelColW - 0.02;
           repLabels.forEach((label, li) => {
-            // Each label vertically centered on its grid line
+            // Grid line Y: Bad(0) at bottom, High(3) at top
             const gridLineY = plotBottom - (li / 3) * plotHeight;
             s.addText(label, {
-              x: chartInnerX - 0.05, y: gridLineY - labelH / 2, w: 0.55, h: labelH,
-              fontSize: 6, color: REP_LABEL_COLORS[label] || theme.mutedColor,
+              x: labelX, y: gridLineY - labelH / 2, w: labelW, h: labelH,
+              fontSize: 7, color: REP_LABEL_COLORS[label] || theme.mutedColor,
               fontFace: FONTS.body, align: "right", bold: true,
               valign: "middle",
             });
