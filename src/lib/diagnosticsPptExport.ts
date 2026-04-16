@@ -1720,8 +1720,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.effectivePractices.forEach((p, ri) => {
         practiceRows.push([
-          { text: sanitizeText(p.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const } },
-          { text: sanitizeText(p.practice), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(p.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const, wrap: false } as any },
+          { text: sanitizeText(p.practice), options: bodyCellOpts(theme, ri, "left", undefined, true) },
         ]);
       });
 
@@ -1782,7 +1782,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.riskAreas.forEach((r, ri) => {
         riskRows.push([
-          { text: sanitizeText(r.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const } },
+          { text: sanitizeText(r.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const, wrap: false } as any },
           { text: sanitizeText(r.observation), options: bodyCellOpts(theme, ri) },
           { text: sanitizeText(r.impact), options: bodyCellOpts(theme, ri) },
         ]);
