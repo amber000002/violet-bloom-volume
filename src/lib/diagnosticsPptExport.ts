@@ -1670,7 +1670,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       addSlideHeader(s, "Creative & Content Effectiveness Analysis", theme, undefined, slideNum);
 
       // Layout constants for three-panel grid
-      // Right panel (3 cols) needs more space than left (2 cols)
+      // Left panel is compact (2 cols), center is narrow, right gets most space (3 cols)
       const padX = 0.35; // 3.5% of 10"
       const contentTop = ZONE.TABLE_Y;
       const contentBottom = ZONE.FOOTER_Y;
@@ -1678,9 +1678,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const gapBetween = 0.12;
       const totalW = 10 - padX * 2;
 
-      // Asymmetric layout: left ~28%, center ~20%, right ~44% (+ gaps)
-      const leftPanelW = totalW * 0.28;
-      const centerW = creativeImage ? totalW * 0.20 : 0;
+      // Asymmetric layout: left ~22%, center ~16%, right ~54% (+ gaps)
+      const leftPanelW = totalW * 0.22;
+      const centerW = creativeImage ? totalW * 0.16 : 0;
       const rightPanelW = centerW > 0
         ? totalW - leftPanelW - centerW - gapBetween * 2
         : totalW - leftPanelW - gapBetween;
@@ -1707,8 +1707,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       s.addText("Effective Design & Content Practices", {
-        x: leftX + 0.12, y: contentTop + 0.06, w: leftPanelW - 0.24, h: titleH,
-        fontSize: 9, bold: true, color: "1D9E75", fontFace: FONTS.body, wrap: false,
+        x: leftX + 0.08, y: contentTop + 0.06, w: leftPanelW - 0.16, h: titleH,
+        fontSize: 8, bold: true, color: "1D9E75", fontFace: FONTS.body, wrap: true,
       });
 
       // Practices table
@@ -1726,12 +1726,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       const practiceRowCount = practiceRows.length;
-      const practiceFontSize = practiceRowCount > 8 ? 6 : practiceRowCount > 6 ? 7 : 8;
-      const areaColW = 0.65;
-      const practiceColW = leftPanelW - 0.24 - areaColW;
+      const practiceFontSize = practiceRowCount > 8 ? 5.5 : practiceRowCount > 6 ? 6 : practiceRowCount > 4 ? 7 : 8;
+      const areaColW = 0.55;
+      const practiceTableInner = leftPanelW - 0.16;
+      const practiceColW = practiceTableInner - areaColW;
 
       s.addTable(practiceRows, {
-        x: leftX + 0.12, y: tableTop, w: leftPanelW - 0.24,
+        x: leftX + 0.08, y: tableTop, w: practiceTableInner,
         colW: [areaColW, practiceColW],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
@@ -1787,17 +1788,17 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         ]);
       });
 
-      // Aggressive font reduction for risk table (typically has more rows & wider text)
+      // Aggressive font reduction for risk table
       const riskRowCount = riskRows.length;
-      const riskFontSize = riskRowCount > 8 ? 5.5 : riskRowCount > 6 ? 6 : riskRowCount > 4 ? 7 : 8;
+      const riskFontSize = riskRowCount > 8 ? 5 : riskRowCount > 6 ? 5.5 : riskRowCount > 4 ? 6 : 7;
       const riskAreaW = 0.6;
       const riskTableInner = rightPanelW - 0.24;
-      const riskImpactW = Math.min(riskTableInner * 0.28, 1.2);
-      const riskObsW = riskTableInner - riskAreaW - riskImpactW;
+      // Observation and Impact share remaining space equally (both wrap)
+      const riskFlexW = (riskTableInner - riskAreaW) / 2;
 
       s.addTable(riskRows, {
         x: rightX + 0.12, y: tableTop, w: riskTableInner,
-        colW: [riskAreaW, riskObsW, riskImpactW],
+        colW: [riskAreaW, riskFlexW, riskFlexW],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
         fontSize: riskFontSize,
