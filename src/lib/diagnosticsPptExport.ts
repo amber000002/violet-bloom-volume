@@ -1670,43 +1670,44 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       addSlideHeader(s, "Creative & Content Effectiveness Analysis", theme, undefined, slideNum);
 
       // Layout constants for three-panel grid
+      // Right panel (3 cols) needs more space than left (2 cols)
       const padX = 0.35; // 3.5% of 10"
-      const contentTop = ZONE.TABLE_Y; // 16px below accent line
-      const contentBottom = ZONE.FOOTER_Y; // top of footer
+      const contentTop = ZONE.TABLE_Y;
+      const contentBottom = ZONE.FOOTER_Y;
       const contentH = contentBottom - contentTop;
-      const gapBetween = 0.12; // 12px gap between panels
-      const totalW = 10 - padX * 2; // available width
+      const gapBetween = 0.12;
+      const totalW = 10 - padX * 2;
 
-      // Center panel: creative image sizing (auto width from aspect ratio)
-      // Default to a reasonable center width; image will use contain
-      const centerW = creativeImage ? Math.max(1.5, Math.min(2.8, totalW * 0.28)) : 0;
-      const sidePanelW = centerW > 0
-        ? (totalW - centerW - gapBetween * 2) / 2
-        : totalW / 2 - gapBetween / 2;
+      // Asymmetric layout: left ~28%, center ~20%, right ~44% (+ gaps)
+      const leftPanelW = totalW * 0.28;
+      const centerW = creativeImage ? totalW * 0.20 : 0;
+      const rightPanelW = centerW > 0
+        ? totalW - leftPanelW - centerW - gapBetween * 2
+        : totalW - leftPanelW - gapBetween;
 
       const leftX = padX;
-      const centerX = leftX + sidePanelW + gapBetween;
-      const rightX = centerX + centerW + gapBetween;
+      const centerX = leftX + leftPanelW + gapBetween;
+      const rightX = centerW > 0
+        ? centerX + centerW + gapBetween
+        : leftX + leftPanelW + gapBetween;
 
       // Section title height
       const titleH = 0.22;
-      const titleGap = 0.08; // 8px below title
+      const titleGap = 0.08;
       const tableTop = contentTop + titleH + titleGap;
       const tableH = contentH - titleH - titleGap;
 
       // --- Left panel: Effective Design & Content Practices ---
-      // Panel container (white card)
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: leftX, y: contentTop, w: sidePanelW, h: contentH,
+        x: leftX, y: contentTop, w: leftPanelW, h: contentH,
         fill: { color: "FFFFFF" },
         line: { color: "000000", width: 0.375 },
         rectRadius: 0.1,
         shadow: { type: "outer", blur: 2, offset: 1, color: "000000", opacity: 0.06 },
       });
 
-      // Section title
       s.addText("Effective Design & Content Practices", {
-        x: leftX + 0.12, y: contentTop + 0.06, w: sidePanelW - 0.24, h: titleH,
+        x: leftX + 0.12, y: contentTop + 0.06, w: leftPanelW - 0.24, h: titleH,
         fontSize: 9, bold: true, color: "1D9E75", fontFace: FONTS.body, wrap: false,
       });
 
@@ -1724,14 +1725,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         ]);
       });
 
-      // Dynamic font sizing for overflow
       const practiceRowCount = practiceRows.length;
       const practiceFontSize = practiceRowCount > 8 ? 6 : practiceRowCount > 6 ? 7 : 8;
-      const areaColW = 0.7;
-      const practiceColW = sidePanelW - 0.24 - areaColW;
+      const areaColW = 0.65;
+      const practiceColW = leftPanelW - 0.24 - areaColW;
 
       s.addTable(practiceRows, {
-        x: leftX + 0.12, y: tableTop, w: sidePanelW - 0.24,
+        x: leftX + 0.12, y: tableTop, w: leftPanelW - 0.24,
         colW: [areaColW, practiceColW],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
@@ -1741,7 +1741,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       // --- Center panel: Creative preview image ---
       if (creativeImage) {
-        // Light gray background card
         s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
           x: centerX, y: contentTop, w: centerW, h: contentH,
           fill: { color: "F8F8FA" },
@@ -1749,28 +1748,26 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           rectRadius: 0.08,
         });
 
-        // Image with contain sizing — preserves aspect ratio
+        // contain preserves aspect ratio — no stretching
         s.addImage({
           data: creativeImage,
-          x: centerX, y: contentTop,
-          w: centerW, h: contentH,
-          sizing: { type: "contain", w: centerW, h: contentH },
+          x: centerX + 0.04, y: contentTop + 0.04,
+          w: centerW - 0.08, h: contentH - 0.08,
+          sizing: { type: "contain", w: centerW - 0.08, h: contentH - 0.08 },
         });
       }
 
       // --- Right panel: Design & Content Risk Areas ---
-      // Panel container (white card)
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: rightX, y: contentTop, w: sidePanelW, h: contentH,
+        x: rightX, y: contentTop, w: rightPanelW, h: contentH,
         fill: { color: "FFFFFF" },
         line: { color: "000000", width: 0.375 },
         rectRadius: 0.1,
         shadow: { type: "outer", blur: 2, offset: 1, color: "000000", opacity: 0.06 },
       });
 
-      // Section title
       s.addText("Design & Content Risk Areas", {
-        x: rightX + 0.12, y: contentTop + 0.06, w: sidePanelW - 0.24, h: titleH,
+        x: rightX + 0.12, y: contentTop + 0.06, w: rightPanelW - 0.24, h: titleH,
         fontSize: 9, bold: true, color: "D85A30", fontFace: FONTS.body, wrap: false,
       });
 
@@ -1786,18 +1783,20 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         riskRows.push([
           { text: sanitizeText(r.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const } },
           { text: sanitizeText(r.observation), options: bodyCellOpts(theme, ri) },
-          { text: sanitizeText(r.impact), options: { ...bodyCellOpts(theme, ri), align: "center" as const } },
+          { text: sanitizeText(r.impact), options: bodyCellOpts(theme, ri) },
         ]);
       });
 
+      // Aggressive font reduction for risk table (typically has more rows & wider text)
       const riskRowCount = riskRows.length;
-      const riskFontSize = riskRowCount > 8 ? 6 : riskRowCount > 6 ? 7 : 8;
-      const riskAreaW = 0.65;
-      const riskImpactW = 0.65;
-      const riskObsW = sidePanelW - 0.24 - riskAreaW - riskImpactW;
+      const riskFontSize = riskRowCount > 8 ? 5.5 : riskRowCount > 6 ? 6 : riskRowCount > 4 ? 7 : 8;
+      const riskAreaW = 0.6;
+      const riskTableInner = rightPanelW - 0.24;
+      const riskImpactW = Math.min(riskTableInner * 0.28, 1.2);
+      const riskObsW = riskTableInner - riskAreaW - riskImpactW;
 
       s.addTable(riskRows, {
-        x: rightX + 0.12, y: tableTop, w: sidePanelW - 0.24,
+        x: rightX + 0.12, y: tableTop, w: riskTableInner,
         colW: [riskAreaW, riskObsW, riskImpactW],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
