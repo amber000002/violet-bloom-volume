@@ -1720,8 +1720,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.effectivePractices.forEach((p, ri) => {
         practiceRows.push([
-          { text: sanitizeText(p.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const, _bodyProp: { wrap: 'none' } as any } },
-          { text: sanitizeText(p.practice), options: { ...bodyCellOpts(theme, ri, "left", undefined, true), _bodyProp: { wrap: 'square' } as any } },
+          { text: sanitizeText(p.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const } as pptxgen.TableCellProps },
+          { text: sanitizeText(p.practice), options: bodyCellOpts(theme, ri, "left", undefined, true) },
         ]);
       });
 
@@ -1782,9 +1782,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       ];
       creativeAnalysis.riskAreas.forEach((r, ri) => {
         riskRows.push([
-          { text: sanitizeText(r.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const, _bodyProp: { wrap: 'none' } as any } },
-          { text: sanitizeText(r.observation), options: { ...bodyCellOpts(theme, ri), _bodyProp: { wrap: 'square' } as any } },
-          { text: sanitizeText(r.impact), options: { ...bodyCellOpts(theme, ri), _bodyProp: { wrap: 'square' } as any } },
+          { text: sanitizeText(r.area), options: { ...bodyCellOpts(theme, ri), align: "center" as const } as pptxgen.TableCellProps },
+          { text: sanitizeText(r.observation), options: bodyCellOpts(theme, ri) },
+          { text: sanitizeText(r.impact), options: bodyCellOpts(theme, ri) },
         ]);
       });
 
