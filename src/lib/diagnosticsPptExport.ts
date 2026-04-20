@@ -1700,9 +1700,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       // --- Left panel: Effective Design & Content Practices ---
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: leftX, y: contentTop, w: leftPanelW, h: contentH,
-        fill: { color: "FFFFFF", transparency: 45 },
-        line: { color: "FFFFFF", width: 0.5, transparency: 20 },
+        fill: { color: "FFFFFF", transparency: 25 },
+        line: { color: "FFFFFF", width: 1.25, transparency: 0 },
         rectRadius: 0.1,
+        shadow: { type: "outer", blur: 8, offset: 2, color: "7A6BB0", opacity: 0.18 },
       });
 
       s.addText("Effective Design & Content Practices", {
