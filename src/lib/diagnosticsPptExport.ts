@@ -644,7 +644,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     creativeImage,
     lifecycleCoverage,
     sectionInsights,
+    auditScope = "email-only",
+    benchmarks: benchmarksOverride,
+    includeProactiveRecommendations = false,
   } = opts;
+
+  const benchmarks: ReportBenchmarks = { ...DEFAULT_BENCHMARKS, ...(benchmarksOverride || {}) };
 
   const theme = buildBrandTheme(brandProfile, industry);
   const hasPostmasterData = !!diagnostics.postmasterData && diagnostics.postmasterData.length > 0;
