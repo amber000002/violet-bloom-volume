@@ -1936,74 +1936,151 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const severityToPriority = (sev: TableInsight["severity"], source: string): "P0" | "P1" | "P2" => {
       if (sev === "critical") return "P0";
       if (sev === "warning") {
-        // Program-wide sources → P1, segment/topic sources → P2
         const wide = /reputation|infrastructure|monthly|trend|overview|sender|deliverability/i;
         return wide.test(source) ? "P1" : "P2";
       }
-      return "P2";
+      return "P2"; // info → P2 (positives are filtered out before this point)
     };
 
-    // Recommendation playbook — grounded in CleverTap best practices
+    // -------- Resource link registry (CleverTap docs) --------
+    type ResourceLink = {
+      keywords: RegExp;
+      url: string;
+      category: string;
+    };
+    const RESOURCE_LINKS: ResourceLink[] = [
+      { keywords: /\b(seed[- ]based inbox placement testing|seed[- ]based inbox placement|seed testing|inbox placement testing)\b/i,
+        url: "https://docs.clevertap.com/docs/email-seed-testing", category: "deliverability" },
+      { keywords: /\b(SPF\/DKIM\/DMARC|SPF\/DKIM|sender authentication|authentication chain|authentication setup|SPF|DKIM|DMARC)\b/i,
+        url: "https://docs.clevertap.com/docs/email-sender-authentication", category: "infrastructure" },
+      { keywords: /\b(list hygiene|data collection|list cleaning|suppression list)\b/i,
+        url: "https://docs.clevertap.com/docs/email-best-practices#email-data-collection", category: "data" },
+      { keywords: /\b(send frequency per user|send frequency|frequency cap[s]?|bombardment|throttling|per[- ]user limit[s]?)\b/i,
+        url: "https://docs.clevertap.com/docs/messaging-frequency-caps", category: "deliverability" },
+      { keywords: /\b(sunset journey|sunsetting|sunset|win[- ]back|re[- ]engagement journey)\b/i,
+        url: "https://docs.clevertap.com/docs/email-sunsetting", category: "lifecycle" },
+      { keywords: /\b(content relevance|content best practice[s]?|content optimisation|content optimization)\b/i,
+        url: "https://docs.clevertap.com/docs/email-best-practices#email-campaign-content", category: "content" },
+      // Generic fallback last so specific links match first
+      { keywords: /\b(Email Best Practices|email best practices)\b/,
+        url: "https://docs.clevertap.com/docs/email-best-practices", category: "general" },
+    ];
+
+    // Convert a recommendation string into pptxgenjs rich-text runs with hyperlinks.
+    // Max 3 distinct URLs per recommendation; each URL hyperlinked only once.
+    const buildRichRecommendation = (
+      text: string,
+      fontSize: number,
+      baseColor: string,
+    ): pptxgen.TextProps[] => {
+      type Match = { start: number; end: number; url: string };
+      const matches: Match[] = [];
+      const usedUrls = new Set<string>();
+      const occupied: Array<[number, number]> = [];
+      const overlaps = (s: number, e: number) =>
+        occupied.some(([a, b]) => !(e <= a || s >= b));
+
+      for (const link of RESOURCE_LINKS) {
+        if (usedUrls.size >= 3) break;
+        if (usedUrls.has(link.url)) continue;
+        link.keywords.lastIndex = 0;
+        const m = link.keywords.exec(text);
+        if (!m) continue;
+        const start = m.index;
+        const end = start + m[0].length;
+        if (overlaps(start, end)) continue;
+        matches.push({ start, end, url: link.url });
+        occupied.push([start, end]);
+        usedUrls.add(link.url);
+      }
+      matches.sort((a, b) => a.start - b.start);
+
+      const runs: pptxgen.TextProps[] = [];
+      let cursor = 0;
+      const baseOpts = { fontSize, fontFace: FONTS.body, color: baseColor };
+      for (const m of matches) {
+        if (m.start > cursor) {
+          runs.push({ text: text.slice(cursor, m.start), options: baseOpts });
+        }
+        runs.push({
+          text: text.slice(m.start, m.end),
+          options: {
+            fontSize, fontFace: FONTS.body,
+            color: "534AB7", underline: { style: "sng", color: "534AB7" },
+            hyperlink: { url: m.url },
+          },
+        });
+        cursor = m.end;
+      }
+      if (cursor < text.length) {
+        runs.push({ text: text.slice(cursor), options: baseOpts });
+      }
+      return runs.length > 0 ? runs : [{ text, options: baseOpts }];
+    };
+
+    // -------- Recommendation playbook (specific, hyperlink-friendly) --------
     const buildRecommendation = (insight: TableInsight): string => {
       const t = insight.text.toLowerCase();
-      const src = insight.source;
 
       if (/spam|complaint/.test(t))
-        return "Implement real-time spam complaint monitoring. Pause sends when complaint rate exceeds 0.1%. Audit list hygiene and cap per-user send frequency to prevent bombardment.";
+        return "Implement real-time spam complaint monitoring and pause campaigns when complaint rate exceeds 0.1%. Audit list hygiene and cap send frequency per user to prevent bombardment.";
       if (/hard bounce/.test(t))
-        return "Verify and clean the email list before the next send. Remove invalid addresses, enable double opt-in, and pause segments contributing to elevated hard bounces.";
+        return "Verify and clean the email list before the next send by enforcing list hygiene and double opt-in. Remove addresses with consecutive bounces and pause the segments driving the spike.";
       if (/soft bounce/.test(t))
-        return "Throttle send velocity to affected ISPs and review payload size (<102KB). Re-attempt after 24h; suppress recipients failing 3+ consecutive sends.";
-      if (/open rate/.test(t) && /(low|below|under|drop|decline)/.test(t))
-        return "Conduct seed-based inbox placement testing across Gmail, Yahoo, and Outlook. Re-validate SPF/DKIM/DMARC. Refresh subject lines and pre-headers to lift open rate.";
-      if (/click|ctr/.test(t) && /(low|below|under|drop|weak)/.test(t))
-        return "Place primary CTA in the top 20% of the email. Personalise content blocks by lifecycle stage and ensure mobile rendering is tested across all top clients.";
-      if (/unsubscribe/.test(t) && /(high|spike|elevated)/.test(t))
-        return "Reduce send frequency for unengaged cohorts and add a preference centre. Apply sunsetting after 6 months of inactivity instead of forcing opt-outs.";
+        return "Throttle send velocity to affected ISPs and keep payload under 102KB. Re-attempt after 24h and suppress recipients failing three consecutive sends.";
+      if (/open rate/.test(t))
+        return "Conduct seed-based inbox placement testing across Gmail, Yahoo, and Outlook. Re-validate the SPF/DKIM/DMARC chain and refresh subject lines and pre-headers to lift inbox placement.";
+      if (/click|ctr/.test(t))
+        return "Review content relevance per lifecycle stage and place the primary CTA in the top 20% of the email. Test dynamic content blocks personalised by user behaviour and ensure mobile rendering is verified.";
+      if (/unsubscribe/.test(t))
+        return "Reduce send frequency for unengaged cohorts and add a preference centre for content and cadence control. Apply a sunset journey for users inactive 6+ months instead of forcing opt-outs.";
       if (/reputation/.test(t))
-        return "Audit IP and domain reputation in Google Postmaster daily. Separate promotional and transactional traffic onto distinct subdomains and follow IP warmup ramp-up steps.";
+        return "Audit IP and domain reputation in Google Postmaster daily and re-validate sender authentication. Separate promotional and transactional traffic onto distinct subdomains and follow a controlled IP warmup ramp.";
       if (/volume gap|gap of \d+ days|inactive for/.test(t))
-        return "Resume sending with a controlled warmup ramp (start at 10% of historical peak, double every 48h). ISPs reset reputation after 30-day silence.";
+        return "Resume sending with a controlled warmup ramp — start at 10% of historical peak, double every 48h. ISPs reset reputation after 30-day silence, so re-establish a consistent cadence.";
       if (/surge|spike|volume increase/.test(t))
-        return "Smooth volume increases over a 7–14 day warmup window. Sudden spikes trigger ISP rate-limiting and reputation re-evaluation.";
+        return "Smooth volume increases over a 7–14 day warmup window and apply frequency caps. Sudden spikes trigger ISP rate-limiting and reputation re-evaluation.";
       if (/lifecycle|coverage|missing/.test(t))
         return "Build journeys for the missing lifecycle stage(s) using internal use-case templates. Prioritise activation and reactivation gaps that block conversion velocity.";
       if (/sunset|inactive/.test(t))
-        return "Move users inactive for 6+ months into a re-engagement journey, then permanent suppression. This protects sender reputation at scale.";
+        return "Move users inactive for 6+ months into a sunset journey, then permanent suppression. This protects sender reputation at scale and improves engaged-audience signal.";
       if (/send mix|batch|automation|triggered/.test(t))
-        return "Shift batch-heavy sends towards triggered automation. Target ≥30% triggered share to mature the program and reduce reliance on broadcast.";
-      if (/best|top|positive|healthy|strong/.test(t))
-        return `Maintain the practices driving this signal in ${src}. Document the playbook and replicate the pattern across adjacent campaigns and segments.`;
+        return "Shift batch-heavy sends towards triggered automation, targeting ≥30% triggered share. This matures the program and reduces reliance on broadcast volume.";
 
-      return `Address the issue surfaced by ${src} using the relevant CleverTap Email Best Practice. Validate with a controlled retest before scaling.`;
+      // Specific, non-boilerplate fallback grounded in Email Best Practices
+      return `Diagnose against Email Best Practices for ${insight.source.toLowerCase()} and run a controlled retest on a holdout segment before scaling the change.`;
     };
 
     const enrichIssue = (insight: TableInsight): string => {
-      // The insight text is already specific (contains values). Append source context for depth.
       const base = insight.text.trim().replace(/\s+/g, " ");
       const baseEnd = /[.!?]$/.test(base) ? "" : ".";
       return `${base}${baseEnd} Source: ${insight.source}.`;
     };
 
-    // Semantic dedupe key — collapse insights about same metric + same direction
+    // Stronger semantic dedupe — same metric + same direction collapse.
     const dedupeKey = (insight: TableInsight): string => {
       const t = insight.text.toLowerCase();
       const metric =
         /spam|complaint/.test(t) ? "spam" :
         /hard bounce/.test(t) ? "hard_bounce" :
         /soft bounce/.test(t) ? "soft_bounce" :
-        /open rate/.test(t) ? "open_rate" :
+        /\bbounce\b/.test(t) ? "bounce" :
+        /open rate|opens?\b/.test(t) ? "open_rate" :
         /click|ctr/.test(t) ? "ctr" :
-        /unsubscribe/.test(t) ? "unsub" :
+        /unsubscribe|unsub\b/.test(t) ? "unsub" :
+        /domain reputation/.test(t) ? "reputation" :
+        /ip reputation/.test(t) ? "reputation" :
         /reputation/.test(t) ? "reputation" :
-        /volume|surge|spike|gap/.test(t) ? "volume" :
-        /lifecycle|coverage/.test(t) ? "lifecycle" :
-        /sunset|inactive/.test(t) ? "sunset" :
-        /send mix|batch|automation/.test(t) ? "send_mix" :
+        /volume gap|gap of \d+ days|inactive for/.test(t) ? "volume_gap" :
+        /volume|surge|spike/.test(t) ? "volume" :
+        /lifecycle|coverage|missing/.test(t) ? "lifecycle" :
+        /sunset|inactive user/.test(t) ? "sunset" :
+        /send mix|batch|automation|triggered/.test(t) ? "send_mix" :
+        /infrastructure|subdomain|warmup|authentication/.test(t) ? "infrastructure" :
         t.slice(0, 40);
       const dir =
-        /(low|below|under|drop|decline|weak|spike|surge|high|elevated|missing|gap)/.test(t) ? "neg" :
-        /(best|top|positive|healthy|strong|good)/.test(t) ? "pos" : "neu";
+        /(low|below|under|drop|decline|weak|spike|surge|high|elevated|missing|gap|breach|exceed|above)/.test(t) ? "neg" :
+        /(best|top|positive|healthy|strong|good|within)/.test(t) ? "pos" : "neu";
       return `${metric}|${dir}`;
     };
 
@@ -2022,15 +2099,18 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
 
+    // Filter healthy/positive metrics — they are not key learnings (spec rule 5).
+    const issuesOnly = collected.filter((ins) => ins.severity !== "positive");
+
     // 2) DEDUPE — keep richer (longer) text per key
     const byKey = new Map<string, TableInsight>();
-    collected.forEach((ins) => {
+    issuesOnly.forEach((ins) => {
       const k = dedupeKey(ins);
       const existing = byKey.get(k);
       if (!existing || ins.text.length > existing.text.length) byKey.set(k, ins);
     });
 
-    // 3) ENRICH
+    // 3) ENRICH from section insights
     const aggregated: EnrichedRow[] = Array.from(byKey.values()).map((ins) => ({
       issue: enrichIssue(ins),
       recommendation: buildRecommendation(ins),
@@ -2038,46 +2118,53 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       severityRank: SEVERITY_RANK[ins.severity] ?? 4,
     }));
 
-    // Merge in dashboard-level intelligentLearnings (treat as already-enriched)
+    // Merge dashboard-level intelligentLearnings, deduped by recommendation text
+    const recoSeen = new Set<string>(aggregated.map((r) => r.recommendation.toLowerCase().slice(0, 80)));
     if (intelligentLearnings && intelligentLearnings.length > 0) {
       intelligentLearnings.forEach((rec) => {
-        const dupKey = `dash|${rec.issue.slice(0, 40).toLowerCase()}`;
-        if (!byKey.has(dupKey)) {
-          byKey.set(dupKey, { severity: "warning", text: rec.issue, source: "Dashboard" });
-          aggregated.push({
-            issue: rec.issue,
-            recommendation: rec.recommendation,
-            priority: rec.priority,
-            severityRank: rec.priority === "P0" ? 0 : rec.priority === "P1" ? 1 : 2,
-          });
-        }
+        const recoKey = rec.recommendation.toLowerCase().slice(0, 80);
+        if (recoSeen.has(recoKey)) return;
+        recoSeen.add(recoKey);
+        aggregated.push({
+          issue: rec.issue,
+          recommendation: rec.recommendation,
+          priority: rec.priority,
+          severityRank: rec.priority === "P0" ? 0 : rec.priority === "P1" ? 1 : 2,
+        });
       });
     }
 
-    // 4) SORT — P0 → P1 → P2; within each, by severityRank (critical first)
+    // Final dedupe — drop rows with identical or near-identical recommendation
+    const finalSeen = new Set<string>();
+    const finalRows: EnrichedRow[] = [];
+    aggregated.forEach((r) => {
+      const k = r.recommendation.toLowerCase().slice(0, 60);
+      if (finalSeen.has(k)) return;
+      finalSeen.add(k);
+      finalRows.push(r);
+    });
+
+    // 4) SORT — P0 → P1 → P2; within each, by severityRank
     const PRIO_RANK: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
-    aggregated.sort((a, b) => {
+    finalRows.sort((a, b) => {
       const pd = PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
       if (pd !== 0) return pd;
       return a.severityRank - b.severityRank;
     });
 
     // -------- Render --------
-    // Slide 15 has NO insight zone — the table itself is the executive summary.
-    // Table extends all the way down to the 8% footer.
+    // Slide 15 has NO insight zone. Table may extend through INSIGHT_Y, but never past FOOTER_Y.
+    // Hard floor: top of footer at ZONE.FOOTER_Y. Render all rows; only split if 6pt + tight padding overflows.
     const KL_TABLE_MAX_H = ZONE.FOOTER_Y - ZONE.TABLE_Y - 0.05;
 
-    if (aggregated.length > 0) {
-      // Adaptive sizing — table is taller now, allow more rows
-      let bodyFont = 7;
-      let cap = 10;
-      if (aggregated.length > 10) { bodyFont = 6.5; cap = 12; }
-      if (aggregated.length > 12) { bodyFont = 6; cap = 8; }
-      const visibleRows = aggregated.slice(0, cap);
-      const overflow = aggregated.length - visibleRows.length;
-
-      // Glassmorphism container card behind the table — extended to footer
-      s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+    const renderKLSlide = (
+      slide: pptxgen.Slide,
+      rowsToRender: EnrichedRow[],
+      bodyFont: number,
+      pad: number,
+    ) => {
+      // Glassmorphism container behind the table — full extended area
+      slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: TABLE_X - 0.05, y: ZONE.TABLE_Y - 0.05,
         w: TABLE_W + 0.10, h: KL_TABLE_MAX_H + 0.05,
         fill: { color: "FFFFFF", transparency: 45 },
@@ -2088,7 +2175,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const klHeaderOpts = (align: "left" | "center"): pptxgen.TableCellProps => ({
         bold: true, fill: { color: theme.headerBg }, fontSize: bodyFont, align,
         color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
-        margin: [4, 5, 4, 5],
+        margin: [pad, pad + 1, pad, pad + 1],
       });
       const klBodyOpts = (
         ri: number,
@@ -2099,7 +2186,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         fontSize: bodyFont, align, color: color || theme.bodyColor,
         fontFace: FONTS.body, valign: "top", bold: !!bold,
         fill: ri % 2 === 1 ? { color: theme.altRowBg } : undefined,
-        margin: [4, 5, 4, 5],
+        margin: [pad, pad + 1, pad, pad + 1],
       });
 
       const klRows: pptxgen.TableRow[] = [
@@ -2110,39 +2197,101 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         ],
       ];
 
-      visibleRows.forEach((row, ri) => {
+      rowsToRender.forEach((row, ri) => {
         const prioColor =
           row.priority === "P0" ? theme.red :
           row.priority === "P1" ? theme.amber :
-          theme.mutedColor;
+          "3B82F6";
+        // Hyperlinked rich-text recommendation
+        const recoRuns = buildRichRecommendation(
+          sanitizeText(row.recommendation),
+          bodyFont,
+          theme.mutedColor,
+        );
         klRows.push([
           { text: sanitizeText(row.issue), options: klBodyOpts(ri, "left") },
-          { text: sanitizeText(row.recommendation), options: klBodyOpts(ri, "left", theme.mutedColor) },
+          { text: recoRuns, options: klBodyOpts(ri, "left", theme.mutedColor) },
           { text: sanitizeText(row.priority), options: klBodyOpts(ri, "center", prioColor, true) },
         ]);
       });
 
-      // Column widths: Issue ~38% | Recommendation ~52% | Priority ~10%
-      const colW: number[] = [TABLE_W * 0.38, TABLE_W * 0.52, TABLE_W * 0.10];
-
-      s.addTable(klRows, {
+      const colW: number[] = [TABLE_W * 0.34, TABLE_W * 0.56, TABLE_W * 0.10];
+      slide.addTable(klRows, {
         x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW,
         border: TABLE_BORDER,
         fontFace: FONTS.body,
         autoPage: false,
       });
+    };
 
-      // Overflow indicator just above the footer
-      if (overflow > 0) {
-        s.addText(`+${overflow} more recommendation${overflow > 1 ? "s" : ""}`, {
-          x: TABLE_X, y: ZONE.FOOTER_Y - 0.26, w: TABLE_W, h: 0.22,
-          fontSize: 7, italic: true, color: theme.mutedColor,
-          fontFace: FONTS.body, align: "right",
-        });
+    // Estimate per-row height to decide if we need to shrink or split.
+    // Heuristic: per-row vertical cost = lineHeight * estimatedLines + verticalPadding.
+    const estimateTableHeight = (rows: EnrichedRow[], bodyFont: number, pad: number): number => {
+      const lineH = (bodyFont * 1.25) / 72; // pt → inches, with 1.25 line-height
+      const padV = (pad * 2) / 72; // top+bottom padding in inches (treating pad as pt)
+      const recoColChars = (TABLE_W * 0.56) / (bodyFont * 0.0075); // rough char capacity per line
+      const issueColChars = (TABLE_W * 0.34) / (bodyFont * 0.0075);
+      let total = lineH + padV + 0.05; // header row
+      rows.forEach((r) => {
+        const recoLines = Math.max(1, Math.ceil(r.recommendation.length / Math.max(20, recoColChars)));
+        const issueLines = Math.max(1, Math.ceil(r.issue.length / Math.max(20, issueColChars)));
+        const lines = Math.max(recoLines, issueLines, 1);
+        total += lineH * lines + padV;
+      });
+      return total;
+    };
+
+    if (finalRows.length > 0) {
+      // Tier 1: 7pt, pad=4 → tier 2: 6.5pt → tier 3: 6pt → tier 4: 6pt + pad=2 → split
+      const tiers: Array<{ font: number; pad: number }> = [
+        { font: 7, pad: 4 },
+        { font: 6.5, pad: 4 },
+        { font: 6, pad: 4 },
+        { font: 6, pad: 2 },
+      ];
+
+      let chosen = tiers[tiers.length - 1];
+      let mustSplit = true;
+      for (const tier of tiers) {
+        const h = estimateTableHeight(finalRows, tier.font, tier.pad);
+        if (h <= KL_TABLE_MAX_H) {
+          chosen = tier;
+          mustSplit = false;
+          break;
+        }
       }
-    }
 
-    addSlideFooter(s, theme, slideNum);
+      if (!mustSplit) {
+        renderKLSlide(s, finalRows, chosen.font, chosen.pad);
+        addSlideFooter(s, theme, slideNum);
+      } else {
+        // Split across two slides at smallest tier (6pt + pad=2).
+        const splitTier = tiers[tiers.length - 1];
+        // Find largest N such that first N rows fit.
+        let firstCount = finalRows.length;
+        while (firstCount > 1) {
+          const h = estimateTableHeight(finalRows.slice(0, firstCount), splitTier.font, splitTier.pad);
+          if (h <= KL_TABLE_MAX_H) break;
+          firstCount--;
+        }
+        const partA = finalRows.slice(0, firstCount);
+        const partB = finalRows.slice(firstCount);
+
+        renderKLSlide(s, partA, splitTier.font, splitTier.pad);
+        addSlideFooter(s, theme, slideNum);
+
+        // Slide 15b
+        slideNum++;
+        const s2 = pptx.addSlide();
+        addSlideBackground(s2, theme);
+        addDecorativeMotif(s2, theme, "corner");
+        addSlideHeader(s2, "Key Learnings & Recommendations (continued)", theme, undefined, slideNum);
+        renderKLSlide(s2, partB, splitTier.font, splitTier.pad);
+        addSlideFooter(s2, theme, slideNum);
+      }
+    } else {
+      addSlideFooter(s, theme, slideNum);
+    }
   }
 
   // ==========================================
