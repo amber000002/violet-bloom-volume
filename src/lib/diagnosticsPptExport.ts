@@ -2138,14 +2138,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       // Overflow indicator inside container
       if (overflow > 0) {
         s.addText(`+${overflow} more recommendation${overflow > 1 ? "s" : ""}`, {
-          x: TABLE_X, y: ZONE.INSIGHT_Y - 0.30, w: TABLE_W, h: 0.22,
+          x: TABLE_X, y: KL_INSIGHT_Y - 0.26, w: TABLE_W, h: 0.22,
           fontSize: 7, italic: true, color: theme.mutedColor,
           fontFace: FONTS.body, align: "right",
         });
       }
     }
 
-    // Insight zone: single summary sentence (per spec — no more than 1)
+    // Insight zone: STRICTLY one summary sentence (per spec).
+    // Rendered manually right above the footer so the table can extend down.
     const summaryInsight: TableInsight | undefined = (() => {
       const klSrc = sectionInsights?.keyLearnings;
       if (klSrc && klSrc.length > 0) return klSrc[0];
@@ -2159,7 +2160,40 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       }
       return undefined;
     })();
-    addInsightBlock(s, summaryInsight ? [summaryInsight] : undefined, 0, theme);
+
+    if (summaryInsight) {
+      const insightZoneX = 0.5;
+      const insightZoneW = 9.0;
+      const cardH = 0.185;
+
+      // Thin divider above the single insight card
+      s.addShape("rect" as pptxgen.SHAPE_NAME, {
+        x: insightZoneX, y: KL_INSIGHT_Y, w: insightZoneW, h: 0.005,
+        fill: { color: "000000", transparency: 94 },
+      });
+
+      const cy = KL_INSIGHT_Y + 0.05;
+      // Frosted glass card
+      s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x: insightZoneX, y: cy, w: insightZoneW, h: cardH,
+        fill: { color: "FFFFFF", transparency: 35 },
+        line: { color: "FFFFFF", width: 0.4, transparency: 60 },
+        rectRadius: 0.06,
+      });
+      // Severity pip
+      const pipColor = SEVERITY_PIP[summaryInsight.severity] || "999999";
+      s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
+        x: insightZoneX + 0.12, y: cy + cardH / 2 - 0.035, w: 0.07, h: 0.07,
+        fill: { color: pipColor },
+        shadow: { type: "outer", blur: 4, offset: 0, color: pipColor, opacity: 0.25 },
+      });
+      // Text
+      s.addText(sanitizeText(summaryInsight.text), {
+        x: insightZoneX + 0.28, y: cy, w: insightZoneW - 0.40, h: cardH,
+        fontSize: 7.5, fontFace: FONTS.body, color: "616161", valign: "middle",
+      });
+    }
+
     addSlideFooter(s, theme, slideNum);
   }
 
