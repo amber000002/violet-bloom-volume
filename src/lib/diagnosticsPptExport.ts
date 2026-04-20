@@ -1743,8 +1743,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       if (creativeImage) {
         s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
           x: centerX, y: contentTop, w: centerW, h: contentH,
-          fill: { color: "F8F8FA" },
-          line: { color: "000000", width: 0.375 },
+          fill: { color: "FFFFFF", transparency: 45 },
+          line: { color: "FFFFFF", width: 0.5, transparency: 20 },
           rectRadius: 0.08,
         });
 
