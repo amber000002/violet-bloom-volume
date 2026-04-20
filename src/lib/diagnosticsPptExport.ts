@@ -1762,9 +1762,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       // --- Right panel: Design & Content Risk Areas ---
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: rightX, y: contentTop, w: rightPanelW, h: contentH,
-        fill: { color: "FFFFFF", transparency: 45 },
-        line: { color: "FFFFFF", width: 0.5, transparency: 20 },
+        fill: { color: "FFFFFF", transparency: 25 },
+        line: { color: "FFFFFF", width: 1.25, transparency: 0 },
         rectRadius: 0.1,
+        shadow: { type: "outer", blur: 8, offset: 2, color: "7A6BB0", opacity: 0.18 },
       });
 
       s.addText("Design & Content Risk Areas", {
