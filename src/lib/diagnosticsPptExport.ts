@@ -1912,8 +1912,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
 
   // ==========================================
-  // SLIDE 13: Key Learnings & Recommendations
-  // Columns: Issue Identified | Recommendation | Priority
+  // SLIDE 15: Key Learnings & Recommendations
+  // Aggregates all slide-level + dashboard insights, deduplicates,
+  // enriches into Issue / Recommendation / Priority rows.
   // ==========================================
   slideNum++;
   {
@@ -1922,52 +1923,236 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addDecorativeMotif(s, theme, "corner");
     addSlideHeader(s, "Key Learnings & Recommendations", theme, undefined, slideNum);
 
+    // -------- Aggregation logic --------
+    type EnrichedRow = {
+      issue: string;
+      recommendation: string;
+      priority: "P0" | "P1" | "P2";
+      severityRank: number; // for in-priority sorting
+    };
+
+    const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2, positive: 3 };
+
+    const severityToPriority = (sev: TableInsight["severity"], source: string): "P0" | "P1" | "P2" => {
+      if (sev === "critical") return "P0";
+      if (sev === "warning") {
+        // Program-wide sources → P1, segment/topic sources → P2
+        const wide = /reputation|infrastructure|monthly|trend|overview|sender|deliverability/i;
+        return wide.test(source) ? "P1" : "P2";
+      }
+      return "P2";
+    };
+
+    // Recommendation playbook — grounded in CleverTap best practices
+    const buildRecommendation = (insight: TableInsight): string => {
+      const t = insight.text.toLowerCase();
+      const src = insight.source;
+
+      if (/spam|complaint/.test(t))
+        return "Implement real-time spam complaint monitoring. Pause sends when complaint rate exceeds 0.1%. Audit list hygiene and cap per-user send frequency to prevent bombardment.";
+      if (/hard bounce/.test(t))
+        return "Verify and clean the email list before the next send. Remove invalid addresses, enable double opt-in, and pause segments contributing to elevated hard bounces.";
+      if (/soft bounce/.test(t))
+        return "Throttle send velocity to affected ISPs and review payload size (<102KB). Re-attempt after 24h; suppress recipients failing 3+ consecutive sends.";
+      if (/open rate/.test(t) && /(low|below|under|drop|decline)/.test(t))
+        return "Conduct seed-based inbox placement testing across Gmail, Yahoo, and Outlook. Re-validate SPF/DKIM/DMARC. Refresh subject lines and pre-headers to lift open rate.";
+      if (/click|ctr/.test(t) && /(low|below|under|drop|weak)/.test(t))
+        return "Place primary CTA in the top 20% of the email. Personalise content blocks by lifecycle stage and ensure mobile rendering is tested across all top clients.";
+      if (/unsubscribe/.test(t) && /(high|spike|elevated)/.test(t))
+        return "Reduce send frequency for unengaged cohorts and add a preference centre. Apply sunsetting after 6 months of inactivity instead of forcing opt-outs.";
+      if (/reputation/.test(t))
+        return "Audit IP and domain reputation in Google Postmaster daily. Separate promotional and transactional traffic onto distinct subdomains and follow IP warmup ramp-up steps.";
+      if (/volume gap|gap of \d+ days|inactive for/.test(t))
+        return "Resume sending with a controlled warmup ramp (start at 10% of historical peak, double every 48h). ISPs reset reputation after 30-day silence.";
+      if (/surge|spike|volume increase/.test(t))
+        return "Smooth volume increases over a 7–14 day warmup window. Sudden spikes trigger ISP rate-limiting and reputation re-evaluation.";
+      if (/lifecycle|coverage|missing/.test(t))
+        return "Build journeys for the missing lifecycle stage(s) using internal use-case templates. Prioritise activation and reactivation gaps that block conversion velocity.";
+      if (/sunset|inactive/.test(t))
+        return "Move users inactive for 6+ months into a re-engagement journey, then permanent suppression. This protects sender reputation at scale.";
+      if (/send mix|batch|automation|triggered/.test(t))
+        return "Shift batch-heavy sends towards triggered automation. Target ≥30% triggered share to mature the program and reduce reliance on broadcast.";
+      if (/best|top|positive|healthy|strong/.test(t))
+        return `Maintain the practices driving this signal in ${src}. Document the playbook and replicate the pattern across adjacent campaigns and segments.`;
+
+      return `Address the issue surfaced by ${src} using the relevant CleverTap Email Best Practice. Validate with a controlled retest before scaling.`;
+    };
+
+    const enrichIssue = (insight: TableInsight): string => {
+      // The insight text is already specific (contains values). Append source context for depth.
+      const base = insight.text.trim().replace(/\s+/g, " ");
+      const baseEnd = /[.!?]$/.test(base) ? "" : ".";
+      return `${base}${baseEnd} Source: ${insight.source}.`;
+    };
+
+    // Semantic dedupe key — collapse insights about same metric + same direction
+    const dedupeKey = (insight: TableInsight): string => {
+      const t = insight.text.toLowerCase();
+      const metric =
+        /spam|complaint/.test(t) ? "spam" :
+        /hard bounce/.test(t) ? "hard_bounce" :
+        /soft bounce/.test(t) ? "soft_bounce" :
+        /open rate/.test(t) ? "open_rate" :
+        /click|ctr/.test(t) ? "ctr" :
+        /unsubscribe/.test(t) ? "unsub" :
+        /reputation/.test(t) ? "reputation" :
+        /volume|surge|spike|gap/.test(t) ? "volume" :
+        /lifecycle|coverage/.test(t) ? "lifecycle" :
+        /sunset|inactive/.test(t) ? "sunset" :
+        /send mix|batch|automation/.test(t) ? "send_mix" :
+        t.slice(0, 40);
+      const dir =
+        /(low|below|under|drop|decline|weak|spike|surge|high|elevated|missing|gap)/.test(t) ? "neg" :
+        /(best|top|positive|healthy|strong|good)/.test(t) ? "pos" : "neu";
+      return `${metric}|${dir}`;
+    };
+
+    // 1) COLLECT
+    const collected: TableInsight[] = [];
+    if (sectionInsights) {
+      const sectionOrder: (keyof SectionInsights)[] = [
+        "campaignOverview", "monthlyOverview", "emailMetricsTrend",
+        "infrastructureReputation", "reputationTrends",
+        "bestPerformingCTR", "underperformingCTR",
+        "sendMixCoverage", "lifecycleCoverage", "keyLearnings",
+      ];
+      sectionOrder.forEach((k) => {
+        const arr = sectionInsights[k];
+        if (Array.isArray(arr)) collected.push(...arr);
+      });
+    }
+
+    // 2) DEDUPE — keep richer (longer) text per key
+    const byKey = new Map<string, TableInsight>();
+    collected.forEach((ins) => {
+      const k = dedupeKey(ins);
+      const existing = byKey.get(k);
+      if (!existing || ins.text.length > existing.text.length) byKey.set(k, ins);
+    });
+
+    // 3) ENRICH
+    const aggregated: EnrichedRow[] = Array.from(byKey.values()).map((ins) => ({
+      issue: enrichIssue(ins),
+      recommendation: buildRecommendation(ins),
+      priority: severityToPriority(ins.severity, ins.source),
+      severityRank: SEVERITY_RANK[ins.severity] ?? 4,
+    }));
+
+    // Merge in dashboard-level intelligentLearnings (treat as already-enriched)
     if (intelligentLearnings && intelligentLearnings.length > 0) {
+      intelligentLearnings.forEach((rec) => {
+        const dupKey = `dash|${rec.issue.slice(0, 40).toLowerCase()}`;
+        if (!byKey.has(dupKey)) {
+          byKey.set(dupKey, { severity: "warning", text: rec.issue, source: "Dashboard" });
+          aggregated.push({
+            issue: rec.issue,
+            recommendation: rec.recommendation,
+            priority: rec.priority,
+            severityRank: rec.priority === "P0" ? 0 : rec.priority === "P1" ? 1 : 2,
+          });
+        }
+      });
+    }
+
+    // 4) SORT — P0 → P1 → P2; within each, by severityRank (critical first)
+    const PRIO_RANK: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
+    aggregated.sort((a, b) => {
+      const pd = PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
+      if (pd !== 0) return pd;
+      return a.severityRank - b.severityRank;
+    });
+
+    // -------- Render --------
+    if (aggregated.length > 0) {
+      // Adaptive sizing
+      let bodyFont = 7;
+      let cap = 8;
+      if (aggregated.length > 8) { bodyFont = 6.5; cap = 9; }
+      if (aggregated.length > 9) { bodyFont = 6; cap = 6; }
+      const visibleRows = aggregated.slice(0, cap);
+      const overflow = aggregated.length - visibleRows.length;
+
+      // Glassmorphism container card behind the table
+      s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x: TABLE_X - 0.05, y: ZONE.TABLE_Y - 0.05,
+        w: TABLE_W + 0.10, h: ZONE.TABLE_MAX_H + 0.05,
+        fill: { color: "FFFFFF", transparency: 45 },
+        line: { color: "FFFFFF", width: 0.5, transparency: 20 },
+        rectRadius: 0.1,
+      });
+
+      const klHeaderOpts = (align: "left" | "center"): pptxgen.TableCellProps => ({
+        bold: true, fill: { color: theme.headerBg }, fontSize: bodyFont, align,
+        color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
+        margin: [4, 5, 4, 5],
+      });
+      const klBodyOpts = (
+        ri: number,
+        align: "left" | "center" = "left",
+        color?: string,
+        bold?: boolean,
+      ): pptxgen.TableCellProps => ({
+        fontSize: bodyFont, align, color: color || theme.bodyColor,
+        fontFace: FONTS.body, valign: "top", bold: !!bold,
+        fill: ri % 2 === 1 ? { color: theme.altRowBg } : undefined,
+        margin: [4, 5, 4, 5],
+      });
+
       const klRows: pptxgen.TableRow[] = [
         [
-          { text: "Issue Identified", options: headerCellOpts(theme) },
-          { text: "Recommendation", options: headerCellOpts(theme) },
-          { text: "Priority", options: headerCellOpts(theme, "center") },
+          { text: "Issue Identified", options: klHeaderOpts("left") },
+          { text: "Recommendation", options: klHeaderOpts("left") },
+          { text: "Priority", options: klHeaderOpts("center") },
         ],
       ];
 
-      intelligentLearnings.forEach((rec, ri) => {
-        const prioColor = rec.priority === "P0" ? theme.red : rec.priority === "P1" ? theme.amber : theme.primary;
+      visibleRows.forEach((row, ri) => {
+        const prioColor =
+          row.priority === "P0" ? theme.red :
+          row.priority === "P1" ? theme.amber :
+          theme.mutedColor;
         klRows.push([
-          { text: sanitizeText(rec.issue), options: { ...bodyCellOpts(theme, ri), valign: "top" } },
-          { text: sanitizeText(rec.recommendation), options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor, valign: "top" } },
-          { text: sanitizeText(rec.priority), options: { ...bodyCellOpts(theme, ri, "center", prioColor), bold: true } },
+          { text: sanitizeText(row.issue), options: klBodyOpts(ri, "left") },
+          { text: sanitizeText(row.recommendation), options: klBodyOpts(ri, "left", theme.mutedColor) },
+          { text: sanitizeText(row.priority), options: klBodyOpts(ri, "center", prioColor, true) },
         ]);
       });
 
+      // Column widths: Issue ~38% | Recommendation ~52% | Priority ~10%
+      const colW: number[] = [TABLE_W * 0.38, TABLE_W * 0.52, TABLE_W * 0.10];
+
       s.addTable(klRows, {
-        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: [3.5, 4.3, 1.8],
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW,
         border: TABLE_BORDER,
         fontFace: FONTS.body,
+        autoPage: false,
       });
-    } else {
-      const allLearnings = report.keyLearnings;
-      if (allLearnings.length > 0) {
-        const klRows: pptxgen.TableRow[] = [
-          [
-            { text: "Learning", options: headerCellOpts(theme) },
-            { text: "Details", options: headerCellOpts(theme) },
-          ],
-        ];
-        allLearnings.slice(0, 8).forEach((l, ri) => {
-          klRows.push([
-            { text: sanitizeText(l.title), options: bodyCellOpts(theme, ri) },
-            { text: sanitizeText(l.description), options: { ...bodyCellOpts(theme, ri), color: theme.mutedColor } },
-          ]);
-        });
-        s.addTable(klRows, {
-          x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: [3.8, 5.8],
-          border: TABLE_BORDER,
-          fontFace: FONTS.body,
+
+      // Overflow indicator inside container
+      if (overflow > 0) {
+        s.addText(`+${overflow} more recommendation${overflow > 1 ? "s" : ""}`, {
+          x: TABLE_X, y: ZONE.INSIGHT_Y - 0.30, w: TABLE_W, h: 0.22,
+          fontSize: 7, italic: true, color: theme.mutedColor,
+          fontFace: FONTS.body, align: "right",
         });
       }
     }
-    addInsightBlock(s, sectionInsights?.keyLearnings, 0, theme);
+
+    // Insight zone: single summary sentence (per spec — no more than 1)
+    const summaryInsight: TableInsight | undefined = (() => {
+      const klSrc = sectionInsights?.keyLearnings;
+      if (klSrc && klSrc.length > 0) return klSrc[0];
+      if (aggregated.length > 0) {
+        const top = aggregated[0];
+        return {
+          severity: top.priority === "P0" ? "critical" : top.priority === "P1" ? "warning" : "info",
+          text: `${aggregated.filter(a => a.priority === "P0").length} P0, ${aggregated.filter(a => a.priority === "P1").length} P1, and ${aggregated.filter(a => a.priority === "P2").length} P2 actions identified across the program.`,
+          source: "Aggregated Diagnostics",
+        };
+      }
+      return undefined;
+    })();
+    addInsightBlock(s, summaryInsight ? [summaryInsight] : undefined, 0, theme);
     addSlideFooter(s, theme, slideNum);
   }
 
