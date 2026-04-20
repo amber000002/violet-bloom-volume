@@ -1952,23 +1952,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addSlideHeader(s, "Key Learnings & Recommendations", theme, undefined, slideNum);
 
     // -------- Aggregation logic --------
-    type EnrichedRow = {
-      issue: string;
-      recommendation: string;
-      priority: "P0" | "P1" | "P2";
-      severityRank: number; // for in-priority sorting
-    };
+    // (EnrichedRow / SEVERITY_RANK / severityToPriority moved into v2 engine below)
 
-    const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2, positive: 3 };
-
-    const severityToPriority = (sev: TableInsight["severity"], source: string): "P0" | "P1" | "P2" => {
-      if (sev === "critical") return "P0";
-      if (sev === "warning") {
-        const wide = /reputation|infrastructure|monthly|trend|overview|sender|deliverability/i;
-        return wide.test(source) ? "P1" : "P2";
-      }
-      return "P2"; // info → P2 (positives are filtered out before this point)
-    };
 
     // -------- Resource link registry (CleverTap docs) --------
     type ResourceLink = {
