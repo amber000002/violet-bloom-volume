@@ -1675,7 +1675,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const contentTop = ZONE.TABLE_Y;
       const contentBottom = ZONE.FOOTER_Y;
       const contentH = contentBottom - contentTop;
-      const gapBetween = 0.12;
+      const gapBetween = 0.18;
       const totalW = 10 - padX * 2;
 
       // Asymmetric layout: left ~22%, center ~16%, right ~54% (+ gaps)
@@ -1700,9 +1700,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       // --- Left panel: Effective Design & Content Practices ---
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: leftX, y: contentTop, w: leftPanelW, h: contentH,
-        fill: { color: "FFFFFF", transparency: 45 },
-        line: { color: "FFFFFF", width: 0.5, transparency: 20 },
+        fill: { color: "FFFFFF", transparency: 25 },
+        line: { color: "FFFFFF", width: 1.25, transparency: 0 },
         rectRadius: 0.1,
+        shadow: { type: "outer", blur: 8, offset: 2, color: "7A6BB0", opacity: 0.18 },
       });
 
       s.addText("Effective Design & Content Practices", {
@@ -1743,9 +1744,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       if (creativeImage) {
         s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
           x: centerX, y: contentTop, w: centerW, h: contentH,
-          fill: { color: "FFFFFF", transparency: 45 },
-          line: { color: "FFFFFF", width: 0.5, transparency: 20 },
+          fill: { color: "FFFFFF", transparency: 25 },
+          line: { color: "FFFFFF", width: 1.25, transparency: 0 },
           rectRadius: 0.08,
+          shadow: { type: "outer", blur: 8, offset: 2, color: "7A6BB0", opacity: 0.18 },
         });
 
         // contain preserves aspect ratio — no stretching
@@ -1760,9 +1762,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       // --- Right panel: Design & Content Risk Areas ---
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: rightX, y: contentTop, w: rightPanelW, h: contentH,
-        fill: { color: "FFFFFF", transparency: 45 },
-        line: { color: "FFFFFF", width: 0.5, transparency: 20 },
+        fill: { color: "FFFFFF", transparency: 25 },
+        line: { color: "FFFFFF", width: 1.25, transparency: 0 },
         rectRadius: 0.1,
+        shadow: { type: "outer", blur: 8, offset: 2, color: "7A6BB0", opacity: 0.18 },
       });
 
       s.addText("Design & Content Risk Areas", {
