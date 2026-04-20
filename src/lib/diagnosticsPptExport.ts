@@ -2063,19 +2063,26 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     });
 
     // -------- Render --------
+    // Slide 15 reclaims most of the standard insight zone for the table,
+    // because the spec restricts the insight zone to ONE summary sentence.
+    // Reserve ~0.34" right above the 8% footer for the single insight card.
+    const SINGLE_INSIGHT_RESERVE = 0.34; // card (0.185) + small top divider/padding
+    const KL_INSIGHT_Y = ZONE.FOOTER_Y - SINGLE_INSIGHT_RESERVE; // ≈ 4.835
+    const KL_TABLE_MAX_H = KL_INSIGHT_Y - ZONE.TABLE_Y - 0.05;   // small bottom padding
+
     if (aggregated.length > 0) {
-      // Adaptive sizing
+      // Adaptive sizing — table is taller now, allow more rows
       let bodyFont = 7;
-      let cap = 8;
-      if (aggregated.length > 8) { bodyFont = 6.5; cap = 9; }
-      if (aggregated.length > 9) { bodyFont = 6; cap = 6; }
+      let cap = 10;
+      if (aggregated.length > 10) { bodyFont = 6.5; cap = 12; }
+      if (aggregated.length > 12) { bodyFont = 6; cap = 8; }
       const visibleRows = aggregated.slice(0, cap);
       const overflow = aggregated.length - visibleRows.length;
 
-      // Glassmorphism container card behind the table
+      // Glassmorphism container card behind the table — extended to footer
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: TABLE_X - 0.05, y: ZONE.TABLE_Y - 0.05,
-        w: TABLE_W + 0.10, h: ZONE.TABLE_MAX_H + 0.05,
+        w: TABLE_W + 0.10, h: KL_TABLE_MAX_H + 0.05,
         fill: { color: "FFFFFF", transparency: 45 },
         line: { color: "FFFFFF", width: 0.5, transparency: 20 },
         rectRadius: 0.1,
