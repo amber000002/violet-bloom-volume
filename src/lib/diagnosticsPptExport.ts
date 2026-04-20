@@ -54,6 +54,25 @@ interface LifecycleCoverageExport {
   campaignCount: number;
 }
 
+// Key Learnings v2 — report-level config
+export interface ReportBenchmarks {
+  openRate: number;        // % e.g. 15
+  clickRate: number;       // % e.g. 2.5
+  spamRate: number;        // % safe threshold, e.g. 0.1
+  unsubRate: number;       // % e.g. 0.5
+  bounceRate: number;      // % hard-bounce threshold, e.g. 2
+  source?: string;         // e.g. "CleverTap industry benchmark"
+}
+
+export const DEFAULT_BENCHMARKS: ReportBenchmarks = {
+  openRate: 15,
+  clickRate: 2.5,
+  spamRate: 0.1,
+  unsubRate: 0.5,
+  bounceRate: 2,
+  source: "CleverTap industry benchmark",
+};
+
 export interface DiagnosticsDeckOptions {
   diagnostics: DiagnosticsData;
   brandName?: string;
@@ -66,6 +85,10 @@ export interface DiagnosticsDeckOptions {
   creativeImage?: string | null;
   lifecycleCoverage?: LifecycleCoverageExport[];
   sectionInsights?: SectionInsights;
+  // Key Learnings v2 governance
+  auditScope?: "email-only" | "multi-channel"; // default: "email-only"
+  benchmarks?: Partial<ReportBenchmarks>;
+  includeProactiveRecommendations?: boolean;   // default: false
 }
 
 // ============= BRAND COLOR ENGINE =============
@@ -621,7 +644,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     creativeImage,
     lifecycleCoverage,
     sectionInsights,
+    auditScope = "email-only",
+    benchmarks: benchmarksOverride,
+    includeProactiveRecommendations = false,
   } = opts;
+
+  const benchmarks: ReportBenchmarks = { ...DEFAULT_BENCHMARKS, ...(benchmarksOverride || {}) };
 
   const theme = buildBrandTheme(brandProfile, industry);
   const hasPostmasterData = !!diagnostics.postmasterData && diagnostics.postmasterData.length > 0;
@@ -1924,23 +1952,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     addSlideHeader(s, "Key Learnings & Recommendations", theme, undefined, slideNum);
 
     // -------- Aggregation logic --------
-    type EnrichedRow = {
-      issue: string;
-      recommendation: string;
-      priority: "P0" | "P1" | "P2";
-      severityRank: number; // for in-priority sorting
-    };
+    // (EnrichedRow / SEVERITY_RANK / severityToPriority moved into v2 engine below)
 
-    const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2, positive: 3 };
-
-    const severityToPriority = (sev: TableInsight["severity"], source: string): "P0" | "P1" | "P2" => {
-      if (sev === "critical") return "P0";
-      if (sev === "warning") {
-        const wide = /reputation|infrastructure|monthly|trend|overview|sender|deliverability/i;
-        return wide.test(source) ? "P1" : "P2";
-      }
-      return "P2"; // info → P2 (positives are filtered out before this point)
-    };
 
     // -------- Resource link registry (CleverTap docs) --------
     type ResourceLink = {
@@ -2018,73 +2031,215 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       return runs.length > 0 ? runs : [{ text, options: baseOpts }];
     };
 
-    // -------- Recommendation playbook (specific, hyperlink-friendly) --------
-    const buildRecommendation = (insight: TableInsight): string => {
-      const t = insight.text.toLowerCase();
+    // ============================================================
+    // ===== KEY LEARNINGS v2 — TOPIC-BASED AGGREGATION ENGINE ====
+    // ============================================================
 
-      if (/spam|complaint/.test(t))
-        return "Implement real-time spam complaint monitoring and pause campaigns when complaint rate exceeds 0.1%. Audit list hygiene and cap send frequency per user to prevent bombardment.";
-      if (/hard bounce/.test(t))
-        return "Verify and clean the email list before the next send by enforcing list hygiene and double opt-in. Remove addresses with consecutive bounces and pause the segments driving the spike.";
-      if (/soft bounce/.test(t))
-        return "Throttle send velocity to affected ISPs and keep payload under 102KB. Re-attempt after 24h and suppress recipients failing three consecutive sends.";
-      if (/open rate/.test(t))
-        return "Conduct seed-based inbox placement testing across Gmail, Yahoo, and Outlook. Re-validate the SPF/DKIM/DMARC chain and refresh subject lines and pre-headers to lift inbox placement.";
-      if (/click|ctr/.test(t))
-        return "Review content relevance per lifecycle stage and place the primary CTA in the top 20% of the email. Test dynamic content blocks personalised by user behaviour and ensure mobile rendering is verified.";
-      if (/unsubscribe/.test(t))
-        return "Reduce send frequency for unengaged cohorts and add a preference centre for content and cadence control. Apply a sunset journey for users inactive 6+ months instead of forcing opt-outs.";
-      if (/reputation/.test(t))
-        return "Audit IP and domain reputation in Google Postmaster daily and re-validate sender authentication. Separate promotional and transactional traffic onto distinct subdomains and follow a controlled IP warmup ramp.";
-      if (/volume gap|gap of \d+ days|inactive for/.test(t))
-        return "Resume sending with a controlled warmup ramp — start at 10% of historical peak, double every 48h. ISPs reset reputation after 30-day silence, so re-establish a consistent cadence.";
-      if (/surge|spike|volume increase/.test(t))
-        return "Smooth volume increases over a 7–14 day warmup window and apply frequency caps. Sudden spikes trigger ISP rate-limiting and reputation re-evaluation.";
-      if (/lifecycle|coverage|missing/.test(t))
-        return "Build journeys for the missing lifecycle stage(s) using internal use-case templates. Prioritise activation and reactivation gaps that block conversion velocity.";
-      if (/sunset|inactive/.test(t))
-        return "Move users inactive for 6+ months into a sunset journey, then permanent suppression. This protects sender reputation at scale and improves engaged-audience signal.";
-      if (/send mix|batch|automation|triggered/.test(t))
-        return "Shift batch-heavy sends towards triggered automation, targeting ≥30% triggered share. This matures the program and reduces reliance on broadcast volume.";
+    // ---------- Topic taxonomy ----------
+    type TopicId =
+      | "low_open_rate" | "low_click_rate" | "spam_complaints"
+      | "domain_reputation" | "ip_reputation" | "unsub_rate" | "bounce_rate"
+      | "block_list" | "subdomain_strategy" | "authentication"
+      | "inactive_segments" | "lifecycle_underutilized"
+      | "creative_quality" | "content_relevance" | "subject_line_optimization"
+      | "send_mix" | "volume_pattern" | "infrastructure_general" | "other";
 
-      // Specific, non-boilerplate fallback grounded in Email Best Practices
-      return `Diagnose against Email Best Practices for ${insight.source.toLowerCase()} and run a controlled retest on a holdout segment before scaling the change.`;
+    const TOPIC_PATTERNS: Array<{ topic: TopicId; pattern: RegExp }> = [
+      { topic: "spam_complaints",          pattern: /\b(spam|complaint|spam ratio|complaint rate|spam folder)\b/i },
+      { topic: "domain_reputation",        pattern: /\b(domain reputation|domain.*reputation|reputation.*domain)\b/i },
+      { topic: "ip_reputation",            pattern: /\b(ip reputation|ip.*reputation|reputation.*ip)\b/i },
+      { topic: "block_list",               pattern: /\b(block ?list|blocklist|spamhaus|barracuda|mxtoolbox)\b/i },
+      { topic: "authentication",           pattern: /\b(authentication chain|sender authentication|spf\/dkim\/dmarc|spf|dkim|dmarc)\b/i },
+      { topic: "subdomain_strategy",       pattern: /\b(dedicated subdomain|subdomain strategy|separate transactional)\b/i },
+      { topic: "bounce_rate",              pattern: /\b(hard bounce|soft bounce|bounce rate|\bbounce\b)\b/i },
+      { topic: "low_open_rate",            pattern: /\b(open rate|opens?|low.*open|inbox placement)\b/i },
+      { topic: "low_click_rate",           pattern: /\b(click rate|ctr|click[- ]through|low.*click)\b/i },
+      { topic: "unsub_rate",               pattern: /\b(unsubscribe|unsub rate|opt[- ]?out)\b/i },
+      { topic: "inactive_segments",        pattern: /\b(inactive segment|inactive.*\d+.*month|disengaged|sunset|win[- ]back)\b/i },
+      { topic: "lifecycle_underutilized",  pattern: /\b(lifecycle|coverage|missing|behaviou?r[- ]triggered|triggered journey|49 .*campaigns)\b/i },
+      { topic: "creative_quality",         pattern: /\b(creative|brand logo|cta placement|visual hierarchy|design)\b/i },
+      { topic: "content_relevance",        pattern: /\b(content relevance|dynamic content|personali[sz]ation|mobile optimi[sz]ation)\b/i },
+      { topic: "subject_line_optimization",pattern: /\b(subject line|preheader|send[- ]time)\b/i },
+      { topic: "send_mix",                 pattern: /\b(send mix|batch[- ]heavy|automation mature|triggered share)\b/i },
+      { topic: "volume_pattern",           pattern: /\b(volume gap|gap of \d+ days|volume surge|volume spike|volume increase)\b/i },
+      { topic: "infrastructure_general",   pattern: /\b(infrastructure|warmup|warm[- ]up)\b/i },
+    ];
+
+    const classifyTopic = (text: string): TopicId => {
+      for (const { topic, pattern } of TOPIC_PATTERNS) {
+        if (pattern.test(text)) return topic;
+      }
+      return "other";
     };
 
-    const enrichIssue = (insight: TableInsight): string => {
-      const base = insight.text.trim().replace(/\s+/g, " ");
-      const baseEnd = /[.!?]$/.test(base) ? "" : ".";
-      return `${base}${baseEnd} Source: ${insight.source}.`;
+    // ---------- Channel-mix exclusion (email-only audit, spec rule 1) ----------
+    const CHANNEL_MIX_EXCLUDE = [
+      /channel\s+(mix|concentration|diversification)/i,
+      /transactional\s+triggers?/i,
+      /diversify\s+campaign\s+mix/i,
+      /\d+%\s*of.*campaigns?\s+are\s+email/i,
+      /concentration\s+per\s+channel/i,
+      /introduce\s+(push|sms|in[- ]?app|other channels)/i,
+      /email\s+channel\s+accounts?\s+for/i,
+    ];
+    const isExcludedForEmailAudit = (text: string, recommendation = ""): boolean =>
+      auditScope === "email-only" &&
+      CHANNEL_MIX_EXCLUDE.some((p) => p.test(text) || p.test(recommendation));
+
+    // ---------- Proactive best-practice gating (spec rule 5) ----------
+    // Topics that are "proactive" — only include if a related active issue exists.
+    const PROACTIVE_TOPICS = new Set<TopicId>([
+      "block_list", "subdomain_strategy", "subject_line_optimization",
+    ]);
+    // Map of proactive topic → list of active topics that justify it
+    const PROACTIVE_JUSTIFIERS: Record<string, TopicId[]> = {
+      block_list:                ["domain_reputation", "ip_reputation", "spam_complaints"],
+      subdomain_strategy:        ["domain_reputation", "ip_reputation"],
+      subject_line_optimization: ["low_open_rate"],
+    };
+    const PROACTIVE_TEXT_PATTERNS = [
+      /verify\s+(domain|ip).*not\s+on\s+block\s+list/i,
+      /consider\s+a\s+dedicated\s+subdomain/i,
+      /analyse\s+subject\s+line\s+format/i,
+      /diagnose\s+against.*best\s+practices/i,
+      /controlled\s+retest\s+on\s+a\s+holdout\s+segment/i,
+    ];
+    const stripBoilerplateSentences = (rec: string): string => {
+      // Strip any sentence matching a proactive boilerplate pattern.
+      const sentences = rec.split(/(?<=[.!?])\s+/);
+      const kept = sentences.filter((sent) =>
+        !PROACTIVE_TEXT_PATTERNS.some((p) => p.test(sent))
+      );
+      return kept.join(" ").trim();
     };
 
-    // Stronger semantic dedupe — same metric + same direction collapse.
-    const dedupeKey = (insight: TableInsight): string => {
-      const t = insight.text.toLowerCase();
-      const metric =
-        /spam|complaint/.test(t) ? "spam" :
-        /hard bounce/.test(t) ? "hard_bounce" :
-        /soft bounce/.test(t) ? "soft_bounce" :
-        /\bbounce\b/.test(t) ? "bounce" :
-        /open rate|opens?\b/.test(t) ? "open_rate" :
-        /click|ctr/.test(t) ? "ctr" :
-        /unsubscribe|unsub\b/.test(t) ? "unsub" :
-        /domain reputation/.test(t) ? "reputation" :
-        /ip reputation/.test(t) ? "reputation" :
-        /reputation/.test(t) ? "reputation" :
-        /volume gap|gap of \d+ days|inactive for/.test(t) ? "volume_gap" :
-        /volume|surge|spike/.test(t) ? "volume" :
-        /lifecycle|coverage|missing/.test(t) ? "lifecycle" :
-        /sunset|inactive user/.test(t) ? "sunset" :
-        /send mix|batch|automation|triggered/.test(t) ? "send_mix" :
-        /infrastructure|subdomain|warmup|authentication/.test(t) ? "infrastructure" :
-        t.slice(0, 40);
-      const dir =
-        /(low|below|under|drop|decline|weak|spike|surge|high|elevated|missing|gap|breach|exceed|above)/.test(t) ? "neg" :
-        /(best|top|positive|healthy|strong|good|within)/.test(t) ? "pos" : "neu";
-      return `${metric}|${dir}`;
+    // ---------- Benchmark injection (spec rule 4) ----------
+    const benchmarksMissing: string[] = [];
+    const fmtBench = (key: keyof ReportBenchmarks, label: string): string => {
+      const v = benchmarks[key];
+      if (typeof v !== "number" || !isFinite(v)) {
+        benchmarksMissing.push(label);
+        return `(benchmark: pending)`;
+      }
+      return `(benchmark: ${v}%)`;
+    };
+    const benchmarkPhrase: Partial<Record<TopicId, string>> = {
+      low_open_rate:    fmtBench("openRate",   "open rate"),
+      low_click_rate:   fmtBench("clickRate",  "click rate"),
+      spam_complaints:  `(safe threshold: ${benchmarks.spamRate}%)`,
+      unsub_rate:       fmtBench("unsubRate",  "unsubscribe rate"),
+      bounce_rate:      fmtBench("bounceRate", "bounce rate"),
     };
 
-    // 1) COLLECT
+    // Extract a numeric metric value from text, e.g. "1.12%" → 1.12
+    const extractMetricValue = (text: string): number | null => {
+      const m = text.match(/(\d+(?:\.\d+)?)\s*%/);
+      return m ? parseFloat(m[1]) : null;
+    };
+
+    // ---------- Explicit P0 / P1 / P2 trigger logic (spec rule 2) ----------
+    const computePriority = (topic: TopicId, insight: TableInsight): "P0" | "P1" | "P2" => {
+      const text = insight.text.toLowerCase();
+      const value = extractMetricValue(insight.text);
+
+      // ---- P0 triggers ----
+      if (topic === "spam_complaints") {
+        if (value !== null && value >= benchmarks.spamRate) return "P0";
+        if (insight.severity === "critical") return "P0";
+      }
+      if (topic === "low_open_rate" && value !== null) {
+        if (value < benchmarks.openRate * 0.5) return "P0";
+        if (value < benchmarks.openRate) return "P1";
+      }
+      if (topic === "low_click_rate" && value !== null) {
+        if (value < benchmarks.clickRate * 0.5) return "P0";
+        if (value < benchmarks.clickRate) return "P1";
+      }
+      if (topic === "domain_reputation" || topic === "ip_reputation") {
+        if (/\b(low|bad|poor)\b/.test(text)) return "P0";
+        if (/\b(medium|drop|decline|degraded?)\b/.test(text)) return "P1";
+      }
+      if (topic === "bounce_rate" && /hard bounce/.test(text)) {
+        if (value !== null && value > benchmarks.bounceRate) return "P0";
+      }
+      if (topic === "block_list" && /\b(listed|active|currently on)\b/.test(text)) return "P0";
+
+      // ---- P1 triggers ----
+      if (topic === "authentication" && /\b(fail|misconfigur|missing|invalid)/.test(text)) return "P1";
+      if (topic === "inactive_segments" && /\b(\d+m|\dm sends?|million|1[,.]?[05]?[mM])/.test(text)) return "P1";
+      if (insight.severity === "critical") return "P0"; // fail-closed for any unhandled critical
+
+      // ---- P2 — everything else (optimization, no active problem) ----
+      return "P2";
+    };
+
+    // ---------- Recommendation playbook ----------
+    const buildRecommendationByTopic = (topic: TopicId, insight: TableInsight): string => {
+      switch (topic) {
+        case "low_open_rate":
+          return "Conduct seed-based inbox placement testing across Gmail, Yahoo, and Outlook. Validate the sender authentication chain (SPF/DKIM/DMARC). Review subject line and pre-header practices and follow Email Best Practices to debug low engagement.";
+        case "low_click_rate":
+          return "Review content relevance per lifecycle stage. Test dynamic content blocks personalised by user behaviour. Place the primary CTA in the top 20% of the email and ensure mobile rendering is verified.";
+        case "spam_complaints":
+          return "Implement real-time spam complaint monitoring and pause campaigns when complaint rate exceeds 0.1%. Audit list hygiene and cap send frequency per user to prevent bombardment of a single user.";
+        case "domain_reputation":
+        case "ip_reputation":
+          return "Audit IP and domain reputation in Google Postmaster daily and re-validate sender authentication. Throttle sends until reputation recovers and apply a controlled warmup ramp.";
+        case "unsub_rate":
+          return "Reduce send frequency for unengaged cohorts and add a preference centre for content and cadence control. Apply a sunset journey for users inactive 6+ months instead of forcing opt-outs.";
+        case "bounce_rate":
+          return "Verify and clean the email list before the next send by enforcing list hygiene and double opt-in. Remove addresses with consecutive bounces and pause the segments driving the spike.";
+        case "block_list":
+          return "Submit delisting requests for active listings (Spamhaus, Barracuda) and pause sends to affected domains. Audit list hygiene and authentication before resuming.";
+        case "subdomain_strategy":
+          return "Separate promotional and transactional sends onto distinct subdomains to isolate reputation. Warm the new subdomain over 7–14 days before redirecting full volume.";
+        case "authentication":
+          return "Re-validate the sender authentication chain (SPF/DKIM/DMARC) and align all sending domains. Failures here block every other deliverability fix.";
+        case "inactive_segments":
+          return "Users inactive for 6+ months must go through a sunset journey before re-entry to promotional sends. Reduce batch size for unengaged segments and implement progressive sending.";
+        case "lifecycle_underutilized":
+          return "Build journeys for missing lifecycle stage(s) using internal use-case templates. Prioritise activation and reactivation gaps that block conversion velocity.";
+        case "creative_quality":
+          return "Incorporate a prominent brand logo in the header. Use distinct colours or labels per CTA based on the offer and increase font size of trust indicators for better scannability.";
+        case "content_relevance":
+          return "Test dynamic content blocks personalised by user behaviour. Ensure mobile optimisation across all templates and align content to lifecycle stage.";
+        case "subject_line_optimization":
+          return "Run systematic subject line A/B tests with a minimum 10% holdout. Optimise send-time per segment using engagement history.";
+        case "send_mix":
+          return "Shift batch-heavy sends towards triggered automation, targeting ≥30% triggered share. This matures the program and reduces reliance on broadcast volume.";
+        case "volume_pattern":
+          return "Smooth volume changes over a 7–14 day warmup window and apply frequency caps. Sudden spikes or long gaps trigger ISP rate-limiting and reputation re-evaluation.";
+        case "infrastructure_general":
+          return "Audit infrastructure (subdomain strategy, IP warmup, authentication) and re-validate the sender authentication chain before scaling volume.";
+        default:
+          return "";
+      }
+    };
+
+    // ---------- Issue Identified enrichment ----------
+    const enrichIssue = (topic: TopicId, insight: TableInsight): string => {
+      let base = insight.text.trim().replace(/\s+/g, " ");
+      if (!/[.!?]$/.test(base)) base += ".";
+      // Inject benchmark phrase next to the metric value if not already present.
+      const benchPhrase = benchmarkPhrase[topic];
+      if (benchPhrase && !/benchmark|threshold/i.test(base)) {
+        base = base.replace(/(\d+(?:\.\d+)?\s*%)/, (match) => `${match} ${benchPhrase}`);
+        if (!base.includes(benchPhrase)) base += ` ${benchPhrase}`;
+      }
+      return `${base} Source: ${insight.source}.`;
+    };
+
+    // ---------- Aggregation row type ----------
+    type EnrichedRow = {
+      topic: TopicId;
+      issue: string;
+      recommendation: string;
+      priority: "P0" | "P1" | "P2";
+      severityRank: number;
+    };
+    const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2, positive: 3 };
+
+    // 1) COLLECT all section + dashboard insights
     const collected: TableInsight[] = [];
     if (sectionInsights) {
       const sectionOrder: (keyof SectionInsights)[] = [
@@ -2099,52 +2254,89 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
 
-    // Filter healthy/positive metrics — they are not key learnings (spec rule 5).
-    const issuesOnly = collected.filter((ins) => ins.severity !== "positive");
+    // 2) FILTER — drop positives, drop channel-mix
+    const filtered = collected.filter((ins) =>
+      ins.severity !== "positive" && !isExcludedForEmailAudit(ins.text)
+    );
 
-    // 2) DEDUPE — keep richer (longer) text per key
-    const byKey = new Map<string, TableInsight>();
-    issuesOnly.forEach((ins) => {
-      const k = dedupeKey(ins);
-      const existing = byKey.get(k);
-      if (!existing || ins.text.length > existing.text.length) byKey.set(k, ins);
+    // 3) CLASSIFY by topic
+    type Classified = { topic: TopicId; insight: TableInsight; priority: "P0" | "P1" | "P2" };
+    const classified: Classified[] = filtered.map((insight) => {
+      const topic = classifyTopic(insight.text);
+      return { topic, insight, priority: computePriority(topic, insight) };
     });
 
-    // 3) ENRICH from section insights
-    const aggregated: EnrichedRow[] = Array.from(byKey.values()).map((ins) => ({
-      issue: enrichIssue(ins),
-      recommendation: buildRecommendation(ins),
-      priority: severityToPriority(ins.severity, ins.source),
-      severityRank: SEVERITY_RANK[ins.severity] ?? 4,
-    }));
+    // 4) Track active topics — used to gate proactive recommendations
+    const activeTopics = new Set<TopicId>(classified.map((c) => c.topic));
 
-    // Merge dashboard-level intelligentLearnings, deduped by recommendation text
-    const recoSeen = new Set<string>(aggregated.map((r) => r.recommendation.toLowerCase().slice(0, 80)));
+    // 5) DEDUPE by topic — one row per topic, pick richest evidence + highest priority
+    const PRIO_RANK_LOCAL: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
+    const byTopic = new Map<TopicId, Classified>();
+    classified.forEach((c) => {
+      const existing = byTopic.get(c.topic);
+      if (!existing) { byTopic.set(c.topic, c); return; }
+      // Prefer higher priority; on tie, prefer longer (richer) text
+      const existingP = PRIO_RANK_LOCAL[existing.priority];
+      const incomingP = PRIO_RANK_LOCAL[c.priority];
+      if (incomingP < existingP) { byTopic.set(c.topic, c); return; }
+      if (incomingP === existingP && c.insight.text.length > existing.insight.text.length) {
+        byTopic.set(c.topic, c);
+      }
+    });
+
+    // 6) ENRICH — build issue + recommendation per topic
+    let aggregated: EnrichedRow[] = Array.from(byTopic.values()).map((c) => {
+      const recRaw = buildRecommendationByTopic(c.topic, c.insight);
+      const recCleaned = stripBoilerplateSentences(recRaw);
+      return {
+        topic: c.topic,
+        issue: enrichIssue(c.topic, c.insight),
+        recommendation: recCleaned,
+        priority: c.priority,
+        severityRank: SEVERITY_RANK[c.insight.severity] ?? 4,
+      };
+    });
+
+    // 7) Gate proactive best practices unless related active finding exists (spec rule 5)
+    if (!includeProactiveRecommendations) {
+      aggregated = aggregated.filter((r) => {
+        if (!PROACTIVE_TOPICS.has(r.topic)) return true;
+        const justifiers = PROACTIVE_JUSTIFIERS[r.topic] || [];
+        return justifiers.some((t) => activeTopics.has(t));
+      });
+    }
+
+    // 8) Drop empty recommendations (after boilerplate strip)
+    aggregated = aggregated.filter((r) => r.recommendation && r.recommendation.length > 5);
+
+    // 9) MERGE dashboard intelligentLearnings — apply same governance
     if (intelligentLearnings && intelligentLearnings.length > 0) {
+      const existingTopics = new Set(aggregated.map((r) => r.topic));
       intelligentLearnings.forEach((rec) => {
-        const recoKey = rec.recommendation.toLowerCase().slice(0, 80);
-        if (recoSeen.has(recoKey)) return;
-        recoSeen.add(recoKey);
+        if (isExcludedForEmailAudit(rec.issue, rec.recommendation)) return;
+        const cleanedReco = stripBoilerplateSentences(rec.recommendation);
+        if (!cleanedReco || cleanedReco.length < 5) return;
+        const topic = classifyTopic(`${rec.issue} ${rec.recommendation}`);
+        if (existingTopics.has(topic)) return; // one topic, one row
+        // Gate proactive
+        if (!includeProactiveRecommendations && PROACTIVE_TOPICS.has(topic)) {
+          const justifiers = PROACTIVE_JUSTIFIERS[topic] || [];
+          if (!justifiers.some((t) => activeTopics.has(t))) return;
+        }
+        existingTopics.add(topic);
         aggregated.push({
+          topic,
           issue: rec.issue,
-          recommendation: rec.recommendation,
+          recommendation: cleanedReco,
           priority: rec.priority,
           severityRank: rec.priority === "P0" ? 0 : rec.priority === "P1" ? 1 : 2,
         });
       });
     }
 
-    // Final dedupe — drop rows with identical or near-identical recommendation
-    const finalSeen = new Set<string>();
-    const finalRows: EnrichedRow[] = [];
-    aggregated.forEach((r) => {
-      const k = r.recommendation.toLowerCase().slice(0, 60);
-      if (finalSeen.has(k)) return;
-      finalSeen.add(k);
-      finalRows.push(r);
-    });
+    const finalRows = aggregated;
 
-    // 4) SORT — P0 → P1 → P2; within each, by severityRank
+    // 10) SORT — P0 → P1 → P2; within each, by severityRank
     const PRIO_RANK: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
     finalRows.sort((a, b) => {
       const pd = PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
