@@ -1846,44 +1846,60 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const totalContentH = padY * 2 + n * rowH + Math.max(0, n - 1) * rowGap;
       const cardH = Math.min(cardMaxH, totalContentH);
 
-      // White card container with subtle border
+      // Outer glassmorphism container — translucent white (55%) with near-white border.
+      // PPTX has no true backdrop-filter; we emulate the frosted look via transparency + light border.
       s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: cardX, y: cardY, w: cardW, h: cardH,
-        fill: { color: "FFFFFF" },
-        line: { color: "000000", width: 0.5, transparency: 94 },
+        fill: { color: "FFFFFF", transparency: 45 },
+        line: { color: "FFFFFF", width: 0.5, transparency: 20 },
         rectRadius: 0.1,
       });
 
       improvements.forEach((imp, i) => {
         const rowY = cardY + padY + i * (rowH + rowGap);
-        const badgeY = rowY + rowPadV;
+
+        // Per-row glassmorphism card (matches outer container styling)
+        s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+          x: cardX + padX, y: rowY, w: innerW, h: rowH,
+          fill: { color: "FFFFFF", transparency: 45 },
+          line: { color: "FFFFFF", width: 0.5, transparency: 20 },
+          rectRadius: 0.08,
+        });
+
+        // Row inner padding: 10px vertical, 14px horizontal
+        const rowPadXIn = 0.146;  // 14px
+        const rowPadYIn = 0.104;  // 10px
+        const badgeXIn = cardX + padX + rowPadXIn;
+        const badgeYIn = rowY + rowPadYIn;
 
         // Number badge — purple-50 fill, purple-600 text (consistent across all rows)
         s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
-          x: cardX + padX, y: badgeY, w: badge, h: badge,
+          x: badgeXIn, y: badgeYIn, w: badge, h: badge,
           fill: { color: "EEEDFE" },
           line: { color: "EEEDFE", width: 0 },
         });
         s.addText(`${i + 1}`, {
-          x: cardX + padX, y: badgeY, w: badge, h: badge,
+          x: badgeXIn, y: badgeYIn, w: badge, h: badge,
           fontSize: 9, bold: true, color: "534AB7",
           fontFace: FONTS.body, align: "center", valign: "middle",
           margin: 0,
         });
 
         // Recommendation text
+        const textXIn = badgeXIn + badge + badgeGap;
+        const textWIn = innerW - rowPadXIn * 2 - badge - badgeGap;
         s.addText(sanitizeText(imp), {
-          x: textX, y: rowY + rowPadV - 0.02, w: textW, h: rowH - rowPadV * 2 + 0.04,
+          x: textXIn, y: rowY + rowPadYIn - 0.02, w: textWIn, h: rowH - rowPadYIn * 2 + 0.04,
           fontSize: 10, color: theme.bodyColor, fontFace: FONTS.body,
           valign: "middle", margin: 0,
         });
 
-        // Separator line between rows (not after the last one)
+        // Separator line between rows — light frosted-white tint to remain visible against glass
         if (i < n - 1) {
           const sepY = rowY + rowH + rowGap / 2;
           s.addShape("line" as pptxgen.SHAPE_NAME, {
             x: cardX + padX, y: sepY, w: innerW, h: 0,
-            line: { color: "000000", width: 0.5, transparency: 96 },
+            line: { color: "FFFFFF", width: 0.5, transparency: 70 },
           });
         }
       });
