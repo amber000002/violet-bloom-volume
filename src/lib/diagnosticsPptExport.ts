@@ -54,6 +54,25 @@ interface LifecycleCoverageExport {
   campaignCount: number;
 }
 
+// Key Learnings v2 — report-level config
+export interface ReportBenchmarks {
+  openRate: number;        // % e.g. 15
+  clickRate: number;       // % e.g. 2.5
+  spamRate: number;        // % safe threshold, e.g. 0.1
+  unsubRate: number;       // % e.g. 0.5
+  bounceRate: number;      // % hard-bounce threshold, e.g. 2
+  source?: string;         // e.g. "CleverTap industry benchmark"
+}
+
+export const DEFAULT_BENCHMARKS: ReportBenchmarks = {
+  openRate: 15,
+  clickRate: 2.5,
+  spamRate: 0.1,
+  unsubRate: 0.5,
+  bounceRate: 2,
+  source: "CleverTap industry benchmark",
+};
+
 export interface DiagnosticsDeckOptions {
   diagnostics: DiagnosticsData;
   brandName?: string;
@@ -66,6 +85,10 @@ export interface DiagnosticsDeckOptions {
   creativeImage?: string | null;
   lifecycleCoverage?: LifecycleCoverageExport[];
   sectionInsights?: SectionInsights;
+  // Key Learnings v2 governance
+  auditScope?: "email-only" | "multi-channel"; // default: "email-only"
+  benchmarks?: Partial<ReportBenchmarks>;
+  includeProactiveRecommendations?: boolean;   // default: false
 }
 
 // ============= BRAND COLOR ENGINE =============
