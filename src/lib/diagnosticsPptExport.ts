@@ -1809,30 +1809,83 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }
 
     // SLIDE 11: Creative Optimizations
+    // Single white card with numbered recommendation rows separated by hairline rules.
     slideNum++;
     {
       const s = pptx.addSlide();
       addSlideBackground(s, theme);
       addDecorativeMotif(s, theme, "corner");
-      addSlideHeader(s, "Creative Optimizations", theme, undefined, slideNum);
+      addSlideHeader(s, "Creative Optimizations", theme, monthRange, slideNum);
 
       const improvements = creativeAnalysis.improvements.slice(0, 7);
+
+      // Card geometry — fits between accent line (with 16px gap) and footer zone
+      const cardX = 0.2;
+      const cardY = ZONE.TABLE_Y;            // 16px below accent line (universal)
+      const cardW = 9.6;
+      const cardMaxBottom = ZONE.FOOTER_Y - 0.1; // breathing room above footer
+      const cardMaxH = cardMaxBottom - cardY;
+
+      const padX = 0.208;                    // 20px horizontal padding
+      const padY = 0.167;                    // 16px vertical padding
+      const rowGap = 0.125;                  // 12px gap between rows
+      const badge = 0.25;                    // 24px badge
+      const badgeGap = 0.125;                // 12px between badge and text
+      const rowPadV = 0.083;                 // 8px vertical padding inside a row
+
+      // Compute available row height so all rows fit within cardMaxH
+      const innerW = cardW - padX * 2;
+      const textX = cardX + padX + badge + badgeGap;
+      const textW = innerW - badge - badgeGap;
+      const n = improvements.length;
+
+      // Row height: enough for 2 wrapped lines at ~10pt (~0.16" per line) + paddings
+      const minRowH = 0.42;
+      const maxAvailable = cardMaxH - padY * 2 - rowGap * Math.max(0, n - 1);
+      const rowH = n > 0 ? Math.max(minRowH, Math.min(0.6, maxAvailable / n)) : minRowH;
+      const totalContentH = padY * 2 + n * rowH + Math.max(0, n - 1) * rowGap;
+      const cardH = Math.min(cardMaxH, totalContentH);
+
+      // White card container with subtle border
+      s.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x: cardX, y: cardY, w: cardW, h: cardH,
+        fill: { color: "FFFFFF" },
+        line: { color: "000000", width: 0.5, transparency: 94 },
+        rectRadius: 0.1,
+      });
+
       improvements.forEach((imp, i) => {
-        const y = 1.2 + i * 0.55;
-        // Number circle
+        const rowY = cardY + padY + i * (rowH + rowGap);
+        const badgeY = rowY + rowPadV;
+
+        // Number badge — purple-50 fill, purple-600 text (consistent across all rows)
         s.addShape("ellipse" as pptxgen.SHAPE_NAME, {
-          x: 0.8, y: y, w: 0.35, h: 0.35,
-          fill: { color: theme.primary, transparency: 85 },
+          x: cardX + padX, y: badgeY, w: badge, h: badge,
+          fill: { color: "EEEDFE" },
+          line: { color: "EEEDFE", width: 0 },
         });
         s.addText(`${i + 1}`, {
-          x: 0.8, y: y, w: 0.35, h: 0.35,
-          fontSize: 10, bold: true, color: theme.primary, fontFace: FONTS.body, align: "center", valign: "middle",
+          x: cardX + padX, y: badgeY, w: badge, h: badge,
+          fontSize: 9, bold: true, color: "534AB7",
+          fontFace: FONTS.body, align: "center", valign: "middle",
+          margin: 0,
         });
+
         // Recommendation text
         s.addText(sanitizeText(imp), {
-          x: 1.3, y: y, w: 8, h: 0.45,
-          fontSize: 10, color: theme.bodyColor, fontFace: FONTS.body, valign: "middle",
+          x: textX, y: rowY + rowPadV - 0.02, w: textW, h: rowH - rowPadV * 2 + 0.04,
+          fontSize: 10, color: theme.bodyColor, fontFace: FONTS.body,
+          valign: "middle", margin: 0,
         });
+
+        // Separator line between rows (not after the last one)
+        if (i < n - 1) {
+          const sepY = rowY + rowH + rowGap / 2;
+          s.addShape("line" as pptxgen.SHAPE_NAME, {
+            x: cardX + padX, y: sepY, w: innerW, h: 0,
+            line: { color: "000000", width: 0.5, transparency: 96 },
+          });
+        }
       });
 
       addSlideFooter(s, theme, slideNum);
