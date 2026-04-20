@@ -1675,7 +1675,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       const contentTop = ZONE.TABLE_Y;
       const contentBottom = ZONE.FOOTER_Y;
       const contentH = contentBottom - contentTop;
-      const gapBetween = 0.12;
+      const gapBetween = 0.18;
       const totalW = 10 - padX * 2;
 
       // Asymmetric layout: left ~22%, center ~16%, right ~54% (+ gaps)
