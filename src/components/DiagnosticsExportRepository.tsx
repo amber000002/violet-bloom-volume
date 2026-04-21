@@ -56,6 +56,7 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reusingId, setReusingId] = useState<string | null>(null);
   const [scope, setScope] = useState<"industry" | "all">("industry");
   const [expanded, setExpanded] = useState(true);
 
