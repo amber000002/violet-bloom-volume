@@ -1,0 +1,183 @@
+// Repository service for Inbox Diagnostics PPT exports.
+// Persists generated .pptx files in Lovable Cloud Storage and tracks them
+// in the `diagnostics_exports` table so users can re-download or re-load
+// previous reports.
+
+import { supabase } from "@/integrations/supabase/client";
+
+const BUCKET = "diagnostics-exports";
+
+export interface DiagnosticsExportRecord {
+  id: string;
+  file_name: string;
+  storage_path: string;
+  brand_name: string | null;
+  industry: string | null;
+  website_host_normalized: string | null;
+  source_file_name: string | null;
+  month_range: string | null;
+  report_type: string;
+  file_size_bytes: number | null;
+  created_at: string;
+}
+
+export interface SaveExportParams {
+  blob: Blob;
+  fileName: string;
+  brandName?: string | null;
+  industry?: string | null;
+  websiteUrl?: string | null;
+  sourceFileName?: string | null;
+  monthRange?: string | null;
+  reportType?: string;
+}
+
+function normalizeHost(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = url.startsWith("http") ? new URL(url) : new URL(`https://${url}`);
+    return u.hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeForPath(s: string): string {
+  return s.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80);
+}
+
+/**
+ * Upload a generated PPT blob to storage and create a registry row.
+ * Failures are swallowed (returns null) so the user-facing download is
+ * never blocked by repository errors.
+ */
+export async function saveDiagnosticsExport(
+  params: SaveExportParams
+): Promise<DiagnosticsExportRecord | null> {
+  const { blob, fileName } = params;
+  const host = normalizeHost(params.websiteUrl);
+  const industryKey = params.industry?.trim().toLowerCase().replace(/\s+/g, "-") || "general";
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeName = sanitizeForPath(fileName.replace(/\.pptx$/i, ""));
+  const storagePath = `${industryKey}/${host || "unknown-host"}/${ts}_${safeName}.pptx`;
+
+  try {
+    const { error: uploadErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(storagePath, blob, {
+        contentType:
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        upsert: false,
+      });
+    if (uploadErr) {
+      console.warn("[diagnosticsExportRepository] upload failed", uploadErr);
+      return null;
+    }
+
+    const { data, error: insertErr } = await supabase
+      .from("diagnostics_exports")
+      .insert({
+        file_name: fileName,
+        storage_path: storagePath,
+        brand_name: params.brandName ?? null,
+        industry: params.industry ?? null,
+        website_host_normalized: host,
+        source_file_name: params.sourceFileName ?? null,
+        month_range: params.monthRange ?? null,
+        report_type: params.reportType ?? "analysis",
+        file_size_bytes: blob.size,
+      })
+      .select()
+      .single();
+
+    if (insertErr) {
+      console.warn("[diagnosticsExportRepository] insert failed", insertErr);
+      // Roll back the upload so we don't leave orphaned files
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+      return null;
+    }
+
+    return data as DiagnosticsExportRecord;
+  } catch (err) {
+    console.warn("[diagnosticsExportRepository] unexpected error", err);
+    return null;
+  }
+}
+
+/**
+ * Fetch all exports, most recent first. If `industry` is provided, results
+ * are scoped to that industry (case-insensitive); otherwise returns global.
+ */
+export async function listDiagnosticsExports(
+  industry?: string | null,
+  limit: number = 100
+): Promise<DiagnosticsExportRecord[]> {
+  let query = supabase
+    .from("diagnostics_exports")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (industry && industry.trim()) {
+    query = query.ilike("industry", industry.trim());
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.warn("[diagnosticsExportRepository] list failed", error);
+    return [];
+  }
+  return (data || []) as DiagnosticsExportRecord[];
+}
+
+/**
+ * Trigger a download of a stored export by streaming the blob to the user.
+ */
+export async function downloadDiagnosticsExport(
+  record: DiagnosticsExportRecord
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .download(record.storage_path);
+    if (error || !data) {
+      console.warn("[diagnosticsExportRepository] download failed", error);
+      return false;
+    }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = record.file_name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return true;
+  } catch (err) {
+    console.warn("[diagnosticsExportRepository] download error", err);
+    return false;
+  }
+}
+
+/**
+ * Delete a stored export (file + registry row).
+ */
+export async function deleteDiagnosticsExport(
+  record: DiagnosticsExportRecord
+): Promise<boolean> {
+  try {
+    await supabase.storage.from(BUCKET).remove([record.storage_path]);
+    const { error } = await supabase
+      .from("diagnostics_exports")
+      .delete()
+      .eq("id", record.id);
+    if (error) {
+      console.warn("[diagnosticsExportRepository] delete failed", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn("[diagnosticsExportRepository] delete error", err);
+    return false;
+  }
+}
