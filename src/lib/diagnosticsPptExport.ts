@@ -2487,12 +2487,16 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     // Estimate per-row height to decide if we need to split (font is locked at 7pt).
+    // Calibrated against real pptxgenjs output: at 7pt with avg char width
+    // ~3.5pt → ~0.0049"/char, and `margin` values in pptxgenjs are in points
+    // (1pt = 1/72"), so KL_PAD=4 → ~0.055" per side.
     const estimateTableHeight = (rows: EnrichedRow[]): number => {
-      const lineH = (KL_BODY_FONT * 1.25) / 72; // pt → inches, with 1.25 line-height
-      const padV = (KL_PAD * 2) / 72; // top+bottom padding in inches (treating pad as pt)
-      const recoColChars = (TABLE_W * 0.56) / (KL_BODY_FONT * 0.0075); // rough char capacity per line
-      const issueColChars = (TABLE_W * 0.34) / (KL_BODY_FONT * 0.0075);
-      let total = lineH + padV + 0.05; // header row
+      const lineH = (KL_BODY_FONT * 1.2) / 72;            // 7pt × 1.2 line-height ≈ 0.117"
+      const padV = (KL_PAD * 2) / 72;                      // ~0.111" top+bottom
+      const charW = KL_BODY_FONT * 0.0049;                 // inches per character at 7pt
+      const recoColChars = (TABLE_W * 0.56) / charW;       // ≈ 110 chars/line
+      const issueColChars = (TABLE_W * 0.34) / charW;      // ≈ 67 chars/line
+      let total = lineH + padV + 0.04;                     // header row
       rows.forEach((r) => {
         const recoLines = Math.max(1, Math.ceil(r.recommendation.length / Math.max(20, recoColChars)));
         const issueLines = Math.max(1, Math.ceil(r.issue.length / Math.max(20, issueColChars)));
