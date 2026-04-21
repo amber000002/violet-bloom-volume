@@ -395,7 +395,26 @@ const addDecorativeMotif = (slide: pptxgen.Slide, theme: BrandTheme, variant: "c
 
 const motifVariants: Array<"corner" | "side" | "diagonal" | "dots"> = ["corner", "side", "diagonal", "dots"];
 
+// When a custom slide background image is configured for the current slide,
+// the generator stores it here so addSlideBackground can render it instead
+// of the default themed color + overlays.
+type CustomBgEntry = { position: number; data: string };
+const __customBgRegistry = new WeakMap<object, CustomBgEntry>();
+
 const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
+  const custom = __customBgRegistry.get(slide as unknown as object);
+  if (custom) {
+    slide.background = { color: "FFFFFF" };
+    slide.addImage({
+      data: custom.data,
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 5.625,
+      sizing: { type: "cover", w: 10, h: 5.625 },
+    });
+    return;
+  }
   slide.background = { color: theme.slideBg };
   slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
 };
