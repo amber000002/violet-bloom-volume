@@ -574,6 +574,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
   const [isDraggingPostmaster, setIsDraggingPostmaster] = useState(false);
   const [activeReport, setActiveReport] = useState<"analysis" | "strategic" | null>(null);
+  const [repoRefreshKey, setRepoRefreshKey] = useState(0);
   const [strategicInsights, setStrategicInsights] = useState<StrategicInsightsOutput | null>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [strategicContext, setStrategicContext] = useState<string>("");
@@ -1097,68 +1098,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </div>
           </div>
 
-          {/* Event Schema & User Property Schema Uploads (1x2 layout) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Event Schema Upload */}
-            <div className="magic-card rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-primary" />
-                  Event Schema
-                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-                </h3>
-                {eventSchemaFileName && (
-                  <button onClick={() => { setEventSchemaData(null); setEventSchemaFileName(""); }} className="text-muted-foreground hover:text-foreground">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              {!eventSchemaFileName ? (
-                <div className="relative border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer border-border hover:border-primary/50">
-                  <input type="file" accept=".csv" onChange={(e) => e.target.files?.[0] && handleEventSchemaUpload(e.target.files[0])} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Upload events_schema.csv</p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-1">Analyze lifecycle instrumentation & funnel health</p>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-xs">{eventSchemaFileName}</span>
-                  <span className="text-[10px] text-muted-foreground">• {eventSchemaData?.length || 0} events</span>
-                </div>
-              )}
-            </div>
-
-            {/* User Property Schema Upload */}
-            <div className="magic-card rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
-                  <PieChart className="w-4 h-4 text-primary" />
-                  User Property Schema
-                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-                </h3>
-                {userPropertyFileName && (
-                  <button onClick={() => { setUserPropertyData(null); setUserPropertyFileName(""); }} className="text-muted-foreground hover:text-foreground">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              {!userPropertyFileName ? (
-                <div className="relative border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer border-border hover:border-primary/50">
-                  <input type="file" accept=".csv" onChange={(e) => e.target.files?.[0] && handleUserPropertyUpload(e.target.files[0])} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Upload user_properties_schema.csv</p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-1">Analyze segmentation & personalization readiness</p>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-xs">{userPropertyFileName}</span>
-                  <span className="text-[10px] text-muted-foreground">• {userPropertyData?.length || 0} properties</span>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Event Schema and User Property Schema uploads removed —
+              schemas are now sourced from the brand profile (Brand Inputs panel). */}
 
           {/* Strategic Priorities (Optional - for Strategic Insights) */}
           <div className="magic-card rounded-2xl p-6">
@@ -1204,6 +1145,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               )}
             </Button>
           </div>
+
+          {/* Report Repository — archive of all generated PPT exports */}
+          <DiagnosticsExportRepository industry={industry} refreshKey={repoRefreshKey} />
         </motion.div>
       )}
 
@@ -1265,9 +1209,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <Button 
                 variant="default" 
                 size="sm" 
-                onClick={() => {
+                onClick={async () => {
                   const learnings = generateIntelligentLearnings(diagnostics.rawData, diagnostics.analysisReport, postmasterData);
-                  exportDiagnosticsToPPT({
+                  await exportDiagnosticsToPPT({
                     diagnostics,
                     brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
                     brandProfile: brandProfile || null,
@@ -1275,10 +1219,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     intelligentLearnings: learnings,
                     industry,
                     sourceFileName: campaignFileName,
+                    websiteUrl: websiteUrl,
+                    reportType: "analysis",
                     creativeAnalysis: creativeAnalysis || null,
                     creativeImage: creativeImage || null,
                     sectionInsights: sectionInsights || undefined,
                   });
+                  setRepoRefreshKey((k) => k + 1);
+                  toast.success("Saved to Report Repository");
                 }}
                 className="gap-2"
               >
@@ -1998,13 +1946,19 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               <Button 
                 variant="default" 
                 size="sm" 
-                onClick={() => exportDiagnosticsToPPT({
-                  diagnostics,
-                  brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
-                  brandProfile: brandProfile || null,
-                  industry,
-                  sourceFileName: campaignFileName,
-                })}
+                onClick={async () => {
+                  await exportDiagnosticsToPPT({
+                    diagnostics,
+                    brandName: brandProfile?.brand_identity?.brand_name || "Campaign",
+                    brandProfile: brandProfile || null,
+                    industry,
+                    sourceFileName: campaignFileName,
+                    websiteUrl: websiteUrl,
+                    reportType: "reputation",
+                  });
+                  setRepoRefreshKey((k) => k + 1);
+                  toast.success("Saved to Report Repository");
+                }}
                 className="gap-2"
               >
                 <Download className="w-4 h-4" />
