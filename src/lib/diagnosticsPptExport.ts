@@ -64,20 +64,22 @@ export interface ReportBenchmarks {
   source?: string;         // e.g. "CleverTap industry benchmark"
 }
 
-// Mirrors getMetricColor() thresholds — the amber→red boundary is what we
-// flag as "below benchmark" so the table colour-coding and the Slide 15
-// priority engine speak with one voice. (Values are %.)
-//   openRate:        red if ≤10  (amber 10-25, green >25)        → benchmark 10
-//   clickRate:       red if ≤1.5 (amber 1.5-3, green >3)         → benchmark 1.5
-//   bounceRate:      red if >3   (amber 1-3, green <1)           → benchmark 3 (max safe)
-//   unsubRate:       red if >0.7 (amber 0.3-0.7, green <0.3)     → benchmark 0.7 (max safe)
-//   spamRate:        no in-app colour band; CleverTap safe ceiling 0.1%
+// Benchmarks = the GREEN-zone boundary from getMetricColor(). A metric is
+// only "healthy" once it crosses into green — so that's the bar we cite when
+// flagging an issue ("benchmark > 25%" for open rate, "benchmark < 1%" for
+// bounce, etc.). The Slide 15 engine inlines these inside the issue
+// sentence; there is no separate threshold caption.
+//   openRate:        green > 25                                   → benchmark > 25%
+//   clickRate:       green > 3                                    → benchmark > 3%
+//   bounceRate:      green < 1                                    → benchmark < 1%
+//   unsubRate:       green < 0.3                                  → benchmark < 0.3%
+//   spamRate:        CleverTap safe ceiling                       → benchmark < 0.1%
 export const DEFAULT_BENCHMARKS: ReportBenchmarks = {
-  openRate: 10,
-  clickRate: 1.5,
+  openRate: 25,
+  clickRate: 3,
   spamRate: 0.1,
-  unsubRate: 0.7,
-  bounceRate: 3,
+  unsubRate: 0.3,
+  bounceRate: 1,
   source: "Inbox Alchemy in-app thresholds",
 };
 
