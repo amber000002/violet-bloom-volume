@@ -2148,6 +2148,22 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       return kept.join(" ").trim();
     };
 
+    // Whole-row killers — if the ISSUE text itself is generic best-practice
+    // boilerplate (not a finding tied to a metric), drop the entire row.
+    // These slipped through previously because they were attached to the
+    // issue string, not the recommendation.
+    const ISSUE_BOILERPLATE_PATTERNS = [
+      /verify\s+(domain|ip).*not\s+on\s+block\s+list/i,
+      /block\s+list\s+monitoring\s+should\s+be\s+ongoing/i,
+      /analyse?\s+subject\s+line\s+format/i,
+      /build\s+a\s+repeatable\s+template/i,
+      /review\s+mobile\s+optimi[sz]ation\s+of\s+templates/i,
+      /over\s+50%\s+of\s+emails\s+are\s+opened\s+on\s+mobile/i,
+      /consider\s+a\s+dedicated\s+subdomain/i,
+    ];
+    const isIssueBoilerplate = (issue: string): boolean =>
+      ISSUE_BOILERPLATE_PATTERNS.some((p) => p.test(issue));
+
     // ---------- Benchmark injection (spec rule 4) ----------
     // Cited inline in parentheses next to the metric value, e.g.
     // "Open rate of 1.12% (benchmark > 25%) indicates …".
