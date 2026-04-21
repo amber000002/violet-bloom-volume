@@ -671,6 +671,23 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const logoUrl = brandProfile?.brand_design_profile?.logo?.logo_url;
   if (logoUrl) logoBase64 = await fetchLogoAsBase64(logoUrl);
 
+  // Pre-fetch slide template backgrounds (uploaded via Resource Library → Slide Templates)
+  // Keyed by 1-indexed slide position. Used as full-bleed backgrounds when present;
+  // generator chrome (zones, content) renders on top exactly as before.
+  let slideBackgrounds: Record<number, string> = {};
+  try {
+    const { fetchSlotBackgroundsBase64, REPORT_TYPES } = await import("./slideTemplateService");
+    slideBackgrounds = await fetchSlotBackgroundsBase64(REPORT_TYPES.INBOX_DIAGNOSTICS);
+  } catch (e) {
+    console.warn("Slide template backgrounds unavailable", e);
+  }
+  const applyBackground = (slide: pptxgen.Slide, position: number) => {
+    const data = slideBackgrounds[position];
+    if (!data) return false;
+    slide.addImage({ data, x: 0, y: 0, w: 10, h: 5.625, sizing: { type: "cover", w: 10, h: 5.625 } });
+    return true;
+  };
+
   // Pre-fetch metric card icons
   const iconPaths: Record<string, string> = {
     paperPlane: "/icons/icon-send.png",
