@@ -2128,6 +2128,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       /diagnose\s+against.*best\s+practices/i,
       /controlled\s+retest\s+on\s+a\s+holdout\s+segment/i,
       /address\s+the\s+issue\s+surfaced\s+by.*using\s+the\s+relevant\s+clevertap/i,
+      // Generic infra/warmup/audit filler with no metric-specific anchor
+      /audit\s+infrastructure.*before\s+scaling\s+volume/i,
+      /smooth\s+volume\s+changes\s+over\s+a\s+\d+/i,
+      /sudden\s+spikes\s+or\s+long\s+gaps\s+trigger/i,
+      /separate\s+promotional\s+and\s+transactional\s+sends/i,
+      /warm\s+the\s+new\s+subdomain\s+over/i,
     ];
     const stripBoilerplateSentences = (rec: string): string => {
       // Strip any sentence matching a proactive boilerplate pattern.
@@ -2139,21 +2145,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     // ---------- Benchmark injection (spec rule 4) ----------
+    // Cited inline in parentheses next to the metric value, e.g.
+    // "Open rate of 1.12% (benchmark > 25%) indicates …".
     const benchmarksMissing: string[] = [];
-    const fmtBench = (key: keyof ReportBenchmarks, label: string): string => {
+    const benchOrPending = (
+      key: keyof ReportBenchmarks,
+      label: string,
+      operator: ">" | "<",
+    ): string => {
       const v = benchmarks[key];
       if (typeof v !== "number" || !isFinite(v)) {
         benchmarksMissing.push(label);
-        return `(benchmark: pending)`;
+        return `(benchmark pending)`;
       }
-      return `(benchmark: ${v}%)`;
+      return `(benchmark ${operator} ${v}%)`;
     };
     const benchmarkPhrase: Partial<Record<TopicId, string>> = {
-      low_open_rate:    fmtBench("openRate",   "open rate"),
-      low_click_rate:   fmtBench("clickRate",  "click rate"),
-      spam_complaints:  `(safe threshold: ${benchmarks.spamRate}%)`,
-      unsub_rate:       fmtBench("unsubRate",  "unsubscribe rate"),
-      bounce_rate:      fmtBench("bounceRate", "bounce rate"),
+      low_open_rate:    benchOrPending("openRate",   "open rate",   ">"),
+      low_click_rate:   benchOrPending("clickRate",  "click rate",  ">"),
+      spam_complaints:  benchOrPending("spamRate",   "spam rate",   "<"),
+      unsub_rate:       benchOrPending("unsubRate",  "unsubscribe rate", "<"),
+      bounce_rate:      benchOrPending("bounceRate", "bounce rate", "<"),
     };
 
     // Extract a numeric metric value from text, e.g. "1.12%" → 1.12
