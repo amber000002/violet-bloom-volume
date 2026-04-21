@@ -226,6 +226,48 @@ export type Database = {
         }
         Relationships: []
       }
+      diagnostics_exports: {
+        Row: {
+          brand_name: string | null
+          created_at: string
+          file_name: string
+          file_size_bytes: number | null
+          id: string
+          industry: string | null
+          month_range: string | null
+          report_type: string
+          source_file_name: string | null
+          storage_path: string
+          website_host_normalized: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          created_at?: string
+          file_name: string
+          file_size_bytes?: number | null
+          id?: string
+          industry?: string | null
+          month_range?: string | null
+          report_type?: string
+          source_file_name?: string | null
+          storage_path: string
+          website_host_normalized?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          created_at?: string
+          file_name?: string
+          file_size_bytes?: number | null
+          id?: string
+          industry?: string | null
+          month_range?: string | null
+          report_type?: string
+          source_file_name?: string | null
+          storage_path?: string
+          website_host_normalized?: string | null
+        }
+        Relationships: []
+      }
       resource_files: {
         Row: {
           channels: string[]
