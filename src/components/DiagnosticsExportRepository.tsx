@@ -242,10 +242,22 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
                       </div>
                     </div>
                     <button
+                      onClick={() => handleReuse(r)}
+                      disabled={reusingId === r.id}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                      title="Reuse with current Slide Layout Editor templates"
+                    >
+                      {reusingId === r.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="w-4 h-4" />
+                      )}
+                    </button>
+                    <button
                       onClick={() => handleDownload(r)}
                       disabled={downloadingId === r.id}
                       className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-                      title="Download"
+                      title="Download original"
                     >
                       {downloadingId === r.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
