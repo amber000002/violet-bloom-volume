@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   listDiagnosticsExports,
@@ -8,6 +8,12 @@ import {
   deleteDiagnosticsExport,
   DiagnosticsExportRecord,
 } from "@/lib/diagnosticsExportRepository";
+import {
+  reusePptWithCurrentTemplate,
+  triggerDownload,
+  buildReusedFileName,
+} from "@/lib/diagnosticsPptReuse";
+import { saveDiagnosticsExport } from "@/lib/diagnosticsExportRepository";
 
 interface DiagnosticsExportRepositoryProps {
   industry?: string;
