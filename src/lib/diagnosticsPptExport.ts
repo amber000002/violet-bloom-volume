@@ -2148,6 +2148,22 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       return kept.join(" ").trim();
     };
 
+    // Whole-row killers — if the ISSUE text itself is generic best-practice
+    // boilerplate (not a finding tied to a metric), drop the entire row.
+    // These slipped through previously because they were attached to the
+    // issue string, not the recommendation.
+    const ISSUE_BOILERPLATE_PATTERNS = [
+      /verify\s+(domain|ip).*not\s+on\s+block\s+list/i,
+      /block\s+list\s+monitoring\s+should\s+be\s+ongoing/i,
+      /analyse?\s+subject\s+line\s+format/i,
+      /build\s+a\s+repeatable\s+template/i,
+      /review\s+mobile\s+optimi[sz]ation\s+of\s+templates/i,
+      /over\s+50%\s+of\s+emails\s+are\s+opened\s+on\s+mobile/i,
+      /consider\s+a\s+dedicated\s+subdomain/i,
+    ];
+    const isIssueBoilerplate = (issue: string): boolean =>
+      ISSUE_BOILERPLATE_PATTERNS.some((p) => p.test(issue));
+
     // ---------- Benchmark injection (spec rule 4) ----------
     // Cited inline in parentheses next to the metric value, e.g.
     // "Open rate of 1.12% (benchmark > 25%) indicates …".
@@ -2351,14 +2367,17 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
 
-    // 8) Drop empty recommendations (after boilerplate strip)
-    aggregated = aggregated.filter((r) => r.recommendation && r.recommendation.length > 5);
+    // 8) Drop empty recommendations + boilerplate-issue rows
+    aggregated = aggregated.filter((r) =>
+      r.recommendation && r.recommendation.length > 5 && !isIssueBoilerplate(r.issue)
+    );
 
     // 9) MERGE dashboard intelligentLearnings — apply same governance
     if (intelligentLearnings && intelligentLearnings.length > 0) {
       const existingTopics = new Set(aggregated.map((r) => r.topic));
       intelligentLearnings.forEach((rec) => {
         if (isExcludedForEmailAudit(rec.issue, rec.recommendation)) return;
+        if (isIssueBoilerplate(rec.issue)) return; // drop generic best-practice rows entirely
         const cleanedReco = stripBoilerplateSentences(rec.recommendation);
         if (!cleanedReco || cleanedReco.length < 5) return;
         const topic = classifyTopic(`${rec.issue} ${rec.recommendation}`);
@@ -2468,12 +2487,16 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     // Estimate per-row height to decide if we need to split (font is locked at 7pt).
+    // Calibrated against real pptxgenjs output: at 7pt with avg char width
+    // ~3.5pt → ~0.0049"/char, and `margin` values in pptxgenjs are in points
+    // (1pt = 1/72"), so KL_PAD=4 → ~0.055" per side.
     const estimateTableHeight = (rows: EnrichedRow[]): number => {
-      const lineH = (KL_BODY_FONT * 1.25) / 72; // pt → inches, with 1.25 line-height
-      const padV = (KL_PAD * 2) / 72; // top+bottom padding in inches (treating pad as pt)
-      const recoColChars = (TABLE_W * 0.56) / (KL_BODY_FONT * 0.0075); // rough char capacity per line
-      const issueColChars = (TABLE_W * 0.34) / (KL_BODY_FONT * 0.0075);
-      let total = lineH + padV + 0.05; // header row
+      const lineH = (KL_BODY_FONT * 1.2) / 72;            // 7pt × 1.2 line-height ≈ 0.117"
+      const padV = (KL_PAD * 2) / 72;                      // ~0.111" top+bottom
+      const charW = KL_BODY_FONT * 0.0049;                 // inches per character at 7pt
+      const recoColChars = (TABLE_W * 0.56) / charW;       // ≈ 110 chars/line
+      const issueColChars = (TABLE_W * 0.34) / charW;      // ≈ 67 chars/line
+      let total = lineH + padV + 0.04;                     // header row
       rows.forEach((r) => {
         const recoLines = Math.max(1, Math.ceil(r.recommendation.length / Math.max(20, recoColChars)));
         const issueLines = Math.max(1, Math.ceil(r.issue.length / Math.max(20, issueColChars)));
