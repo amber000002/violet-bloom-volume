@@ -2346,8 +2346,55 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
     // -------- Render --------
     // Slide 15 has NO insight zone. Table may extend through INSIGHT_Y, but never past FOOTER_Y.
-    // Hard floor: top of footer at ZONE.FOOTER_Y. Render all rows; only split if 6pt + tight padding overflows.
-    const KL_TABLE_MAX_H = ZONE.FOOTER_Y - ZONE.TABLE_Y - 0.05;
+    // A small "Thresholds applied" caption row is rendered above the table, surfacing the
+    // user-configured benchmarks that drive the P0/P1/P2 priority logic.
+    const KL_CAPTION_H = 0.28;
+    const KL_CAPTION_GAP = 0.06;
+    const KL_TABLE_TOP = ZONE.TABLE_Y + KL_CAPTION_H + KL_CAPTION_GAP;
+    const KL_TABLE_MAX_H = ZONE.FOOTER_Y - KL_TABLE_TOP - 0.05;
+
+    // Build the human-readable threshold caption from the resolved benchmarks.
+    const fmtBenchVal = (v: number | undefined): string =>
+      typeof v === "number" && isFinite(v) ? `${v}%` : "—";
+    const benchmarkSourceLabel = benchmarks.source || "configured";
+    const thresholdSegments: Array<{ label: string; value: string }> = [
+      { label: "Open ≥",   value: fmtBenchVal(benchmarks.openRate) },
+      { label: "Click ≥",  value: fmtBenchVal(benchmarks.clickRate) },
+      { label: "Spam ≤",   value: fmtBenchVal(benchmarks.spamRate) },
+      { label: "Unsub ≤",  value: fmtBenchVal(benchmarks.unsubRate) },
+      { label: "Bounce ≤", value: fmtBenchVal(benchmarks.bounceRate) },
+    ];
+
+    const renderThresholdCaption = (slide: pptxgen.Slide) => {
+      // Glassy pill behind the caption to keep it visually grouped with the table card.
+      slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+        x: TABLE_X - 0.05, y: ZONE.TABLE_Y - 0.02,
+        w: TABLE_W + 0.10, h: KL_CAPTION_H + 0.04,
+        fill: { color: "FFFFFF", transparency: 55 },
+        line: { color: "FFFFFF", width: 0.5, transparency: 25 },
+        rectRadius: 0.06,
+      });
+
+      // Single-line rich-text run: "Thresholds applied · Open ≥ 15% · Click ≥ 2.5% · ..."
+      const captionRuns: pptxgen.TextProps[] = [
+        { text: "Thresholds applied", options: { fontSize: 8, bold: true, color: theme.titleColor, fontFace: FONTS.body } },
+      ];
+      thresholdSegments.forEach((seg) => {
+        captionRuns.push(
+          { text: "  ·  ", options: { fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body } },
+          { text: `${seg.label} `, options: { fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body } },
+          { text: seg.value, options: { fontSize: 8, bold: true, color: theme.titleColor, fontFace: FONTS.body } },
+        );
+      });
+      captionRuns.push(
+        { text: `  ·  Source: ${sanitizeText(benchmarkSourceLabel)}`, options: { fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body } },
+      );
+
+      slide.addText(captionRuns, {
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, h: KL_CAPTION_H,
+        align: "left", valign: "middle",
+      });
+    };
 
     const renderKLSlide = (
       slide: pptxgen.Slide,
@@ -2355,9 +2402,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       bodyFont: number,
       pad: number,
     ) => {
-      // Glassmorphism container behind the table — full extended area
+      // 1) Threshold caption (surfaces the user-configured benchmarks)
+      renderThresholdCaption(slide);
+
+      // 2) Glassmorphism container behind the table — full extended area
       slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: TABLE_X - 0.05, y: ZONE.TABLE_Y - 0.05,
+        x: TABLE_X - 0.05, y: KL_TABLE_TOP - 0.05,
         w: TABLE_W + 0.10, h: KL_TABLE_MAX_H + 0.05,
         fill: { color: "FFFFFF", transparency: 45 },
         line: { color: "FFFFFF", width: 0.5, transparency: 20 },
@@ -2409,7 +2459,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       const colW: number[] = [TABLE_W * 0.34, TABLE_W * 0.56, TABLE_W * 0.10];
       slide.addTable(klRows, {
-        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW,
+        x: TABLE_X, y: KL_TABLE_TOP, w: TABLE_W, colW,
         border: TABLE_BORDER,
         fontFace: FONTS.body,
         autoPage: false,
