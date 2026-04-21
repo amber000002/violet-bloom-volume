@@ -2367,14 +2367,17 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     }
 
-    // 8) Drop empty recommendations (after boilerplate strip)
-    aggregated = aggregated.filter((r) => r.recommendation && r.recommendation.length > 5);
+    // 8) Drop empty recommendations + boilerplate-issue rows
+    aggregated = aggregated.filter((r) =>
+      r.recommendation && r.recommendation.length > 5 && !isIssueBoilerplate(r.issue)
+    );
 
     // 9) MERGE dashboard intelligentLearnings — apply same governance
     if (intelligentLearnings && intelligentLearnings.length > 0) {
       const existingTopics = new Set(aggregated.map((r) => r.topic));
       intelligentLearnings.forEach((rec) => {
         if (isExcludedForEmailAudit(rec.issue, rec.recommendation)) return;
+        if (isIssueBoilerplate(rec.issue)) return; // drop generic best-practice rows entirely
         const cleanedReco = stripBoilerplateSentences(rec.recommendation);
         if (!cleanedReco || cleanedReco.length < 5) return;
         const topic = classifyTopic(`${rec.issue} ${rec.recommendation}`);
