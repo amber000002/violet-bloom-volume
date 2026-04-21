@@ -700,13 +700,6 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   } catch (e) {
     console.warn("Slide template backgrounds unavailable", e);
   }
-  const applyBackground = (slide: pptxgen.Slide, position: number) => {
-    const data = slideBackgrounds[position];
-    if (!data) return false;
-    slide.addImage({ data, x: 0, y: 0, w: 10, h: 5.625, sizing: { type: "cover", w: 10, h: 5.625 } });
-    return true;
-  };
-
   // Pre-fetch metric card icons
   const iconPaths: Record<string, string> = {
     paperPlane: "/icons/icon-send.png",
