@@ -2098,19 +2098,30 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     // Topics that are "proactive" — only include if a related active issue exists.
     const PROACTIVE_TOPICS = new Set<TopicId>([
       "block_list", "subdomain_strategy", "subject_line_optimization",
+      "creative_quality", "content_relevance",
     ]);
     // Map of proactive topic → list of active topics that justify it
     const PROACTIVE_JUSTIFIERS: Record<string, TopicId[]> = {
       block_list:                ["domain_reputation", "ip_reputation", "spam_complaints"],
       subdomain_strategy:        ["domain_reputation", "ip_reputation"],
       subject_line_optimization: ["low_open_rate"],
+      creative_quality:          ["low_click_rate", "low_open_rate"],
+      content_relevance:         ["low_click_rate", "low_open_rate"],
     };
+    // Sentence-level boilerplate killers — strip these even when they ride along
+    // with a legitimate finding. Covers the specific filler the user called out.
     const PROACTIVE_TEXT_PATTERNS = [
       /verify\s+(domain|ip).*not\s+on\s+block\s+list/i,
+      /block\s+list\s+monitoring\s+should\s+be\s+ongoing/i,
+      /using\s+mxtoolbox\s+or\s+google\s+postmaster/i,
       /consider\s+a\s+dedicated\s+subdomain/i,
-      /analyse\s+subject\s+line\s+format/i,
+      /analyse?\s+subject\s+line\s+format/i,
+      /build\s+a\s+repeatable\s+template/i,
+      /review\s+mobile\s+optimi[sz]ation\s+of\s+templates/i,
+      /over\s+50%\s+of\s+emails\s+are\s+opened\s+on\s+mobile/i,
       /diagnose\s+against.*best\s+practices/i,
       /controlled\s+retest\s+on\s+a\s+holdout\s+segment/i,
+      /address\s+the\s+issue\s+surfaced\s+by.*using\s+the\s+relevant\s+clevertap/i,
     ];
     const stripBoilerplateSentences = (rec: string): string => {
       // Strip any sentence matching a proactive boilerplate pattern.
