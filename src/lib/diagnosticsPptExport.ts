@@ -369,6 +369,9 @@ const getReputationColor = (rep: string, theme: BrandTheme): string => {
 // ============= SLIDE HELPERS =============
 
 const addDecorativeMotif = (slide: pptxgen.Slide, theme: BrandTheme, variant: "corner" | "side" | "diagonal" | "dots" = "corner") => {
+  // Suppress themed decorative shapes when a user-uploaded full-bleed
+  // background is in place — the user's design owns the visual chrome.
+  if (__customBgRegistry.get(slide as unknown as object)) return;
   const motifColor = theme.accent;
   switch (variant) {
     case "corner":
@@ -400,6 +403,14 @@ const motifVariants: Array<"corner" | "side" | "diagonal" | "dots"> = ["corner",
 // of the default themed color + overlays.
 type CustomBgEntry = { position: number; data: string };
 const __customBgRegistry = new WeakMap<object, CustomBgEntry>();
+
+// Whether this slide has a user-uploaded full-bleed background. When true,
+// the generator must suppress all themed decorative chrome (motifs, accent
+// lines, themed cover/thank-you shapes) so the user's branded background
+// is the only visual layer. Content (titles, tables, charts, insights,
+// footer page numbers) still renders on top.
+const __hasCustomBg = (slide: pptxgen.Slide): boolean =>
+  !!__customBgRegistry.get(slide as unknown as object);
 
 const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
   const custom = __customBgRegistry.get(slide as unknown as object);
@@ -438,13 +449,17 @@ const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, 
     autoFit: true,
   });
 
-  // Accent line — short bar under title, ~40-50% of title text width
-  const accentW = Math.min(title.length * 0.11, titleW * 0.5, 3.0);
-  slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-    x: titleX, y: titleY + 0.44, w: Math.max(accentW, 1.2), h: 0.035,
-    fill: { color: theme.primary },
-    rectRadius: 0.018,
-  });
+  // Accent line — short bar under title, ~40-50% of title text width.
+  // Suppressed when a user-uploaded background is in place so the branded
+  // template visuals are not overlaid by generator chrome.
+  if (!__hasCustomBg(slide)) {
+    const accentW = Math.min(title.length * 0.11, titleW * 0.5, 3.0);
+    slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+      x: titleX, y: titleY + 0.44, w: Math.max(accentW, 1.2), h: 0.035,
+      fill: { color: theme.primary },
+      rectRadius: 0.018,
+    });
+  }
 
   // Date range — right-aligned
   if (monthRange) {
@@ -773,20 +788,25 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       s0.addShape("ellipse" as pptxgen.SHAPE_NAME, { x: 5, y: 1.5, w: 8, h: 4, fill: { color: theme.accent, transparency: 85 } });
     }
 
-    if (logoBase64) {
-      s0.addImage({ data: logoBase64, x: 3.5, y: 0.4, w: 3.0, h: 1.4, sizing: { type: "contain", w: 3.0, h: 1.4 } });
-    } else {
-      s0.addShape("roundRect" as pptxgen.SHAPE_NAME, { x: 3.75, y: 0.6, w: 2.5, h: 1.2, fill: { color: "FFFFFF", transparency: 80 }, line: { color: "FFFFFF", width: 1.5, dashType: "dash" }, rectRadius: 0.15 });
-      s0.addText("LOGO", { x: 3.75, y: 0.6, w: 2.5, h: 1.2, fontSize: 14, color: "FFFFFF", fontFace: FONTS.body, align: "center", valign: "middle", transparency: 50 });
-    }
+    if (!hasCustomBg(s0)) {
+      // Generator-owned cover chrome (logo placeholder, deck title, dates)
+      // is suppressed when a user-uploaded full-bleed cover background is
+      // in place — the uploaded slide already contains brand identity.
+      if (logoBase64) {
+        s0.addImage({ data: logoBase64, x: 3.5, y: 0.4, w: 3.0, h: 1.4, sizing: { type: "contain", w: 3.0, h: 1.4 } });
+      } else {
+        s0.addShape("roundRect" as pptxgen.SHAPE_NAME, { x: 3.75, y: 0.6, w: 2.5, h: 1.2, fill: { color: "FFFFFF", transparency: 80 }, line: { color: "FFFFFF", width: 1.5, dashType: "dash" }, rectRadius: 0.15 });
+        s0.addText("LOGO", { x: 3.75, y: 0.6, w: 2.5, h: 1.2, fontSize: 14, color: "FFFFFF", fontFace: FONTS.body, align: "center", valign: "middle", transparency: 50 });
+      }
 
-    const deckBrandName = sanitizeText(brandProfile?.brand_identity?.brand_name || brandName || "Email");
-    s0.addText(`${deckBrandName}\nInbox Diagnostics Report`, { x: 0.5, y: 2.1, w: 9, h: 1.4, fontSize: 36, bold: true, color: "FFFFFF", fontFace: FONTS.headline, align: "center", valign: "middle", lineSpacingMultiple: 1.2 });
-    s0.addText("Executive Performance Report", { x: 0.5, y: 3.4, w: 9, h: 0.5, fontSize: 16, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 20 });
-    if (monthRange) s0.addText(sanitizeText(monthRange), { x: 0.5, y: 4.1, w: 9, h: 0.4, fontSize: 13, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 35 });
-    s0.addShape("rect" as pptxgen.SHAPE_NAME, { x: 3, y: 4.8, w: 4, h: 0.04, fill: { color: "FFFFFF", transparency: 50 } });
-    const now = new Date();
-    s0.addText(`Generated: ${now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, { x: 0.5, y: 5.0, w: 9, h: 0.3, fontSize: 9, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 50 });
+      const deckBrandName = sanitizeText(brandProfile?.brand_identity?.brand_name || brandName || "Email");
+      s0.addText(`${deckBrandName}\nInbox Diagnostics Report`, { x: 0.5, y: 2.1, w: 9, h: 1.4, fontSize: 36, bold: true, color: "FFFFFF", fontFace: FONTS.headline, align: "center", valign: "middle", lineSpacingMultiple: 1.2 });
+      s0.addText("Executive Performance Report", { x: 0.5, y: 3.4, w: 9, h: 0.5, fontSize: 16, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 20 });
+      if (monthRange) s0.addText(sanitizeText(monthRange), { x: 0.5, y: 4.1, w: 9, h: 0.4, fontSize: 13, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 35 });
+      s0.addShape("rect" as pptxgen.SHAPE_NAME, { x: 3, y: 4.8, w: 4, h: 0.04, fill: { color: "FFFFFF", transparency: 50 } });
+      const now = new Date();
+      s0.addText(`Generated: ${now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, { x: 0.5, y: 5.0, w: 9, h: 0.3, fontSize: 9, color: "FFFFFF", fontFace: FONTS.body, align: "center", transparency: 50 });
+    }
   }
 
   // ==========================================
@@ -2603,14 +2623,20 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   {
     const s = pptx.addSlide();
-    addSlideBackground(s, theme);
-    addDecorativeMotif(s, theme, "corner");
-
-    s.addText("Thank You", {
-      x: 0, y: 0, w: 10, h: 5.625,
-      fontSize: 44, bold: true, color: theme.titleColor,
-      fontFace: FONTS.headline, align: "center", valign: "middle",
-    });
+    if (hasCustomBg(s)) {
+      // Full-bleed branded background owns the entire slide — suppress
+      // themed background, decorative motif, and the generated "Thank You"
+      // text since the uploaded slide already provides them.
+      renderCustomBg(s);
+    } else {
+      addSlideBackground(s, theme);
+      addDecorativeMotif(s, theme, "corner");
+      s.addText("Thank You", {
+        x: 0, y: 0, w: 10, h: 5.625,
+        fontSize: 44, bold: true, color: theme.titleColor,
+        fontFace: FONTS.headline, align: "center", valign: "middle",
+      });
+    }
   }
 
 
