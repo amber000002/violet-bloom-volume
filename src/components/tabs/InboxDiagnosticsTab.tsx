@@ -63,6 +63,7 @@ import {
   InfrastructureDetailsTable,
   ReputationSmallMultiples,
 } from "../metrics";
+import { DiagnosticsExportRepository } from "../DiagnosticsExportRepository";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
