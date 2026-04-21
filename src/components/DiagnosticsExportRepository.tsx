@@ -93,6 +93,40 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
     }
   };
 
+  const handleReuse = async (record: DiagnosticsExportRecord) => {
+    setReusingId(record.id);
+    const toastId = toast.loading("Re-skinning with current template…");
+    try {
+      const blob = await reusePptWithCurrentTemplate(record, (msg) => {
+        toast.loading(msg, { id: toastId });
+      });
+      const fileName = buildReusedFileName(record.file_name);
+      triggerDownload(blob, fileName);
+      // Archive the new version too so it shows up in the repository.
+      try {
+        await saveDiagnosticsExport({
+          blob,
+          fileName,
+          brandName: record.brand_name,
+          industry: record.industry,
+          websiteUrl: record.website_host_normalized,
+          sourceFileName: record.source_file_name,
+          monthRange: record.month_range,
+          reportType: record.report_type,
+        });
+      } catch {
+        /* non-blocking */
+      }
+      toast.success(`Downloaded ${fileName}`, { id: toastId });
+      load();
+    } catch (err: any) {
+      console.error("[reuse]", err);
+      toast.error(err?.message || "Failed to re-skin presentation", { id: toastId });
+    } finally {
+      setReusingId(null);
+    }
+  };
+
   return (
     <div className="magic-card rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
