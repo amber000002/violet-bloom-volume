@@ -2258,16 +2258,20 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     // ---------- Issue Identified enrichment ----------
+    // Issue text inlines the benchmark in parentheses next to the metric value
+    // (e.g. "Open rate of 1.12% (benchmark > 25%) indicates …"). No "Source:"
+    // suffix — keep the row tight and executive-readable.
     const enrichIssue = (topic: TopicId, insight: TableInsight): string => {
       let base = insight.text.trim().replace(/\s+/g, " ");
       if (!/[.!?]$/.test(base)) base += ".";
-      // Inject benchmark phrase next to the metric value if not already present.
       const benchPhrase = benchmarkPhrase[topic];
       if (benchPhrase && !/benchmark|threshold/i.test(base)) {
+        const before = base;
         base = base.replace(/(\d+(?:\.\d+)?\s*%)/, (match) => `${match} ${benchPhrase}`);
-        if (!base.includes(benchPhrase)) base += ` ${benchPhrase}`;
+        // Fallback: if no % token was present, append the benchmark inline.
+        if (base === before) base = base.replace(/[.!?]$/, ` ${benchPhrase}.`);
       }
-      return `${base} Source: ${insight.source}.`;
+      return base;
     };
 
     // ---------- Aggregation row type ----------
