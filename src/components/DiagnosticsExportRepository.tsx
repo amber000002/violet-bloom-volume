@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   listDiagnosticsExports,
@@ -8,6 +8,12 @@ import {
   deleteDiagnosticsExport,
   DiagnosticsExportRecord,
 } from "@/lib/diagnosticsExportRepository";
+import {
+  reusePptWithCurrentTemplate,
+  triggerDownload,
+  buildReusedFileName,
+} from "@/lib/diagnosticsPptReuse";
+import { saveDiagnosticsExport } from "@/lib/diagnosticsExportRepository";
 
 interface DiagnosticsExportRepositoryProps {
   industry?: string;
@@ -50,6 +56,7 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reusingId, setReusingId] = useState<string | null>(null);
   const [scope, setScope] = useState<"industry" | "all">("industry");
   const [expanded, setExpanded] = useState(true);
 
@@ -83,6 +90,40 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
       setRecords((prev) => prev.filter((r) => r.id !== record.id));
     } else {
       toast.error("Failed to remove from repository");
+    }
+  };
+
+  const handleReuse = async (record: DiagnosticsExportRecord) => {
+    setReusingId(record.id);
+    const toastId = toast.loading("Re-skinning with current template…");
+    try {
+      const blob = await reusePptWithCurrentTemplate(record, (msg) => {
+        toast.loading(msg, { id: toastId });
+      });
+      const fileName = buildReusedFileName(record.file_name);
+      triggerDownload(blob, fileName);
+      // Archive the new version too so it shows up in the repository.
+      try {
+        await saveDiagnosticsExport({
+          blob,
+          fileName,
+          brandName: record.brand_name,
+          industry: record.industry,
+          websiteUrl: record.website_host_normalized,
+          sourceFileName: record.source_file_name,
+          monthRange: record.month_range,
+          reportType: record.report_type,
+        });
+      } catch {
+        /* non-blocking */
+      }
+      toast.success(`Downloaded ${fileName}`, { id: toastId });
+      load();
+    } catch (err: any) {
+      console.error("[reuse]", err);
+      toast.error(err?.message || "Failed to re-skin presentation", { id: toastId });
+    } finally {
+      setReusingId(null);
     }
   };
 
@@ -201,10 +242,22 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
                       </div>
                     </div>
                     <button
+                      onClick={() => handleReuse(r)}
+                      disabled={reusingId === r.id}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                      title="Reuse with current Slide Layout Editor templates"
+                    >
+                      {reusingId === r.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="w-4 h-4" />
+                      )}
+                    </button>
+                    <button
                       onClick={() => handleDownload(r)}
                       disabled={downloadingId === r.id}
                       className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-                      title="Download"
+                      title="Download original"
                     >
                       {downloadingId === r.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
