@@ -64,13 +64,21 @@ export interface ReportBenchmarks {
   source?: string;         // e.g. "CleverTap industry benchmark"
 }
 
+// Mirrors getMetricColor() thresholds — the amber→red boundary is what we
+// flag as "below benchmark" so the table colour-coding and the Slide 15
+// priority engine speak with one voice. (Values are %.)
+//   openRate:        red if ≤10  (amber 10-25, green >25)        → benchmark 10
+//   clickRate:       red if ≤1.5 (amber 1.5-3, green >3)         → benchmark 1.5
+//   bounceRate:      red if >3   (amber 1-3, green <1)           → benchmark 3 (max safe)
+//   unsubRate:       red if >0.7 (amber 0.3-0.7, green <0.3)     → benchmark 0.7 (max safe)
+//   spamRate:        no in-app colour band; CleverTap safe ceiling 0.1%
 export const DEFAULT_BENCHMARKS: ReportBenchmarks = {
-  openRate: 15,
-  clickRate: 2.5,
+  openRate: 10,
+  clickRate: 1.5,
   spamRate: 0.1,
-  unsubRate: 0.5,
-  bounceRate: 2,
-  source: "CleverTap industry benchmark",
+  unsubRate: 0.7,
+  bounceRate: 3,
+  source: "Inbox Alchemy in-app thresholds",
 };
 
 export interface DiagnosticsDeckOptions {
@@ -2044,17 +2052,21 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       | "creative_quality" | "content_relevance" | "subject_line_optimization"
       | "send_mix" | "volume_pattern" | "infrastructure_general" | "other";
 
+    // Order matters — first match wins. Put rate-specific topics BEFORE
+    // generic deliverability topics so phrases like "low opens cause ISPs to
+    // divert emails to spam folders" classify as `low_open_rate` (the actual
+    // metric being reported) rather than `spam_complaints`.
     const TOPIC_PATTERNS: Array<{ topic: TopicId; pattern: RegExp }> = [
-      { topic: "spam_complaints",          pattern: /\b(spam|complaint|spam ratio|complaint rate|spam folder)\b/i },
+      { topic: "low_open_rate",            pattern: /\b(open rate|low.*open|inbox placement|opens?\b)/i },
+      { topic: "low_click_rate",           pattern: /\b(click rate|ctr|click[- ]through|low.*click)\b/i },
+      { topic: "unsub_rate",               pattern: /\b(unsubscribe|unsub rate|opt[- ]?out)\b/i },
+      { topic: "bounce_rate",              pattern: /\b(hard bounce|soft bounce|bounce rate|\bbounce\b)\b/i },
+      { topic: "spam_complaints",          pattern: /\b(spam ratio|complaint rate|spam complaint|user[- ]reported spam|marked as spam)\b/i },
       { topic: "domain_reputation",        pattern: /\b(domain reputation|domain.*reputation|reputation.*domain)\b/i },
       { topic: "ip_reputation",            pattern: /\b(ip reputation|ip.*reputation|reputation.*ip)\b/i },
       { topic: "block_list",               pattern: /\b(block ?list|blocklist|spamhaus|barracuda|mxtoolbox)\b/i },
       { topic: "authentication",           pattern: /\b(authentication chain|sender authentication|spf\/dkim\/dmarc|spf|dkim|dmarc)\b/i },
       { topic: "subdomain_strategy",       pattern: /\b(dedicated subdomain|subdomain strategy|separate transactional)\b/i },
-      { topic: "bounce_rate",              pattern: /\b(hard bounce|soft bounce|bounce rate|\bbounce\b)\b/i },
-      { topic: "low_open_rate",            pattern: /\b(open rate|opens?|low.*open|inbox placement)\b/i },
-      { topic: "low_click_rate",           pattern: /\b(click rate|ctr|click[- ]through|low.*click)\b/i },
-      { topic: "unsub_rate",               pattern: /\b(unsubscribe|unsub rate|opt[- ]?out)\b/i },
       { topic: "inactive_segments",        pattern: /\b(inactive segment|inactive.*\d+.*month|disengaged|sunset|win[- ]back)\b/i },
       { topic: "lifecycle_underutilized",  pattern: /\b(lifecycle|coverage|missing|behaviou?r[- ]triggered|triggered journey|49 .*campaigns)\b/i },
       { topic: "creative_quality",         pattern: /\b(creative|brand logo|cta placement|visual hierarchy|design)\b/i },
@@ -2090,19 +2102,30 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     // Topics that are "proactive" — only include if a related active issue exists.
     const PROACTIVE_TOPICS = new Set<TopicId>([
       "block_list", "subdomain_strategy", "subject_line_optimization",
+      "creative_quality", "content_relevance",
     ]);
     // Map of proactive topic → list of active topics that justify it
     const PROACTIVE_JUSTIFIERS: Record<string, TopicId[]> = {
       block_list:                ["domain_reputation", "ip_reputation", "spam_complaints"],
       subdomain_strategy:        ["domain_reputation", "ip_reputation"],
       subject_line_optimization: ["low_open_rate"],
+      creative_quality:          ["low_click_rate", "low_open_rate"],
+      content_relevance:         ["low_click_rate", "low_open_rate"],
     };
+    // Sentence-level boilerplate killers — strip these even when they ride along
+    // with a legitimate finding. Covers the specific filler the user called out.
     const PROACTIVE_TEXT_PATTERNS = [
       /verify\s+(domain|ip).*not\s+on\s+block\s+list/i,
+      /block\s+list\s+monitoring\s+should\s+be\s+ongoing/i,
+      /using\s+mxtoolbox\s+or\s+google\s+postmaster/i,
       /consider\s+a\s+dedicated\s+subdomain/i,
-      /analyse\s+subject\s+line\s+format/i,
+      /analyse?\s+subject\s+line\s+format/i,
+      /build\s+a\s+repeatable\s+template/i,
+      /review\s+mobile\s+optimi[sz]ation\s+of\s+templates/i,
+      /over\s+50%\s+of\s+emails\s+are\s+opened\s+on\s+mobile/i,
       /diagnose\s+against.*best\s+practices/i,
       /controlled\s+retest\s+on\s+a\s+holdout\s+segment/i,
+      /address\s+the\s+issue\s+surfaced\s+by.*using\s+the\s+relevant\s+clevertap/i,
     ];
     const stripBoilerplateSentences = (rec: string): string => {
       // Strip any sentence matching a proactive boilerplate pattern.
