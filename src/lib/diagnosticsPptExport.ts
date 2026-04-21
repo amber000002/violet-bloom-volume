@@ -2105,6 +2105,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const PROACTIVE_TOPICS = new Set<TopicId>([
       "block_list", "subdomain_strategy", "subject_line_optimization",
       "creative_quality", "content_relevance",
+      "infrastructure_general", "volume_pattern", "send_mix",
     ]);
     // Map of proactive topic → list of active topics that justify it
     const PROACTIVE_JUSTIFIERS: Record<string, TopicId[]> = {
@@ -2113,6 +2114,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       subject_line_optimization: ["low_open_rate"],
       creative_quality:          ["low_click_rate", "low_open_rate"],
       content_relevance:         ["low_click_rate", "low_open_rate"],
+      infrastructure_general:    ["domain_reputation", "ip_reputation", "spam_complaints", "bounce_rate"],
+      volume_pattern:            ["domain_reputation", "ip_reputation", "spam_complaints", "bounce_rate"],
+      send_mix:                  ["low_open_rate", "low_click_rate"],
     };
     // Sentence-level boilerplate killers — strip these even when they ride along
     // with a legitimate finding. Covers the specific filler the user called out.
