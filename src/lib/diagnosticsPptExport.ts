@@ -2369,9 +2369,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           if (!justifiers.some((t) => activeTopics.has(t))) return;
         }
         existingTopics.add(topic);
+        // Strip any trailing "Source: …" suffix from upstream issue text.
+        const cleanedIssue = rec.issue.replace(/\s*Source:\s*[^.]*\.?\s*$/i, "").trim();
         aggregated.push({
           topic,
-          issue: rec.issue,
+          issue: cleanedIssue || rec.issue,
           recommendation: cleanedReco,
           priority: rec.priority,
           severityRank: rec.priority === "P0" ? 0 : rec.priority === "P1" ? 1 : 2,
