@@ -449,13 +449,17 @@ const addSlideHeader = (slide: pptxgen.Slide, title: string, theme: BrandTheme, 
     autoFit: true,
   });
 
-  // Accent line — short bar under title, ~40-50% of title text width
-  const accentW = Math.min(title.length * 0.11, titleW * 0.5, 3.0);
-  slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-    x: titleX, y: titleY + 0.44, w: Math.max(accentW, 1.2), h: 0.035,
-    fill: { color: theme.primary },
-    rectRadius: 0.018,
-  });
+  // Accent line — short bar under title, ~40-50% of title text width.
+  // Suppressed when a user-uploaded background is in place so the branded
+  // template visuals are not overlaid by generator chrome.
+  if (!__hasCustomBg(slide)) {
+    const accentW = Math.min(title.length * 0.11, titleW * 0.5, 3.0);
+    slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
+      x: titleX, y: titleY + 0.44, w: Math.max(accentW, 1.2), h: 0.035,
+      fill: { color: theme.primary },
+      rectRadius: 0.018,
+    });
+  }
 
   // Date range — right-aligned
   if (monthRange) {
