@@ -2618,14 +2618,20 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   {
     const s = pptx.addSlide();
-    addSlideBackground(s, theme);
-    addDecorativeMotif(s, theme, "corner");
-
-    s.addText("Thank You", {
-      x: 0, y: 0, w: 10, h: 5.625,
-      fontSize: 44, bold: true, color: theme.titleColor,
-      fontFace: FONTS.headline, align: "center", valign: "middle",
-    });
+    if (hasCustomBg(s)) {
+      // Full-bleed branded background owns the entire slide — suppress
+      // themed background, decorative motif, and the generated "Thank You"
+      // text since the uploaded slide already provides them.
+      renderCustomBg(s);
+    } else {
+      addSlideBackground(s, theme);
+      addDecorativeMotif(s, theme, "corner");
+      s.addText("Thank You", {
+        x: 0, y: 0, w: 10, h: 5.625,
+        fontSize: 44, bold: true, color: theme.titleColor,
+        fontFace: FONTS.headline, align: "center", valign: "middle",
+      });
+    }
   }
 
 
