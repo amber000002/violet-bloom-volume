@@ -772,9 +772,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   {
     const s0 = pptx.addSlide();
-    s0.background = { color: theme.primary };
-    s0.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.secondary, transparency: 70 } });
-    s0.addShape("ellipse" as pptxgen.SHAPE_NAME, { x: 5, y: 1.5, w: 8, h: 4, fill: { color: theme.accent, transparency: 85 } });
+    if (hasCustomBg(s0)) {
+      renderCustomBg(s0);
+    } else {
+      s0.background = { color: theme.primary };
+      s0.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.secondary, transparency: 70 } });
+      s0.addShape("ellipse" as pptxgen.SHAPE_NAME, { x: 5, y: 1.5, w: 8, h: 4, fill: { color: theme.accent, transparency: 85 } });
+    }
 
     if (logoBase64) {
       s0.addImage({ data: logoBase64, x: 3.5, y: 0.4, w: 3.0, h: 1.4, sizing: { type: "contain", w: 3.0, h: 1.4 } });
@@ -799,10 +803,14 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   {
     const s = pptx.addSlide();
-    // Background: #f8f8fa with existing decorative elements
-    s.background = { color: "F8F8FA" };
-    s.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
-    addDecorativeMotif(s, theme, "corner");
+    if (hasCustomBg(s)) {
+      renderCustomBg(s);
+    } else {
+      // Background: #f8f8fa with existing decorative elements
+      s.background = { color: "F8F8FA" };
+      s.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
+      addDecorativeMotif(s, theme, "corner");
+    }
 
     // --- HEADER ZONE --- (universal)
     addSlideHeader(s, "Campaign overview", theme, monthRange);
