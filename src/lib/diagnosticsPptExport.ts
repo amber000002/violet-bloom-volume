@@ -2052,17 +2052,21 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       | "creative_quality" | "content_relevance" | "subject_line_optimization"
       | "send_mix" | "volume_pattern" | "infrastructure_general" | "other";
 
+    // Order matters — first match wins. Put rate-specific topics BEFORE
+    // generic deliverability topics so phrases like "low opens cause ISPs to
+    // divert emails to spam folders" classify as `low_open_rate` (the actual
+    // metric being reported) rather than `spam_complaints`.
     const TOPIC_PATTERNS: Array<{ topic: TopicId; pattern: RegExp }> = [
-      { topic: "spam_complaints",          pattern: /\b(spam|complaint|spam ratio|complaint rate|spam folder)\b/i },
+      { topic: "low_open_rate",            pattern: /\b(open rate|low.*open|inbox placement|opens?\b)/i },
+      { topic: "low_click_rate",           pattern: /\b(click rate|ctr|click[- ]through|low.*click)\b/i },
+      { topic: "unsub_rate",               pattern: /\b(unsubscribe|unsub rate|opt[- ]?out)\b/i },
+      { topic: "bounce_rate",              pattern: /\b(hard bounce|soft bounce|bounce rate|\bbounce\b)\b/i },
+      { topic: "spam_complaints",          pattern: /\b(spam ratio|complaint rate|spam complaint|user[- ]reported spam|marked as spam)\b/i },
       { topic: "domain_reputation",        pattern: /\b(domain reputation|domain.*reputation|reputation.*domain)\b/i },
       { topic: "ip_reputation",            pattern: /\b(ip reputation|ip.*reputation|reputation.*ip)\b/i },
       { topic: "block_list",               pattern: /\b(block ?list|blocklist|spamhaus|barracuda|mxtoolbox)\b/i },
       { topic: "authentication",           pattern: /\b(authentication chain|sender authentication|spf\/dkim\/dmarc|spf|dkim|dmarc)\b/i },
       { topic: "subdomain_strategy",       pattern: /\b(dedicated subdomain|subdomain strategy|separate transactional)\b/i },
-      { topic: "bounce_rate",              pattern: /\b(hard bounce|soft bounce|bounce rate|\bbounce\b)\b/i },
-      { topic: "low_open_rate",            pattern: /\b(open rate|opens?|low.*open|inbox placement)\b/i },
-      { topic: "low_click_rate",           pattern: /\b(click rate|ctr|click[- ]through|low.*click)\b/i },
-      { topic: "unsub_rate",               pattern: /\b(unsubscribe|unsub rate|opt[- ]?out)\b/i },
       { topic: "inactive_segments",        pattern: /\b(inactive segment|inactive.*\d+.*month|disengaged|sunset|win[- ]back)\b/i },
       { topic: "lifecycle_underutilized",  pattern: /\b(lifecycle|coverage|missing|behaviou?r[- ]triggered|triggered journey|49 .*campaigns)\b/i },
       { topic: "creative_quality",         pattern: /\b(creative|brand logo|cta placement|visual hierarchy|design)\b/i },
