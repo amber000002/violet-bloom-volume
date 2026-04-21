@@ -395,7 +395,26 @@ const addDecorativeMotif = (slide: pptxgen.Slide, theme: BrandTheme, variant: "c
 
 const motifVariants: Array<"corner" | "side" | "diagonal" | "dots"> = ["corner", "side", "diagonal", "dots"];
 
+// When a custom slide background image is configured for the current slide,
+// the generator stores it here so addSlideBackground can render it instead
+// of the default themed color + overlays.
+type CustomBgEntry = { position: number; data: string };
+const __customBgRegistry = new WeakMap<object, CustomBgEntry>();
+
 const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
+  const custom = __customBgRegistry.get(slide as unknown as object);
+  if (custom) {
+    slide.background = { color: "FFFFFF" };
+    slide.addImage({
+      data: custom.data,
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 5.625,
+      sizing: { type: "cover", w: 10, h: 5.625 },
+    });
+    return;
+  }
   slide.background = { color: theme.slideBg };
   slide.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
 };
@@ -671,6 +690,16 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const logoUrl = brandProfile?.brand_design_profile?.logo?.logo_url;
   if (logoUrl) logoBase64 = await fetchLogoAsBase64(logoUrl);
 
+  // Pre-fetch slide template backgrounds (uploaded via Resource Library → Slide Templates)
+  // Keyed by 1-indexed slide position. Used as full-bleed backgrounds when present;
+  // generator chrome (zones, content) renders on top exactly as before.
+  let slideBackgrounds: Record<number, string> = {};
+  try {
+    const { fetchSlotBackgroundsBase64, REPORT_TYPES } = await import("./slideTemplateService");
+    slideBackgrounds = await fetchSlotBackgroundsBase64(REPORT_TYPES.INBOX_DIAGNOSTICS);
+  } catch (e) {
+    console.warn("Slide template backgrounds unavailable", e);
+  }
   // Pre-fetch metric card icons
   const iconPaths: Record<string, string> = {
     paperPlane: "/icons/icon-send.png",
@@ -701,6 +730,25 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   pptx.defineLayout({ name: "WIDESCREEN", width: 10, height: 5.625 });
   pptx.layout = "WIDESCREEN";
 
+  // Wrap addSlide so we automatically register any custom background image
+  // (uploaded via Resource Library → Slide Templates) for that slide position.
+  const __originalAddSlide = pptx.addSlide.bind(pptx);
+  let __pptPosition = 0;
+  (pptx as unknown as { addSlide: () => pptxgen.Slide }).addSlide = () => {
+    __pptPosition += 1;
+    const s = __originalAddSlide();
+    const data = slideBackgrounds[__pptPosition];
+    if (data) __customBgRegistry.set(s as unknown as object, { position: __pptPosition, data });
+    return s;
+  };
+  const hasCustomBg = (s: pptxgen.Slide) => !!__customBgRegistry.get(s as unknown as object);
+  const renderCustomBg = (s: pptxgen.Slide) => {
+    const entry = __customBgRegistry.get(s as unknown as object);
+    if (!entry) return;
+    s.background = { color: "FFFFFF" };
+    s.addImage({ data: entry.data, x: 0, y: 0, w: 10, h: 5.625, sizing: { type: "cover", w: 10, h: 5.625 } });
+  };
+
   const report = diagnostics.analysisReport;
   if (!report) {
     const s = pptx.addSlide();
@@ -717,9 +765,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   {
     const s0 = pptx.addSlide();
-    s0.background = { color: theme.primary };
-    s0.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.secondary, transparency: 70 } });
-    s0.addShape("ellipse" as pptxgen.SHAPE_NAME, { x: 5, y: 1.5, w: 8, h: 4, fill: { color: theme.accent, transparency: 85 } });
+    if (hasCustomBg(s0)) {
+      renderCustomBg(s0);
+    } else {
+      s0.background = { color: theme.primary };
+      s0.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.secondary, transparency: 70 } });
+      s0.addShape("ellipse" as pptxgen.SHAPE_NAME, { x: 5, y: 1.5, w: 8, h: 4, fill: { color: theme.accent, transparency: 85 } });
+    }
 
     if (logoBase64) {
       s0.addImage({ data: logoBase64, x: 3.5, y: 0.4, w: 3.0, h: 1.4, sizing: { type: "contain", w: 3.0, h: 1.4 } });
@@ -744,10 +796,14 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   slideNum++;
   {
     const s = pptx.addSlide();
-    // Background: #f8f8fa with existing decorative elements
-    s.background = { color: "F8F8FA" };
-    s.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
-    addDecorativeMotif(s, theme, "corner");
+    if (hasCustomBg(s)) {
+      renderCustomBg(s);
+    } else {
+      // Background: #f8f8fa with existing decorative elements
+      s.background = { color: "F8F8FA" };
+      s.addShape("rect" as pptxgen.SHAPE_NAME, { x: 0, y: 0, w: 10, h: 5.625, fill: { color: theme.bgAccent, transparency: 85 } });
+      addDecorativeMotif(s, theme, "corner");
+    }
 
     // --- HEADER ZONE --- (universal)
     addSlideHeader(s, "Campaign overview", theme, monthRange);

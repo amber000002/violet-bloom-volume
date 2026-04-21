@@ -418,6 +418,54 @@ export type Database = {
         }
         Relationships: []
       }
+      slide_template_slots: {
+        Row: {
+          background_filename: string | null
+          background_height: number | null
+          background_path: string | null
+          background_width: number | null
+          created_at: string
+          file_size_bytes: number | null
+          id: string
+          position: number
+          report_type: string
+          slide_type: string
+          title: string
+          updated_at: string
+          uploaded_at: string | null
+        }
+        Insert: {
+          background_filename?: string | null
+          background_height?: number | null
+          background_path?: string | null
+          background_width?: number | null
+          created_at?: string
+          file_size_bytes?: number | null
+          id?: string
+          position: number
+          report_type?: string
+          slide_type?: string
+          title: string
+          updated_at?: string
+          uploaded_at?: string | null
+        }
+        Update: {
+          background_filename?: string | null
+          background_height?: number | null
+          background_path?: string | null
+          background_width?: number | null
+          created_at?: string
+          file_size_bytes?: number | null
+          id?: string
+          position?: number
+          report_type?: string
+          slide_type?: string
+          title?: string
+          updated_at?: string
+          uploaded_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
