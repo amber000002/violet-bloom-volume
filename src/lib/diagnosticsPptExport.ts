@@ -737,6 +737,25 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   pptx.defineLayout({ name: "WIDESCREEN", width: 10, height: 5.625 });
   pptx.layout = "WIDESCREEN";
 
+  // Wrap addSlide so we automatically register any custom background image
+  // (uploaded via Resource Library → Slide Templates) for that slide position.
+  const __originalAddSlide = pptx.addSlide.bind(pptx);
+  let __pptPosition = 0;
+  (pptx as unknown as { addSlide: () => pptxgen.Slide }).addSlide = () => {
+    __pptPosition += 1;
+    const s = __originalAddSlide();
+    const data = slideBackgrounds[__pptPosition];
+    if (data) __customBgRegistry.set(s as unknown as object, { position: __pptPosition, data });
+    return s;
+  };
+  const hasCustomBg = (s: pptxgen.Slide) => !!__customBgRegistry.get(s as unknown as object);
+  const renderCustomBg = (s: pptxgen.Slide) => {
+    const entry = __customBgRegistry.get(s as unknown as object);
+    if (!entry) return;
+    s.background = { color: "FFFFFF" };
+    s.addImage({ data: entry.data, x: 0, y: 0, w: 10, h: 5.625, sizing: { type: "cover", w: 10, h: 5.625 } });
+  };
+
   const report = diagnostics.analysisReport;
   if (!report) {
     const s = pptx.addSlide();
