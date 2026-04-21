@@ -2392,67 +2392,21 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     });
 
     // -------- Render --------
-    // Slide 15 has NO insight zone. Table may extend through INSIGHT_Y, but never past FOOTER_Y.
-    // A small "Thresholds applied" caption row is rendered above the table, surfacing the
-    // user-configured benchmarks that drive the P0/P1/P2 priority logic.
-    const KL_CAPTION_H = 0.28;
-    const KL_CAPTION_GAP = 0.06;
-    const KL_TABLE_TOP = ZONE.TABLE_Y + KL_CAPTION_H + KL_CAPTION_GAP;
+    // Slide 15 has NO insight zone and NO threshold caption. The benchmark
+    // values are inlined in parentheses inside each Issue sentence. Table
+    // body font is locked at 7pt and may overflow into the insight zone,
+    // stopping at FOOTER_Y (the hard 92% floor). If content still doesn't
+    // fit at 7pt, it splits onto a continuation slide instead of shrinking.
+    const KL_TABLE_TOP = ZONE.TABLE_Y;
     const KL_TABLE_MAX_H = ZONE.FOOTER_Y - KL_TABLE_TOP - 0.05;
-
-    // Build the human-readable threshold caption from the resolved benchmarks.
-    const fmtBenchVal = (v: number | undefined): string =>
-      typeof v === "number" && isFinite(v) ? `${v}%` : "—";
-    const benchmarkSourceLabel = benchmarks.source || "configured";
-    const thresholdSegments: Array<{ label: string; value: string }> = [
-      { label: "Open ≥",   value: fmtBenchVal(benchmarks.openRate) },
-      { label: "Click ≥",  value: fmtBenchVal(benchmarks.clickRate) },
-      { label: "Spam ≤",   value: fmtBenchVal(benchmarks.spamRate) },
-      { label: "Unsub ≤",  value: fmtBenchVal(benchmarks.unsubRate) },
-      { label: "Bounce ≤", value: fmtBenchVal(benchmarks.bounceRate) },
-    ];
-
-    const renderThresholdCaption = (slide: pptxgen.Slide) => {
-      // Glassy pill behind the caption to keep it visually grouped with the table card.
-      slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: TABLE_X - 0.05, y: ZONE.TABLE_Y - 0.02,
-        w: TABLE_W + 0.10, h: KL_CAPTION_H + 0.04,
-        fill: { color: "FFFFFF", transparency: 55 },
-        line: { color: "FFFFFF", width: 0.5, transparency: 25 },
-        rectRadius: 0.06,
-      });
-
-      // Single-line rich-text run: "Thresholds applied · Open ≥ 15% · Click ≥ 2.5% · ..."
-      const captionRuns: pptxgen.TextProps[] = [
-        { text: "Thresholds applied", options: { fontSize: 8, bold: true, color: theme.titleColor, fontFace: FONTS.body } },
-      ];
-      thresholdSegments.forEach((seg) => {
-        captionRuns.push(
-          { text: "  ·  ", options: { fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body } },
-          { text: `${seg.label} `, options: { fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body } },
-          { text: seg.value, options: { fontSize: 8, bold: true, color: theme.titleColor, fontFace: FONTS.body } },
-        );
-      });
-      captionRuns.push(
-        { text: `  ·  Source: ${sanitizeText(benchmarkSourceLabel)}`, options: { fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body } },
-      );
-
-      slide.addText(captionRuns, {
-        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, h: KL_CAPTION_H,
-        align: "left", valign: "middle",
-      });
-    };
+    const KL_BODY_FONT = 7;
+    const KL_PAD = 4;
 
     const renderKLSlide = (
       slide: pptxgen.Slide,
       rowsToRender: EnrichedRow[],
-      bodyFont: number,
-      pad: number,
     ) => {
-      // 1) Threshold caption (surfaces the user-configured benchmarks)
-      renderThresholdCaption(slide);
-
-      // 2) Glassmorphism container behind the table — full extended area
+      // Glassmorphism container behind the table — full extended area
       slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: TABLE_X - 0.05, y: KL_TABLE_TOP - 0.05,
         w: TABLE_W + 0.10, h: KL_TABLE_MAX_H + 0.05,
@@ -2462,9 +2416,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       const klHeaderOpts = (align: "left" | "center"): pptxgen.TableCellProps => ({
-        bold: true, fill: { color: theme.headerBg }, fontSize: bodyFont, align,
+        bold: true, fill: { color: theme.headerBg }, fontSize: KL_BODY_FONT, align,
         color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
-        margin: [pad, pad + 1, pad, pad + 1],
+        margin: [KL_PAD, KL_PAD + 1, KL_PAD, KL_PAD + 1],
       });
       const klBodyOpts = (
         ri: number,
@@ -2472,10 +2426,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         color?: string,
         bold?: boolean,
       ): pptxgen.TableCellProps => ({
-        fontSize: bodyFont, align, color: color || theme.bodyColor,
+        fontSize: KL_BODY_FONT, align, color: color || theme.bodyColor,
         fontFace: FONTS.body, valign: "top", bold: !!bold,
         fill: ri % 2 === 1 ? { color: theme.altRowBg } : undefined,
-        margin: [pad, pad + 1, pad, pad + 1],
+        margin: [KL_PAD, KL_PAD + 1, KL_PAD, KL_PAD + 1],
       });
 
       const klRows: pptxgen.TableRow[] = [
@@ -2494,7 +2448,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         // Hyperlinked rich-text recommendation
         const recoRuns = buildRichRecommendation(
           sanitizeText(row.recommendation),
-          bodyFont,
+          KL_BODY_FONT,
           theme.mutedColor,
         );
         klRows.push([
@@ -2513,13 +2467,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     };
 
-    // Estimate per-row height to decide if we need to shrink or split.
-    // Heuristic: per-row vertical cost = lineHeight * estimatedLines + verticalPadding.
-    const estimateTableHeight = (rows: EnrichedRow[], bodyFont: number, pad: number): number => {
-      const lineH = (bodyFont * 1.25) / 72; // pt → inches, with 1.25 line-height
-      const padV = (pad * 2) / 72; // top+bottom padding in inches (treating pad as pt)
-      const recoColChars = (TABLE_W * 0.56) / (bodyFont * 0.0075); // rough char capacity per line
-      const issueColChars = (TABLE_W * 0.34) / (bodyFont * 0.0075);
+    // Estimate per-row height to decide if we need to split (font is locked at 7pt).
+    const estimateTableHeight = (rows: EnrichedRow[]): number => {
+      const lineH = (KL_BODY_FONT * 1.25) / 72; // pt → inches, with 1.25 line-height
+      const padV = (KL_PAD * 2) / 72; // top+bottom padding in inches (treating pad as pt)
+      const recoColChars = (TABLE_W * 0.56) / (KL_BODY_FONT * 0.0075); // rough char capacity per line
+      const issueColChars = (TABLE_W * 0.34) / (KL_BODY_FONT * 0.0075);
       let total = lineH + padV + 0.05; // header row
       rows.forEach((r) => {
         const recoLines = Math.max(1, Math.ceil(r.recommendation.length / Math.max(20, recoColChars)));
@@ -2531,42 +2484,22 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     if (finalRows.length > 0) {
-      // Tier 1: 7pt, pad=4 → tier 2: 6.5pt → tier 3: 6pt → tier 4: 6pt + pad=2 → split
-      const tiers: Array<{ font: number; pad: number }> = [
-        { font: 7, pad: 4 },
-        { font: 6.5, pad: 4 },
-        { font: 6, pad: 4 },
-        { font: 6, pad: 2 },
-      ];
-
-      let chosen = tiers[tiers.length - 1];
-      let mustSplit = true;
-      for (const tier of tiers) {
-        const h = estimateTableHeight(finalRows, tier.font, tier.pad);
-        if (h <= KL_TABLE_MAX_H) {
-          chosen = tier;
-          mustSplit = false;
-          break;
-        }
-      }
-
-      if (!mustSplit) {
-        renderKLSlide(s, finalRows, chosen.font, chosen.pad);
+      const totalH = estimateTableHeight(finalRows);
+      if (totalH <= KL_TABLE_MAX_H) {
+        renderKLSlide(s, finalRows);
         addSlideFooter(s, theme, slideNum);
       } else {
-        // Split across two slides at smallest tier (6pt + pad=2).
-        const splitTier = tiers[tiers.length - 1];
-        // Find largest N such that first N rows fit.
+        // Find largest N such that first N rows fit at 7pt; remainder spills to a continuation slide.
         let firstCount = finalRows.length;
         while (firstCount > 1) {
-          const h = estimateTableHeight(finalRows.slice(0, firstCount), splitTier.font, splitTier.pad);
+          const h = estimateTableHeight(finalRows.slice(0, firstCount));
           if (h <= KL_TABLE_MAX_H) break;
           firstCount--;
         }
         const partA = finalRows.slice(0, firstCount);
         const partB = finalRows.slice(firstCount);
 
-        renderKLSlide(s, partA, splitTier.font, splitTier.pad);
+        renderKLSlide(s, partA);
         addSlideFooter(s, theme, slideNum);
 
         // Slide 15b
@@ -2575,7 +2508,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         addSlideBackground(s2, theme);
         addDecorativeMotif(s2, theme, "corner");
         addSlideHeader(s2, "Key Learnings & Recommendations (continued)", theme, undefined, slideNum);
-        renderKLSlide(s2, partB, splitTier.font, splitTier.pad);
+        renderKLSlide(s2, partB);
         addSlideFooter(s2, theme, slideNum);
       }
     } else {
