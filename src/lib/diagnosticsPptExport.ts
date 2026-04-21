@@ -369,6 +369,9 @@ const getReputationColor = (rep: string, theme: BrandTheme): string => {
 // ============= SLIDE HELPERS =============
 
 const addDecorativeMotif = (slide: pptxgen.Slide, theme: BrandTheme, variant: "corner" | "side" | "diagonal" | "dots" = "corner") => {
+  // Suppress themed decorative shapes when a user-uploaded full-bleed
+  // background is in place — the user's design owns the visual chrome.
+  if (__customBgRegistry.get(slide as unknown as object)) return;
   const motifColor = theme.accent;
   switch (variant) {
     case "corner":
@@ -400,6 +403,14 @@ const motifVariants: Array<"corner" | "side" | "diagonal" | "dots"> = ["corner",
 // of the default themed color + overlays.
 type CustomBgEntry = { position: number; data: string };
 const __customBgRegistry = new WeakMap<object, CustomBgEntry>();
+
+// Whether this slide has a user-uploaded full-bleed background. When true,
+// the generator must suppress all themed decorative chrome (motifs, accent
+// lines, themed cover/thank-you shapes) so the user's branded background
+// is the only visual layer. Content (titles, tables, charts, insights,
+// footer page numbers) still renders on top.
+const __hasCustomBg = (slide: pptxgen.Slide): boolean =>
+  !!__customBgRegistry.get(slide as unknown as object);
 
 const addSlideBackground = (slide: pptxgen.Slide, theme: BrandTheme) => {
   const custom = __customBgRegistry.get(slide as unknown as object);
