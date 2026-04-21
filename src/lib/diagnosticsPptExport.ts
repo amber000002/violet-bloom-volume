@@ -64,20 +64,22 @@ export interface ReportBenchmarks {
   source?: string;         // e.g. "CleverTap industry benchmark"
 }
 
-// Mirrors getMetricColor() thresholds — the amber→red boundary is what we
-// flag as "below benchmark" so the table colour-coding and the Slide 15
-// priority engine speak with one voice. (Values are %.)
-//   openRate:        red if ≤10  (amber 10-25, green >25)        → benchmark 10
-//   clickRate:       red if ≤1.5 (amber 1.5-3, green >3)         → benchmark 1.5
-//   bounceRate:      red if >3   (amber 1-3, green <1)           → benchmark 3 (max safe)
-//   unsubRate:       red if >0.7 (amber 0.3-0.7, green <0.3)     → benchmark 0.7 (max safe)
-//   spamRate:        no in-app colour band; CleverTap safe ceiling 0.1%
+// Benchmarks = the GREEN-zone boundary from getMetricColor(). A metric is
+// only "healthy" once it crosses into green — so that's the bar we cite when
+// flagging an issue ("benchmark > 25%" for open rate, "benchmark < 1%" for
+// bounce, etc.). The Slide 15 engine inlines these inside the issue
+// sentence; there is no separate threshold caption.
+//   openRate:        green > 25                                   → benchmark > 25%
+//   clickRate:       green > 3                                    → benchmark > 3%
+//   bounceRate:      green < 1                                    → benchmark < 1%
+//   unsubRate:       green < 0.3                                  → benchmark < 0.3%
+//   spamRate:        CleverTap safe ceiling                       → benchmark < 0.1%
 export const DEFAULT_BENCHMARKS: ReportBenchmarks = {
-  openRate: 10,
-  clickRate: 1.5,
+  openRate: 25,
+  clickRate: 3,
   spamRate: 0.1,
-  unsubRate: 0.7,
-  bounceRate: 3,
+  unsubRate: 0.3,
+  bounceRate: 1,
   source: "Inbox Alchemy in-app thresholds",
 };
 
@@ -2103,6 +2105,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const PROACTIVE_TOPICS = new Set<TopicId>([
       "block_list", "subdomain_strategy", "subject_line_optimization",
       "creative_quality", "content_relevance",
+      "infrastructure_general", "volume_pattern", "send_mix",
     ]);
     // Map of proactive topic → list of active topics that justify it
     const PROACTIVE_JUSTIFIERS: Record<string, TopicId[]> = {
@@ -2111,6 +2114,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       subject_line_optimization: ["low_open_rate"],
       creative_quality:          ["low_click_rate", "low_open_rate"],
       content_relevance:         ["low_click_rate", "low_open_rate"],
+      infrastructure_general:    ["domain_reputation", "ip_reputation", "spam_complaints", "bounce_rate"],
+      volume_pattern:            ["domain_reputation", "ip_reputation", "spam_complaints", "bounce_rate"],
+      send_mix:                  ["low_open_rate", "low_click_rate"],
     };
     // Sentence-level boilerplate killers — strip these even when they ride along
     // with a legitimate finding. Covers the specific filler the user called out.
@@ -2126,6 +2132,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       /diagnose\s+against.*best\s+practices/i,
       /controlled\s+retest\s+on\s+a\s+holdout\s+segment/i,
       /address\s+the\s+issue\s+surfaced\s+by.*using\s+the\s+relevant\s+clevertap/i,
+      // Generic infra/warmup/audit filler with no metric-specific anchor
+      /audit\s+infrastructure.*before\s+scaling\s+volume/i,
+      /smooth\s+volume\s+changes\s+over\s+a\s+\d+/i,
+      /sudden\s+spikes\s+or\s+long\s+gaps\s+trigger/i,
+      /separate\s+promotional\s+and\s+transactional\s+sends/i,
+      /warm\s+the\s+new\s+subdomain\s+over/i,
     ];
     const stripBoilerplateSentences = (rec: string): string => {
       // Strip any sentence matching a proactive boilerplate pattern.
@@ -2137,21 +2149,27 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     // ---------- Benchmark injection (spec rule 4) ----------
+    // Cited inline in parentheses next to the metric value, e.g.
+    // "Open rate of 1.12% (benchmark > 25%) indicates …".
     const benchmarksMissing: string[] = [];
-    const fmtBench = (key: keyof ReportBenchmarks, label: string): string => {
+    const benchOrPending = (
+      key: keyof ReportBenchmarks,
+      label: string,
+      operator: ">" | "<",
+    ): string => {
       const v = benchmarks[key];
       if (typeof v !== "number" || !isFinite(v)) {
         benchmarksMissing.push(label);
-        return `(benchmark: pending)`;
+        return `(benchmark pending)`;
       }
-      return `(benchmark: ${v}%)`;
+      return `(benchmark ${operator} ${v}%)`;
     };
     const benchmarkPhrase: Partial<Record<TopicId, string>> = {
-      low_open_rate:    fmtBench("openRate",   "open rate"),
-      low_click_rate:   fmtBench("clickRate",  "click rate"),
-      spam_complaints:  `(safe threshold: ${benchmarks.spamRate}%)`,
-      unsub_rate:       fmtBench("unsubRate",  "unsubscribe rate"),
-      bounce_rate:      fmtBench("bounceRate", "bounce rate"),
+      low_open_rate:    benchOrPending("openRate",   "open rate",   ">"),
+      low_click_rate:   benchOrPending("clickRate",  "click rate",  ">"),
+      spam_complaints:  benchOrPending("spamRate",   "spam rate",   "<"),
+      unsub_rate:       benchOrPending("unsubRate",  "unsubscribe rate", "<"),
+      bounce_rate:      benchOrPending("bounceRate", "bounce rate", "<"),
     };
 
     // Extract a numeric metric value from text, e.g. "1.12%" → 1.12
@@ -2240,16 +2258,20 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     // ---------- Issue Identified enrichment ----------
+    // Issue text inlines the benchmark in parentheses next to the metric value
+    // (e.g. "Open rate of 1.12% (benchmark > 25%) indicates …"). No "Source:"
+    // suffix — keep the row tight and executive-readable.
     const enrichIssue = (topic: TopicId, insight: TableInsight): string => {
       let base = insight.text.trim().replace(/\s+/g, " ");
       if (!/[.!?]$/.test(base)) base += ".";
-      // Inject benchmark phrase next to the metric value if not already present.
       const benchPhrase = benchmarkPhrase[topic];
       if (benchPhrase && !/benchmark|threshold/i.test(base)) {
+        const before = base;
         base = base.replace(/(\d+(?:\.\d+)?\s*%)/, (match) => `${match} ${benchPhrase}`);
-        if (!base.includes(benchPhrase)) base += ` ${benchPhrase}`;
+        // Fallback: if no % token was present, append the benchmark inline.
+        if (base === before) base = base.replace(/[.!?]$/, ` ${benchPhrase}.`);
       }
-      return `${base} Source: ${insight.source}.`;
+      return base;
     };
 
     // ---------- Aggregation row type ----------
@@ -2347,9 +2369,11 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           if (!justifiers.some((t) => activeTopics.has(t))) return;
         }
         existingTopics.add(topic);
+        // Strip any trailing "Source: …" suffix from upstream issue text.
+        const cleanedIssue = rec.issue.replace(/\s*Source:\s*[^.]*\.?\s*$/i, "").trim();
         aggregated.push({
           topic,
-          issue: rec.issue,
+          issue: cleanedIssue || rec.issue,
           recommendation: cleanedReco,
           priority: rec.priority,
           severityRank: rec.priority === "P0" ? 0 : rec.priority === "P1" ? 1 : 2,
@@ -2368,67 +2392,21 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     });
 
     // -------- Render --------
-    // Slide 15 has NO insight zone. Table may extend through INSIGHT_Y, but never past FOOTER_Y.
-    // A small "Thresholds applied" caption row is rendered above the table, surfacing the
-    // user-configured benchmarks that drive the P0/P1/P2 priority logic.
-    const KL_CAPTION_H = 0.28;
-    const KL_CAPTION_GAP = 0.06;
-    const KL_TABLE_TOP = ZONE.TABLE_Y + KL_CAPTION_H + KL_CAPTION_GAP;
+    // Slide 15 has NO insight zone and NO threshold caption. The benchmark
+    // values are inlined in parentheses inside each Issue sentence. Table
+    // body font is locked at 7pt and may overflow into the insight zone,
+    // stopping at FOOTER_Y (the hard 92% floor). If content still doesn't
+    // fit at 7pt, it splits onto a continuation slide instead of shrinking.
+    const KL_TABLE_TOP = ZONE.TABLE_Y;
     const KL_TABLE_MAX_H = ZONE.FOOTER_Y - KL_TABLE_TOP - 0.05;
-
-    // Build the human-readable threshold caption from the resolved benchmarks.
-    const fmtBenchVal = (v: number | undefined): string =>
-      typeof v === "number" && isFinite(v) ? `${v}%` : "—";
-    const benchmarkSourceLabel = benchmarks.source || "configured";
-    const thresholdSegments: Array<{ label: string; value: string }> = [
-      { label: "Open ≥",   value: fmtBenchVal(benchmarks.openRate) },
-      { label: "Click ≥",  value: fmtBenchVal(benchmarks.clickRate) },
-      { label: "Spam ≤",   value: fmtBenchVal(benchmarks.spamRate) },
-      { label: "Unsub ≤",  value: fmtBenchVal(benchmarks.unsubRate) },
-      { label: "Bounce ≤", value: fmtBenchVal(benchmarks.bounceRate) },
-    ];
-
-    const renderThresholdCaption = (slide: pptxgen.Slide) => {
-      // Glassy pill behind the caption to keep it visually grouped with the table card.
-      slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
-        x: TABLE_X - 0.05, y: ZONE.TABLE_Y - 0.02,
-        w: TABLE_W + 0.10, h: KL_CAPTION_H + 0.04,
-        fill: { color: "FFFFFF", transparency: 55 },
-        line: { color: "FFFFFF", width: 0.5, transparency: 25 },
-        rectRadius: 0.06,
-      });
-
-      // Single-line rich-text run: "Thresholds applied · Open ≥ 15% · Click ≥ 2.5% · ..."
-      const captionRuns: pptxgen.TextProps[] = [
-        { text: "Thresholds applied", options: { fontSize: 8, bold: true, color: theme.titleColor, fontFace: FONTS.body } },
-      ];
-      thresholdSegments.forEach((seg) => {
-        captionRuns.push(
-          { text: "  ·  ", options: { fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body } },
-          { text: `${seg.label} `, options: { fontSize: 8, color: theme.mutedColor, fontFace: FONTS.body } },
-          { text: seg.value, options: { fontSize: 8, bold: true, color: theme.titleColor, fontFace: FONTS.body } },
-        );
-      });
-      captionRuns.push(
-        { text: `  ·  Source: ${sanitizeText(benchmarkSourceLabel)}`, options: { fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body } },
-      );
-
-      slide.addText(captionRuns, {
-        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, h: KL_CAPTION_H,
-        align: "left", valign: "middle",
-      });
-    };
+    const KL_BODY_FONT = 7;
+    const KL_PAD = 4;
 
     const renderKLSlide = (
       slide: pptxgen.Slide,
       rowsToRender: EnrichedRow[],
-      bodyFont: number,
-      pad: number,
     ) => {
-      // 1) Threshold caption (surfaces the user-configured benchmarks)
-      renderThresholdCaption(slide);
-
-      // 2) Glassmorphism container behind the table — full extended area
+      // Glassmorphism container behind the table — full extended area
       slide.addShape("roundRect" as pptxgen.SHAPE_NAME, {
         x: TABLE_X - 0.05, y: KL_TABLE_TOP - 0.05,
         w: TABLE_W + 0.10, h: KL_TABLE_MAX_H + 0.05,
@@ -2438,9 +2416,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
 
       const klHeaderOpts = (align: "left" | "center"): pptxgen.TableCellProps => ({
-        bold: true, fill: { color: theme.headerBg }, fontSize: bodyFont, align,
+        bold: true, fill: { color: theme.headerBg }, fontSize: KL_BODY_FONT, align,
         color: theme.titleColor, fontFace: FONTS.body, valign: "middle",
-        margin: [pad, pad + 1, pad, pad + 1],
+        margin: [KL_PAD, KL_PAD + 1, KL_PAD, KL_PAD + 1],
       });
       const klBodyOpts = (
         ri: number,
@@ -2448,10 +2426,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         color?: string,
         bold?: boolean,
       ): pptxgen.TableCellProps => ({
-        fontSize: bodyFont, align, color: color || theme.bodyColor,
+        fontSize: KL_BODY_FONT, align, color: color || theme.bodyColor,
         fontFace: FONTS.body, valign: "top", bold: !!bold,
         fill: ri % 2 === 1 ? { color: theme.altRowBg } : undefined,
-        margin: [pad, pad + 1, pad, pad + 1],
+        margin: [KL_PAD, KL_PAD + 1, KL_PAD, KL_PAD + 1],
       });
 
       const klRows: pptxgen.TableRow[] = [
@@ -2470,7 +2448,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         // Hyperlinked rich-text recommendation
         const recoRuns = buildRichRecommendation(
           sanitizeText(row.recommendation),
-          bodyFont,
+          KL_BODY_FONT,
           theme.mutedColor,
         );
         klRows.push([
@@ -2489,13 +2467,12 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       });
     };
 
-    // Estimate per-row height to decide if we need to shrink or split.
-    // Heuristic: per-row vertical cost = lineHeight * estimatedLines + verticalPadding.
-    const estimateTableHeight = (rows: EnrichedRow[], bodyFont: number, pad: number): number => {
-      const lineH = (bodyFont * 1.25) / 72; // pt → inches, with 1.25 line-height
-      const padV = (pad * 2) / 72; // top+bottom padding in inches (treating pad as pt)
-      const recoColChars = (TABLE_W * 0.56) / (bodyFont * 0.0075); // rough char capacity per line
-      const issueColChars = (TABLE_W * 0.34) / (bodyFont * 0.0075);
+    // Estimate per-row height to decide if we need to split (font is locked at 7pt).
+    const estimateTableHeight = (rows: EnrichedRow[]): number => {
+      const lineH = (KL_BODY_FONT * 1.25) / 72; // pt → inches, with 1.25 line-height
+      const padV = (KL_PAD * 2) / 72; // top+bottom padding in inches (treating pad as pt)
+      const recoColChars = (TABLE_W * 0.56) / (KL_BODY_FONT * 0.0075); // rough char capacity per line
+      const issueColChars = (TABLE_W * 0.34) / (KL_BODY_FONT * 0.0075);
       let total = lineH + padV + 0.05; // header row
       rows.forEach((r) => {
         const recoLines = Math.max(1, Math.ceil(r.recommendation.length / Math.max(20, recoColChars)));
@@ -2507,42 +2484,22 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     };
 
     if (finalRows.length > 0) {
-      // Tier 1: 7pt, pad=4 → tier 2: 6.5pt → tier 3: 6pt → tier 4: 6pt + pad=2 → split
-      const tiers: Array<{ font: number; pad: number }> = [
-        { font: 7, pad: 4 },
-        { font: 6.5, pad: 4 },
-        { font: 6, pad: 4 },
-        { font: 6, pad: 2 },
-      ];
-
-      let chosen = tiers[tiers.length - 1];
-      let mustSplit = true;
-      for (const tier of tiers) {
-        const h = estimateTableHeight(finalRows, tier.font, tier.pad);
-        if (h <= KL_TABLE_MAX_H) {
-          chosen = tier;
-          mustSplit = false;
-          break;
-        }
-      }
-
-      if (!mustSplit) {
-        renderKLSlide(s, finalRows, chosen.font, chosen.pad);
+      const totalH = estimateTableHeight(finalRows);
+      if (totalH <= KL_TABLE_MAX_H) {
+        renderKLSlide(s, finalRows);
         addSlideFooter(s, theme, slideNum);
       } else {
-        // Split across two slides at smallest tier (6pt + pad=2).
-        const splitTier = tiers[tiers.length - 1];
-        // Find largest N such that first N rows fit.
+        // Find largest N such that first N rows fit at 7pt; remainder spills to a continuation slide.
         let firstCount = finalRows.length;
         while (firstCount > 1) {
-          const h = estimateTableHeight(finalRows.slice(0, firstCount), splitTier.font, splitTier.pad);
+          const h = estimateTableHeight(finalRows.slice(0, firstCount));
           if (h <= KL_TABLE_MAX_H) break;
           firstCount--;
         }
         const partA = finalRows.slice(0, firstCount);
         const partB = finalRows.slice(firstCount);
 
-        renderKLSlide(s, partA, splitTier.font, splitTier.pad);
+        renderKLSlide(s, partA);
         addSlideFooter(s, theme, slideNum);
 
         // Slide 15b
@@ -2551,7 +2508,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         addSlideBackground(s2, theme);
         addDecorativeMotif(s2, theme, "corner");
         addSlideHeader(s2, "Key Learnings & Recommendations (continued)", theme, undefined, slideNum);
-        renderKLSlide(s2, partB, splitTier.font, splitTier.pad);
+        renderKLSlide(s2, partB);
         addSlideFooter(s2, theme, slideNum);
       }
     } else {
