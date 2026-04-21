@@ -91,6 +91,8 @@ export interface DiagnosticsDeckOptions {
   intelligentLearnings?: IntelligentRecommendation[];
   industry?: string;
   sourceFileName?: string;
+  websiteUrl?: string;                          // for repository scoping
+  reportType?: string;                          // e.g. "analysis" | "reputation"
   creativeAnalysis?: CreativeAnalysisExport | null;
   creativeImage?: string | null;
   lifecycleCoverage?: LifecycleCoverageExport[];
@@ -2561,5 +2563,25 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const fallbackName = `${brandLabel}_Diagnostics_Executive_${safeMonthRange || "Report"}`;
   const fileName = buildExportFileName(opts.sourceFileName, fallbackName);
 
+  // Write file (triggers user download)
   await pptx.writeFile({ fileName });
+
+  // Also persist a copy to the Repository so it can be re-downloaded later.
+  // Failures are silent — repository is a convenience layer, not blocking.
+  try {
+    const blob = (await pptx.write({ outputType: "blob" })) as Blob;
+    const { saveDiagnosticsExport } = await import("./diagnosticsExportRepository");
+    await saveDiagnosticsExport({
+      blob,
+      fileName,
+      brandName: brandLabel,
+      industry: opts.industry || null,
+      websiteUrl: opts.websiteUrl || null,
+      sourceFileName: opts.sourceFileName || null,
+      monthRange: monthRange || null,
+      reportType: opts.reportType || "analysis",
+    });
+  } catch (err) {
+    console.warn("[diagnosticsPptExport] repository save skipped", err);
+  }
 };
