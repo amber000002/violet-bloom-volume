@@ -217,7 +217,6 @@ export async function reusePptWithCurrentTemplate(
   const zip = await JSZip.loadAsync(await original.arrayBuffer());
   const slidePaths = listSlideFiles(zip);
 
-  let ctXml = await zip.file("[Content_Types].xml")!.async("string");
   let swappedCount = 0;
 
   for (let i = 0; i < slidePaths.length; i++) {
