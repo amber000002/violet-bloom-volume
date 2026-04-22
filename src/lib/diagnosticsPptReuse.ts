@@ -12,9 +12,6 @@ import { fetchSlots, REPORT_TYPES, SlideSlot } from "./slideTemplateService";
 import { supabase } from "@/integrations/supabase/client";
 import { DiagnosticsExportRecord } from "./diagnosticsExportRepository";
 
-const BG_EMU_W = 9144000; // 10 inches
-const BG_EMU_H = 5143500; // 5.625 inches (PPT 16:9 height as used by generator)
-
 interface SlotBg {
   position: number;
   bytes: Uint8Array;
@@ -84,6 +81,35 @@ async function downloadBlob(record: DiagnosticsExportRecord): Promise<Blob | nul
     .download(record.storage_path);
   if (error || !data) return null;
   return data;
+}
+
+function isReskinnedFileName(fileName: string): boolean {
+  return /_reskinned_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}/i.test(fileName);
+}
+
+async function resolveReuseBaseRecord(
+  record: DiagnosticsExportRecord,
+): Promise<DiagnosticsExportRecord> {
+  if (!record.source_file_name || !isReskinnedFileName(record.file_name)) {
+    return record;
+  }
+
+  let query = supabase
+    .from("diagnostics_exports")
+    .select("*")
+    .eq("source_file_name", record.source_file_name)
+    .eq("report_type", record.report_type)
+    .not("file_name", "ilike", "%_reskinned_%")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (record.website_host_normalized) {
+    query = query.eq("website_host_normalized", record.website_host_normalized);
+  }
+
+  const { data, error } = await query;
+  if (error || !data?.length) return record;
+  return data[0] as DiagnosticsExportRecord;
 }
 
 async function loadSlotBackgrounds(): Promise<Map<number, SlotBg>> {
@@ -167,32 +193,6 @@ function resolveRidTarget(relsXml: string, rid: string): string | null {
   return `ppt/${target}`;
 }
 
-/** Update the slide's _rels Relationship Target/Type for a given rId. */
-function updateRelTarget(
-  relsXml: string,
-  rid: string,
-  newTarget: string,
-  newContentType: string,
-): string {
-  // newTarget is like "ppt/media/image1.png" — convert back to "../media/image1.png"
-  const rel = newTarget.startsWith("ppt/")
-    ? "../" + newTarget.slice(4)
-    : newTarget;
-  return relsXml.replace(
-    new RegExp(`(<Relationship[^>]*Id="${rid}"[^>]*Target=")[^"]+(")`, "i"),
-    `$1${rel}$2`,
-  );
-}
-
-/** Ensure [Content_Types].xml has an override or default for the new image type. */
-function ensureContentType(ctXml: string, ext: string, mime: string): string {
-  if (new RegExp(`Extension="${ext}"`, "i").test(ctXml)) return ctXml;
-  return ctXml.replace(
-    /<Types[^>]*>/,
-    (m) => `${m}<Default Extension="${ext}" ContentType="${mime}"/>`,
-  );
-}
-
 /**
  * Rewrite an archived .pptx with new slide backgrounds from the current
  * Slide Layout Editor. Returns a Blob ready to download.
@@ -202,7 +202,12 @@ export async function reusePptWithCurrentTemplate(
   onStatus?: (msg: string) => void,
 ): Promise<Blob> {
   onStatus?.("Loading archived report…");
-  const original = await downloadBlob(record);
+  const baseRecord = await resolveReuseBaseRecord(record);
+  if (baseRecord.id !== record.id) {
+    onStatus?.("Using the clean source archive before applying current templates…");
+  }
+
+  const original = await downloadBlob(baseRecord);
   if (!original) throw new Error("Could not fetch original PPT from repository");
 
   onStatus?.("Loading current template…");
@@ -294,6 +299,8 @@ export function triggerDownload(blob: Blob, fileName: string) {
 /** Suggest a filename for the regenerated PPT. */
 export function buildReusedFileName(originalName: string): string {
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const base = originalName.replace(/\.pptx$/i, "");
+  const base = originalName
+    .replace(/\.pptx$/i, "")
+    .replace(/(_reskinned_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})+$/i, "");
   return `${base}_reskinned_${ts}.pptx`;
 }
