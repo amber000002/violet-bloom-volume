@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -9,15 +9,19 @@ import {
   Image as ImageIcon,
   Loader2,
   AlertTriangle,
+  Check,
 } from "lucide-react";
 import {
   fetchSlots,
   uploadSlotBackground,
   removeSlotBackground,
+  bulkUploadSlotBackgrounds,
+  restoreSlotsToSnapshot,
   REPORT_TYPES,
   SlideSlot,
 } from "@/lib/slideTemplateService";
 import { toast } from "sonner";
+import { BulkApplyPanel, Preset } from "./BulkApplyPanel";
 
 interface SlideLayoutEditorProps {
   onClose: () => void;
@@ -33,10 +37,16 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "data" | "special">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingUploadFor, setPendingUploadFor] = useState<SlideSlot | null>(null);
+
+  // Bulk apply state (lifted so the slot grid can render selection state)
+  const [preset, setPreset] = useState<Preset>("data");
+  const [customSelection, setCustomSelection] = useState<Set<string>>(new Set());
+  const [lastClickedId, setLastClickedId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -121,6 +131,112 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
     await handleUpload(slot, file);
   };
 
+  // ===== Bulk apply =====
+  const handleBulkApply = async (file: File, targetSlots: SlideSlot[], skipExisting: boolean) => {
+    setBulkBusy(true);
+    // Snapshot prior state of all targeted slots for Undo
+    const snapshot = targetSlots.map((s) => ({ ...s }));
+    try {
+      const result = await bulkUploadSlotBackgrounds(targetSlots, file, { skipExisting });
+      const updatedById = new Map(result.applied.map((s) => [s.id, s]));
+      setSlots((prev) => prev.map((s) => updatedById.get(s.id) || s));
+
+      const parts: string[] = [];
+      if (result.applied.length) parts.push(`${result.applied.length} applied`);
+      if (result.skipped.length) parts.push(`${result.skipped.length} skipped`);
+      if (result.failed.length) parts.push(`${result.failed.length} failed`);
+
+      if (result.applied.length > 0) {
+        toast.success(`Applied ${file.name} to ${result.applied.length} slot${result.applied.length === 1 ? "" : "s"}` +
+          (result.skipped.length ? ` · ${result.skipped.length} skipped` : ""), {
+          duration: 5000,
+          action: {
+            label: "Undo",
+            onClick: async () => {
+              try {
+                const restored = await restoreSlotsToSnapshot(snapshot);
+                const byId = new Map(restored.map((s) => [s.id, s]));
+                setSlots((prev) => prev.map((s) => byId.get(s.id) || s));
+                toast.success("Undone");
+              } catch {
+                toast.error("Undo failed");
+              }
+            },
+          },
+        });
+      } else {
+        toast.message(parts.join(" · ") || "Nothing to apply");
+      }
+      if (result.failed.length) {
+        toast.error(`${result.failed.length} slot${result.failed.length === 1 ? "" : "s"} failed`);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Bulk apply failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  // Compute target slot ids for highlighting in grid
+  const targetIds = useMemo(() => {
+    const set = new Set<string>();
+    const pick = (s: SlideSlot) => set.add(s.id);
+    switch (preset) {
+      case "all":
+        slots.forEach(pick);
+        break;
+      case "data":
+        slots.filter((s) => s.slide_type === "data").forEach(pick);
+        break;
+      case "special":
+        slots.filter((s) => s.slide_type === "special").forEach(pick);
+        break;
+      case "empty":
+        slots.filter((s) => !s.background_path).forEach(pick);
+        break;
+      case "custom":
+        customSelection.forEach((id) => set.add(id));
+        break;
+    }
+    return set;
+  }, [preset, customSelection, slots]);
+
+  // Keyboard shortcuts when in custom selection mode
+  useEffect(() => {
+    if (preset !== "custom") return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setCustomSelection(new Set(slots.map((s) => s.id)));
+      } else if (e.key === "Escape") {
+        setPreset("data");
+        setCustomSelection(new Set());
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preset, slots]);
+
+  const toggleCustom = (slot: SlideSlot, e: React.MouseEvent) => {
+    const next = new Set(customSelection);
+    if (e.shiftKey && lastClickedId) {
+      const ids = slots.map((s) => s.id);
+      const a = ids.indexOf(lastClickedId);
+      const b = ids.indexOf(slot.id);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = [Math.min(a, b), Math.max(a, b)];
+        for (let i = lo; i <= hi; i++) next.add(ids[i]);
+      }
+    } else if (next.has(slot.id)) {
+      next.delete(slot.id);
+    } else {
+      next.add(slot.id);
+    }
+    setLastClickedId(slot.id);
+    setCustomSelection(next);
+  };
+
   const filtered = slots.filter((s) => {
     if (typeFilter !== "all" && s.slide_type !== typeFilter) return false;
     if (search && !s.title.toLowerCase().includes(search.toLowerCase()) && !String(s.position).includes(search))
@@ -130,6 +246,7 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
 
   const selected = slots.find((s) => s.id === selectedId) || null;
   const filledCount = slots.filter((s) => !!s.background_path).length;
+  const inCustomMode = preset === "custom";
 
   return (
     <div className="space-y-4">
@@ -160,6 +277,69 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
           Resource library / Inbox Diagnostics Report template
         </p>
       </div>
+
+      {/* Bulk apply panel */}
+      {!loading && (
+        <BulkApplyPanel
+          slots={slots}
+          preset={preset}
+          customSelection={customSelection}
+          onPresetChange={setPreset}
+          onCustomSelectionChange={setCustomSelection}
+          onApply={handleBulkApply}
+          busy={bulkBusy}
+        />
+      )}
+
+      {/* Custom-mode toolbar */}
+      {inCustomMode && (
+        <div className="flex flex-wrap items-center gap-3 text-[11px] px-1">
+          <span className="text-muted-foreground">Quick actions:</span>
+          <button
+            onClick={() => setCustomSelection(new Set(slots.map((s) => s.id)))}
+            className="text-primary hover:bg-primary/10 px-1.5 py-0.5 rounded"
+          >
+            Select all
+          </button>
+          <button
+            onClick={() =>
+              setCustomSelection(new Set(slots.filter((s) => s.slide_type === "data").map((s) => s.id)))
+            }
+            className="text-primary hover:bg-primary/10 px-1.5 py-0.5 rounded"
+          >
+            Select data slides
+          </button>
+          <button
+            onClick={() =>
+              setCustomSelection(new Set(slots.filter((s) => s.slide_type === "special").map((s) => s.id)))
+            }
+            className="text-primary hover:bg-primary/10 px-1.5 py-0.5 rounded"
+          >
+            Select special slides
+          </button>
+          <button
+            onClick={() => {
+              const next = new Set<string>();
+              slots.forEach((s) => {
+                if (!customSelection.has(s.id)) next.add(s.id);
+              });
+              setCustomSelection(next);
+            }}
+            className="text-primary hover:bg-primary/10 px-1.5 py-0.5 rounded"
+          >
+            Invert
+          </button>
+          <button
+            onClick={() => setCustomSelection(new Set())}
+            className="text-primary hover:bg-primary/10 px-1.5 py-0.5 rounded"
+          >
+            Clear selection
+          </button>
+          <span className="ml-auto text-muted-foreground">
+            Shift+click for range · Cmd/Ctrl+A select all · Esc exit
+          </span>
+        </div>
+      )}
 
       {/* Search + filter */}
       <div className="flex gap-2">
@@ -193,22 +373,53 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
               const isSelected = slot.id === selectedId;
               const isBusy = slot.id === busyId;
               const filled = !!slot.background_path;
+              const inTarget = targetIds.has(slot.id);
+              const inCustomSel = customSelection.has(slot.id);
               return (
                 <motion.div
                   key={slot.id}
                   whileHover={{ scale: 1.01 }}
-                  onClick={() => setSelectedId(slot.id)}
+                  onClick={(e) => {
+                    if (inCustomMode) {
+                      toggleCustom(slot, e);
+                    } else {
+                      setSelectedId(slot.id);
+                    }
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                   }}
                   onDrop={(e) => onDrop(slot, e)}
-                  className={`cursor-pointer rounded-xl border bg-card/40 backdrop-blur-sm overflow-hidden transition-all ${
-                    isSelected
+                  className={`cursor-pointer rounded-xl border bg-card/40 backdrop-blur-sm overflow-hidden transition-all relative ${
+                    inCustomMode && inCustomSel
+                      ? "border-primary border-2 bg-primary/5"
+                      : inTarget && !inCustomMode
+                      ? "border-primary/70 ring-1 ring-primary/40"
+                      : isSelected
                       ? "border-primary ring-2 ring-primary/40"
                       : "border-border hover:border-foreground/30"
                   }`}
                 >
+                  {/* Custom-mode checkbox */}
+                  {inCustomMode && (
+                    <div
+                      className={`absolute top-2 right-2 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                        inCustomSel
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "bg-background/80 border-border"
+                      }`}
+                    >
+                      {inCustomSel && <Check className="w-3 h-3" />}
+                    </div>
+                  )}
+                  {/* Target indicator (presets) */}
+                  {!inCustomMode && inTarget && (
+                    <div className="absolute top-2 right-2 z-10 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+
                   {/* Header strip */}
                   <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border bg-muted/20">
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
@@ -238,7 +449,11 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          triggerFilePicker(slot);
+                          if (inCustomMode) {
+                            toggleCustom(slot, e);
+                          } else {
+                            triggerFilePicker(slot);
+                          }
                         }}
                         className="flex flex-col items-center gap-1 text-muted-foreground hover:text-primary"
                       >
@@ -261,7 +476,7 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
           </div>
 
           {/* Detail panel */}
-          {selected && (
+          {selected && !inCustomMode && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
