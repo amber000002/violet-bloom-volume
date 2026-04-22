@@ -20,6 +20,62 @@ interface SlotBg {
   bytes: Uint8Array;
   contentType: string;
   ext: string;
+  /** Object URL or data URL we can re-decode for transcoding. */
+  blobUrl: string;
+}
+
+/**
+ * Transcode an image (given as object/blob URL) into a target format
+ * (png | jpg | jpeg | gif | webp | bmp). Returns Uint8Array bytes.
+ * This lets us swap a JPG template into a slot that originally held a PNG
+ * without having to rewrite [Content_Types].xml or relationship targets,
+ * which is the safest way to keep PowerPoint happy.
+ */
+async function transcodeImage(
+  blobUrl: string,
+  targetExt: string,
+): Promise<Uint8Array> {
+  const ext = targetExt.toLowerCase();
+  const mime =
+    ext === "jpg" || ext === "jpeg"
+      ? "image/jpeg"
+      : ext === "gif"
+        ? "image/png" // gif encoding not supported by canvas; fall back to png bytes (PPT will still render)
+        : ext === "webp"
+          ? "image/webp"
+          : ext === "bmp"
+            ? "image/bmp"
+            : "image/png";
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.crossOrigin = "anonymous";
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("Failed to decode template image"));
+    el.src = blobUrl;
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || 1920;
+  canvas.height = img.naturalHeight || 1080;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+
+  // For JPG, fill white background since JPEG has no alpha.
+  if (mime === "image/jpeg") {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+      mime,
+      mime === "image/jpeg" ? 0.92 : undefined,
+    );
+  });
+  return new Uint8Array(await blob.arrayBuffer());
 }
 
 async function downloadBlob(record: DiagnosticsExportRecord): Promise<Blob | null> {
