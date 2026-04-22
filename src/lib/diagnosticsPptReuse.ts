@@ -96,8 +96,9 @@ async function loadSlotBackgrounds(): Promise<Map<number, SlotBg>> {
         try {
           const resp = await fetch(s.background_url!);
           if (!resp.ok) return;
-          const buf = await resp.arrayBuffer();
-          const contentType = resp.headers.get("content-type") || "image/png";
+          const blob = await resp.blob();
+          const buf = await blob.arrayBuffer();
+          const contentType = blob.type || resp.headers.get("content-type") || "image/png";
           const ext =
             contentType.includes("jpeg") || contentType.includes("jpg")
               ? "jpg"
@@ -109,6 +110,7 @@ async function loadSlotBackgrounds(): Promise<Map<number, SlotBg>> {
             bytes: new Uint8Array(buf),
             contentType,
             ext,
+            blobUrl: URL.createObjectURL(blob),
           });
         } catch {
           /* skip */
