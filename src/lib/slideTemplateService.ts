@@ -125,6 +125,64 @@ export async function uploadSlotBackground(
   return { ...(updated as SlideSlot), background_url: publicUrl(updated.background_path) };
 }
 
+export interface BulkApplyResult {
+  applied: SlideSlot[];
+  skipped: SlideSlot[];
+  failed: Array<{ slot: SlideSlot; error: string }>;
+}
+
+/**
+ * Upload one image once and apply it to many slots. Each slot gets its own
+ * storage object (so individual replacement/removal stays clean), but the
+ * source File is read just once.
+ */
+export async function bulkUploadSlotBackgrounds(
+  slots: SlideSlot[],
+  file: File,
+  options: { skipExisting: boolean },
+): Promise<BulkApplyResult> {
+  const result: BulkApplyResult = { applied: [], skipped: [], failed: [] };
+  const dims = await readImageDimensions(file).catch(() => ({ width: 1920, height: 1080 }));
+
+  for (const slot of slots) {
+    if (options.skipExisting && slot.background_path) {
+      result.skipped.push(slot);
+      continue;
+    }
+    try {
+      const updated = await uploadSlotBackground(slot, file);
+      result.applied.push({ ...updated, background_width: dims.width, background_height: dims.height });
+    } catch (e) {
+      result.failed.push({ slot, error: (e as Error)?.message || "Upload failed" });
+    }
+  }
+  return result;
+}
+
+/** Restore many slots to a previous state (used by Undo on bulk apply). */
+export async function restoreSlotsToSnapshot(snapshots: SlideSlot[]): Promise<SlideSlot[]> {
+  const restored: SlideSlot[] = [];
+  for (const snap of snapshots) {
+    const { data, error } = await supabase
+      .from("slide_template_slots")
+      .update({
+        background_path: snap.background_path,
+        background_filename: snap.background_filename,
+        background_width: snap.background_width,
+        background_height: snap.background_height,
+        file_size_bytes: snap.file_size_bytes,
+        uploaded_at: snap.uploaded_at,
+      })
+      .eq("id", snap.id)
+      .select()
+      .single();
+    if (!error && data) {
+      restored.push({ ...(data as SlideSlot), background_url: publicUrl(data.background_path) });
+    }
+  }
+  return restored;
+}
+
 /** Clear a slot's background (storage + DB). */
 export async function removeSlotBackground(slot: SlideSlot): Promise<SlideSlot> {
   if (slot.background_path) {
