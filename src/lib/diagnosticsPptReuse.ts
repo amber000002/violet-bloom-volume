@@ -240,31 +240,36 @@ export async function reusePptWithCurrentTemplate(
     const targetMedia = resolveRidTarget(relsXml, rid);
     if (!targetMedia) continue;
 
-    // Replace the media binary with the new background. Keep the same
-    // filename if extension matches, otherwise write a new file and
-    // re-point the relationship.
-    const currentExt = targetMedia.split(".").pop()?.toLowerCase();
+    // Always transcode the new background to match the original media's
+    // extension and write it back to the SAME path. This avoids any need to
+    // touch [Content_Types].xml or relationship targets — the safest path
+    // to keep PowerPoint from flagging the file as corrupted.
+    const currentExt = (targetMedia.split(".").pop() || "png").toLowerCase();
+    let bytes: Uint8Array;
     if (currentExt === slot.ext) {
-      zip.file(targetMedia, slot.bytes);
+      bytes = slot.bytes;
     } else {
-      const newPath = targetMedia.replace(/\.[^.]+$/, `.${slot.ext}`);
-      // Remove old media (best-effort) and write new file
-      zip.remove(targetMedia);
-      zip.file(newPath, slot.bytes);
-      const newRelsXml = updateRelTarget(relsXml, rid, newPath, slot.contentType);
-      zip.file(relPath, newRelsXml);
-      ctXml = ensureContentType(ctXml, slot.ext, slot.contentType);
+      try {
+        bytes = await transcodeImage(slot.blobUrl, currentExt);
+      } catch (e) {
+        console.warn("[reuse] transcode failed, falling back to raw bytes", e);
+        bytes = slot.bytes;
+      }
     }
+    zip.file(targetMedia, bytes);
     swappedCount++;
   }
-
-  zip.file("[Content_Types].xml", ctXml);
 
   if (swappedCount === 0) {
     throw new Error(
       "Couldn't locate any background images in this archive — it may have been generated before the Slide Layout Editor was enabled.",
     );
   }
+
+  // Release object URLs we created for transcoding.
+  slotBgs.forEach((s) => {
+    try { URL.revokeObjectURL(s.blobUrl); } catch { /* noop */ }
+  });
 
   onStatus?.(`Updated ${swappedCount} slide background${swappedCount === 1 ? "" : "s"}.`);
   return await zip.generateAsync({
