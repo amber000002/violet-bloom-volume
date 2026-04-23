@@ -213,7 +213,10 @@ export async function deleteDiagnosticsExport(
   record: DiagnosticsExportRecord
 ): Promise<boolean> {
   try {
-    await supabase.storage.from(BUCKET).remove([record.storage_path]);
+    const paths = [record.storage_path];
+    if (record.campaign_csv_path) paths.push(record.campaign_csv_path);
+    if (record.postmaster_csv_path) paths.push(record.postmaster_csv_path);
+    await supabase.storage.from(BUCKET).remove(paths);
     const { error } = await supabase
       .from("diagnostics_exports")
       .delete()
@@ -226,5 +229,46 @@ export async function deleteDiagnosticsExport(
   } catch (err) {
     console.warn("[diagnosticsExportRepository] delete error", err);
     return false;
+  }
+}
+
+/**
+ * Download the archived source CSVs for a report so the dashboard can be
+ * fully re-hydrated without the user re-uploading any files.
+ */
+export async function loadDiagnosticsExportSources(
+  record: DiagnosticsExportRecord
+): Promise<LoadedExportSources | null> {
+  if (!record.campaign_csv_path) {
+    return null;
+  }
+  try {
+    const { data: campaignBlob, error: campaignErr } = await supabase.storage
+      .from(BUCKET)
+      .download(record.campaign_csv_path);
+    if (campaignErr || !campaignBlob) {
+      console.warn("[diagnosticsExportRepository] campaign csv load failed", campaignErr);
+      return null;
+    }
+    const campaignCsvText = await campaignBlob.text();
+
+    let postmasterCsvText: string | null = null;
+    if (record.postmaster_csv_path) {
+      const { data: pmBlob, error: pmErr } = await supabase.storage
+        .from(BUCKET)
+        .download(record.postmaster_csv_path);
+      if (!pmErr && pmBlob) {
+        postmasterCsvText = await pmBlob.text();
+      }
+    }
+
+    return {
+      campaignCsvText,
+      postmasterCsvText,
+      contextText: record.context_text ?? null,
+    };
+  } catch (err) {
+    console.warn("[diagnosticsExportRepository] load sources error", err);
+    return null;
   }
 }
