@@ -1230,7 +1230,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           </div>
 
           {/* Report Repository — archive of all generated PPT exports */}
-          <DiagnosticsExportRepository industry={industry} refreshKey={repoRefreshKey} />
+          <DiagnosticsExportRepository industry={industry} refreshKey={repoRefreshKey} onLoad={handleLoadFromRepository} />
         </motion.div>
       )}
 
