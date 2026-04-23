@@ -1232,6 +1232,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     creativeAnalysis: creativeAnalysis || null,
                     creativeImage: creativeImage || null,
                     sectionInsights: sectionInsights || undefined,
+                    campaignCsvText: campaignCsvText || null,
+                    postmasterCsvText: postmasterCsvText || null,
+                    contextText: contextText || null,
                   });
                   setRepoRefreshKey((k) => k + 1);
                   toast.success("Saved to Report Repository");
