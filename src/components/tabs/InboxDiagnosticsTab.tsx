@@ -528,6 +528,10 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [contextText, setContextText] = useState<string>("");
   const [campaignFileName, setCampaignFileName] = useState<string>("");
   const [postmasterFileName, setPostmasterFileName] = useState<string>("");
+  // Raw CSV text retained so we can archive it alongside the PPT export and
+  // re-hydrate the dashboard later from the Report Repository.
+  const [campaignCsvText, setCampaignCsvText] = useState<string>("");
+  const [postmasterCsvText, setPostmasterCsvText] = useState<string>("");
   const [eventSchemaFileName, setEventSchemaFileName] = useState<string>("");
   const [userPropertyFileName, setUserPropertyFileName] = useState<string>("");
   const [eventSchemaData, setEventSchemaData] = useState<EventSchemaRow[] | null>(null);
