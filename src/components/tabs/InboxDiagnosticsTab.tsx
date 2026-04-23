@@ -64,6 +64,7 @@ import {
   ReputationSmallMultiples,
 } from "../metrics";
 import { DiagnosticsExportRepository } from "../DiagnosticsExportRepository";
+import { loadDiagnosticsExportSources, DiagnosticsExportRecord } from "@/lib/diagnosticsExportRepository";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
