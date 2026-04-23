@@ -101,6 +101,10 @@ export interface DiagnosticsDeckOptions {
   auditScope?: "email-only" | "multi-channel"; // default: "email-only"
   benchmarks?: Partial<ReportBenchmarks>;
   includeProactiveRecommendations?: boolean;   // default: false
+  // Source CSVs archived alongside the PPT so the dashboard can be reloaded later.
+  campaignCsvText?: string | null;
+  postmasterCsvText?: string | null;
+  contextText?: string | null;
 }
 
 // ============= BRAND COLOR ENGINE =============
@@ -2636,6 +2640,9 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       sourceFileName: opts.sourceFileName || null,
       monthRange: monthRange || null,
       reportType: opts.reportType || "analysis",
+      campaignCsvText: opts.campaignCsvText ?? null,
+      postmasterCsvText: opts.postmasterCsvText ?? null,
+      contextText: opts.contextText ?? null,
     });
   } catch (err) {
     console.warn("[diagnosticsPptExport] repository save skipped", err);
