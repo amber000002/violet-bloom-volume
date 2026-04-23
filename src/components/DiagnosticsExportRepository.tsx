@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe, Wand2 } from "lucide-react";
+import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe, Wand2, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import {
   listDiagnosticsExports,
@@ -19,6 +19,8 @@ interface DiagnosticsExportRepositoryProps {
   industry?: string;
   /** Bumped externally each time a new export is generated, to refresh the list. */
   refreshKey?: number;
+  /** Called when the user clicks "Load" — parent rehydrates dashboard from CSV archive. */
+  onLoad?: (record: DiagnosticsExportRecord) => Promise<void> | void;
 }
 
 const formatBytes = (bytes: number | null): string => {
@@ -51,12 +53,14 @@ const formatDate = (iso: string): string => {
 export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryProps> = ({
   industry,
   refreshKey,
+  onLoad,
 }) => {
   const [records, setRecords] = useState<DiagnosticsExportRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reusingId, setReusingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [scope, setScope] = useState<"industry" | "all">("industry");
   const [expanded, setExpanded] = useState(true);
 
