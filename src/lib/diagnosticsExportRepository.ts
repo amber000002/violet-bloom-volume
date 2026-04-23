@@ -19,6 +19,9 @@ export interface DiagnosticsExportRecord {
   report_type: string;
   file_size_bytes: number | null;
   created_at: string;
+  campaign_csv_path: string | null;
+  postmaster_csv_path: string | null;
+  context_text: string | null;
 }
 
 export interface SaveExportParams {
@@ -30,6 +33,18 @@ export interface SaveExportParams {
   sourceFileName?: string | null;
   monthRange?: string | null;
   reportType?: string;
+  /** Raw text of the campaign performance CSV to archive for future reload. */
+  campaignCsvText?: string | null;
+  /** Raw text of the optional Postmaster Tools CSV to archive for future reload. */
+  postmasterCsvText?: string | null;
+  /** Optional analyst-supplied context note to archive with the report. */
+  contextText?: string | null;
+}
+
+export interface LoadedExportSources {
+  campaignCsvText: string | null;
+  postmasterCsvText: string | null;
+  contextText: string | null;
 }
 
 function normalizeHost(url?: string | null): string | null {
