@@ -131,6 +131,25 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
     }
   };
 
+  const handleLoad = async (record: DiagnosticsExportRecord) => {
+    if (!onLoad) return;
+    if (!record.campaign_csv_path) {
+      toast.error(
+        "This report was archived before source CSVs were saved. Re-generate the report once to enable Load.",
+      );
+      return;
+    }
+    setLoadingId(record.id);
+    try {
+      await onLoad(record);
+    } catch (err: any) {
+      console.error("[load]", err);
+      toast.error(err?.message || "Failed to load report into dashboard");
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
   return (
     <div className="magic-card rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
