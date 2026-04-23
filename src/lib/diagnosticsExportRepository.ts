@@ -89,6 +89,32 @@ export async function saveDiagnosticsExport(
       return null;
     }
 
+    // Upload source CSVs alongside the PPT so the report can be reloaded later.
+    let campaignCsvPath: string | null = null;
+    let postmasterCsvPath: string | null = null;
+
+    if (params.campaignCsvText && params.campaignCsvText.trim().length > 0) {
+      const path = `${industryKey}/${host || "unknown-host"}/${ts}_${safeName}__campaign.csv`;
+      const { error: csvErr } = await supabase.storage.from(BUCKET).upload(
+        path,
+        new Blob([params.campaignCsvText], { type: "text/csv" }),
+        { contentType: "text/csv", upsert: false },
+      );
+      if (!csvErr) campaignCsvPath = path;
+      else console.warn("[diagnosticsExportRepository] campaign csv upload failed", csvErr);
+    }
+
+    if (params.postmasterCsvText && params.postmasterCsvText.trim().length > 0) {
+      const path = `${industryKey}/${host || "unknown-host"}/${ts}_${safeName}__postmaster.csv`;
+      const { error: csvErr } = await supabase.storage.from(BUCKET).upload(
+        path,
+        new Blob([params.postmasterCsvText], { type: "text/csv" }),
+        { contentType: "text/csv", upsert: false },
+      );
+      if (!csvErr) postmasterCsvPath = path;
+      else console.warn("[diagnosticsExportRepository] postmaster csv upload failed", csvErr);
+    }
+
     const { data, error: insertErr } = await supabase
       .from("diagnostics_exports")
       .insert({
@@ -101,14 +127,20 @@ export async function saveDiagnosticsExport(
         month_range: params.monthRange ?? null,
         report_type: params.reportType ?? "analysis",
         file_size_bytes: blob.size,
+        campaign_csv_path: campaignCsvPath,
+        postmaster_csv_path: postmasterCsvPath,
+        context_text: params.contextText ?? null,
       })
       .select()
       .single();
 
     if (insertErr) {
       console.warn("[diagnosticsExportRepository] insert failed", insertErr);
-      // Roll back the upload so we don't leave orphaned files
-      await supabase.storage.from(BUCKET).remove([storagePath]);
+      // Roll back uploads so we don't leave orphaned files
+      const toRemove = [storagePath];
+      if (campaignCsvPath) toRemove.push(campaignCsvPath);
+      if (postmasterCsvPath) toRemove.push(postmasterCsvPath);
+      await supabase.storage.from(BUCKET).remove(toRemove);
       return null;
     }
 
