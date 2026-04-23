@@ -882,6 +882,80 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     }
   }, [industry, brandProfile, websiteUrl, campaignData, strategicContext]);
 
+  // Hydrate the dashboard from an archived report — re-parse the saved CSVs
+  // and run the same analysis pipeline a fresh upload would trigger.
+  const handleLoadFromRepository = useCallback(async (record: DiagnosticsExportRecord) => {
+    const toastId = toast.loading("Loading archived report…");
+    try {
+      const sources = await loadDiagnosticsExportSources(record);
+      if (!sources?.campaignCsvText) {
+        toast.error(
+          "Source CSV missing for this archive — re-generate the report once to enable Load.",
+          { id: toastId },
+        );
+        return;
+      }
+
+      // Re-parse campaign CSV
+      const campaignResult = parseCSV(sources.campaignCsvText);
+      if (!campaignResult.isValid) {
+        toast.error(campaignResult.errors[0] || "Failed to parse archived campaign CSV", { id: toastId });
+        return;
+      }
+
+      // Re-parse postmaster CSV (optional)
+      let pmRows: PostmasterRow[] | null = null;
+      let pmName = "";
+      if (sources.postmasterCsvText) {
+        const pmResult = parsePostmasterCSV(sources.postmasterCsvText);
+        if (pmResult.isValid) {
+          pmRows = pmResult.data;
+          pmName = `${record.source_file_name || "report"}__postmaster.csv`;
+        }
+      }
+
+      // Hydrate state — mirrors what handleCampaignUpload + Run Analysis would do.
+      setCampaignCsvText(sources.campaignCsvText);
+      setPostmasterCsvText(sources.postmasterCsvText || "");
+      setCampaignData(campaignResult.data);
+      setCampaignValidation(campaignResult);
+      setPostmasterData(pmRows);
+      setPostmasterValidation(null);
+      setProcessingSummary(campaignResult.processingSummary);
+      setContextText(sources.contextText || "");
+      setCampaignFileName(record.source_file_name || `${record.brand_name || "report"}.csv`);
+      setPostmasterFileName(pmName);
+
+      // Run analysis to populate diagnostics + open the report view.
+      const analysisReport = generateAnalysisReport(campaignResult.data);
+      const reconciliation = runReconciliationCheck(
+        campaignResult.data,
+        analysisReport.providerAggregates,
+        analysisReport.monthlyOverview,
+      );
+      setProcessingSummary({
+        ...campaignResult.processingSummary,
+        reconciliation,
+      });
+
+      const newDiagnostics: DiagnosticsData = {
+        rawData: campaignResult.data,
+        postmasterData: pmRows,
+        contextText: sources.contextText || null,
+        analysisReport,
+        reputationReport: null,
+      };
+      setDiagnostics(newDiagnostics);
+      setActiveReport("analysis");
+      onDataChange?.(newDiagnostics);
+
+      toast.success(`Loaded ${record.file_name}`, { id: toastId });
+    } catch (err: any) {
+      console.error("[load from repo]", err);
+      toast.error(err?.message || "Failed to load report", { id: toastId });
+    }
+  }, [onDataChange]);
+
   const clearAll = useCallback(() => {
     setCampaignValidation(null);
     setPostmasterValidation(null);
