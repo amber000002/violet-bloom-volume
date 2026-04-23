@@ -891,6 +891,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setStrategicContext("");
     setCampaignFileName("");
     setPostmasterFileName("");
+    setCampaignCsvText("");
+    setPostmasterCsvText("");
     setEventSchemaFileName("");
     setUserPropertyFileName("");
     setEventSchemaData(null);
@@ -934,7 +936,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 <span className="text-xs text-primary font-normal">(Required)</span>
               </h3>
               {campaignFileName && (
-                <button onClick={() => { setCampaignValidation(null); setCampaignData([]); setCampaignFileName(""); }} className="text-muted-foreground hover:text-foreground">
+                <button onClick={() => { setCampaignValidation(null); setCampaignData([]); setCampaignFileName(""); setCampaignCsvText(""); }} className="text-muted-foreground hover:text-foreground">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -1010,7 +1012,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </h3>
                 {postmasterFileName && (
-                  <button onClick={() => { setPostmasterValidation(null); setPostmasterData(null); setPostmasterFileName(""); }} className="text-muted-foreground hover:text-foreground">
+                  <button onClick={() => { setPostmasterValidation(null); setPostmasterData(null); setPostmasterFileName(""); setPostmasterCsvText(""); }} className="text-muted-foreground hover:text-foreground">
                     <X className="w-4 h-4" />
                   </button>
                 )}
