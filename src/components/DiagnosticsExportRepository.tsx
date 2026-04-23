@@ -264,6 +264,24 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
                         <span>· {formatBytes(r.file_size_bytes)}</span>
                       </div>
                     </div>
+                    {onLoad && (
+                      <button
+                        onClick={() => handleLoad(r)}
+                        disabled={loadingId === r.id || !r.campaign_csv_path}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={
+                          r.campaign_csv_path
+                            ? "Load this report into the dashboard (no upload required)"
+                            : "Source CSVs not archived for this report — re-generate it once to enable Load"
+                        }
+                      >
+                        {loadingId === r.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FolderOpen className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleReuse(r)}
                       disabled={reusingId === r.id}
