@@ -623,6 +623,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
+      setCampaignCsvText(text);
       const result = parseCSV(text);
       setCampaignValidation(result);
       setProcessingSummary(result.processingSummary);
@@ -638,6 +639,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
+      setPostmasterCsvText(text);
       const result = parsePostmasterCSV(text);
       setPostmasterValidation(result);
       if (result.isValid) {
