@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe, Wand2 } from "lucide-react";
+import { Download, FileText, RefreshCw, Trash2, Calendar, Folder, Loader2, ChevronDown, ChevronUp, Globe, Wand2, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import {
   listDiagnosticsExports,
@@ -19,6 +19,8 @@ interface DiagnosticsExportRepositoryProps {
   industry?: string;
   /** Bumped externally each time a new export is generated, to refresh the list. */
   refreshKey?: number;
+  /** Called when the user clicks "Load" — parent rehydrates dashboard from CSV archive. */
+  onLoad?: (record: DiagnosticsExportRecord) => Promise<void> | void;
 }
 
 const formatBytes = (bytes: number | null): string => {
@@ -51,12 +53,14 @@ const formatDate = (iso: string): string => {
 export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryProps> = ({
   industry,
   refreshKey,
+  onLoad,
 }) => {
   const [records, setRecords] = useState<DiagnosticsExportRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reusingId, setReusingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [scope, setScope] = useState<"industry" | "all">("industry");
   const [expanded, setExpanded] = useState(true);
 
@@ -124,6 +128,25 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
       toast.error(err?.message || "Failed to re-skin presentation", { id: toastId });
     } finally {
       setReusingId(null);
+    }
+  };
+
+  const handleLoad = async (record: DiagnosticsExportRecord) => {
+    if (!onLoad) return;
+    if (!record.campaign_csv_path) {
+      toast.error(
+        "This report was archived before source CSVs were saved. Re-generate the report once to enable Load.",
+      );
+      return;
+    }
+    setLoadingId(record.id);
+    try {
+      await onLoad(record);
+    } catch (err: any) {
+      console.error("[load]", err);
+      toast.error(err?.message || "Failed to load report into dashboard");
+    } finally {
+      setLoadingId(null);
     }
   };
 
@@ -241,6 +264,24 @@ export const DiagnosticsExportRepository: React.FC<DiagnosticsExportRepositoryPr
                         <span>· {formatBytes(r.file_size_bytes)}</span>
                       </div>
                     </div>
+                    {onLoad && (
+                      <button
+                        onClick={() => handleLoad(r)}
+                        disabled={loadingId === r.id || !r.campaign_csv_path}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={
+                          r.campaign_csv_path
+                            ? "Load this report into the dashboard (no upload required)"
+                            : "Source CSVs not archived for this report — re-generate it once to enable Load"
+                        }
+                      >
+                        {loadingId === r.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FolderOpen className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleReuse(r)}
                       disabled={reusingId === r.id}

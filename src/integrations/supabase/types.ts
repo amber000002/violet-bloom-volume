@@ -229,12 +229,15 @@ export type Database = {
       diagnostics_exports: {
         Row: {
           brand_name: string | null
+          campaign_csv_path: string | null
+          context_text: string | null
           created_at: string
           file_name: string
           file_size_bytes: number | null
           id: string
           industry: string | null
           month_range: string | null
+          postmaster_csv_path: string | null
           report_type: string
           source_file_name: string | null
           storage_path: string
@@ -242,12 +245,15 @@ export type Database = {
         }
         Insert: {
           brand_name?: string | null
+          campaign_csv_path?: string | null
+          context_text?: string | null
           created_at?: string
           file_name: string
           file_size_bytes?: number | null
           id?: string
           industry?: string | null
           month_range?: string | null
+          postmaster_csv_path?: string | null
           report_type?: string
           source_file_name?: string | null
           storage_path: string
@@ -255,12 +261,15 @@ export type Database = {
         }
         Update: {
           brand_name?: string | null
+          campaign_csv_path?: string | null
+          context_text?: string | null
           created_at?: string
           file_name?: string
           file_size_bytes?: number | null
           id?: string
           industry?: string | null
           month_range?: string | null
+          postmaster_csv_path?: string | null
           report_type?: string
           source_file_name?: string | null
           storage_path?: string
