@@ -195,10 +195,13 @@ export const CreativeAnalyzerTab: React.FC<CreativeAnalyzerTabProps> = ({
         animate={{ opacity: 1, y: 0 }}
         className="bg-card rounded-xl border border-border p-6"
       >
-        <h3 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-primary" />
-          Email Creative Upload
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
+            <Upload className="w-5 h-5 text-primary" />
+            Email Creative Upload
+          </h3>
+          <RecentFilesDropdown category="creative-image" onPick={acceptCreativeFile} />
+        </div>
 
         {!uploadedImage ? (
           <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/30">
