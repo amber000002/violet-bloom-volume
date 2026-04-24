@@ -523,7 +523,41 @@ export const generateJourneyAnalysisReport = (
   monthlyOverview.forEach(recomputeJourneyMonthlyRates);
   monthlyOverviewByProvider.forEach(recomputeJourneyMonthlyRates);
 
-  return { providerAggregates, monthlyOverview, monthlyOverviewByProvider };
+  // ---- Best / Worst journey nodes (FR-7: eligibility totalSent > 1) ----
+  const eligible: TopJourney[] = data
+    .filter((r) => r.totalSent > 1)
+    .map((r) => ({
+      journeyKey: `${r.journeyId}|${r.versionNumber}|${r.nodeId}`,
+      journeyId: r.journeyId,
+      versionNumber: r.versionNumber,
+      nodeId: r.nodeId,
+      journeyName: r.journeyName,
+      nodeName: r.nodeName,
+      providerName: r.providerName,
+      startLabel: r.dayKey || r.journeyStartTime || "",
+      totalSent: r.totalSent,
+      totalDelivered: r.totalDelivered,
+      uniqueViewed: r.uniqueViewed,
+      uniqueClicked: r.uniqueClicked,
+      unsubscribes: r.totalUnsubscribes,
+      errors: r.errors,
+      openRate: r.openRate,
+      clickRate: r.clickRate,
+      uniqueCTR: r.uniqueCTR,
+      unsubscribeRate: r.unsubscribeRate,
+      errorRate: r.errorRate,
+    }));
+
+  const bestJourneys = [...eligible]
+    .sort((a, b) => b.openRate - a.openRate)
+    .slice(0, 5);
+  const bestKeys = new Set(bestJourneys.map((j) => j.journeyKey));
+  const worstJourneys = [...eligible]
+    .filter((j) => !bestKeys.has(j.journeyKey))
+    .sort((a, b) => a.openRate - b.openRate)
+    .slice(0, 5);
+
+  return { providerAggregates, monthlyOverview, monthlyOverviewByProvider, bestJourneys, worstJourneys };
 };
 
 // ============= COMBINED VIEWS =============
