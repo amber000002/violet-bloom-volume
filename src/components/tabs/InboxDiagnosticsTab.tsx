@@ -833,7 +833,19 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       setJourneyAnalysis(null);
     }
 
-    if (campaignData.length === 0) return;
+    // Journey-only mode: surface a stub diagnostics so the Analysis view
+    // renders Sections 1 & 2 from journey data alone.
+    if (campaignData.length === 0) {
+      setDiagnostics({
+        rawData: [],
+        postmasterData,
+        contextText: contextText || null,
+        analysisReport: null as unknown as AnalysisReport,
+        reputationReport: null,
+      });
+      setActiveReport("analysis");
+      return;
+    }
 
     const analysisReport = generateAnalysisReport(campaignData);
     
