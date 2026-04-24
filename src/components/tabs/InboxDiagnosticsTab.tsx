@@ -593,8 +593,10 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   } | null>(null);
   
    // Campaign sort toggles (independent per table)
-   const [bestSortBy, setBestSortBy] = useState<"openRate" | "clickRate">("openRate");
-   const [worstSortBy, setWorstSortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [bestSortBy, setBestSortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [worstSortBy, setWorstSortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [bestJourneySortBy, setBestJourneySortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [worstJourneySortBy, setWorstJourneySortBy] = useState<"openRate" | "clickRate">("openRate");
    const [monthlyProviderTab, setMonthlyProviderTab] = useState<string | null>(null);
 
   // UI states
