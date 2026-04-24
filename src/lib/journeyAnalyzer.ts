@@ -131,6 +131,8 @@ export interface TopJourney {
   journeyName: string;
   nodeName: string;
   providerName: string;
+  campaignTitle: string;
+  templateName: string;
   startLabel: string; // raw "MMM D" — never a year
   totalSent: number;
   totalDelivered: number;
