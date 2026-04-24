@@ -65,6 +65,17 @@ import {
 } from "../metrics";
 import { DiagnosticsExportRepository } from "../DiagnosticsExportRepository";
 import { loadDiagnosticsExportSources, DiagnosticsExportRecord } from "@/lib/diagnosticsExportRepository";
+import {
+  parseJourneyCSV,
+  generateJourneyAnalysisReport,
+  combineProviderAggregates,
+  sumCampaignProviderAggregates,
+  sumJourneyProviderAggregates,
+  JourneyRow,
+  JourneyValidationResult,
+  JourneyAnalysisReport,
+  JourneyFilterSummary,
+} from "@/lib/journeyAnalyzer";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
