@@ -1433,7 +1433,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       )}
 
       {/* Analysis Report View */}
-      {activeReport === "analysis" && diagnostics?.analysisReport && (
+      {activeReport === "analysis" && (diagnostics?.analysisReport || journeyAnalysis) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
