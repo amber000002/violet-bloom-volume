@@ -1724,13 +1724,13 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </thead>
                 <tbody>
                   {diagnostics.analysisReport.providerAggregates.map((p, i) => (
-                    <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                    <tr key={`c-${i}`} className="border-b border-border/50 hover:bg-muted/20">
                       <td className="py-2 px-3">
                         <span className="font-medium">{p.serviceProvider}</span>
                         <span className="text-muted-foreground ml-1">/ {p.providerName}</span>
                       </td>
                       <td className="text-right py-2 px-3">{formatNumber(p.totalSentUsers)}</td>
-                      {p.useDeliveredAsDenominator && (
+                      {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator && (
                         <td className="text-right py-2 px-3">{formatNumber(p.totalDeliveredUsers)}</td>
                       )}
                       <td className="text-right py-2 px-3">{formatNumber(p.uniqueViewed)}</td>
@@ -1746,10 +1746,35 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       <td className="text-right py-2 px-3"><ColoredPercent value={p.softBouncePercent} metricType="bounceRate" /></td>
                     </tr>
                   ))}
+                  {(journeyAnalysis?.providerAggregates ?? []).map((j, i) => (
+                    <tr key={`j-${i}`} className="border-b border-border/50 hover:bg-muted/20 bg-primary/[0.03]">
+                      <td className="py-2 px-3">
+                        <span className="font-medium">{j.providerName}</span>
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-primary/15 text-primary border border-primary/30">
+                          Journeys
+                        </span>
+                      </td>
+                      <td className="text-right py-2 px-3">{formatNumber(j.totalSent)}</td>
+                      {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator && (
+                        <td className="text-right py-2 px-3">{formatNumber(j.totalDelivered)}</td>
+                      )}
+                      <td className="text-right py-2 px-3">{formatNumber(j.uniqueViewed)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={j.viewPercent} metricType="openRate" /></td>
+                      <td className="text-right py-2 px-3">{formatNumber(j.uniqueClicked)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={j.clickPercent} metricType="clickRate" /></td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={j.uniqueCTR} metricType="clickRate" /></td>
+                      <td className="text-right py-2 px-3">{formatNumber(j.unsubscribes)}</td>
+                      <td className="text-right py-2 px-3"><ColoredPercent value={j.unsubscribePercent} metricType="unsubscribeRate" /></td>
+                      <td className="text-right py-2 px-3 text-muted-foreground">—</td>
+                      <td className="text-right py-2 px-3 text-muted-foreground">—</td>
+                      <td className="text-right py-2 px-3 text-muted-foreground">—</td>
+                      <td className="text-right py-2 px-3 text-muted-foreground">—</td>
+                    </tr>
+                  ))}
                 </tbody>
                 <tfoot>
                   {(() => {
-                    const totals = diagnostics.analysisReport.providerAggregates.reduce((acc, p) => ({
+                    const campaignTotals = diagnostics.analysisReport.providerAggregates.reduce((acc, p) => ({
                       totalSentUsers: acc.totalSentUsers + p.totalSentUsers,
                       totalDeliveredUsers: acc.totalDeliveredUsers + p.totalDeliveredUsers,
                       uniqueViewed: acc.uniqueViewed + p.uniqueViewed,
@@ -1758,8 +1783,26 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       hardBounces: acc.hardBounces + p.hardBounces,
                       softBounces: acc.softBounces + p.softBounces,
                     }), { totalSentUsers: 0, totalDeliveredUsers: 0, uniqueViewed: 0, uniqueClicked: 0, unsubscribes: 0, hardBounces: 0, softBounces: 0 });
+                    const journeyTotals = (journeyAnalysis?.providerAggregates ?? []).reduce((acc, j) => ({
+                      totalSent: acc.totalSent + j.totalSent,
+                      totalDelivered: acc.totalDelivered + j.totalDelivered,
+                      uniqueViewed: acc.uniqueViewed + j.uniqueViewed,
+                      uniqueClicked: acc.uniqueClicked + j.uniqueClicked,
+                      unsubscribes: acc.unsubscribes + j.unsubscribes,
+                    }), { totalSent: 0, totalDelivered: 0, uniqueViewed: 0, uniqueClicked: 0, unsubscribes: 0 });
+                    const totals = {
+                      totalSentUsers: campaignTotals.totalSentUsers + journeyTotals.totalSent,
+                      totalDeliveredUsers: campaignTotals.totalDeliveredUsers + journeyTotals.totalDelivered,
+                      uniqueViewed: campaignTotals.uniqueViewed + journeyTotals.uniqueViewed,
+                      uniqueClicked: campaignTotals.uniqueClicked + journeyTotals.uniqueClicked,
+                      unsubscribes: campaignTotals.unsubscribes + journeyTotals.unsubscribes,
+                      hardBounces: campaignTotals.hardBounces,
+                      softBounces: campaignTotals.softBounces,
+                    };
                     const useDelivered = diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator;
                     const denom = useDelivered ? totals.totalDeliveredUsers : totals.totalSentUsers;
+                    // Bounce % denominator stays campaign-only (journeys don't carry bounces)
+                    const bounceDenom = useDelivered ? campaignTotals.totalDeliveredUsers : campaignTotals.totalSentUsers;
                     return (
                       <tr className="border-t-2 border-border bg-muted/30 font-semibold">
                         <td className="py-2 px-3">Grand Total</td>
@@ -1773,9 +1816,9 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         <td className="text-right py-2 px-3">{formatNumber(totals.unsubscribes)}</td>
                         <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.unsubscribes / denom) * 100 : 0} metricType="unsubscribeRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(totals.hardBounces)}</td>
-                        <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.hardBounces / denom) * 100 : 0} metricType="bounceRate" /></td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={bounceDenom > 0 ? (totals.hardBounces / bounceDenom) * 100 : 0} metricType="bounceRate" /></td>
                         <td className="text-right py-2 px-3">{formatNumber(totals.softBounces)}</td>
-                        <td className="text-right py-2 px-3"><ColoredPercent value={denom > 0 ? (totals.softBounces / denom) * 100 : 0} metricType="bounceRate" /></td>
+                        <td className="text-right py-2 px-3"><ColoredPercent value={bounceDenom > 0 ? (totals.softBounces / bounceDenom) * 100 : 0} metricType="bounceRate" /></td>
                       </tr>
                     );
                   })()}
@@ -1783,8 +1826,31 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               </table>
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              * Percentages calculated using {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator
+              * Percentages calculated using {diagnostics.analysisReport.providerAggregates[0]?.useDeliveredAsDenominator ? 'Delivered' : 'Sent'} as denominator. Journey rows use the same providerName key as exact-match; bounce metrics are campaign-only (journey exports don't carry bounce data).
             </p>
+            {(() => {
+              const campaignSent = diagnostics.analysisReport.providerAggregates.reduce((s, p) => s + p.totalSentUsers, 0);
+              const journeySent = (journeyAnalysis?.providerAggregates ?? []).reduce((s, j) => s + j.totalSent, 0);
+              const grand = campaignSent + journeySent;
+              if (!(journeyAnalysis?.providerAggregates?.length) || grand <= 0) return null;
+              const cShare = (campaignSent / grand) * 100;
+              const jShare = (journeySent / grand) * 100;
+              return (
+                <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold">Volume mix:</span>{" "}
+                      <span className="text-foreground">
+                        {formatPercent(cShare)} of total sent volume is from <strong>Campaigns</strong> ({formatNumber(campaignSent)}),
+                        and {formatPercent(jShare)} is from <strong>Journeys</strong> ({formatNumber(journeySent)}).
+                      </span>
+                      <span className="text-muted-foreground ml-1">Grand total sent: {formatNumber(grand)}.</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <SectionInsightsBlock insights={sectionInsights?.campaignOverview ?? null} />
             <SectionInsightsBlock insights={sectionInsights?.campaignOverviewByProvider ?? null} />
           </CollapsibleSection>
