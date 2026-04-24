@@ -1502,9 +1502,33 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   ? combineProviderAggregates(campaignAggs, journeyAggs)
                   : [];
 
+                // Volume-share insight: % of grand total Sent contributed by each source
+                const campaignSentTotal = campaignAggs.reduce((s, p) => s + p.totalSentUsers, 0);
+                const journeySentTotal = journeyAggs.reduce((s, p) => s + p.totalSent, 0);
+                const grandSent = campaignSentTotal + journeySentTotal;
+                const campaignShare = grandSent > 0 ? (campaignSentTotal / grandSent) * 100 : 0;
+                const journeyShare = grandSent > 0 ? (journeySentTotal / grandSent) * 100 : 0;
+
                 return (
                   <div className="space-y-6">
-                    {/* Combined sub-table */}
+                    {/* Volume share insight */}
+                    {hasCampaigns && hasJourneys && grandSent > 0 && (
+                      <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                        <div className="flex items-start gap-2">
+                          <Lightbulb className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                          <div>
+                            <span className="font-semibold">Volume mix:</span>{" "}
+                            <span className="text-foreground">
+                              {formatPercent(campaignShare)} of total sent volume is from <strong>Campaigns</strong> ({formatNumber(campaignSentTotal)}),
+                              and {formatPercent(journeyShare)} is from <strong>Journeys</strong> ({formatNumber(journeySentTotal)}).
+                            </span>
+                            <span className="text-muted-foreground ml-1">Grand total sent: {formatNumber(grandSent)}.</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Combined sub-table — only when BOTH datasets present */}
                     {combinedAggs.length > 0 && (
                       <div>
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Combined (Campaign + Journey)</div>
@@ -1549,6 +1573,51 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                         <p className="text-xs text-muted-foreground mt-2">
                           Bounce % is campaign-only (journey exports don't carry bounce data). Provider matching is exact.
                         </p>
+                      </div>
+                    )}
+
+                    {/* Campaigns-only sub-table */}
+                    {hasCampaigns && (
+                      <div>
+                        <div className="text-xs font-semibold text-muted-foreground mb-2">Campaigns</div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border">
+                                <th className="text-left py-2 px-3 font-medium text-muted-foreground">Provider</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Delivered</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Hard %</th>
+                                <th className="text-right py-2 px-3 font-medium text-muted-foreground">Soft %</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {campaignAggs.map((p, i) => (
+                                <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                                  <td className="py-2 px-3 font-medium">{p.providerName}</td>
+                                  <td className="text-right py-2 px-3">{formatNumber(p.totalSentUsers)}</td>
+                                  <td className="text-right py-2 px-3">{formatNumber(p.totalDeliveredUsers)}</td>
+                                  <td className="text-right py-2 px-3">{formatNumber(p.uniqueViewed)}</td>
+                                  <td className="text-right py-2 px-3"><ColoredPercent value={p.viewPercent} metricType="openRate" /></td>
+                                  <td className="text-right py-2 px-3">{formatNumber(p.uniqueClicked)}</td>
+                                  <td className="text-right py-2 px-3"><ColoredPercent value={p.clickPercent} metricType="clickRate" /></td>
+                                  <td className="text-right py-2 px-3"><ColoredPercent value={p.uniqueCTR} metricType="clickRate" /></td>
+                                  <td className="text-right py-2 px-3">{formatNumber(p.unsubscribes)}</td>
+                                  <td className="text-right py-2 px-3"><ColoredPercent value={p.unsubscribePercent} metricType="unsubscribeRate" /></td>
+                                  <td className="text-right py-2 px-3"><ColoredPercent value={p.hardBouncePercent} metricType="bounceRate" /></td>
+                                  <td className="text-right py-2 px-3"><ColoredPercent value={p.softBouncePercent} metricType="bounceRate" /></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
 
