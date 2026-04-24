@@ -1875,6 +1875,56 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               const providerInsights = hasMultiProvider && sectionInsights?.monthlyOverviewByProvider?.[activeProvider];
               return <SectionInsightsBlock insights={(providerInsights ? providerInsights : sectionInsights?.monthlyOverview) ?? null} />;
             })()}
+
+            {/* Journey Monthly sub-table — appears when Journey CSV is loaded */}
+            {journeyAnalysis?.monthlyOverview && journeyAnalysis.monthlyOverview.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-border">
+                <div className="text-xs font-semibold text-muted-foreground mb-2">Journeys — Monthly Overview</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Month</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Nodes</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Delivered</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Viewed</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">View %</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Clicked</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Errors</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Error %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {journeyAnalysis.monthlyOverview.map((m, i) => (
+                        <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                          <td className="py-2 px-3 font-medium">{m.month}</td>
+                          <td className="text-right py-2 px-3">{m.rowCount}</td>
+                          <td className="text-right py-2 px-3">{formatNumber(m.totalSent)}</td>
+                          <td className="text-right py-2 px-3">{formatNumber(m.totalDelivered)}</td>
+                          <td className="text-right py-2 px-3">{formatNumber(m.uniqueViewed)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={m.viewPercent} metricType="openRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(m.uniqueClicked)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={m.clickPercent} metricType="clickRate" /></td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={m.uniqueCTR} metricType="clickRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(m.unsubscribes)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={m.unsubscribePercent} metricType="unsubscribeRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(m.errors)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={m.errorPercent} metricType="bounceRate" /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  * Journey rows carry month + day only (no year). Bounces are not tracked in journey exports.
+                </p>
+              </div>
+            )}
           </CollapsibleSection>
 
           {/* ============= EMAIL METRICS TREND CHART ============= */}
