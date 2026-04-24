@@ -65,6 +65,8 @@ import {
 } from "../metrics";
 import { DiagnosticsExportRepository } from "../DiagnosticsExportRepository";
 import { loadDiagnosticsExportSources, DiagnosticsExportRecord } from "@/lib/diagnosticsExportRepository";
+import { RecentFilesDropdown } from "../RecentFilesDropdown";
+import { addRecentFile } from "@/lib/recentFilesStore";
 import {
   parseJourneyCSV,
   generateJourneyAnalysisReport,
