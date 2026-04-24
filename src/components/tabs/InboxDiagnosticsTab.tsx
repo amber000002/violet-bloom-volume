@@ -867,7 +867,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     if (creativeImage && !creativeAnalysis && !isAnalyzingCreative) {
       runCreativeAnalysis();
     }
-  }, [campaignData, postmasterData, contextText, processingSummary, onDataChange, creativeImage, creativeAnalysis, isAnalyzingCreative, runCreativeAnalysis]);
+  }, [campaignData, journeyData, postmasterData, contextText, processingSummary, onDataChange, creativeImage, creativeAnalysis, isAnalyzingCreative, runCreativeAnalysis]);
 
   const runStrategicInsights = useCallback(async () => {
     if (!industry) return;
@@ -1038,6 +1038,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setPostmasterFileName("");
     setCampaignCsvText("");
     setPostmasterCsvText("");
+    setJourneyFileName("");
+    setJourneyCsvText("");
+    setJourneyValidation(null);
+    setJourneyData([]);
+    setJourneyFilterSummary(null);
+    setJourneyAnalysis(null);
     setEventSchemaFileName("");
     setUserPropertyFileName("");
     setEventSchemaData(null);
@@ -1061,7 +1067,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     );
   }
 
-  const hasData = campaignData.length > 0;
+  // Either a campaign or a journey CSV is enough to enable Run Analysis.
+  const hasData = campaignData.length > 0 || journeyData.length > 0;
 
   return (
     <div className="space-y-6">
