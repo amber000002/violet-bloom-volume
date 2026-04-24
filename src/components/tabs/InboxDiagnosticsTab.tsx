@@ -2055,6 +2055,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           </CollapsibleSection>
 
           {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
+          {diagnostics?.analysisReport?.bestCampaigns?.length ? (
           <CollapsibleSection
             title="Best Performing Campaigns"
             icon={<TrendingUp className="w-5 h-5 text-green-500" />}
