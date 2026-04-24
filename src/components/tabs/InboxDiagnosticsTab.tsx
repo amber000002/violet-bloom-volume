@@ -688,6 +688,44 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     }
   }, [handlePostmasterUpload]);
 
+  // Journey CSV upload — Phase 1 of journey integration.
+  // Filters non-email / non-message / zero-volume rows silently and surfaces
+  // a brief filterSummary toast so the user can audit what was excluded.
+  const handleJourneyUpload = useCallback((file: File) => {
+    setJourneyFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setJourneyCsvText(text);
+      const result = parseJourneyCSV(text);
+      setJourneyValidation(result);
+      setJourneyFilterSummary(result.filterSummary);
+      if (result.isValid) {
+        setJourneyData(result.data);
+        const fs = result.filterSummary;
+        const skipped = fs.excludedByNodeType + fs.excludedByChannel + fs.excludedByZeroVolume;
+        if (skipped > 0) {
+          toast.success(`Journey CSV loaded: ${result.data.length} email message nodes (${skipped} filtered)`);
+        } else {
+          toast.success(`Journey CSV loaded: ${result.data.length} email message nodes`);
+        }
+      } else {
+        setJourneyData([]);
+        toast.error(result.errors[0] || "Failed to parse journey CSV");
+      }
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const handleDropJourney = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingJourney(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".csv")) {
+      handleJourneyUpload(file);
+    }
+  }, [handleJourneyUpload]);
+
   const handleEventSchemaUpload = useCallback((file: File) => {
     setEventSchemaFileName(file.name);
     const reader = new FileReader();
