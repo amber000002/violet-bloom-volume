@@ -1775,6 +1775,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           ) : null}
 
 
+          {diagnostics?.analysisReport && (<>
           {/* Report 1a: Campaign Overview by Provider with Percentages */}
           <CollapsibleSection
             title="Campaign Overview (by Provider)"
