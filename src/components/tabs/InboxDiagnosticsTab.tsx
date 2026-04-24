@@ -2272,7 +2272,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     <tr className="border-b border-border">
                       <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start</th>
                       <th className="text-left py-2 px-3 font-medium text-muted-foreground">Journey / Node</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Provider</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Title</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Message</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
@@ -2299,7 +2300,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                           <td className="py-2 px-3 min-w-[220px] whitespace-normal break-words">
                             {j.journeyName}{j.nodeName ? ` — ${j.nodeName}` : ""}
                           </td>
-                          <td className="py-2 px-3 whitespace-nowrap">{j.providerName}</td>
+                          <td className="py-2 px-3 min-w-[180px] whitespace-normal break-words">{j.campaignTitle || "—"}</td>
+                          <td className="py-2 px-3 min-w-[200px] whitespace-normal break-words">{j.templateName || "—"}</td>
                           <td className="text-right py-2 px-3">{formatNumber(j.totalSent)}</td>
                           <td className="text-right py-2 px-3">{formatNumber(j.uniqueViewed)}</td>
                           <td className="text-right py-2 px-3"><ColoredPercent value={j.openRate} metricType="openRate" /></td>
@@ -2482,7 +2484,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     <tr className="border-b border-border">
                       <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start</th>
                       <th className="text-left py-2 px-3 font-medium text-muted-foreground">Journey / Node</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Provider</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Title</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Message</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
@@ -2509,7 +2512,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                           <td className="py-2 px-3 min-w-[220px] whitespace-normal break-words">
                             {j.journeyName}{j.nodeName ? ` — ${j.nodeName}` : ""}
                           </td>
-                          <td className="py-2 px-3 whitespace-nowrap">{j.providerName}</td>
+                          <td className="py-2 px-3 min-w-[180px] whitespace-normal break-words">{j.campaignTitle || "—"}</td>
+                          <td className="py-2 px-3 min-w-[200px] whitespace-normal break-words">{j.templateName || "—"}</td>
                           <td className="text-right py-2 px-3">{formatNumber(j.totalSent)}</td>
                           <td className="text-right py-2 px-3">{formatNumber(j.uniqueViewed)}</td>
                           <td className="text-right py-2 px-3"><ColoredPercent value={j.openRate} metricType="openRate" /></td>
