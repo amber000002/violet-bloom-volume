@@ -65,6 +65,17 @@ import {
 } from "../metrics";
 import { DiagnosticsExportRepository } from "../DiagnosticsExportRepository";
 import { loadDiagnosticsExportSources, DiagnosticsExportRecord } from "@/lib/diagnosticsExportRepository";
+import {
+  parseJourneyCSV,
+  generateJourneyAnalysisReport,
+  combineProviderAggregates,
+  sumCampaignProviderAggregates,
+  sumJourneyProviderAggregates,
+  JourneyRow,
+  JourneyValidationResult,
+  JourneyAnalysisReport,
+  JourneyFilterSummary,
+} from "@/lib/journeyAnalyzer";
 
 interface InboxDiagnosticsTabProps {
   industry: string;
@@ -533,6 +544,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // re-hydrate the dashboard later from the Report Repository.
   const [campaignCsvText, setCampaignCsvText] = useState<string>("");
   const [postmasterCsvText, setPostmasterCsvText] = useState<string>("");
+  // Journey CSV state — Phase 1 of journey integration. Independent of
+  // campaign upload: either or both files can drive the report.
+  const [journeyFileName, setJourneyFileName] = useState<string>("");
+  const [journeyCsvText, setJourneyCsvText] = useState<string>("");
+  const [journeyValidation, setJourneyValidation] = useState<JourneyValidationResult | null>(null);
+  const [journeyData, setJourneyData] = useState<JourneyRow[]>([]);
+  const [journeyFilterSummary, setJourneyFilterSummary] = useState<JourneyFilterSummary | null>(null);
+  const [journeyAnalysis, setJourneyAnalysis] = useState<JourneyAnalysisReport | null>(null);
+  const [isDraggingJourney, setIsDraggingJourney] = useState(false);
   const [eventSchemaFileName, setEventSchemaFileName] = useState<string>("");
   const [userPropertyFileName, setUserPropertyFileName] = useState<string>("");
   const [eventSchemaData, setEventSchemaData] = useState<EventSchemaRow[] | null>(null);
@@ -668,6 +688,44 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     }
   }, [handlePostmasterUpload]);
 
+  // Journey CSV upload — Phase 1 of journey integration.
+  // Filters non-email / non-message / zero-volume rows silently and surfaces
+  // a brief filterSummary toast so the user can audit what was excluded.
+  const handleJourneyUpload = useCallback((file: File) => {
+    setJourneyFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setJourneyCsvText(text);
+      const result = parseJourneyCSV(text);
+      setJourneyValidation(result);
+      setJourneyFilterSummary(result.filterSummary);
+      if (result.isValid) {
+        setJourneyData(result.data);
+        const fs = result.filterSummary;
+        const skipped = fs.excludedByNodeType + fs.excludedByChannel + fs.excludedByZeroVolume;
+        if (skipped > 0) {
+          toast.success(`Journey CSV loaded: ${result.data.length} email message nodes (${skipped} filtered)`);
+        } else {
+          toast.success(`Journey CSV loaded: ${result.data.length} email message nodes`);
+        }
+      } else {
+        setJourneyData([]);
+        toast.error(result.errors[0] || "Failed to parse journey CSV");
+      }
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const handleDropJourney = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingJourney(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".csv")) {
+      handleJourneyUpload(file);
+    }
+  }, [handleJourneyUpload]);
+
   const handleEventSchemaUpload = useCallback((file: File) => {
     setEventSchemaFileName(file.name);
     const reader = new FileReader();
@@ -763,8 +821,20 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   }, [creativeImage, creativeContext, industry]);
 
   const runAnalysisReport = useCallback(() => {
+    // Either file may drive the report — at least one must be present.
+    if (campaignData.length === 0 && journeyData.length === 0) return;
+
+    // Journey analysis runs in parallel to the campaign pipeline. Stored
+    // separately so dashboard sections can render Combined / Campaigns /
+    // Journeys sub-tables without disrupting the existing campaign view.
+    if (journeyData.length > 0) {
+      setJourneyAnalysis(generateJourneyAnalysisReport(journeyData));
+    } else {
+      setJourneyAnalysis(null);
+    }
+
     if (campaignData.length === 0) return;
-    
+
     const analysisReport = generateAnalysisReport(campaignData);
     
     // Run reconciliation check (MANDATORY)
@@ -797,7 +867,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     if (creativeImage && !creativeAnalysis && !isAnalyzingCreative) {
       runCreativeAnalysis();
     }
-  }, [campaignData, postmasterData, contextText, processingSummary, onDataChange, creativeImage, creativeAnalysis, isAnalyzingCreative, runCreativeAnalysis]);
+  }, [campaignData, journeyData, postmasterData, contextText, processingSummary, onDataChange, creativeImage, creativeAnalysis, isAnalyzingCreative, runCreativeAnalysis]);
 
   const runStrategicInsights = useCallback(async () => {
     if (!industry) return;
@@ -968,6 +1038,12 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     setPostmasterFileName("");
     setCampaignCsvText("");
     setPostmasterCsvText("");
+    setJourneyFileName("");
+    setJourneyCsvText("");
+    setJourneyValidation(null);
+    setJourneyData([]);
+    setJourneyFilterSummary(null);
+    setJourneyAnalysis(null);
     setEventSchemaFileName("");
     setUserPropertyFileName("");
     setEventSchemaData(null);
@@ -991,7 +1067,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
     );
   }
 
-  const hasData = campaignData.length > 0;
+  // Either a campaign or a journey CSV is enough to enable Run Analysis.
+  const hasData = campaignData.length > 0 || journeyData.length > 0;
 
   return (
     <div className="space-y-6">
@@ -1002,79 +1079,144 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {/* Campaign CSV Upload (Required) */}
-          <div className="magic-card rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-primary" />
-                Campaign Performance CSV
-                <span className="text-xs text-primary font-normal">(Required)</span>
-              </h3>
-              {campaignFileName && (
-                <button onClick={() => { setCampaignValidation(null); setCampaignData([]); setCampaignFileName(""); setCampaignCsvText(""); }} className="text-muted-foreground hover:text-foreground">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {!campaignFileName ? (
-              <motion.div
-                onDragOver={(e) => { e.preventDefault(); setIsDraggingCampaign(true); }}
-                onDragLeave={() => setIsDraggingCampaign(false)}
-                onDrop={handleDropCampaign}
-                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                  isDraggingCampaign ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-                }`}
-              >
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => e.target.files?.[0] && handleCampaignUpload(e.target.files[0])}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-                <Upload className={`w-8 h-8 mx-auto mb-2 ${isDraggingCampaign ? "text-primary" : "text-muted-foreground"}`} />
-                <p className="text-sm text-muted-foreground">Drop CSV or click to upload</p>
-              </motion.div>
-            ) : (
-              <div className="flex items-center gap-3 bg-primary/5 rounded-lg px-4 py-3">
-                <CheckCircle2 className="w-5 h-5 text-primary" />
-                <span className="font-medium text-sm">{campaignFileName}</span>
-                <span className="text-xs text-muted-foreground">• {campaignData.length} campaigns loaded</span>
+          {/* Campaign + Journey CSV Uploads (at least one required) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Campaign CSV */}
+            <div className="magic-card rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-primary" />
+                  Campaign Performance CSV
+                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </h3>
+                {campaignFileName && (
+                  <button onClick={() => { setCampaignValidation(null); setCampaignData([]); setCampaignFileName(""); setCampaignCsvText(""); }} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-            )}
 
-            {/* Required headers info */}
-            <div className="mt-4">
-              <p className="text-xs text-muted-foreground mb-2">Required headers (case-sensitive):</p>
-              <div className="flex flex-wrap gap-1.5">
-                {REQUIRED_HEADERS.slice(0, 8).map(h => (
-                  <span key={h} className="px-2 py-0.5 text-xs font-mono bg-muted text-muted-foreground rounded">
-                    {h}
-                  </span>
-                ))}
-                <span className="px-2 py-0.5 text-xs text-muted-foreground">+{REQUIRED_HEADERS.length - 8} more</span>
-              </div>
-            </div>
-
-            {/* Validation errors */}
-            <AnimatePresence>
-              {campaignValidation && !campaignValidation.isValid && (
+              {!campaignFileName ? (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg"
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingCampaign(true); }}
+                  onDragLeave={() => setIsDraggingCampaign(false)}
+                  onDrop={handleDropCampaign}
+                  className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+                    isDraggingCampaign ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
                 >
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                    <div className="text-sm text-destructive">
-                      {campaignValidation.errors.map((e, i) => <p key={i}>{e}</p>)}
-                    </div>
-                  </div>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => e.target.files?.[0] && handleCampaignUpload(e.target.files[0])}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  <Upload className={`w-7 h-7 mx-auto mb-2 ${isDraggingCampaign ? "text-primary" : "text-muted-foreground"}`} />
+                  <p className="text-sm text-muted-foreground">Drop CSV or click to upload</p>
                 </motion.div>
+              ) : (
+                <div className="flex items-center gap-3 bg-primary/5 rounded-lg px-4 py-3">
+                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                  <span className="font-medium text-sm truncate">{campaignFileName}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">• {campaignData.length} campaigns</span>
+                </div>
               )}
-            </AnimatePresence>
+
+              {/* Validation errors */}
+              <AnimatePresence>
+                {campaignValidation && !campaignValidation.isValid && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                      <div className="text-sm text-destructive">
+                        {campaignValidation.errors.map((e, i) => <p key={i}>{e}</p>)}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Journey CSV — Phase 1 of journey integration. Either file is enough to run the report. */}
+            <div className="magic-card rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-primary" />
+                  Journey CSV
+                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </h3>
+                {journeyFileName && (
+                  <button onClick={() => { setJourneyValidation(null); setJourneyData([]); setJourneyFileName(""); setJourneyCsvText(""); setJourneyFilterSummary(null); setJourneyAnalysis(null); }} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {!journeyFileName ? (
+                <motion.div
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingJourney(true); }}
+                  onDragLeave={() => setIsDraggingJourney(false)}
+                  onDrop={handleDropJourney}
+                  className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+                    isDraggingJourney ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => e.target.files?.[0] && handleJourneyUpload(e.target.files[0])}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  <Upload className={`w-7 h-7 mx-auto mb-2 ${isDraggingJourney ? "text-primary" : "text-muted-foreground"}`} />
+                  <p className="text-sm text-muted-foreground">Drop journey export CSV</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">Email message nodes only</p>
+                </motion.div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 bg-primary/5 rounded-lg px-4 py-3">
+                    <CheckCircle2 className="w-5 h-5 text-primary" />
+                    <span className="font-medium text-sm truncate">{journeyFileName}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">• {journeyData.length} email nodes</span>
+                  </div>
+                  {journeyFilterSummary && (journeyFilterSummary.excludedByNodeType + journeyFilterSummary.excludedByChannel + journeyFilterSummary.excludedByZeroVolume) > 0 && (
+                    <p className="text-[11px] text-muted-foreground px-1">
+                      Filtered: {journeyFilterSummary.excludedByNodeType} non-message · {journeyFilterSummary.excludedByChannel} non-email · {journeyFilterSummary.excludedByZeroVolume} zero-volume
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Validation errors */}
+              <AnimatePresence>
+                {journeyValidation && !journeyValidation.isValid && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                      <div className="text-sm text-destructive">
+                        {journeyValidation.errors.map((e, i) => <p key={i}>{e}</p>)}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
+
+          {!hasData && (
+            <p className="text-xs text-muted-foreground text-center -mt-2">
+              Upload a Campaign CSV, a Journey CSV, or both to enable Run Analysis.
+            </p>
+          )}
 
           {/* Postmaster + Creative Upload (1x2 layout) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
