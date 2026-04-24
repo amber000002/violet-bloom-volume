@@ -544,6 +544,15 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // re-hydrate the dashboard later from the Report Repository.
   const [campaignCsvText, setCampaignCsvText] = useState<string>("");
   const [postmasterCsvText, setPostmasterCsvText] = useState<string>("");
+  // Journey CSV state — Phase 1 of journey integration. Independent of
+  // campaign upload: either or both files can drive the report.
+  const [journeyFileName, setJourneyFileName] = useState<string>("");
+  const [journeyCsvText, setJourneyCsvText] = useState<string>("");
+  const [journeyValidation, setJourneyValidation] = useState<JourneyValidationResult | null>(null);
+  const [journeyData, setJourneyData] = useState<JourneyRow[]>([]);
+  const [journeyFilterSummary, setJourneyFilterSummary] = useState<JourneyFilterSummary | null>(null);
+  const [journeyAnalysis, setJourneyAnalysis] = useState<JourneyAnalysisReport | null>(null);
+  const [isDraggingJourney, setIsDraggingJourney] = useState(false);
   const [eventSchemaFileName, setEventSchemaFileName] = useState<string>("");
   const [userPropertyFileName, setUserPropertyFileName] = useState<string>("");
   const [eventSchemaData, setEventSchemaData] = useState<EventSchemaRow[] | null>(null);
