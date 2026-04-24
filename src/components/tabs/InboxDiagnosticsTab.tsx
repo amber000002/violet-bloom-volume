@@ -643,6 +643,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // File handlers
   const handleCampaignUpload = useCallback((file: File) => {
     setCampaignFileName(file.name);
+    addRecentFile("campaign-csv", file);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -659,6 +660,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
 
   const handlePostmasterUpload = useCallback((file: File) => {
     setPostmasterFileName(file.name);
+    addRecentFile("postmaster-csv", file);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -695,6 +697,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // a brief filterSummary toast so the user can audit what was excluded.
   const handleJourneyUpload = useCallback((file: File) => {
     setJourneyFileName(file.name);
+    addRecentFile("journey-csv", file);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -769,6 +772,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       return;
     }
     setCreativeFileName(file.name);
+    addRecentFile("creative-image", file);
     const reader = new FileReader();
     reader.onload = (event) => {
       setCreativeImage(event.target?.result as string);
