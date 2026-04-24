@@ -123,10 +123,34 @@ export interface JourneyMonthlyOverview {
   errorPercent: number;
 }
 
+export interface TopJourney {
+  journeyKey: string; // `${journeyId}|${versionNumber}|${nodeId}`
+  journeyId: string;
+  versionNumber: string;
+  nodeId: string;
+  journeyName: string;
+  nodeName: string;
+  providerName: string;
+  startLabel: string; // raw "MMM D" — never a year
+  totalSent: number;
+  totalDelivered: number;
+  uniqueViewed: number;
+  uniqueClicked: number;
+  unsubscribes: number;
+  errors: number;
+  openRate: number;
+  clickRate: number;
+  uniqueCTR: number;
+  unsubscribeRate: number;
+  errorRate: number;
+}
+
 export interface JourneyAnalysisReport {
   providerAggregates: JourneyProviderAggregate[];
   monthlyOverview: JourneyMonthlyOverview[];
   monthlyOverviewByProvider: JourneyMonthlyOverview[];
+  bestJourneys: TopJourney[];
+  worstJourneys: TopJourney[];
 }
 
 // ============= CONSTANTS =============
