@@ -821,8 +821,20 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   }, [creativeImage, creativeContext, industry]);
 
   const runAnalysisReport = useCallback(() => {
+    // Either file may drive the report — at least one must be present.
+    if (campaignData.length === 0 && journeyData.length === 0) return;
+
+    // Journey analysis runs in parallel to the campaign pipeline. Stored
+    // separately so dashboard sections can render Combined / Campaigns /
+    // Journeys sub-tables without disrupting the existing campaign view.
+    if (journeyData.length > 0) {
+      setJourneyAnalysis(generateJourneyAnalysisReport(journeyData));
+    } else {
+      setJourneyAnalysis(null);
+    }
+
     if (campaignData.length === 0) return;
-    
+
     const analysisReport = generateAnalysisReport(campaignData);
     
     // Run reconciliation check (MANDATORY)
