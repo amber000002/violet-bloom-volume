@@ -593,8 +593,10 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   } | null>(null);
   
    // Campaign sort toggles (independent per table)
-   const [bestSortBy, setBestSortBy] = useState<"openRate" | "clickRate">("openRate");
-   const [worstSortBy, setWorstSortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [bestSortBy, setBestSortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [worstSortBy, setWorstSortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [bestJourneySortBy, setBestJourneySortBy] = useState<"openRate" | "clickRate">("openRate");
+  const [worstJourneySortBy, setWorstJourneySortBy] = useState<"openRate" | "clickRate">("openRate");
    const [monthlyProviderTab, setMonthlyProviderTab] = useState<string | null>(null);
 
   // UI states
@@ -2053,6 +2055,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
           </CollapsibleSection>
 
           {/* ============= BEST PERFORMING CAMPAIGNS ============= */}
+          {diagnostics?.analysisReport?.bestCampaigns?.length ? (
           <CollapsibleSection
             title="Best Performing Campaigns"
             icon={<TrendingUp className="w-5 h-5 text-green-500" />}
@@ -2163,8 +2166,106 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </p>
             <SectionInsightsBlock insights={bestSortBy === "clickRate" ? (sectionInsights?.bestPerformingCTR ?? null) : (sectionInsights?.bestPerformingOpenRate ?? null)} />
           </CollapsibleSection>
+          ) : null}
+
+          {/* ============= BEST PERFORMING JOURNEYS ============= */}
+          {journeyAnalysis?.bestJourneys && journeyAnalysis.bestJourneys.length > 0 && (
+            <CollapsibleSection
+              title="Best Performing Journeys"
+              icon={<TrendingUp className="w-5 h-5 text-green-500" />}
+              isOpen={expandedSections.best}
+              onToggle={() => toggleSection("best")}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setBestJourneySortBy("openRate")}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      bestJourneySortBy === "openRate"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    By Unique Open Rate
+                  </button>
+                  <button
+                    onClick={() => setBestJourneySortBy("clickRate")}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      bestJourneySortBy === "clickRate"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    By Unique CTR
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Journey / Node</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Provider</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Errors</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Error %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...journeyAnalysis.bestJourneys]
+                      .sort((a, b) =>
+                        bestJourneySortBy === "clickRate"
+                          ? b.uniqueCTR - a.uniqueCTR
+                          : b.openRate - a.openRate,
+                      )
+                      .slice(0, 5)
+                      .map((j, i) => (
+                        <tr key={j.journeyKey + i} className="border-b border-border/50 hover:bg-muted/20">
+                          <td className="py-2 px-3 whitespace-nowrap text-muted-foreground">{j.startLabel}</td>
+                          <td className="py-2 px-3 min-w-[220px] whitespace-normal break-words">
+                            {j.journeyName}{j.nodeName ? ` — ${j.nodeName}` : ""}
+                          </td>
+                          <td className="py-2 px-3 whitespace-nowrap">{j.providerName}</td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.totalSent)}</td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.uniqueViewed)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.openRate} metricType="openRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.uniqueClicked)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.clickRate} metricType="clickRate" /></td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.uniqueCTR} metricType="clickRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.unsubscribes)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.unsubscribeRate} metricType="unsubscribeRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.errors)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.errorRate} metricType="bounceRate" /></td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-sm text-muted-foreground italic">
+                {(() => {
+                  const best = journeyAnalysis.bestJourneys;
+                  if (best.length === 0) return "";
+                  const avgOpen = best.reduce((s, c) => s + c.openRate, 0) / best.length;
+                  const avgClick = best.reduce((s, c) => s + c.clickRate, 0) / best.length;
+                  return `Top journey nodes achieved ${avgOpen.toFixed(1)}% avg open rate and ${avgClick.toFixed(1)}% click rate.`;
+                })()}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                * Journey rows have no bounce data; error % uses the same benchmark as bounce % for severity.
+              </p>
+            </CollapsibleSection>
+          )}
 
           {/* ============= UNDER-PERFORMING CAMPAIGNS ============= */}
+          {diagnostics?.analysisReport?.worstCampaigns?.length ? (
           <CollapsibleSection
             title="Under-Performing Campaigns"
             icon={<TrendingDown className="w-5 h-5 text-red-500" />}
@@ -2275,6 +2376,103 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             </p>
             <SectionInsightsBlock insights={worstSortBy === "clickRate" ? (sectionInsights?.underperformingCTR ?? null) : (sectionInsights?.underperformingOpenRate ?? null)} />
           </CollapsibleSection>
+          ) : null}
+
+          {/* ============= UNDER-PERFORMING JOURNEYS ============= */}
+          {journeyAnalysis?.worstJourneys && journeyAnalysis.worstJourneys.length > 0 && (
+            <CollapsibleSection
+              title="Under-Performing Journeys"
+              icon={<TrendingDown className="w-5 h-5 text-red-500" />}
+              isOpen={expandedSections.worst}
+              onToggle={() => toggleSection("worst")}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setWorstJourneySortBy("openRate")}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      worstJourneySortBy === "openRate"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    By Unique Open Rate
+                  </button>
+                  <button
+                    onClick={() => setWorstJourneySortBy("clickRate")}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      worstJourneySortBy === "clickRate"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    By Unique CTR
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Journey / Node</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Provider</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Sent</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Open</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Open %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique Clicked</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Click %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unique CTR</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsubs</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unsub %</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Errors</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Error %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...journeyAnalysis.worstJourneys]
+                      .sort((a, b) =>
+                        worstJourneySortBy === "clickRate"
+                          ? a.uniqueCTR - b.uniqueCTR
+                          : a.openRate - b.openRate,
+                      )
+                      .slice(0, 5)
+                      .map((j, i) => (
+                        <tr key={j.journeyKey + i} className="border-b border-border/50 hover:bg-muted/20">
+                          <td className="py-2 px-3 whitespace-nowrap text-muted-foreground">{j.startLabel}</td>
+                          <td className="py-2 px-3 min-w-[220px] whitespace-normal break-words">
+                            {j.journeyName}{j.nodeName ? ` — ${j.nodeName}` : ""}
+                          </td>
+                          <td className="py-2 px-3 whitespace-nowrap">{j.providerName}</td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.totalSent)}</td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.uniqueViewed)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.openRate} metricType="openRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.uniqueClicked)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.clickRate} metricType="clickRate" /></td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.uniqueCTR} metricType="clickRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.unsubscribes)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.unsubscribeRate} metricType="unsubscribeRate" /></td>
+                          <td className="text-right py-2 px-3">{formatNumber(j.errors)}</td>
+                          <td className="text-right py-2 px-3"><ColoredPercent value={j.errorRate} metricType="bounceRate" /></td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-sm text-muted-foreground italic">
+                {(() => {
+                  const worst = journeyAnalysis.worstJourneys;
+                  if (worst.length === 0) return "";
+                  const avgOpen = worst.reduce((s, c) => s + c.openRate, 0) / worst.length;
+                  const avgClick = worst.reduce((s, c) => s + c.clickRate, 0) / worst.length;
+                  return `Under-performing journey nodes averaged ${avgOpen.toFixed(1)}% open rate and ${avgClick.toFixed(1)}% click rate.`;
+                })()}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                * Eligible journey nodes have totalSent &gt; 1. Bounce columns omitted (no journey bounce data).
+              </p>
+            </CollapsibleSection>
+          )}
 
           {/* ============= CREATIVE & CONTENT EFFECTIVENESS ANALYZER ============= */}
           {(creativeAnalysis || isAnalyzingCreative) && (
