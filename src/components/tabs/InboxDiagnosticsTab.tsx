@@ -65,6 +65,8 @@ import {
 } from "../metrics";
 import { DiagnosticsExportRepository } from "../DiagnosticsExportRepository";
 import { loadDiagnosticsExportSources, DiagnosticsExportRecord } from "@/lib/diagnosticsExportRepository";
+import { RecentFilesDropdown } from "../RecentFilesDropdown";
+import { addRecentFile } from "@/lib/recentFilesStore";
 import {
   parseJourneyCSV,
   generateJourneyAnalysisReport,
@@ -641,6 +643,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // File handlers
   const handleCampaignUpload = useCallback((file: File) => {
     setCampaignFileName(file.name);
+    addRecentFile("campaign-csv", file);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -657,6 +660,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
 
   const handlePostmasterUpload = useCallback((file: File) => {
     setPostmasterFileName(file.name);
+    addRecentFile("postmaster-csv", file);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -693,6 +697,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   // a brief filterSummary toast so the user can audit what was excluded.
   const handleJourneyUpload = useCallback((file: File) => {
     setJourneyFileName(file.name);
+    addRecentFile("journey-csv", file);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -767,6 +772,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
       return;
     }
     setCreativeFileName(file.name);
+    addRecentFile("creative-image", file);
     const reader = new FileReader();
     reader.onload = (event) => {
       setCreativeImage(event.target?.result as string);
@@ -1101,11 +1107,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   Campaign Performance CSV
                   <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </h3>
-                {campaignFileName && (
-                  <button onClick={() => { setCampaignValidation(null); setCampaignData([]); setCampaignFileName(""); setCampaignCsvText(""); }} className="text-muted-foreground hover:text-foreground">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  <RecentFilesDropdown category="campaign-csv" onPick={handleCampaignUpload} />
+                  {campaignFileName && (
+                    <button onClick={() => { setCampaignValidation(null); setCampaignData([]); setCampaignFileName(""); setCampaignCsvText(""); }} className="text-muted-foreground hover:text-foreground">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {!campaignFileName ? (
@@ -1162,11 +1171,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   Journey CSV
                   <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </h3>
-                {journeyFileName && (
-                  <button onClick={() => { setJourneyValidation(null); setJourneyData([]); setJourneyFileName(""); setJourneyCsvText(""); setJourneyFilterSummary(null); setJourneyAnalysis(null); }} className="text-muted-foreground hover:text-foreground">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  <RecentFilesDropdown category="journey-csv" onPick={handleJourneyUpload} />
+                  {journeyFileName && (
+                    <button onClick={() => { setJourneyValidation(null); setJourneyData([]); setJourneyFileName(""); setJourneyCsvText(""); setJourneyFilterSummary(null); setJourneyAnalysis(null); }} className="text-muted-foreground hover:text-foreground">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {!journeyFileName ? (
@@ -1240,11 +1252,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   Postmaster CSV
                   <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </h3>
-                {postmasterFileName && (
-                  <button onClick={() => { setPostmasterValidation(null); setPostmasterData(null); setPostmasterFileName(""); setPostmasterCsvText(""); }} className="text-muted-foreground hover:text-foreground">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  <RecentFilesDropdown category="postmaster-csv" onPick={handlePostmasterUpload} />
+                  {postmasterFileName && (
+                    <button onClick={() => { setPostmasterValidation(null); setPostmasterData(null); setPostmasterFileName(""); setPostmasterCsvText(""); }} className="text-muted-foreground hover:text-foreground">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {!postmasterFileName ? (
@@ -1286,11 +1301,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   Email Creative Upload
                   <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </h3>
-                {creativeFileName && (
-                  <button onClick={removeCreativeImage} className="text-muted-foreground hover:text-foreground">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  <RecentFilesDropdown category="creative-image" onPick={handleCreativeUpload} />
+                  {creativeFileName && (
+                    <button onClick={removeCreativeImage} className="text-muted-foreground hover:text-foreground">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {!creativeImage ? (

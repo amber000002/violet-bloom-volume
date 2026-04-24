@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CreativeAnalyzerSlides } from "@/components/presentation/CreativeAnalyzerSlides";
+import { RecentFilesDropdown } from "@/components/RecentFilesDropdown";
+import { addRecentFile } from "@/lib/recentFilesStore";
 
 interface AnalysisData {
   effectivePractices: { area: string; practice: string }[];
@@ -86,15 +88,19 @@ export const CreativeAnalyzerTab: React.FC<CreativeAnalyzerTabProps> = ({
     onDataChange,
   ]);
 
+  const acceptCreativeFile = (file: File) => {
+    if (!file || !(file.type === "image/png" || file.type === "image/jpeg")) return;
+    addRecentFile("creative-image", file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && (file.type === "image/png" || file.type === "image/jpeg")) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setUploadedImage(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) acceptCreativeFile(file);
   };
 
   const removeImage = () => {
@@ -189,10 +195,13 @@ export const CreativeAnalyzerTab: React.FC<CreativeAnalyzerTabProps> = ({
         animate={{ opacity: 1, y: 0 }}
         className="bg-card rounded-xl border border-border p-6"
       >
-        <h3 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-primary" />
-          Email Creative Upload
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
+            <Upload className="w-5 h-5 text-primary" />
+            Email Creative Upload
+          </h3>
+          <RecentFilesDropdown category="creative-image" onPick={acceptCreativeFile} />
+        </div>
 
         {!uploadedImage ? (
           <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/30">
