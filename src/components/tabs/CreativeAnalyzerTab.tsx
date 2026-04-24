@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CreativeAnalyzerSlides } from "@/components/presentation/CreativeAnalyzerSlides";
+import { RecentFilesDropdown } from "@/components/RecentFilesDropdown";
+import { addRecentFile } from "@/lib/recentFilesStore";
 
 interface AnalysisData {
   effectivePractices: { area: string; practice: string }[];
@@ -86,15 +88,19 @@ export const CreativeAnalyzerTab: React.FC<CreativeAnalyzerTabProps> = ({
     onDataChange,
   ]);
 
+  const acceptCreativeFile = (file: File) => {
+    if (!file || !(file.type === "image/png" || file.type === "image/jpeg")) return;
+    addRecentFile("creative-image", file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && (file.type === "image/png" || file.type === "image/jpeg")) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setUploadedImage(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) acceptCreativeFile(file);
   };
 
   const removeImage = () => {
