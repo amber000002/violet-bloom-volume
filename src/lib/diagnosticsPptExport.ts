@@ -816,8 +816,10 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     // --- HEADER ZONE --- (universal)
     addSlideHeader(s, "Campaign overview", theme, monthRange);
 
-    // --- Compute grand totals ---
-    const gt = { sent: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0 };
+    // --- Compute grand totals (campaign + journey combined) ---
+    // Mirrors dashboard logic: journey volumes added for sent/viewed/clicked/unsubs;
+    // bounces remain campaign-only (journey exports don't carry bounce data).
+    const gt = { sent: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0, campaignSent: 0 };
     report.providerAggregates.forEach(p => {
       gt.sent += p.totalSentUsers;
       gt.viewed += p.uniqueViewed;
@@ -825,13 +827,21 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       gt.unsubs += p.unsubscribes;
       gt.hard += p.hardBounces;
       gt.soft += p.softBounces;
+      gt.campaignSent += p.totalSentUsers;
+    });
+    (journeyAnalysis?.providerAggregates ?? []).forEach(j => {
+      gt.sent += j.totalSent;
+      gt.viewed += j.uniqueViewed;
+      gt.clicked += j.uniqueClicked;
+      gt.unsubs += j.unsubscribes;
     });
     const denom = gt.sent || 1;
+    const bounceDenom = gt.campaignSent || 1; // bounces are campaign-only
     const viewRate = (gt.viewed / denom) * 100;
     const clickRate = (gt.clicked / denom) * 100;
     const unsubRate = (gt.unsubs / denom) * 100;
-    const hardRate = (gt.hard / denom) * 100;
-    const softRate = (gt.soft / denom) * 100;
+    const hardRate = (gt.hard / bounceDenom) * 100;
+    const softRate = (gt.soft / bounceDenom) * 100;
 
     // --- Metric definitions with fixed accent colors per spec ---
     const METRIC_COLORS = {
