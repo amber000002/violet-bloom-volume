@@ -13,6 +13,7 @@ import {
 } from "./csvAnalyzer";
 import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
 import { SectionInsights, TableInsight } from "./sectionInsightEngine";
+import { JourneyAnalysisReport } from "./journeyAnalyzer";
 
 // ============= TYPES =============
 
