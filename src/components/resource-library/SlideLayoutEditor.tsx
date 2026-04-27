@@ -266,8 +266,19 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
         >
           <ArrowLeft className="w-4 h-4" /> Back to library
         </button>
-        <div className="text-xs text-muted-foreground">
-          {filledCount}/{slots.length} slots filled
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRemoveAll}
+            disabled={bulkBusy || filledCount === 0}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Remove backgrounds from all slides"
+          >
+            {bulkBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            Remove all backgrounds
+          </button>
+          <div className="text-xs text-muted-foreground">
+            {filledCount}/{slots.length} slots filled
+          </div>
         </div>
       </div>
 
