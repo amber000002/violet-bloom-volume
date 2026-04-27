@@ -109,7 +109,53 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
     }
   }, []);
 
-  const triggerFilePicker = (slot: SlideSlot) => {
+  const handleRemoveAll = useCallback(async () => {
+    const filled = slots.filter((s) => !!s.background_path);
+    if (filled.length === 0) {
+      toast.message("No backgrounds to remove");
+      return;
+    }
+    if (!confirm(`Remove backgrounds from all ${filled.length} slide${filled.length === 1 ? "" : "s"}? This can be undone.`)) {
+      return;
+    }
+    const snapshot = filled.map((s) => ({ ...s }));
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(filled.map((s) => removeSlotBackground(s)));
+      const updates = new Map<string, SlideSlot>();
+      let failures = 0;
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") updates.set(filled[i].id, r.value);
+        else failures++;
+      });
+      setSlots((prev) => prev.map((s) => updates.get(s.id) || s));
+
+      if (updates.size > 0) {
+        toast.success(`Removed ${updates.size} background${updates.size === 1 ? "" : "s"}`, {
+          duration: 6000,
+          action: {
+            label: "Undo",
+            onClick: async () => {
+              try {
+                const restored = await restoreSlotsToSnapshot(snapshot);
+                const byId = new Map(restored.map((s) => [s.id, s]));
+                setSlots((prev) => prev.map((s) => byId.get(s.id) || s));
+                toast.success("Restored");
+              } catch {
+                toast.error("Undo failed");
+              }
+            },
+          },
+        });
+      }
+      if (failures > 0) toast.error(`${failures} slot${failures === 1 ? "" : "s"} failed to remove`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Remove all failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [slots]);
     setPendingUploadFor(slot);
     fileInputRef.current?.click();
   };
