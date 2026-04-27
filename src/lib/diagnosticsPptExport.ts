@@ -106,6 +106,8 @@ export interface DiagnosticsDeckOptions {
   campaignCsvText?: string | null;
   postmasterCsvText?: string | null;
   contextText?: string | null;
+  // Journey analysis (optional) — when present, slides 2 & 3 incorporate journey volumes.
+  journeyAnalysis?: JourneyAnalysisReport | null;
 }
 
 // ============= BRAND COLOR ENGINE =============
