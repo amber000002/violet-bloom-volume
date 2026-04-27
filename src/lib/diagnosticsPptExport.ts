@@ -685,6 +685,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     auditScope = "email-only",
     benchmarks: benchmarksOverride,
     includeProactiveRecommendations = false,
+    journeyAnalysis = null,
   } = opts;
 
   const benchmarks: ReportBenchmarks = { ...DEFAULT_BENCHMARKS, ...(benchmarksOverride || {}) };
