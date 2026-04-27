@@ -109,6 +109,54 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
     }
   }, []);
 
+  const handleRemoveAll = useCallback(async () => {
+    const filled = slots.filter((s) => !!s.background_path);
+    if (filled.length === 0) {
+      toast.message("No backgrounds to remove");
+      return;
+    }
+    if (!confirm(`Remove backgrounds from all ${filled.length} slide${filled.length === 1 ? "" : "s"}? This can be undone.`)) {
+      return;
+    }
+    const snapshot = filled.map((s) => ({ ...s }));
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(filled.map((s) => removeSlotBackground(s)));
+      const updates = new Map<string, SlideSlot>();
+      let failures = 0;
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") updates.set(filled[i].id, r.value);
+        else failures++;
+      });
+      setSlots((prev) => prev.map((s) => updates.get(s.id) || s));
+
+      if (updates.size > 0) {
+        toast.success(`Removed ${updates.size} background${updates.size === 1 ? "" : "s"}`, {
+          duration: 6000,
+          action: {
+            label: "Undo",
+            onClick: async () => {
+              try {
+                const restored = await restoreSlotsToSnapshot(snapshot);
+                const byId = new Map(restored.map((s) => [s.id, s]));
+                setSlots((prev) => prev.map((s) => byId.get(s.id) || s));
+                toast.success("Restored");
+              } catch {
+                toast.error("Undo failed");
+              }
+            },
+          },
+        });
+      }
+      if (failures > 0) toast.error(`${failures} slot${failures === 1 ? "" : "s"} failed to remove`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Remove all failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [slots]);
+
   const triggerFilePicker = (slot: SlideSlot) => {
     setPendingUploadFor(slot);
     fileInputRef.current?.click();
@@ -266,8 +314,19 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
         >
           <ArrowLeft className="w-4 h-4" /> Back to library
         </button>
-        <div className="text-xs text-muted-foreground">
-          {filledCount}/{slots.length} slots filled
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRemoveAll}
+            disabled={bulkBusy || filledCount === 0}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Remove backgrounds from all slides"
+          >
+            {bulkBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            Remove all backgrounds
+          </button>
+          <div className="text-xs text-muted-foreground">
+            {filledCount}/{slots.length} slots filled
+          </div>
         </div>
       </div>
 
