@@ -1003,25 +1003,72 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       rows.push(row);
     });
 
-    // Grand Total row
-    const denom = useDelivered ? totals.delivered : totals.sent;
+    // --- Journey rows (when journey CSV is loaded) ---
+    // Mirrors the dashboard's provider table: separate row per journey provider,
+    // tagged "[Journeys]" in the provider cell; bounce columns rendered as "—"
+    // because journey exports don't carry bounce data.
+    const journeyAggs = journeyAnalysis?.providerAggregates ?? [];
+    const journeyTotals = { sent: 0, delivered: 0, viewed: 0, clicked: 0, unsubs: 0 };
+    journeyAggs.forEach((j, idx) => {
+      const ri = report.providerAggregates.length + idx;
+      journeyTotals.sent += j.totalSent;
+      journeyTotals.delivered += j.totalDelivered;
+      journeyTotals.viewed += j.uniqueViewed;
+      journeyTotals.clicked += j.uniqueClicked;
+      journeyTotals.unsubs += j.unsubscribes;
+
+      const row: pptxgen.TableCell[] = [
+        { text: sanitizeText(`${j.providerName}  [Journeys]`), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+        { text: formatNumber(j.totalSent), options: bodyCellOpts(theme, ri, "center") },
+      ];
+      if (useDelivered) row.push({ text: formatNumber(j.totalDelivered), options: bodyCellOpts(theme, ri, "center") });
+      row.push(
+        { text: formatNumber(j.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(j.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.viewPercent, "openRate", theme)) },
+        { text: formatNumber(j.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(j.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.clickPercent, "clickRate", theme)) },
+        { text: formatNumber(j.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
+        { text: formatPercent(j.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.unsubscribePercent, "unsubscribeRate", theme)) },
+        { text: "—", options: bodyCellOpts(theme, ri, "center") },
+        { text: "—", options: bodyCellOpts(theme, ri, "center") },
+        { text: "—", options: bodyCellOpts(theme, ri, "center") },
+        { text: "—", options: bodyCellOpts(theme, ri, "center") },
+      );
+      rows.push(row);
+    });
+
+    // --- Grand Total row (campaigns + journeys) ---
+    // Bounces stay campaign-only because journey exports don't carry bounce data.
+    const campaignSent = totals.sent;
+    const campaignDelivered = totals.delivered;
+    const combined = {
+      sent: totals.sent + journeyTotals.sent,
+      delivered: totals.delivered + journeyTotals.delivered,
+      viewed: totals.viewed + journeyTotals.viewed,
+      clicked: totals.clicked + journeyTotals.clicked,
+      unsubs: totals.unsubs + journeyTotals.unsubs,
+      hard: totals.hard,
+      soft: totals.soft,
+    };
+    const denom = useDelivered ? combined.delivered : combined.sent;
+    const bounceDenom = useDelivered ? campaignDelivered : campaignSent;
     const gtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({ bold: true, fontSize: 7, align, fill: { color: theme.headerBg }, fontFace: FONTS.body, valign: "middle", margin: [3, 4, 3, 4] });
     const gt: pptxgen.TableCell[] = [
       { text: "Grand Total", options: gtOpts("left") },
-      { text: formatNumber(totals.sent), options: gtOpts() },
+      { text: formatNumber(combined.sent), options: gtOpts() },
     ];
-    if (useDelivered) gt.push({ text: formatNumber(totals.delivered), options: gtOpts() });
+    if (useDelivered) gt.push({ text: formatNumber(combined.delivered), options: gtOpts() });
     gt.push(
-      { text: formatNumber(totals.viewed), options: gtOpts() },
-      { text: formatPercent(denom > 0 ? (totals.viewed / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (totals.viewed / denom) * 100 : 0, "openRate", theme) } },
-      { text: formatNumber(totals.clicked), options: gtOpts() },
-      { text: formatPercent(denom > 0 ? (totals.clicked / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (totals.clicked / denom) * 100 : 0, "clickRate", theme) } },
-      { text: formatNumber(totals.unsubs), options: gtOpts() },
-      { text: formatPercent(denom > 0 ? (totals.unsubs / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (totals.unsubs / denom) * 100 : 0, "unsubscribeRate", theme) } },
-      { text: formatNumber(totals.hard), options: gtOpts() },
-      { text: formatPercent(denom > 0 ? (totals.hard / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (totals.hard / denom) * 100 : 0, "bounceRate", theme) } },
-      { text: formatNumber(totals.soft), options: gtOpts() },
-      { text: formatPercent(denom > 0 ? (totals.soft / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (totals.soft / denom) * 100 : 0, "bounceRate", theme) } },
+      { text: formatNumber(combined.viewed), options: gtOpts() },
+      { text: formatPercent(denom > 0 ? (combined.viewed / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.viewed / denom) * 100 : 0, "openRate", theme) } },
+      { text: formatNumber(combined.clicked), options: gtOpts() },
+      { text: formatPercent(denom > 0 ? (combined.clicked / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.clicked / denom) * 100 : 0, "clickRate", theme) } },
+      { text: formatNumber(combined.unsubs), options: gtOpts() },
+      { text: formatPercent(denom > 0 ? (combined.unsubs / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.unsubs / denom) * 100 : 0, "unsubscribeRate", theme) } },
+      { text: formatNumber(combined.hard), options: gtOpts() },
+      { text: formatPercent(bounceDenom > 0 ? (combined.hard / bounceDenom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(bounceDenom > 0 ? (combined.hard / bounceDenom) * 100 : 0, "bounceRate", theme) } },
+      { text: formatNumber(combined.soft), options: gtOpts() },
+      { text: formatPercent(bounceDenom > 0 ? (combined.soft / bounceDenom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(bounceDenom > 0 ? (combined.soft / bounceDenom) * 100 : 0, "bounceRate", theme) } },
     );
     rows.push(gt);
 
