@@ -1085,8 +1085,19 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     });
 
     s.addText(`* Percentages use ${useDelivered ? "Delivered" : "Sent"} as denominator`, { x: 0.5, y: ZONE.INSIGHT_Y - 0.25, w: 5, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body });
-    // Merge both campaign overview + provider insights into a single block (max 4 total)
+    // Volume mix insight (when journey data is present) — prepended to merged insights
+    const volumeMixInsights: TableInsight[] = [];
+    if (journeyAggs.length > 0 && combined.sent > 0) {
+      const journeyShare = (journeyTotals.sent / combined.sent) * 100;
+      volumeMixInsights.push({
+        severity: "info",
+        text: `Journeys form ${formatPercent(journeyShare)} of the total sent volume.`,
+        source: "Volume mix",
+      });
+    }
+    // Merge volume mix + campaign overview + provider insights into a single block (max 4 total)
     const mergedOverviewInsights = [
+      ...volumeMixInsights,
       ...(sectionInsights?.campaignOverview || []),
       ...(sectionInsights?.campaignOverviewByProvider || []),
     ].slice(0, 4);
