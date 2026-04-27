@@ -156,6 +156,8 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
       setBulkBusy(false);
     }
   }, [slots]);
+
+  const triggerFilePicker = (slot: SlideSlot) => {
     setPendingUploadFor(slot);
     fileInputRef.current?.click();
   };
