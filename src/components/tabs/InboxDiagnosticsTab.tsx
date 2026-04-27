@@ -1484,6 +1484,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     campaignCsvText: campaignCsvText || null,
                     postmasterCsvText: postmasterCsvText || null,
                     contextText: contextText || null,
+                    journeyAnalysis: journeyAnalysis || null,
                   });
                   setRepoRefreshKey((k) => k + 1);
                   toast.success("Saved to Report Repository");
@@ -2762,6 +2763,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                     sourceFileName: campaignFileName,
                     websiteUrl: websiteUrl,
                     reportType: "reputation",
+                    journeyAnalysis: journeyAnalysis || null,
                   });
                   setRepoRefreshKey((k) => k + 1);
                   toast.success("Saved to Report Repository");
