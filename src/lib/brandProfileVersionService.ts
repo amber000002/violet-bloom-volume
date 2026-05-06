@@ -1,8 +1,51 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
 import { computeCompletenessScore, mergeProfiles } from "@/lib/brandEnrichmentEngine";
 
 // ===== HELPERS =====
+
+function sanitizeTextForPostgres(value: string | null | undefined): string | null {
+  if (value == null) return null;
+
+  let cleaned = "";
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+
+    // Postgres JSONB/text cannot store NUL characters; they surface as
+    // "unsupported Unicode escape sequence" when sent through JSON APIs.
+    if (code === 0) continue;
+
+    // Drop malformed surrogate halves while preserving valid emoji pairs.
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        cleaned += value[i] + value[i + 1];
+        i++;
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) continue;
+
+    cleaned += value[i];
+  }
+
+  return cleaned;
+}
+
+function sanitizeJsonForPostgres<T>(value: T): T {
+  if (typeof value === "string") return sanitizeTextForPostgres(value) as T;
+  if (Array.isArray(value)) return value.map(item => sanitizeJsonForPostgres(item)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        sanitizeJsonForPostgres(entry),
+      ])
+    ) as T;
+  }
+  return value;
+}
 
 export function normalizeHost(url: string): string {
   try {
@@ -42,8 +85,10 @@ export async function ensureBrandProfile(params: {
   eventSchemaCSV?: string;
   userPropertiesCSV?: string;
 }): Promise<string> {
-  const host = normalizeHost(params.websiteUrl);
-  const industryNorm = params.industry.toLowerCase().trim();
+  const safeWebsiteUrl = sanitizeTextForPostgres(params.websiteUrl) || "";
+  const safeIndustry = sanitizeTextForPostgres(params.industry) || "";
+  const host = normalizeHost(safeWebsiteUrl);
+  const industryNorm = safeIndustry.toLowerCase().trim();
 
   const { data: existing } = await supabase
     .from("brand_profiles")
@@ -54,11 +99,12 @@ export async function ensureBrandProfile(params: {
 
   if (existing) {
     // Update schema CSVs if provided
-    const updates: Record<string, any> = {};
-    if (params.eventSchemaCSV) updates.event_schema_csv = params.eventSchemaCSV;
-    if (params.userPropertiesCSV) updates.user_properties_csv = params.userPropertiesCSV;
+    const updates: Record<string, string | null> = {};
+    if (params.eventSchemaCSV) updates.event_schema_csv = sanitizeTextForPostgres(params.eventSchemaCSV);
+    if (params.userPropertiesCSV) updates.user_properties_csv = sanitizeTextForPostgres(params.userPropertiesCSV);
     if (Object.keys(updates).length > 0) {
-      await supabase.from("brand_profiles").update(updates).eq("brand_id", existing.brand_id);
+      const { error: updateError } = await supabase.from("brand_profiles").update(updates).eq("brand_id", existing.brand_id);
+      if (updateError) throw new Error(`Failed to update brand profile schema fields: ${updateError.message}`);
     }
     return existing.brand_id;
   }
@@ -66,13 +112,13 @@ export async function ensureBrandProfile(params: {
   const { data: inserted, error } = await supabase
     .from("brand_profiles")
     .insert({
-      website_url: params.websiteUrl,
+      website_url: safeWebsiteUrl,
       website_host_normalized: host,
       industry_selected: industryNorm,
-      brand_name: params.brandName || null,
-      event_schema_csv: params.eventSchemaCSV || null,
-      user_properties_csv: params.userPropertiesCSV || null,
-    } as any)
+      brand_name: sanitizeTextForPostgres(params.brandName) || null,
+      event_schema_csv: sanitizeTextForPostgres(params.eventSchemaCSV) || null,
+      user_properties_csv: sanitizeTextForPostgres(params.userPropertiesCSV) || null,
+    })
     .select("brand_id")
     .single();
 
@@ -94,44 +140,48 @@ export async function createBrandProfileVersion(params: {
   status?: string;
   notes?: string;
 }): Promise<string> {
-  const host = normalizeHost(params.websiteUrl);
+  const safeWebsiteUrl = sanitizeTextForPostgres(params.websiteUrl) || "";
+  const safeBrandProfileJson = sanitizeJsonForPostgres(params.brandProfileJson);
+  const safeBrandDesignProfileJson = sanitizeJsonForPostgres(params.brandDesignProfileJson || null);
+  const host = normalizeHost(safeWebsiteUrl);
 
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .insert({
       brand_id: params.brandId,
-      website_url_original: params.websiteUrl,
+      website_url_original: safeWebsiteUrl,
       website_host_normalized: host,
-      extraction_method: params.extractionMethod || "url_crawl",
-      extraction_version: params.extractionVersion || "1.0",
-      source_fingerprint: params.sourceFingerprint || null,
-      brand_profile_json: params.brandProfileJson as any,
-      brand_design_profile_json: params.brandDesignProfileJson || null,
-      confidence: params.confidence || "medium",
-      status: params.status || "success",
-      notes: params.notes || null,
+      extraction_method: sanitizeTextForPostgres(params.extractionMethod) || "url_crawl",
+      extraction_version: sanitizeTextForPostgres(params.extractionVersion) || "1.0",
+      source_fingerprint: sanitizeTextForPostgres(params.sourceFingerprint) || null,
+      brand_profile_json: safeBrandProfileJson as unknown as Json,
+      brand_design_profile_json: safeBrandDesignProfileJson as unknown as Json,
+      confidence: sanitizeTextForPostgres(params.confidence) || "medium",
+      status: sanitizeTextForPostgres(params.status) || "success",
+      notes: sanitizeTextForPostgres(params.notes) || null,
     })
     .select("brand_profile_version_id")
     .single();
 
   if (error) throw new Error(`Failed to create brand profile version: ${error.message}`);
 
-  const versionId = (data as any).brand_profile_version_id;
+  const versionId = data.brand_profile_version_id;
 
   // Update brand_profiles with latest version pointer, brand name, scores
-  const brandName = params.brandProfileJson?.brand_identity?.brand_name;
-  const completeness = computeCompletenessScore(params.brandProfileJson);
-  await supabase
+  const brandName = safeBrandProfileJson?.brand_identity?.brand_name;
+  const completeness = computeCompletenessScore(safeBrandProfileJson);
+  const { error: profileUpdateError } = await supabase
     .from("brand_profiles")
     .update({
       latest_brand_profile_version_id: versionId,
-      brand_profile_json: params.brandProfileJson as any,
-      brand_design_profile_json: params.brandDesignProfileJson || null,
+      brand_profile_json: safeBrandProfileJson as unknown as Json,
+      brand_design_profile_json: safeBrandDesignProfileJson as unknown as Json,
       brand_name: brandName || null,
-      website_url: params.websiteUrl,
+      website_url: safeWebsiteUrl,
       profile_completeness_score: completeness,
-    } as any)
+    })
     .eq("brand_id", params.brandId);
+  if (profileUpdateError) throw new Error(`Failed to update saved brand profile: ${profileUpdateError.message}`);
 
   // Increment iteration_count
   const { data: currentProfile } = await supabase
@@ -139,11 +189,12 @@ export async function createBrandProfileVersion(params: {
     .select("iteration_count")
     .eq("brand_id", params.brandId)
     .maybeSingle();
-  const currentCount = (currentProfile as any)?.iteration_count || 0;
-  await supabase
+  const currentCount = currentProfile?.iteration_count || 0;
+  const { error: iterationError } = await supabase
     .from("brand_profiles")
-    .update({ iteration_count: currentCount + 1 } as any)
+    .update({ iteration_count: currentCount + 1 })
     .eq("brand_id", params.brandId);
+  if (iterationError) throw new Error(`Failed to update brand profile iteration count: ${iterationError.message}`);
 
   return versionId;
 }
@@ -163,7 +214,7 @@ export async function loadBrandProfileMeta(params: {
     .maybeSingle();
 
   if (error || !data) return null;
-  const row = data as any;
+  const row = data;
   return {
     brandId: row.brand_id,
     completenessScore: row.profile_completeness_score || 0,
@@ -182,17 +233,19 @@ export async function saveBrandSchemaCSVs(params: {
   eventSchemaCSV?: string;
   userPropertiesCSV?: string;
 }): Promise<void> {
-  const host = normalizeHost(params.websiteUrl);
-  const updates: Record<string, any> = {};
-  if (params.eventSchemaCSV !== undefined) updates.event_schema_csv = params.eventSchemaCSV || null;
-  if (params.userPropertiesCSV !== undefined) updates.user_properties_csv = params.userPropertiesCSV || null;
+  const safeWebsiteUrl = sanitizeTextForPostgres(params.websiteUrl) || "";
+  const host = normalizeHost(safeWebsiteUrl);
+  const updates: Record<string, string | null> = {};
+  if (params.eventSchemaCSV !== undefined) updates.event_schema_csv = sanitizeTextForPostgres(params.eventSchemaCSV) || null;
+  if (params.userPropertiesCSV !== undefined) updates.user_properties_csv = sanitizeTextForPostgres(params.userPropertiesCSV) || null;
   if (Object.keys(updates).length === 0) return;
 
-  await supabase
+  const { error } = await supabase
     .from("brand_profiles")
     .update(updates)
     .eq("website_host_normalized", host)
     .eq("industry_selected", params.industry.toLowerCase().trim());
+  if (error) throw new Error(`Failed to save brand profile schema fields: ${error.message}`);
 }
 
 // ===== ENRICH EXISTING PROFILE =====
@@ -211,10 +264,10 @@ export async function loadBrandProfileVersions(params: {
   websiteUrl: string;
   industry: string;
 }): Promise<BrandProfileVersion[]> {
-  const host = normalizeHost(params.websiteUrl);
+  const host = normalizeHost(sanitizeTextForPostgres(params.websiteUrl) || "");
 
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .select("*")
     .eq("website_host_normalized", host)
     .order("generated_at", { ascending: false })
@@ -222,7 +275,7 @@ export async function loadBrandProfileVersions(params: {
 
   if (error || !data) return [];
 
-  return (data as any[]).map(row => ({
+  return data.map(row => ({
     brandProfileVersionId: row.brand_profile_version_id,
     brandId: row.brand_id,
     websiteUrlOriginal: row.website_url_original,
@@ -230,8 +283,8 @@ export async function loadBrandProfileVersions(params: {
     extractionMethod: row.extraction_method,
     extractionVersion: row.extraction_version,
     sourceFingerprint: row.source_fingerprint,
-    brandProfileJson: row.brand_profile_json as CoreBrandJSON,
-    brandDesignProfileJson: row.brand_design_profile_json || null,
+    brandProfileJson: row.brand_profile_json as unknown as CoreBrandJSON,
+    brandDesignProfileJson: row.brand_design_profile_json as unknown as BrandDesignProfile | null,
     confidence: row.confidence,
     status: row.status,
     generatedAt: row.generated_at,
@@ -243,14 +296,14 @@ export async function loadBrandProfileVersions(params: {
 
 export async function loadAllRecentBrandVersions(limit = 20): Promise<BrandProfileVersion[]> {
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .select("*")
     .order("generated_at", { ascending: false })
     .limit(limit);
 
   if (error || !data) return [];
 
-  return (data as any[]).map(row => ({
+  return data.map(row => ({
     brandProfileVersionId: row.brand_profile_version_id,
     brandId: row.brand_id,
     websiteUrlOriginal: row.website_url_original,
@@ -258,8 +311,8 @@ export async function loadAllRecentBrandVersions(limit = 20): Promise<BrandProfi
     extractionMethod: row.extraction_method,
     extractionVersion: row.extraction_version,
     sourceFingerprint: row.source_fingerprint,
-    brandProfileJson: row.brand_profile_json as CoreBrandJSON,
-    brandDesignProfileJson: row.brand_design_profile_json || null,
+    brandProfileJson: row.brand_profile_json as unknown as CoreBrandJSON,
+    brandDesignProfileJson: row.brand_design_profile_json as unknown as BrandDesignProfile | null,
     confidence: row.confidence,
     status: row.status,
     generatedAt: row.generated_at,
@@ -271,13 +324,13 @@ export async function loadAllRecentBrandVersions(limit = 20): Promise<BrandProfi
 
 export async function loadBrandProfileVersionById(versionId: string): Promise<BrandProfileVersion | null> {
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .select("*")
     .eq("brand_profile_version_id", versionId)
     .maybeSingle();
 
   if (error || !data) return null;
-  const row = data as any;
+  const row = data;
 
   return {
     brandProfileVersionId: row.brand_profile_version_id,
@@ -287,8 +340,8 @@ export async function loadBrandProfileVersionById(versionId: string): Promise<Br
     extractionMethod: row.extraction_method,
     extractionVersion: row.extraction_version,
     sourceFingerprint: row.source_fingerprint,
-    brandProfileJson: row.brand_profile_json as CoreBrandJSON,
-    brandDesignProfileJson: row.brand_design_profile_json || null,
+    brandProfileJson: row.brand_profile_json as unknown as CoreBrandJSON,
+    brandDesignProfileJson: row.brand_design_profile_json as unknown as BrandDesignProfile | null,
     confidence: row.confidence,
     status: row.status,
     generatedAt: row.generated_at,
