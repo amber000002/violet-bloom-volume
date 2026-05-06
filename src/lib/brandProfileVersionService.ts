@@ -98,7 +98,7 @@ export async function ensureBrandProfile(params: {
 
   if (existing) {
     // Update schema CSVs if provided
-    const updates: Record<string, any> = {};
+    const updates: Record<string, string | null> = {};
     if (params.eventSchemaCSV) updates.event_schema_csv = sanitizeTextForPostgres(params.eventSchemaCSV);
     if (params.userPropertiesCSV) updates.user_properties_csv = sanitizeTextForPostgres(params.userPropertiesCSV);
     if (Object.keys(updates).length > 0) {
@@ -117,7 +117,7 @@ export async function ensureBrandProfile(params: {
       brand_name: sanitizeTextForPostgres(params.brandName) || null,
       event_schema_csv: sanitizeTextForPostgres(params.eventSchemaCSV) || null,
       user_properties_csv: sanitizeTextForPostgres(params.userPropertiesCSV) || null,
-    } as any)
+    })
     .select("brand_id")
     .single();
 
@@ -153,7 +153,7 @@ export async function createBrandProfileVersion(params: {
       extraction_method: sanitizeTextForPostgres(params.extractionMethod) || "url_crawl",
       extraction_version: sanitizeTextForPostgres(params.extractionVersion) || "1.0",
       source_fingerprint: sanitizeTextForPostgres(params.sourceFingerprint) || null,
-      brand_profile_json: safeBrandProfileJson as any,
+      brand_profile_json: safeBrandProfileJson,
       brand_design_profile_json: safeBrandDesignProfileJson,
       confidence: sanitizeTextForPostgres(params.confidence) || "medium",
       status: sanitizeTextForPostgres(params.status) || "success",
@@ -173,12 +173,12 @@ export async function createBrandProfileVersion(params: {
     .from("brand_profiles")
     .update({
       latest_brand_profile_version_id: versionId,
-      brand_profile_json: safeBrandProfileJson as any,
+      brand_profile_json: safeBrandProfileJson,
       brand_design_profile_json: safeBrandDesignProfileJson,
       brand_name: brandName || null,
       website_url: safeWebsiteUrl,
       profile_completeness_score: completeness,
-    } as any)
+    })
     .eq("brand_id", params.brandId);
   if (profileUpdateError) throw new Error(`Failed to update saved brand profile: ${profileUpdateError.message}`);
 
@@ -191,7 +191,7 @@ export async function createBrandProfileVersion(params: {
   const currentCount = (currentProfile as any)?.iteration_count || 0;
   const { error: iterationError } = await supabase
     .from("brand_profiles")
-    .update({ iteration_count: currentCount + 1 } as any)
+    .update({ iteration_count: currentCount + 1 })
     .eq("brand_id", params.brandId);
   if (iterationError) throw new Error(`Failed to update brand profile iteration count: ${iterationError.message}`);
 
