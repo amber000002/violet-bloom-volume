@@ -495,15 +495,31 @@ export const SlideLayoutEditor: React.FC<SlideLayoutEditorProps> = ({ onClose })
                   </div>
 
                   {/* Body 16:9 */}
-                  <div className="relative aspect-video bg-muted/40 flex items-center justify-center">
+                  <div className="relative aspect-video bg-muted/40 flex items-center justify-center group/slot">
                     {isBusy ? (
                       <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                     ) : filled ? (
-                      <img
-                        src={slot.background_url || ""}
-                        alt={slot.title}
-                        className="w-full h-full object-contain"
-                      />
+                      <>
+                        <img
+                          src={slot.background_url || ""}
+                          alt={slot.title}
+                          className="w-full h-full object-contain"
+                        />
+                        {!inCustomMode && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemove(slot);
+                            }}
+                            disabled={busyId === slot.id}
+                            title={`Remove background from slide ${slot.position}`}
+                            className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1 px-1.5 py-1 rounded-md bg-background/80 backdrop-blur-sm border border-border text-[10px] text-muted-foreground hover:text-destructive hover:border-destructive opacity-0 group-hover/slot:opacity-100 transition-opacity disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Remove
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <button
                         onClick={(e) => {
