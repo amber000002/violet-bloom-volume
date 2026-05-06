@@ -214,7 +214,7 @@ export async function loadBrandProfileMeta(params: {
     .maybeSingle();
 
   if (error || !data) return null;
-  const row = data as any;
+  const row = data;
   return {
     brandId: row.brand_id,
     completenessScore: row.profile_completeness_score || 0,
