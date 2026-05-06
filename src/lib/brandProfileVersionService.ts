@@ -139,22 +139,25 @@ export async function createBrandProfileVersion(params: {
   status?: string;
   notes?: string;
 }): Promise<string> {
-  const host = normalizeHost(params.websiteUrl);
+  const safeWebsiteUrl = sanitizeTextForPostgres(params.websiteUrl) || "";
+  const safeBrandProfileJson = sanitizeJsonForPostgres(params.brandProfileJson);
+  const safeBrandDesignProfileJson = sanitizeJsonForPostgres(params.brandDesignProfileJson || null);
+  const host = normalizeHost(safeWebsiteUrl);
 
   const { data, error } = await supabase
     .from("brand_profile_versions" as any)
     .insert({
       brand_id: params.brandId,
-      website_url_original: params.websiteUrl,
+      website_url_original: safeWebsiteUrl,
       website_host_normalized: host,
-      extraction_method: params.extractionMethod || "url_crawl",
-      extraction_version: params.extractionVersion || "1.0",
-      source_fingerprint: params.sourceFingerprint || null,
-      brand_profile_json: params.brandProfileJson as any,
-      brand_design_profile_json: params.brandDesignProfileJson || null,
-      confidence: params.confidence || "medium",
-      status: params.status || "success",
-      notes: params.notes || null,
+      extraction_method: sanitizeTextForPostgres(params.extractionMethod) || "url_crawl",
+      extraction_version: sanitizeTextForPostgres(params.extractionVersion) || "1.0",
+      source_fingerprint: sanitizeTextForPostgres(params.sourceFingerprint) || null,
+      brand_profile_json: safeBrandProfileJson as any,
+      brand_design_profile_json: safeBrandDesignProfileJson,
+      confidence: sanitizeTextForPostgres(params.confidence) || "medium",
+      status: sanitizeTextForPostgres(params.status) || "success",
+      notes: sanitizeTextForPostgres(params.notes) || null,
     })
     .select("brand_profile_version_id")
     .single();
@@ -164,19 +167,20 @@ export async function createBrandProfileVersion(params: {
   const versionId = (data as any).brand_profile_version_id;
 
   // Update brand_profiles with latest version pointer, brand name, scores
-  const brandName = params.brandProfileJson?.brand_identity?.brand_name;
-  const completeness = computeCompletenessScore(params.brandProfileJson);
-  await supabase
+  const brandName = safeBrandProfileJson?.brand_identity?.brand_name;
+  const completeness = computeCompletenessScore(safeBrandProfileJson);
+  const { error: profileUpdateError } = await supabase
     .from("brand_profiles")
     .update({
       latest_brand_profile_version_id: versionId,
-      brand_profile_json: params.brandProfileJson as any,
-      brand_design_profile_json: params.brandDesignProfileJson || null,
+      brand_profile_json: safeBrandProfileJson as any,
+      brand_design_profile_json: safeBrandDesignProfileJson,
       brand_name: brandName || null,
-      website_url: params.websiteUrl,
+      website_url: safeWebsiteUrl,
       profile_completeness_score: completeness,
     } as any)
     .eq("brand_id", params.brandId);
+  if (profileUpdateError) throw new Error(`Failed to update saved brand profile: ${profileUpdateError.message}`);
 
   // Increment iteration_count
   const { data: currentProfile } = await supabase
@@ -185,10 +189,11 @@ export async function createBrandProfileVersion(params: {
     .eq("brand_id", params.brandId)
     .maybeSingle();
   const currentCount = (currentProfile as any)?.iteration_count || 0;
-  await supabase
+  const { error: iterationError } = await supabase
     .from("brand_profiles")
     .update({ iteration_count: currentCount + 1 } as any)
     .eq("brand_id", params.brandId);
+  if (iterationError) throw new Error(`Failed to update brand profile iteration count: ${iterationError.message}`);
 
   return versionId;
 }
