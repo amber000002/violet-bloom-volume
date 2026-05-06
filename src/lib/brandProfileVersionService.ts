@@ -4,6 +4,48 @@ import { computeCompletenessScore, mergeProfiles } from "@/lib/brandEnrichmentEn
 
 // ===== HELPERS =====
 
+function sanitizeTextForPostgres(value: string | null | undefined): string | null {
+  if (value == null) return null;
+
+  let cleaned = "";
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+
+    // Postgres JSONB/text cannot store NUL characters; they surface as
+    // "unsupported Unicode escape sequence" when sent through JSON APIs.
+    if (code === 0) continue;
+
+    // Drop malformed surrogate halves while preserving valid emoji pairs.
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        cleaned += value[i] + value[i + 1];
+        i++;
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) continue;
+
+    cleaned += value[i];
+  }
+
+  return cleaned;
+}
+
+function sanitizeJsonForPostgres<T>(value: T): T {
+  if (typeof value === "string") return sanitizeTextForPostgres(value) as T;
+  if (Array.isArray(value)) return value.map(item => sanitizeJsonForPostgres(item)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        sanitizeJsonForPostgres(entry),
+      ])
+    ) as T;
+  }
+  return value;
+}
+
 export function normalizeHost(url: string): string {
   try {
     let host = url.replace(/^https?:\/\//, "").replace(/^www\./, "").toLowerCase().trim();
@@ -42,8 +84,10 @@ export async function ensureBrandProfile(params: {
   eventSchemaCSV?: string;
   userPropertiesCSV?: string;
 }): Promise<string> {
-  const host = normalizeHost(params.websiteUrl);
-  const industryNorm = params.industry.toLowerCase().trim();
+  const safeWebsiteUrl = sanitizeTextForPostgres(params.websiteUrl) || "";
+  const safeIndustry = sanitizeTextForPostgres(params.industry) || "";
+  const host = normalizeHost(safeWebsiteUrl);
+  const industryNorm = safeIndustry.toLowerCase().trim();
 
   const { data: existing } = await supabase
     .from("brand_profiles")
@@ -55,10 +99,11 @@ export async function ensureBrandProfile(params: {
   if (existing) {
     // Update schema CSVs if provided
     const updates: Record<string, any> = {};
-    if (params.eventSchemaCSV) updates.event_schema_csv = params.eventSchemaCSV;
-    if (params.userPropertiesCSV) updates.user_properties_csv = params.userPropertiesCSV;
+    if (params.eventSchemaCSV) updates.event_schema_csv = sanitizeTextForPostgres(params.eventSchemaCSV);
+    if (params.userPropertiesCSV) updates.user_properties_csv = sanitizeTextForPostgres(params.userPropertiesCSV);
     if (Object.keys(updates).length > 0) {
-      await supabase.from("brand_profiles").update(updates).eq("brand_id", existing.brand_id);
+      const { error: updateError } = await supabase.from("brand_profiles").update(updates).eq("brand_id", existing.brand_id);
+      if (updateError) throw new Error(`Failed to update brand profile schema fields: ${updateError.message}`);
     }
     return existing.brand_id;
   }
@@ -66,12 +111,12 @@ export async function ensureBrandProfile(params: {
   const { data: inserted, error } = await supabase
     .from("brand_profiles")
     .insert({
-      website_url: params.websiteUrl,
+      website_url: safeWebsiteUrl,
       website_host_normalized: host,
       industry_selected: industryNorm,
-      brand_name: params.brandName || null,
-      event_schema_csv: params.eventSchemaCSV || null,
-      user_properties_csv: params.userPropertiesCSV || null,
+      brand_name: sanitizeTextForPostgres(params.brandName) || null,
+      event_schema_csv: sanitizeTextForPostgres(params.eventSchemaCSV) || null,
+      user_properties_csv: sanitizeTextForPostgres(params.userPropertiesCSV) || null,
     } as any)
     .select("brand_id")
     .single();
