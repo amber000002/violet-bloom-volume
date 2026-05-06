@@ -233,17 +233,19 @@ export async function saveBrandSchemaCSVs(params: {
   eventSchemaCSV?: string;
   userPropertiesCSV?: string;
 }): Promise<void> {
-  const host = normalizeHost(params.websiteUrl);
-  const updates: Record<string, any> = {};
-  if (params.eventSchemaCSV !== undefined) updates.event_schema_csv = params.eventSchemaCSV || null;
-  if (params.userPropertiesCSV !== undefined) updates.user_properties_csv = params.userPropertiesCSV || null;
+  const safeWebsiteUrl = sanitizeTextForPostgres(params.websiteUrl) || "";
+  const host = normalizeHost(safeWebsiteUrl);
+  const updates: Record<string, string | null> = {};
+  if (params.eventSchemaCSV !== undefined) updates.event_schema_csv = sanitizeTextForPostgres(params.eventSchemaCSV) || null;
+  if (params.userPropertiesCSV !== undefined) updates.user_properties_csv = sanitizeTextForPostgres(params.userPropertiesCSV) || null;
   if (Object.keys(updates).length === 0) return;
 
-  await supabase
+  const { error } = await supabase
     .from("brand_profiles")
     .update(updates)
     .eq("website_host_normalized", host)
     .eq("industry_selected", params.industry.toLowerCase().trim());
+  if (error) throw new Error(`Failed to save brand profile schema fields: ${error.message}`);
 }
 
 // ===== ENRICH EXISTING PROFILE =====
@@ -262,10 +264,10 @@ export async function loadBrandProfileVersions(params: {
   websiteUrl: string;
   industry: string;
 }): Promise<BrandProfileVersion[]> {
-  const host = normalizeHost(params.websiteUrl);
+  const host = normalizeHost(sanitizeTextForPostgres(params.websiteUrl) || "");
 
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .select("*")
     .eq("website_host_normalized", host)
     .order("generated_at", { ascending: false })
@@ -273,7 +275,7 @@ export async function loadBrandProfileVersions(params: {
 
   if (error || !data) return [];
 
-  return (data as any[]).map(row => ({
+  return data.map(row => ({
     brandProfileVersionId: row.brand_profile_version_id,
     brandId: row.brand_id,
     websiteUrlOriginal: row.website_url_original,
@@ -294,14 +296,14 @@ export async function loadBrandProfileVersions(params: {
 
 export async function loadAllRecentBrandVersions(limit = 20): Promise<BrandProfileVersion[]> {
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .select("*")
     .order("generated_at", { ascending: false })
     .limit(limit);
 
   if (error || !data) return [];
 
-  return (data as any[]).map(row => ({
+  return data.map(row => ({
     brandProfileVersionId: row.brand_profile_version_id,
     brandId: row.brand_id,
     websiteUrlOriginal: row.website_url_original,
@@ -322,13 +324,13 @@ export async function loadAllRecentBrandVersions(limit = 20): Promise<BrandProfi
 
 export async function loadBrandProfileVersionById(versionId: string): Promise<BrandProfileVersion | null> {
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .select("*")
     .eq("brand_profile_version_id", versionId)
     .maybeSingle();
 
   if (error || !data) return null;
-  const row = data as any;
+  const row = data;
 
   return {
     brandProfileVersionId: row.brand_profile_version_id,
