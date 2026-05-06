@@ -209,7 +209,11 @@ const InboxAlchemyContent: React.FC = () => {
           toast.success(`Brand profile saved (version ${versions.length}, completeness ${meta?.completenessScore || computeCompletenessScore(profile)}%)`);
         } catch (saveErr: any) {
           console.error("Failed to persist brand profile version:", saveErr);
-          toast.warning("Brand profile generated but failed to save version to cloud");
+          const errMsg = saveErr?.message || saveErr?.error_description || saveErr?.details || (typeof saveErr === "string" ? saveErr : JSON.stringify(saveErr));
+          toast.error(`Brand profile generated but NOT saved to cloud: ${errMsg}`, {
+            duration: 12000,
+            description: "The profile won't appear under Saved Brand Profiles. Check console for full error.",
+          });
         }
 
         const meta = profile.extraction_metadata;
