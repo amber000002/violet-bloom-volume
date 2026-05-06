@@ -214,7 +214,7 @@ ${combinedText}${schemaContext}`,
           },
         ],
         temperature: 0.2,
-        max_tokens: 10000,
+        max_tokens: 16000,
       }),
     });
 
@@ -231,6 +231,10 @@ ${combinedText}${schemaContext}`,
 
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content;
+    const finishReason = aiData.choices?.[0]?.finish_reason;
+    if (finishReason === "length") {
+      console.warn("⚠️ Brand profile output was truncated by max_tokens cap — JSON repair will be attempted.");
+    }
     if (!content) throw new Error("No AI response content");
 
     let jsonStr = content.trim();
