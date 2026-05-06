@@ -146,7 +146,7 @@ export async function createBrandProfileVersion(params: {
   const host = normalizeHost(safeWebsiteUrl);
 
   const { data, error } = await supabase
-    .from("brand_profile_versions" as any)
+    .from("brand_profile_versions")
     .insert({
       brand_id: params.brandId,
       website_url_original: safeWebsiteUrl,
@@ -165,7 +165,7 @@ export async function createBrandProfileVersion(params: {
 
   if (error) throw new Error(`Failed to create brand profile version: ${error.message}`);
 
-  const versionId = (data as any).brand_profile_version_id;
+  const versionId = data.brand_profile_version_id;
 
   // Update brand_profiles with latest version pointer, brand name, scores
   const brandName = safeBrandProfileJson?.brand_identity?.brand_name;
@@ -189,7 +189,7 @@ export async function createBrandProfileVersion(params: {
     .select("iteration_count")
     .eq("brand_id", params.brandId)
     .maybeSingle();
-  const currentCount = (currentProfile as any)?.iteration_count || 0;
+  const currentCount = currentProfile?.iteration_count || 0;
   const { error: iterationError } = await supabase
     .from("brand_profiles")
     .update({ iteration_count: currentCount + 1 })
