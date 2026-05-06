@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
 import { computeCompletenessScore, mergeProfiles } from "@/lib/brandEnrichmentEngine";
 
@@ -153,8 +154,8 @@ export async function createBrandProfileVersion(params: {
       extraction_method: sanitizeTextForPostgres(params.extractionMethod) || "url_crawl",
       extraction_version: sanitizeTextForPostgres(params.extractionVersion) || "1.0",
       source_fingerprint: sanitizeTextForPostgres(params.sourceFingerprint) || null,
-      brand_profile_json: safeBrandProfileJson,
-      brand_design_profile_json: safeBrandDesignProfileJson,
+      brand_profile_json: safeBrandProfileJson as unknown as Json,
+      brand_design_profile_json: safeBrandDesignProfileJson as unknown as Json,
       confidence: sanitizeTextForPostgres(params.confidence) || "medium",
       status: sanitizeTextForPostgres(params.status) || "success",
       notes: sanitizeTextForPostgres(params.notes) || null,
@@ -173,8 +174,8 @@ export async function createBrandProfileVersion(params: {
     .from("brand_profiles")
     .update({
       latest_brand_profile_version_id: versionId,
-      brand_profile_json: safeBrandProfileJson,
-      brand_design_profile_json: safeBrandDesignProfileJson,
+      brand_profile_json: safeBrandProfileJson as unknown as Json,
+      brand_design_profile_json: safeBrandDesignProfileJson as unknown as Json,
       brand_name: brandName || null,
       website_url: safeWebsiteUrl,
       profile_completeness_score: completeness,
