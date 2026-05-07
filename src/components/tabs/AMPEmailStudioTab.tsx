@@ -13,6 +13,7 @@ import { CoreBrandJSON } from "@/types/brandProfile";
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
 import { TemplateEngineMode } from "./TemplateEngineMode";
+import { AmpTemplatesMode } from "./AmpTemplatesMode";
 
 interface AMPEmailStudioTabProps {
   industry: string;
@@ -22,7 +23,7 @@ interface AMPEmailStudioTabProps {
 }
 
 type TemplateStyle = "brand-carousel" | "gamified";
-type StudioMode = "interactive" | "template-engine";
+type StudioMode = "interactive" | "template-engine" | "amp-templates";
 
 const templateStyleOptions = [
   { id: "brand-carousel" as const, label: "Brand-led Carousel" },
@@ -38,7 +39,7 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   onDataChange,
   brandProfile = null,
 }) => {
-  const [studioMode, setStudioMode] = useState<StudioMode>("template-engine");
+  const [studioMode, setStudioMode] = useState<StudioMode>("amp-templates");
   const [selectedUseCase, setSelectedUseCase] = useState("");
   const [templateStyle, setTemplateStyle] = useState<TemplateStyle>("brand-carousel");
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -172,7 +173,18 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   return (
     <div className="space-y-8">
       {/* Mode Toggle */}
-      <div className="flex justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-md mx-auto">
+      <div className="flex justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-2xl mx-auto">
+        <button
+          onClick={() => setStudioMode("amp-templates")}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            studioMode === "amp-templates"
+              ? "bg-gradient-magic text-primary-foreground shadow-magic"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          AMP Templates
+        </button>
         <button
           onClick={() => setStudioMode("template-engine")}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
@@ -196,6 +208,15 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
           Interactive Preview
         </button>
       </div>
+
+      {/* AMP Templates Mode (Phase 2: brand-aware generation) */}
+      {studioMode === "amp-templates" && (
+        <AmpTemplatesMode
+          brandProfile={brandProfile}
+          brandDesignProfile={brandProfile?.brand_design_profile || null}
+          websiteUrl={brandProfile?.brand_identity?.website}
+        />
+      )}
 
       {/* Template Engine Mode */}
       {studioMode === "template-engine" && (
