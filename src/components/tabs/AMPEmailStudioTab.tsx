@@ -39,7 +39,7 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   onDataChange,
   brandProfile = null,
 }) => {
-  const [studioMode, setStudioMode] = useState<StudioMode>("template-engine");
+  const [studioMode, setStudioMode] = useState<StudioMode>("amp-templates");
   const [selectedUseCase, setSelectedUseCase] = useState("");
   const [templateStyle, setTemplateStyle] = useState<TemplateStyle>("brand-carousel");
   const [websiteUrl, setWebsiteUrl] = useState("");
