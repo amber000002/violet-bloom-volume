@@ -475,6 +475,48 @@ export type Database = {
         }
         Relationships: []
       }
+      use_case_templates: {
+        Row: {
+          amp_valid: boolean
+          amp_validator_errors: Json | null
+          created_at: string
+          file_size_bytes: number
+          html_content: string
+          id: string
+          is_active: boolean
+          label: string
+          thumbnail_url: string | null
+          updated_at: string
+          usage_count: number
+        }
+        Insert: {
+          amp_valid?: boolean
+          amp_validator_errors?: Json | null
+          created_at?: string
+          file_size_bytes?: number
+          html_content: string
+          id?: string
+          is_active?: boolean
+          label: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number
+        }
+        Update: {
+          amp_valid?: boolean
+          amp_validator_errors?: Json | null
+          created_at?: string
+          file_size_bytes?: number
+          html_content?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          usage_count?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
