@@ -9,6 +9,7 @@ import {
   Search,
   FileJson,
   LayoutTemplate,
+  FileCode,
 } from "lucide-react";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { TabRelevance } from "@/types/resources";
@@ -16,6 +17,7 @@ import { AddResourceForm } from "./AddResourceForm";
 import { ResourceCard } from "./ResourceCard";
 import { JSONResourceUpload } from "./JSONResourceUpload";
 import { SlideLayoutEditor } from "./SlideLayoutEditor";
+import { UseCaseTemplateEditor } from "./UseCaseTemplateEditor";
 
 const tabLabels: Record<TabRelevance, string> = {
   "inbox-potential": "Inbox Potential",
@@ -25,7 +27,7 @@ const tabLabels: Record<TabRelevance, string> = {
   "creative": "Creative Analyzer",
 };
 
-type ViewMode = "list" | "add-form" | "add-json" | "slide-templates";
+type ViewMode = "list" | "add-form" | "add-json" | "slide-templates" | "use-case-templates";
 
 export const ResourceLibrary: React.FC = () => {
   const { resources, isLibraryOpen, setIsLibraryOpen, isOwner, cloudItems } = useResourceLibrary();
