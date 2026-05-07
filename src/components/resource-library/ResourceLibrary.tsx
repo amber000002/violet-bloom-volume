@@ -141,6 +141,8 @@ export const ResourceLibrary: React.FC = () => {
                   <JSONResourceUpload onClose={() => setViewMode("list")} />
                 ) : viewMode === "slide-templates" ? (
                   <SlideLayoutEditor onClose={() => setViewMode("list")} />
+                ) : viewMode === "use-case-templates" ? (
+                  <UseCaseTemplateEditor onClose={() => setViewMode("list")} />
                 ) : (
                   <div className="space-y-4">
                     {/* Add Buttons — Owner only */}
@@ -185,6 +187,26 @@ export const ResourceLibrary: React.FC = () => {
                           <div className="text-sm font-medium text-foreground">Slide Templates</div>
                           <div className="text-xs text-muted-foreground">
                             Manage branded backgrounds for Inbox Diagnostics report
+                          </div>
+                        </div>
+                      </motion.button>
+                    )}
+
+                    {/* Use Case Templates entry */}
+                    {isOwner && (
+                      <motion.button
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setViewMode("use-case-templates")}
+                        className="w-full p-3 border border-border rounded-xl bg-card/40 hover:bg-card/60 transition-colors flex items-center gap-3 text-left"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-gradient-magic flex items-center justify-center flex-shrink-0">
+                          <FileCode className="w-4 h-4 text-primary-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground">Use Case Templates</div>
+                          <div className="text-xs text-muted-foreground">
+                            Upload .html templates that power AMP brand-styled email generation
                           </div>
                         </div>
                       </motion.button>
