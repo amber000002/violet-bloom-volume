@@ -125,8 +125,8 @@ export function validateAmpEmail(html: string): AmpValidationResult {
   );
 
   // 9. CSS size limit (75 KB)
-  const styleBlocks = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) ?? [];
-  const totalCssBytes = styleBlocks.reduce((acc, b) => acc + new TextEncoder().encode(b).length, 0);
+  const styleBlocks: string[] = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) ?? [];
+  const totalCssBytes = styleBlocks.reduce<number>((acc, b) => acc + new TextEncoder().encode(b).length, 0);
   if (totalCssBytes > 75 * 1024) {
     hits.push({
       rule: "css-size-limit",
