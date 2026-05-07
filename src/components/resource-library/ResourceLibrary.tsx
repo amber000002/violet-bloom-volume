@@ -9,6 +9,7 @@ import {
   Search,
   FileJson,
   LayoutTemplate,
+  FileCode,
 } from "lucide-react";
 import { useResourceLibrary } from "@/contexts/ResourceLibraryContext";
 import { TabRelevance } from "@/types/resources";
@@ -16,6 +17,7 @@ import { AddResourceForm } from "./AddResourceForm";
 import { ResourceCard } from "./ResourceCard";
 import { JSONResourceUpload } from "./JSONResourceUpload";
 import { SlideLayoutEditor } from "./SlideLayoutEditor";
+import { UseCaseTemplateEditor } from "./UseCaseTemplateEditor";
 
 const tabLabels: Record<TabRelevance, string> = {
   "inbox-potential": "Inbox Potential",
@@ -25,7 +27,7 @@ const tabLabels: Record<TabRelevance, string> = {
   "creative": "Creative Analyzer",
 };
 
-type ViewMode = "list" | "add-form" | "add-json" | "slide-templates";
+type ViewMode = "list" | "add-form" | "add-json" | "slide-templates" | "use-case-templates";
 
 export const ResourceLibrary: React.FC = () => {
   const { resources, isLibraryOpen, setIsLibraryOpen, isOwner, cloudItems } = useResourceLibrary();
@@ -139,6 +141,8 @@ export const ResourceLibrary: React.FC = () => {
                   <JSONResourceUpload onClose={() => setViewMode("list")} />
                 ) : viewMode === "slide-templates" ? (
                   <SlideLayoutEditor onClose={() => setViewMode("list")} />
+                ) : viewMode === "use-case-templates" ? (
+                  <UseCaseTemplateEditor onClose={() => setViewMode("list")} />
                 ) : (
                   <div className="space-y-4">
                     {/* Add Buttons — Owner only */}
@@ -183,6 +187,26 @@ export const ResourceLibrary: React.FC = () => {
                           <div className="text-sm font-medium text-foreground">Slide Templates</div>
                           <div className="text-xs text-muted-foreground">
                             Manage branded backgrounds for Inbox Diagnostics report
+                          </div>
+                        </div>
+                      </motion.button>
+                    )}
+
+                    {/* Use Case Templates entry */}
+                    {isOwner && (
+                      <motion.button
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setViewMode("use-case-templates")}
+                        className="w-full p-3 border border-border rounded-xl bg-card/40 hover:bg-card/60 transition-colors flex items-center gap-3 text-left"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-gradient-magic flex items-center justify-center flex-shrink-0">
+                          <FileCode className="w-4 h-4 text-primary-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground">Use Case Templates</div>
+                          <div className="text-xs text-muted-foreground">
+                            Upload .html templates that power AMP brand-styled email generation
                           </div>
                         </div>
                       </motion.button>
