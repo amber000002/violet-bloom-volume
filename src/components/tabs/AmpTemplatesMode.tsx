@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileCode, Wand2, Loader2, Eye, Code, Copy, Check, AlertTriangle,
-  CheckCircle2, ShieldCheck, Sparkles, X, Upload,
+  CheckCircle2, ShieldCheck, Sparkles, X, Upload, Save, FolderOpen, Trash2, Clock,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateServ
 import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
 import { validateAmpEmail, AmpValidationError } from "@/lib/ampEmailValidator";
 import { autoFixAmpHtml } from "@/lib/ampAutoFix";
+import { listAmpDrafts, saveAmpDraft, deleteAmpDraft, AmpDraft } from "@/lib/ampDraftService";
 
 interface AmpTemplatesModeProps {
   brandProfile: CoreBrandJSON | null;
@@ -39,6 +40,22 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
   const [view, setView] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
 
+  // Drafts
+  const [drafts, setDrafts] = useState<AmpDraft[]>([]);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
+  const loadDrafts = async () => {
+    try {
+      const list = await listAmpDrafts();
+      setDrafts(list);
+    } catch (e: any) {
+      toast.error(`Failed to load drafts: ${e?.message || e}`);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -51,6 +68,7 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
         setLoadingTemplates(false);
       }
     })();
+    loadDrafts();
   }, []);
 
   const selectedTemplate = useMemo(
@@ -134,6 +152,54 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
     toast.success("HTML copied");
   };
 
+  const handleSaveDraft = async () => {
+    const name = draftName.trim();
+    if (!name) { toast.error("Enter a draft name"); return; }
+    if (!outputHtml) return;
+    setSavingDraft(true);
+    try {
+      await saveAmpDraft({
+        name,
+        htmlContent: outputHtml,
+        templateId: selectedTemplate?.id ?? null,
+        templateLabel: selectedTemplate?.label ?? null,
+        brandName: brandProfile?.brand_identity?.brand_name ?? null,
+        websiteHostNormalized: (websiteUrl || "").replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase() || null,
+        ampValid: validationErrors.length === 0,
+        ampValidatorErrors: validationErrors,
+        autoFixesApplied,
+      });
+      toast.success(`Draft "${name}" saved`);
+      setShowSaveDialog(false);
+      setDraftName("");
+      await loadDrafts();
+    } catch (e: any) {
+      toast.error(`Save failed: ${e?.message || e}`);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleLoadDraft = (d: AmpDraft) => {
+    setOutputHtml(d.htmlContent);
+    const v = validateAmpEmail(d.htmlContent);
+    setValidationErrors(v.errors);
+    setAutoFixesApplied(Array.isArray(d.autoFixesApplied) ? d.autoFixesApplied : []);
+    setDraftsOpen(false);
+    toast.success(`Loaded "${d.name}"`);
+  };
+
+  const handleDeleteDraft = async (d: AmpDraft) => {
+    if (!confirm(`Delete draft "${d.name}"?`)) return;
+    try {
+      await deleteAmpDraft(d.id);
+      toast.success("Draft deleted");
+      await loadDrafts();
+    } catch (e: any) {
+      toast.error(`Delete failed: ${e?.message || e}`);
+    }
+  };
+
   const badgeStyles: Record<ValidationBadge, { bg: string; text: string; label: string; Icon: any }> = {
     green: { bg: "bg-emerald-500/15 border-emerald-500/40", text: "text-emerald-500", label: "AMP Valid", Icon: CheckCircle2 },
     yellow: { bg: "bg-amber-500/15 border-amber-500/40", text: "text-amber-500", label: `${validationErrors.length} warning${validationErrors.length === 1 ? "" : "s"}`, Icon: AlertTriangle },
@@ -145,10 +211,65 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
     <div className="space-y-6">
       {/* Inputs */}
       <div className="max-w-5xl mx-auto magic-card rounded-2xl p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          AMP Templates — Brand-Aware Generation
-        </h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            AMP Templates — Brand-Aware Generation
+          </h3>
+          <button
+            onClick={() => setDraftsOpen((o) => !o)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-muted/50"
+          >
+            <FolderOpen className="w-3 h-3" />
+            Drafts {drafts.length > 0 && <span className="text-foreground/70">({drafts.length})</span>}
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {draftsOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-lg border border-border bg-muted/20 max-h-64 overflow-auto divide-y divide-border">
+                {drafts.length === 0 ? (
+                  <div className="p-3 text-xs text-muted-foreground">No saved drafts yet.</div>
+                ) : (
+                  drafts.map((d) => (
+                    <div key={d.id} className="flex items-center gap-2 px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{d.name}</p>
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          {new Date(d.createdAt).toLocaleString()}
+                          {d.brandName && <> · {d.brandName}</>}
+                          {d.templateLabel && <> · {d.templateLabel}</>}
+                          {d.ampValid ? " · ✓" : " · ⚠"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleLoadDraft(d)}
+                        className="px-2 py-1 rounded text-[10px] border border-border hover:bg-muted/50 text-foreground"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDraft(d)}
+                        className="p-1 rounded text-muted-foreground hover:text-destructive"
+                        title="Delete draft"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
 
         {/* Use Case Template */}
         <div>
@@ -300,6 +421,15 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
                   {B.label}
                 </span>
                 <button
+                  onClick={() => {
+                    setDraftName(`${selectedTemplate?.label || "AMP draft"} – ${brandProfile?.brand_identity?.brand_name || "Brand"} – ${new Date().toLocaleDateString()}`);
+                    setShowSaveDialog(true);
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-muted/50"
+                >
+                  <Save className="w-3 h-3" /> Save draft
+                </button>
+                <button
                   onClick={handleCopy}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-muted/50"
                 >
@@ -367,6 +497,63 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
           </div>
         </motion.div>
       )}
+
+      {/* Save draft dialog */}
+      <AnimatePresence>
+        {showSaveDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+            onClick={() => !savingDraft && setShowSaveDialog(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md mx-4 magic-card rounded-2xl p-5 space-y-4"
+            >
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Save className="w-4 h-4 text-primary" /> Save AMP draft
+              </h3>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">Draft name</label>
+                <input
+                  type="text"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveDraft(); }}
+                  autoFocus
+                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="e.g. Welcome – Carousell – v1"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Saved {new Date().toLocaleString()}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowSaveDialog(false)}
+                  disabled={savingDraft}
+                  className="px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground border border-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft || !draftName.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-gradient-magic text-primary-foreground disabled:opacity-50"
+                >
+                  {savingDraft ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  Save draft
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
