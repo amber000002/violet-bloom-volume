@@ -40,6 +40,22 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
   const [view, setView] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
 
+  // Drafts
+  const [drafts, setDrafts] = useState<AmpDraft[]>([]);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
+  const loadDrafts = async () => {
+    try {
+      const list = await listAmpDrafts();
+      setDrafts(list);
+    } catch (e: any) {
+      toast.error(`Failed to load drafts: ${e?.message || e}`);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -52,6 +68,7 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
         setLoadingTemplates(false);
       }
     })();
+    loadDrafts();
   }, []);
 
   const selectedTemplate = useMemo(
