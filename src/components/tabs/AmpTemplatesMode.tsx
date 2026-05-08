@@ -421,6 +421,15 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
                   {B.label}
                 </span>
                 <button
+                  onClick={() => {
+                    setDraftName(`${selectedTemplate?.label || "AMP draft"} – ${brandProfile?.brand_identity?.brand_name || "Brand"} – ${new Date().toLocaleDateString()}`);
+                    setShowSaveDialog(true);
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-muted/50"
+                >
+                  <Save className="w-3 h-3" /> Save draft
+                </button>
+                <button
                   onClick={handleCopy}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-muted/50"
                 >
