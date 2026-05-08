@@ -497,6 +497,63 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
           </div>
         </motion.div>
       )}
+
+      {/* Save draft dialog */}
+      <AnimatePresence>
+        {showSaveDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+            onClick={() => !savingDraft && setShowSaveDialog(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md mx-4 magic-card rounded-2xl p-5 space-y-4"
+            >
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Save className="w-4 h-4 text-primary" /> Save AMP draft
+              </h3>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">Draft name</label>
+                <input
+                  type="text"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveDraft(); }}
+                  autoFocus
+                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="e.g. Welcome – Carousell – v1"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Saved {new Date().toLocaleString()}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowSaveDialog(false)}
+                  disabled={savingDraft}
+                  className="px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground border border-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft || !draftName.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-gradient-magic text-primary-foreground disabled:opacity-50"
+                >
+                  {savingDraft ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  Save draft
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
