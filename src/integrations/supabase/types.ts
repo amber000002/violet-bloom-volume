@@ -118,6 +118,57 @@ export type Database = {
           },
         ]
       }
+      amp_template_drafts: {
+        Row: {
+          amp_valid: boolean
+          amp_validator_errors: Json | null
+          auto_fixes_applied: Json | null
+          brand_id: string | null
+          brand_name: string | null
+          created_at: string
+          file_size_bytes: number
+          html_content: string
+          id: string
+          name: string
+          template_id: string | null
+          template_label: string | null
+          updated_at: string
+          website_host_normalized: string | null
+        }
+        Insert: {
+          amp_valid?: boolean
+          amp_validator_errors?: Json | null
+          auto_fixes_applied?: Json | null
+          brand_id?: string | null
+          brand_name?: string | null
+          created_at?: string
+          file_size_bytes?: number
+          html_content: string
+          id?: string
+          name: string
+          template_id?: string | null
+          template_label?: string | null
+          updated_at?: string
+          website_host_normalized?: string | null
+        }
+        Update: {
+          amp_valid?: boolean
+          amp_validator_errors?: Json | null
+          auto_fixes_applied?: Json | null
+          brand_id?: string | null
+          brand_name?: string | null
+          created_at?: string
+          file_size_bytes?: number
+          html_content?: string
+          id?: string
+          name?: string
+          template_id?: string | null
+          template_label?: string | null
+          updated_at?: string
+          website_host_normalized?: string | null
+        }
+        Relationships: []
+      }
       brand_profile_versions: {
         Row: {
           brand_design_profile_json: Json | null
