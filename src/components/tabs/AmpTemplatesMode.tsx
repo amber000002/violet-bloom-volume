@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileCode, Wand2, Loader2, Eye, Code, Copy, Check, AlertTriangle,
-  CheckCircle2, ShieldCheck, Sparkles, X, Upload,
+  CheckCircle2, ShieldCheck, Sparkles, X, Upload, Save, FolderOpen, Trash2, Clock,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateServ
 import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
 import { validateAmpEmail, AmpValidationError } from "@/lib/ampEmailValidator";
 import { autoFixAmpHtml } from "@/lib/ampAutoFix";
+import { listAmpDrafts, saveAmpDraft, deleteAmpDraft, AmpDraft } from "@/lib/ampDraftService";
 
 interface AmpTemplatesModeProps {
   brandProfile: CoreBrandJSON | null;
