@@ -152,6 +152,54 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
     toast.success("HTML copied");
   };
 
+  const handleSaveDraft = async () => {
+    const name = draftName.trim();
+    if (!name) { toast.error("Enter a draft name"); return; }
+    if (!outputHtml) return;
+    setSavingDraft(true);
+    try {
+      await saveAmpDraft({
+        name,
+        htmlContent: outputHtml,
+        templateId: selectedTemplate?.id ?? null,
+        templateLabel: selectedTemplate?.label ?? null,
+        brandName: brandProfile?.brand_identity?.brand_name ?? null,
+        websiteHostNormalized: (websiteUrl || "").replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase() || null,
+        ampValid: validationErrors.length === 0,
+        ampValidatorErrors: validationErrors,
+        autoFixesApplied,
+      });
+      toast.success(`Draft "${name}" saved`);
+      setShowSaveDialog(false);
+      setDraftName("");
+      await loadDrafts();
+    } catch (e: any) {
+      toast.error(`Save failed: ${e?.message || e}`);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleLoadDraft = (d: AmpDraft) => {
+    setOutputHtml(d.htmlContent);
+    const v = validateAmpEmail(d.htmlContent);
+    setValidationErrors(v.errors);
+    setAutoFixesApplied(Array.isArray(d.autoFixesApplied) ? d.autoFixesApplied : []);
+    setDraftsOpen(false);
+    toast.success(`Loaded "${d.name}"`);
+  };
+
+  const handleDeleteDraft = async (d: AmpDraft) => {
+    if (!confirm(`Delete draft "${d.name}"?`)) return;
+    try {
+      await deleteAmpDraft(d.id);
+      toast.success("Draft deleted");
+      await loadDrafts();
+    } catch (e: any) {
+      toast.error(`Delete failed: ${e?.message || e}`);
+    }
+  };
+
   const badgeStyles: Record<ValidationBadge, { bg: string; text: string; label: string; Icon: any }> = {
     green: { bg: "bg-emerald-500/15 border-emerald-500/40", text: "text-emerald-500", label: "AMP Valid", Icon: CheckCircle2 },
     yellow: { bg: "bg-amber-500/15 border-amber-500/40", text: "text-amber-500", label: `${validationErrors.length} warning${validationErrors.length === 1 ? "" : "s"}`, Icon: AlertTriangle },
