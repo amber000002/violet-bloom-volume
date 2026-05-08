@@ -211,10 +211,65 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
     <div className="space-y-6">
       {/* Inputs */}
       <div className="max-w-5xl mx-auto magic-card rounded-2xl p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          AMP Templates — Brand-Aware Generation
-        </h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            AMP Templates — Brand-Aware Generation
+          </h3>
+          <button
+            onClick={() => setDraftsOpen((o) => !o)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground border border-border hover:bg-muted/50"
+          >
+            <FolderOpen className="w-3 h-3" />
+            Drafts {drafts.length > 0 && <span className="text-foreground/70">({drafts.length})</span>}
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {draftsOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-lg border border-border bg-muted/20 max-h-64 overflow-auto divide-y divide-border">
+                {drafts.length === 0 ? (
+                  <div className="p-3 text-xs text-muted-foreground">No saved drafts yet.</div>
+                ) : (
+                  drafts.map((d) => (
+                    <div key={d.id} className="flex items-center gap-2 px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{d.name}</p>
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          {new Date(d.createdAt).toLocaleString()}
+                          {d.brandName && <> · {d.brandName}</>}
+                          {d.templateLabel && <> · {d.templateLabel}</>}
+                          {d.ampValid ? " · ✓" : " · ⚠"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleLoadDraft(d)}
+                        className="px-2 py-1 rounded text-[10px] border border-border hover:bg-muted/50 text-foreground"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDraft(d)}
+                        className="p-1 rounded text-muted-foreground hover:text-destructive"
+                        title="Delete draft"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
 
         {/* Use Case Template */}
         <div>
