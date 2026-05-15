@@ -263,6 +263,79 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
         </AnimatePresence>
       </div>
 
+      {/* AI Prompt Preview — visible once a website URL is provided */}
+      {inputs.websiteUrl.trim() && (() => {
+        const { system, user } = buildBrandProfilePrompt(inputs.websiteUrl, industry || "");
+        const fullPrompt = `[SYSTEM]\n${system}\n\n[USER]\n${user}`;
+        return (
+          <div className="rounded-lg border border-border bg-muted/20">
+            <button
+              type="button"
+              onClick={() => setShowPrompt((s) => !s)}
+              className="w-full flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Code2 className="w-3.5 h-3.5 text-primary" />
+              AI Prompt for Brand Profile
+              <span className="text-[10px] font-normal text-muted-foreground/70">
+                (sent to the model when you generate)
+              </span>
+              {showPrompt ? (
+                <ChevronUp className="w-3.5 h-3.5 ml-auto" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 ml-auto" />
+              )}
+            </button>
+            <AnimatePresence>
+              {showPrompt && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-3 pb-3 space-y-2">
+                    <div className="flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(fullPrompt);
+                            setPromptCopied(true);
+                            setTimeout(() => setPromptCopied(false), 1500);
+                          } catch {}
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+                      >
+                        {promptCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {promptCopied ? "Copied" : "Copy prompt"}
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground/80 mb-1">System</p>
+                      <pre className="text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap break-words bg-background/60 border border-border rounded-md p-2 max-h-40 overflow-auto">
+{system}
+                      </pre>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground/80 mb-1">User</p>
+                      <pre className="text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap break-words bg-background/60 border border-border rounded-md p-2 max-h-60 overflow-auto">
+{user}
+                      </pre>
+                    </div>
+                    {!hasIndustry && (
+                      <p className="text-[10px] text-secondary">
+                        Select an industry to substitute it into the prompt.
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })()}
+
       {/* Event Schema + User Properties - 1x2 Grid */}
       <div className="grid grid-cols-2 gap-3">
         <CSVUploadBox
