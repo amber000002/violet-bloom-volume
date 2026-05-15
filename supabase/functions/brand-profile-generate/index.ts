@@ -130,11 +130,11 @@ serve(async (req) => {
     const crawledPages: string[] = [];
     let sourceMode: "url_only" | "url_plus_text" | "text_only" = hasText ? "url_plus_text" : "url_only";
 
-    const parsed = new URL(baseUrl);
-    const origin = parsed.origin;
+    const parsedUrl = new URL(baseUrl);
+    const origin = parsedUrl.origin;
     // If user gave bare domain (e.g. example.com), also try www.example.com which many sites canonicalize to
-    const wwwOrigin = !parsed.hostname.startsWith("www.")
-      ? `${parsed.protocol}//www.${parsed.hostname}`
+    const wwwOrigin = !parsedUrl.hostname.startsWith("www.")
+      ? `${parsedUrl.protocol}//www.${parsedUrl.hostname}`
       : null;
     const originsToTry = wwwOrigin ? [origin, wwwOrigin] : [origin];
     const urls = originsToTry.flatMap(o => [o, `${o}/pricing`, `${o}/products`, `${o}/about`, `${o}/features`, `${o}/solutions`]);
