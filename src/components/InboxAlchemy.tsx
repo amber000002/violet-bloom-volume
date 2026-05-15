@@ -521,6 +521,36 @@ const InboxAlchemyContent: React.FC = () => {
                     Enhance for richer insights →
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      const json = JSON.stringify(brandProfile, null, 2);
+                      const blob = new Blob([json], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      const safeName = (brandProfile.brand_identity?.brand_name || "brand")
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-|-$/g, "");
+                      const ts = new Date().toISOString().slice(0, 10);
+                      a.href = url;
+                      a.download = `brand-profile-${safeName}-${ts}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast.success("Brand profile JSON downloaded");
+                    } catch (e) {
+                      toast.error("Failed to download brand profile JSON");
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors ${brandMeta && brandMeta.completenessScore < 85 ? "" : "ml-auto"}`}
+                  title="Download brand profile JSON"
+                >
+                  <Download className="w-3 h-3" />
+                  Download JSON
+                </button>
               </div>
             )}
           </div>
