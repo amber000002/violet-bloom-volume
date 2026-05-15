@@ -50,8 +50,9 @@ async function fetchPageRaw(url: string): Promise<{ text: string; html: string }
     const timeout = setTimeout(() => controller.abort(), 8000);
     const resp = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; BrandBot/1.0)",
-        "Accept": "text/html",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
       },
       redirect: "follow",
       signal: controller.signal,
@@ -129,14 +130,20 @@ serve(async (req) => {
     const crawledPages: string[] = [];
     let sourceMode: "url_only" | "url_plus_text" | "text_only" = hasText ? "url_plus_text" : "url_only";
 
-    const origin = new URL(baseUrl).origin;
-    const urls = [origin, `${origin}/pricing`, `${origin}/products`, `${origin}/about`, `${origin}/features`, `${origin}/solutions`];
-    console.log(`Fetching pages for ${origin}`);
+    const parsed = new URL(baseUrl);
+    const origin = parsed.origin;
+    // If user gave bare domain (e.g. example.com), also try www.example.com which many sites canonicalize to
+    const wwwOrigin = !parsed.hostname.startsWith("www.")
+      ? `${parsed.protocol}//www.${parsed.hostname}`
+      : null;
+    const originsToTry = wwwOrigin ? [origin, wwwOrigin] : [origin];
+    const urls = originsToTry.flatMap(o => [o, `${o}/pricing`, `${o}/products`, `${o}/about`, `${o}/features`, `${o}/solutions`]);
+    console.log(`Fetching pages for ${origin}${wwwOrigin ? ` (and ${wwwOrigin})` : ""}`);
 
     const results = await Promise.allSettled(urls.map(u => fetchPageRaw(u)));
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
-      if (r.status === "fulfilled" && r.value.text.length > 150) {
+      if (r.status === "fulfilled" && r.value.text.length > 80) {
         crawledContent += `\n[PAGE: ${urls[i]}]\n${r.value.text}\n`;
         crawledPages.push(urls[i]);
         // Collect raw HTML for design extraction (homepage + first found page)
