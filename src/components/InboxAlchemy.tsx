@@ -385,7 +385,6 @@ const InboxAlchemyContent: React.FC = () => {
                 onGenerate={handleGenerateBrandProfile}
                 isGenerating={isGeneratingBrand}
                 hasIndustry={!!industry}
-                industry={industry}
                 brandMeta={brandMeta}
                 hasBrandProfile={!!brandProfile}
               />
