@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, ChevronDown, ChevronUp, Plus, RefreshCw, Upload, FileText, X, Database } from "lucide-react";
+import { Globe, ChevronDown, ChevronUp, Plus, RefreshCw, Upload, FileText, X, Database, Code2, Copy, Check } from "lucide-react";
 import { BrandInputs, emptyBrandInputs, additionalContextFields } from "@/types/brandProfile";
 
 const URL_HISTORY_KEY = "brand-url-history";
