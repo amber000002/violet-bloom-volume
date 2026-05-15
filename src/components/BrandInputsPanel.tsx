@@ -29,8 +29,24 @@ interface BrandInputsPanelProps {
   onGenerate: () => void;
   isGenerating: boolean;
   hasIndustry: boolean;
+  industry?: string;
   brandMeta?: { completenessScore: number; iterationCount: number; lastUpdated: string } | null;
   hasBrandProfile?: boolean;
+}
+
+// Mirrors the prompt sent by supabase/functions/brand-profile-generate (Step 1)
+function buildBrandProfilePrompt(websiteUrl: string, industry: string): { system: string; user: string } {
+  const ind = industry || "<industry>";
+  const url = websiteUrl || "<website_url>";
+  const system = `You are a brand intelligence extraction engine. Analyze website content to produce a structured Brand JSON. Extract ONLY what is evidenced. Use empty arrays for missing data. For brand_colors, extract the actual hex color codes used on the website. If EVENT SCHEMA or USER PROPERTIES SCHEMA data is provided, use it to enrich lifecycle_signal_map (map events to key_user_actions, activation_events, monetization_events, churn_signals etc.), engagement_architecture (engagement_drivers, event_based_triggers), tech_scale_layer (supported_channels, volume_indicators), and kpi_framework sections with real instrumented data. Industry context: ${ind}. Return ONLY valid JSON, no markdown fences.`;
+  const user = `Extract a Brand JSON from this content for industry "${ind}", website "${url}".
+
+Return this exact JSON structure:
+{"brand_identity":{...},"business_model":{...},"product_ecosystem":{...},"audience_intelligence":{...},"value_framework":{...},"engagement_architecture":{...},"lifecycle_signal_map":{...},"risk_compliance_layer":{...},"industry_signal_layer":{...},"kpi_framework":{...},"tech_scale_layer":{...},"brand_colors":{...},"extraction_metadata":{"source_mode":"<auto>","pages_crawled":[...],"confidence_by_section":{},"evidence_snippets":[],"missing_sections":[],"warnings":[...]}}
+
+Content:
+<crawled website text + optional EVENT SCHEMA + USER PROPERTIES SCHEMA appended at runtime>`;
+  return { system, user };
 }
 
 const CSVUploadBox: React.FC<{
