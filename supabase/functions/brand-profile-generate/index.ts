@@ -130,14 +130,20 @@ serve(async (req) => {
     const crawledPages: string[] = [];
     let sourceMode: "url_only" | "url_plus_text" | "text_only" = hasText ? "url_plus_text" : "url_only";
 
-    const origin = new URL(baseUrl).origin;
-    const urls = [origin, `${origin}/pricing`, `${origin}/products`, `${origin}/about`, `${origin}/features`, `${origin}/solutions`];
-    console.log(`Fetching pages for ${origin}`);
+    const parsed = new URL(baseUrl);
+    const origin = parsed.origin;
+    // If user gave bare domain (e.g. example.com), also try www.example.com which many sites canonicalize to
+    const wwwOrigin = !parsed.hostname.startsWith("www.")
+      ? `${parsed.protocol}//www.${parsed.hostname}`
+      : null;
+    const originsToTry = wwwOrigin ? [origin, wwwOrigin] : [origin];
+    const urls = originsToTry.flatMap(o => [o, `${o}/pricing`, `${o}/products`, `${o}/about`, `${o}/features`, `${o}/solutions`]);
+    console.log(`Fetching pages for ${origin}${wwwOrigin ? ` (and ${wwwOrigin})` : ""}`);
 
     const results = await Promise.allSettled(urls.map(u => fetchPageRaw(u)));
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
-      if (r.status === "fulfilled" && r.value.text.length > 150) {
+      if (r.status === "fulfilled" && r.value.text.length > 80) {
         crawledContent += `\n[PAGE: ${urls[i]}]\n${r.value.text}\n`;
         crawledPages.push(urls[i]);
         // Collect raw HTML for design extraction (homepage + first found page)
