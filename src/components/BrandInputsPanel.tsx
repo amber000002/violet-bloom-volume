@@ -108,8 +108,11 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
   hasIndustry,
   brandMeta,
   hasBrandProfile,
+  industry,
 }) => {
   const [showAdditional, setShowAdditional] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   const [eventFileName, setEventFileName] = useState<string | null>(null);
   const [userPropFileName, setUserPropFileName] = useState<string | null>(null);
 
