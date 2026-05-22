@@ -999,8 +999,9 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     agg.clickPercent = denominator > 0 ? (agg.uniqueClicked / denominator) * 100 : 0;
     agg.uniqueCTR = agg.uniqueViewed > 0 ? (agg.uniqueClicked / agg.uniqueViewed) * 100 : 0;
     agg.unsubscribePercent = denominator > 0 ? (agg.unsubscribes / denominator) * 100 : 0;
-    agg.hardBouncePercent = denominator > 0 ? (agg.hardBounces / denominator) * 100 : 0;
-    agg.softBouncePercent = denominator > 0 ? (agg.softBounces / denominator) * 100 : 0;
+    // Bounces are NEVER delivered — always divide by Sent (delivered as denominator inflates the rate)
+    agg.hardBouncePercent = agg.totalSentUsers > 0 ? (agg.hardBounces / agg.totalSentUsers) * 100 : 0;
+    agg.softBouncePercent = agg.totalSentUsers > 0 ? (agg.softBounces / agg.totalSentUsers) * 100 : 0;
     
     return agg;
   });
@@ -1098,8 +1099,9 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     m.clickPercent = m.clickRate;
     m.uniqueCTR = m.uniqueViewed > 0 ? (m.uniqueClicked / m.uniqueViewed) * 100 : 0;
     m.unsubscribePercent = denominator > 0 ? (m.unsubscribes / denominator) * 100 : 0;
-    m.hardBouncePercent = denominator > 0 ? (m.hardBounces / denominator) * 100 : 0;
-    m.softBouncePercent = denominator > 0 ? (m.softBounces / denominator) * 100 : 0;
+    // Bounces are NEVER delivered — always divide by Sent
+    m.hardBouncePercent = m.totalSentUsers > 0 ? (m.hardBounces / m.totalSentUsers) * 100 : 0;
+    m.softBouncePercent = m.totalSentUsers > 0 ? (m.softBounces / m.totalSentUsers) * 100 : 0;
     return m;
   };
 
