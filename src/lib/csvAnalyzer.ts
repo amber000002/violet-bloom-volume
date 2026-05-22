@@ -1099,8 +1099,9 @@ export const generateAnalysisReport = (data: CampaignRow[]): AnalysisReport => {
     m.clickPercent = m.clickRate;
     m.uniqueCTR = m.uniqueViewed > 0 ? (m.uniqueClicked / m.uniqueViewed) * 100 : 0;
     m.unsubscribePercent = denominator > 0 ? (m.unsubscribes / denominator) * 100 : 0;
-    m.hardBouncePercent = denominator > 0 ? (m.hardBounces / denominator) * 100 : 0;
-    m.softBouncePercent = denominator > 0 ? (m.softBounces / denominator) * 100 : 0;
+    // Bounces are NEVER delivered — always divide by Sent
+    m.hardBouncePercent = m.totalSentUsers > 0 ? (m.hardBounces / m.totalSentUsers) * 100 : 0;
+    m.softBouncePercent = m.totalSentUsers > 0 ? (m.softBounces / m.totalSentUsers) * 100 : 0;
     return m;
   };
 
