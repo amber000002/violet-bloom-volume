@@ -608,12 +608,53 @@ export const parseCSV = (csvText: string): ValidationResult => {
     return header.replace(/(\w)\(/g, "$1 (");
   };
 
-  // Create header index map with normalized headers
+  // Header aliases: map common short/alternate column names to the canonical key the parser expects.
+  // This lets compact CSV exports (e.g. CleverTap "Date, Campaign, Subject, Sent, Open, Click, Unsub, Hard, Soft") work
+  // without renaming, so metrics don't silently compute as 0.
+  const HEADER_ALIASES: Record<string, string> = {
+    "date": "start date",
+    "campaign": "campaign name",
+    "subject": "title",
+    "sent": "total sent (users)",
+    "delivered": "total delivered (users)",
+    "open": "unique viewed within conversion time",
+    "opens": "unique viewed within conversion time",
+    "unique opens": "unique viewed within conversion time",
+    "unique viewed": "unique viewed within conversion time",
+    "click": "unique clicked within conversion time",
+    "clicks": "unique clicked within conversion time",
+    "unique clicks": "unique clicked within conversion time",
+    "unique clicked": "unique clicked within conversion time",
+    "ctr": "unique ctr",
+    "conversions": "click through conversions",
+    "unsub": "total unsubscribes",
+    "unsubs": "total unsubscribes",
+    "unsubscribes": "total unsubscribes",
+    "hard": "error: email hard bounced",
+    "hard bounce": "error: email hard bounced",
+    "hard bounces": "error: email hard bounced",
+    "soft": "error: email soft bounced",
+    "soft bounce": "error: email soft bounced",
+    "soft bounces": "error: email soft bounced",
+    "provider": "provider name",
+    "esp": "service provider",
+  };
+
+  // Create header index map with normalized + aliased headers
   const headerIndexMap: Record<string, number> = {};
+  const aliasedHeaders: string[] = [];
   rawHeaders.forEach((header, idx) => {
     const normalized = normalizeHeader(header);
     headerIndexMap[normalized] = idx;
+    const alias = HEADER_ALIASES[normalized];
+    if (alias && headerIndexMap[alias] === undefined) {
+      headerIndexMap[alias] = idx;
+      aliasedHeaders.push(`"${header}" → "${alias}"`);
+    }
   });
+  if (aliasedHeaders.length > 0) {
+    warnings.push(`Header aliases applied (${aliasedHeaders.length}): ${aliasedHeaders.join(", ")}`);
+  }
 
   // Check required headers
   const requiredKeys = Object.keys(REQUIRED_HEADERS_MAP);
