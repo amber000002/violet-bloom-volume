@@ -637,6 +637,27 @@ export const parseCSV = (csvText: string): ValidationResult => {
     warnings.push(`Optional columns not found: ${missingHeaders.join(", ")}`);
   }
 
+  // CRITICAL: Surface numeric columns that will silently read as 0 because their header is missing.
+  // Without this, downstream Open%/Click%/Unsub%/Bounce% compute as 0.00% and look like a calc bug.
+  const NUMERIC_COLUMNS_TO_AUDIT: { header: string; label: string; impact: string }[] = [
+    { header: "total delivered (users)", label: "Total Delivered (users)", impact: "Open/Click/Unsub % will fall back to Sent as denominator" },
+    { header: "unique viewed within conversion time", label: "Unique Viewed within Conversion Time", impact: "Open Rate (Opens) reads as 0 for every row" },
+    { header: "unique clicked within conversion time", label: "Unique Clicked within Conversion Time", impact: "Click Rate and Unique CTR read as 0 for every row" },
+    { header: "total unsubscribes", label: "Total Unsubscribes", impact: "Unsubscribe count and % read as 0" },
+    { header: "error: email hard bounced", label: "Error: Email Hard Bounced", impact: "Hard bounce count and % read as 0" },
+    { header: "error: email soft bounced", label: "Error: Email Soft Bounced", impact: "Soft bounce count and % read as 0" },
+    { header: "click through conversions", label: "Click Through Conversions", impact: "Conversion counts read as 0" },
+  ];
+  const columnsReadAsZero = NUMERIC_COLUMNS_TO_AUDIT.filter(c => headerIndexMap[c.header] === undefined);
+  if (columnsReadAsZero.length > 0) {
+    warnings.push(
+      `⚠️ Schema mismatch — ${columnsReadAsZero.length} numeric column${columnsReadAsZero.length > 1 ? "s" : ""} not found in your CSV and will be read as 0:\n` +
+      columnsReadAsZero.map(c => `  • "${c.label}" — ${c.impact}`).join("\n") +
+      `\n\nFound CSV headers: ${rawHeaders.join(", ")}\n` +
+      `Rename your CSV columns to the expected names so metrics calculate correctly.`
+    );
+  }
+
   // Track seen campaign IDs for duplicate detection
   const seenCampaignIds = new Map<string, number>(); // campaignId -> index in data array
   let deliveredFallbackCount = 0;
