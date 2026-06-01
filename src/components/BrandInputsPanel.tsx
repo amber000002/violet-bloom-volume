@@ -31,7 +31,9 @@ interface BrandInputsPanelProps {
   hasIndustry: boolean;
   brandMeta?: { completenessScore: number; iterationCount: number; lastUpdated: string } | null;
   hasBrandProfile?: boolean;
+  onUploadBrandProfile?: (json: any, fileName: string) => Promise<void> | void;
 }
+
 
 const CSVUploadBox: React.FC<{
   label: string;
