@@ -1,4 +1,13 @@
-import { AugmentedUseCase } from "@/types/augmentedUseCase";
+import { AugmentedUseCase, ExecutionDetail } from "@/types/augmentedUseCase";
+import { normalizeChannel } from "./channelNormalization";
+
+const CHANNEL_COLUMNS: { key: string; label: string; aliases: string[] }[] = [
+  { key: "email", label: "Channel-Specific Execution (Email)", aliases: ["email"] },
+  { key: "in_app", label: "Channel-Specific Execution (In-App)", aliases: ["in_app", "inapp", "in-app"] },
+  { key: "whatsapp", label: "Channel-Specific Execution (WhatsApp)", aliases: ["whatsapp", "wa"] },
+  { key: "sms", label: "Channel-Specific Execution (SMS)", aliases: ["sms"] },
+  { key: "push", label: "Channel-Specific Execution (Push)", aliases: ["push", "web_push", "webpush"] },
+];
 
 const HEADERS = [
   "Use Case Title",
@@ -14,7 +23,7 @@ const HEADERS = [
   "Risk Overlay",
   "Why This Fits This Brand",
   "Personalization Layers Applied",
-  "Channel-Specific Execution",
+  ...CHANNEL_COLUMNS.map(c => c.label),
 ];
 
 function escapeCSV(val: string): string {
@@ -24,16 +33,21 @@ function escapeCSV(val: string): string {
   return val;
 }
 
-function formatExecutionDetails(uc: AugmentedUseCase): string {
+function formatDetail(detail: ExecutionDetail): string {
+  const fieldEntries = Object.entries(detail.fields || {})
+    .map(([key, value]) => `${key.replace(/_/g, " ")}: ${value}`)
+    .join("; ");
+  return `Trigger: ${detail.trigger}${fieldEntries ? " | " + fieldEntries : ""}`;
+}
+
+function executionForChannel(uc: AugmentedUseCase, aliases: string[]): string {
   if (!uc.execution_details || uc.execution_details.length === 0) return "";
-  return uc.execution_details
-    .map((detail) => {
-      const fieldEntries = Object.entries(detail.fields || {})
-        .map(([key, value]) => `${key.replace(/_/g, " ")}: ${value}`)
-        .join("; ");
-      return `[${detail.channel}] Trigger: ${detail.trigger}${fieldEntries ? " | " + fieldEntries : ""}`;
-    })
-    .join(" /// ");
+  const matches = uc.execution_details.filter((d) => {
+    const norm = normalizeChannel(d.channel || "");
+    return aliases.includes(norm as string) || aliases.includes((d.channel || "").toLowerCase().trim());
+  });
+  if (matches.length === 0) return "";
+  return matches.map(formatDetail).join(" /// ");
 }
 
 function useCaseToRow(uc: AugmentedUseCase): string[] {
@@ -51,7 +65,7 @@ function useCaseToRow(uc: AugmentedUseCase): string[] {
     uc.risk_overlay || "",
     uc.why_this_fits_brand,
     uc.personalization_layers.join(", "),
-    formatExecutionDetails(uc),
+    ...CHANNEL_COLUMNS.map(c => executionForChannel(uc, c.aliases)),
   ];
 }
 
