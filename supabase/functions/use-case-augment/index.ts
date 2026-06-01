@@ -328,7 +328,7 @@ Rules:
 - Every internal use case MUST be augmented (no static pass-through)
 - AI-Native must be meaningfully different from internal ones
 - Apply brand tone: ${brandProfile?.brand_identity?.tone_of_voice || "Professional"}
-- Include execution_details array with channel-specific structured blocks
+- Include execution_details array with one structured block PER selected channel (${channels.join(", ")}). Every use case MUST contain an execution_details entry for EACH of these channels — no skipping. If a channel is less central, still include it with a lightweight supporting role.
 
 Return ONLY the JSON object.`;
 
