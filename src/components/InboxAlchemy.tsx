@@ -449,7 +449,9 @@ const InboxAlchemyContent: React.FC = () => {
                 hasIndustry={!!industry}
                 brandMeta={brandMeta}
                 hasBrandProfile={!!brandProfile}
+                onUploadBrandProfile={handleUploadBrandProfile}
               />
+
 
               {/* Presentation Controls */}
               <div className="flex flex-col gap-2 lg:border-l lg:border-border lg:pl-4 lg:w-40 flex-shrink-0">
