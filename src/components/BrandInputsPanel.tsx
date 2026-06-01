@@ -251,8 +251,8 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* Event Schema + User Properties - 1x2 Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Event Schema + User Properties + Brand Profile JSON - 1x3 Grid */}
+      <div className="grid grid-cols-3 gap-3">
         <CSVUploadBox
           label="Event Schema"
           icon={<Database className="w-3 h-3 inline mr-1 text-primary" />}
@@ -281,7 +281,65 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
           }}
           rowCount={userPropRowCount}
         />
+
+        {/* Brand Profile JSON upload */}
+        <div className="flex-1 min-w-0">
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5 truncate">
+            <FileText className="w-3 h-3 inline mr-1 text-primary" />
+            Brand Profile JSON
+          </label>
+          <input
+            ref={brandJsonInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file || !onUploadBrandProfile) return;
+              if (!hasIndustry || !inputs.websiteUrl.trim()) {
+                alert("Select an industry and enter a website URL before uploading a brand profile JSON.");
+                return;
+              }
+              try {
+                setIsUploadingBrandJson(true);
+                const text = await file.text();
+                const parsed = JSON.parse(text);
+                await onUploadBrandProfile(parsed, file.name);
+                setBrandJsonFileName(file.name);
+              } catch (err: any) {
+                alert(`Failed to load brand profile JSON: ${err?.message || err}`);
+              } finally {
+                setIsUploadingBrandJson(false);
+              }
+            }}
+          />
+          {brandJsonFileName ? (
+            <div className="h-9 px-2.5 rounded-lg border border-primary/30 bg-primary/5 flex items-center gap-1.5 text-xs">
+              <FileText className="w-3 h-3 text-primary flex-shrink-0" />
+              <span className="truncate text-foreground font-medium">{brandJsonFileName}</span>
+              <button
+                onClick={() => setBrandJsonFileName(null)}
+                className="ml-auto p-0.5 hover:text-destructive transition-colors flex-shrink-0"
+                title="Clear (does not delete saved profile)"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => brandJsonInputRef.current?.click()}
+              disabled={isUploadingBrandJson || !onUploadBrandProfile}
+              className="w-full h-9 px-2.5 rounded-lg border border-dashed border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/40 flex items-center justify-center gap-1.5 text-xs text-muted-foreground transition-all disabled:opacity-50"
+              title="Upload a pre-existing brand profile JSON to skip generation"
+            >
+              <Upload className="w-3 h-3" />
+              {isUploadingBrandJson ? "Loading…" : "Upload JSON"}
+            </button>
+          )}
+        </div>
       </div>
+
 
       {/* Additional Context (Expandable) */}
       <div>
