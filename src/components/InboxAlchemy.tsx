@@ -235,6 +235,68 @@ const InboxAlchemyContent: React.FC = () => {
     }
   }, [industry, brandInputs]);
 
+  // Upload an existing brand profile JSON instead of generating one
+  const handleUploadBrandProfile = useCallback(async (json: any, fileName: string) => {
+    if (!industry || !brandInputs.websiteUrl.trim()) {
+      toast.error("Select an industry and enter a website URL first.");
+      return;
+    }
+    // Tolerate wrappers like { brand_profile_json: {...} } or { data: {...} }
+    let profile: CoreBrandJSON = json?.brand_identity
+      ? json
+      : json?.brand_profile_json?.brand_identity
+        ? json.brand_profile_json
+        : json?.data?.brand_identity
+          ? json.data
+          : json;
+
+    if (!profile || typeof profile !== "object" || !profile.brand_identity) {
+      toast.error("Invalid brand profile JSON: missing brand_identity.");
+      return;
+    }
+
+    setIsGeneratingBrand(true);
+    try {
+      setBrandProfile(profile);
+
+      const brandId = await ensureBrandProfile({
+        websiteUrl: brandInputs.websiteUrl,
+        industry,
+        brandName: profile.brand_identity?.brand_name,
+        eventSchemaCSV: brandInputs.eventSchemaCSV || undefined,
+        userPropertiesCSV: brandInputs.userPropertiesCSV || undefined,
+      });
+
+      const versionId = await createBrandProfileVersion({
+        brandId,
+        websiteUrl: brandInputs.websiteUrl,
+        brandProfileJson: profile,
+        brandDesignProfileJson: profile.brand_design_profile || null,
+        extractionMethod: "user_paste",
+        confidence: "high",
+        status: "success",
+        notes: `Uploaded from ${fileName}`,
+      });
+
+      setActiveBrandVersionId(versionId);
+
+      const [versions, meta] = await Promise.all([
+        loadBrandProfileVersions({ websiteUrl: brandInputs.websiteUrl, industry }),
+        loadBrandProfileMeta({ websiteUrl: brandInputs.websiteUrl, industry }),
+      ]);
+      setBrandVersions(versions);
+      if (meta) setBrandMeta({ completenessScore: meta.completenessScore, iterationCount: meta.iterationCount, lastUpdated: meta.lastUpdated });
+
+      toast.success(`Brand profile "${profile.brand_identity?.brand_name || fileName}" uploaded and saved.`);
+    } catch (err: any) {
+      console.error("Brand profile upload error:", err);
+      toast.error(err?.message || "Failed to save uploaded brand profile.");
+    } finally {
+      setIsGeneratingBrand(false);
+    }
+  }, [industry, brandInputs]);
+
+
   // Callback to collect export data from tabs
   const updateExportData = useCallback((tab: string, data: any) => {
     setExportData(prev => ({ ...prev, [tab]: data }));
@@ -387,7 +449,9 @@ const InboxAlchemyContent: React.FC = () => {
                 hasIndustry={!!industry}
                 brandMeta={brandMeta}
                 hasBrandProfile={!!brandProfile}
+                onUploadBrandProfile={handleUploadBrandProfile}
               />
+
 
               {/* Presentation Controls */}
               <div className="flex flex-col gap-2 lg:border-l lg:border-border lg:pl-4 lg:w-40 flex-shrink-0">
