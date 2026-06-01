@@ -94,10 +94,15 @@ export const BrandInputsPanel: React.FC<BrandInputsPanelProps> = ({
   hasIndustry,
   brandMeta,
   hasBrandProfile,
+  onUploadBrandProfile,
 }) => {
   const [showAdditional, setShowAdditional] = useState(false);
   const [eventFileName, setEventFileName] = useState<string | null>(null);
   const [userPropFileName, setUserPropFileName] = useState<string | null>(null);
+  const [brandJsonFileName, setBrandJsonFileName] = useState<string | null>(null);
+  const [isUploadingBrandJson, setIsUploadingBrandJson] = useState(false);
+  const brandJsonInputRef = useRef<HTMLInputElement>(null);
+
 
   const canGenerate = hasIndustry && inputs.websiteUrl.trim();
   const isEnrich = hasBrandProfile && brandMeta && brandMeta.iterationCount > 0;
