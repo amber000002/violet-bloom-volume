@@ -296,125 +296,113 @@ OUTPUT FORMAT: Return a JSON object with this structure:
       useCasesByStage[stage].push(uc);
     }
 
-    let useCaseSummary = "";
-    for (const [stage, ucs] of Object.entries(useCasesByStage)) {
-      useCaseSummary += `\n=== STAGE: ${stage} (${ucs.length} internal use cases) ===\n`;
-      for (const uc of ucs) {
-        useCaseSummary += `- Title: ${uc.name}, Type: ${uc.type || "N/A"}, TriggerType: ${uc.triggerType || "N/A"}, Description: ${uc.description || "N/A"}, Channels: ${uc.channels?.join(", ") || channels.join(", ")}, BusinessGoal: ${uc.business_goal || "N/A"}, BusinessChallenge: ${uc.business_challenge || "N/A"}, Solution: ${uc.clevertap_solution || "N/A"}, MetricsImpacted: ${uc.metrics_impacted?.join(", ") || "N/A"}, BusinessImpact: ${uc.business_impact || "N/A"}\n`;
+    // ---- Chunked per-stage execution to avoid 150s edge timeout ----
+    // One AI call per lifecycle stage (smaller, faster, parallel) instead of
+    // a single giant gemini-2.5-pro call that exceeds the 150s idle timeout.
+    const stagesList: string[] = (lifecycleStages && lifecycleStages.length > 0)
+      ? lifecycleStages
+      : Object.keys(useCasesByStage);
+
+    const channelCount = Math.max(1, channels?.length || 1);
+
+    const callAIForStage = async (stageName: string, stageUcs: any[]) => {
+      let stageSummary = "";
+      for (const uc of stageUcs) {
+        stageSummary += `- Title: ${uc.name}, Type: ${uc.type || "N/A"}, TriggerType: ${uc.triggerType || "N/A"}, Description: ${uc.description || "N/A"}, Channels: ${uc.channels?.join(", ") || channels.join(", ")}, BusinessGoal: ${uc.business_goal || "N/A"}, BusinessChallenge: ${uc.business_challenge || "N/A"}, Solution: ${uc.clevertap_solution || "N/A"}, MetricsImpacted: ${uc.metrics_impacted?.join(", ") || "N/A"}, BusinessImpact: ${uc.business_impact || "N/A"}\n`;
       }
-    }
 
-    const stagesStr = (lifecycleStages || []).join(", ");
+      const expectedUcs = stageUcs.length + 2;
+      const estimated = expectedUcs * (1200 + channelCount * 600);
+      const maxTokens = Math.min(32000, Math.max(8000, estimated));
 
-    const userPrompt = `Augment these lifecycle use cases for the ${industry} industry.
+      const stagePrompt = `Augment lifecycle use cases for the ${industry} industry — LIFECYCLE STAGE: "${stageName}".
 
 Selected Channels: ${channels.join(", ")}
-Lifecycle Stages Present: ${stagesStr}
 
 ${brandContext}
 
-INTERNAL USE CASES TO AUGMENT (ALL must be augmented — 100% coverage):
-${useCaseSummary}
+INTERNAL USE CASES TO AUGMENT (ALL ${stageUcs.length} must be augmented — 100% coverage):
+${stageSummary || "(none — generate only the 2 AI-Native use cases for this stage)"}
 
 REQUIRED OUTPUT:
-1. Augmented versions of ALL ${allInternalUseCases?.length || 0} internal use cases above (Source: "Internal Resource (AI Augmented)", Confidence: "High")
-2. EXACTLY 2 AI-Native Expansion use cases for EACH lifecycle stage: ${stagesStr} (Source: "AI-Native Expansion", Confidence: "Medium")
+1. Augmented versions of ALL ${stageUcs.length} internal use cases above (Source: "Internal Resource (AI Augmented)", Confidence: "High")
+2. EXACTLY 2 AI-Native Expansion use cases for lifecycle stage "${stageName}" (Source: "AI-Native Expansion", Confidence: "Medium")
 
-Total expected: ${(allInternalUseCases?.length || 0)} augmented + ${(lifecycleStages?.length || 0) * 2} AI-native = ${(allInternalUseCases?.length || 0) + (lifecycleStages?.length || 0) * 2} use cases
+All use cases MUST have lifecycle_stage="${stageName}" exactly.
 
 Rules:
-- Preserve lifecycle_stage EXACTLY
 - Only use channels from: [${channels.join(", ")}]
 - Every internal use case MUST be augmented (no static pass-through)
 - AI-Native must be meaningfully different from internal ones
 - Apply brand tone: ${brandProfile?.brand_identity?.tone_of_voice || "Professional"}
-- Include execution_details array with one structured block PER selected channel (${channels.join(", ")}). Every use case MUST contain an execution_details entry for EACH of these channels — no skipping. If a channel is less central, still include it with a lightweight supporting role.
+- Include execution_details array with one structured block PER selected channel (${channels.join(", ")}). No skipping.
 
-Return ONLY the JSON object.`;
+Return ONLY the JSON object with shape { "augmented_use_cases": [...] }.`;
 
-    // Retry up to 3 times on 500 errors
-    let response: Response | null = null;
-    // Scale max_tokens based on use case count + channels (each UC must include execution_details for every channel)
-    const ucCount = allInternalUseCases?.length || 0;
-    const channelCount = Math.max(1, channels?.length || 1);
-    const totalUcs = ucCount + (lifecycleStages?.length || 0) * 2;
-    // ~1200 tokens per UC base + ~600 per channel block per UC
-    const estimated = totalUcs * (1200 + channelCount * 600);
-    const maxTokens = Math.min(128000, Math.max(16000, estimated));
-
-    // Use gemini-2.5-pro for larger output capacity when payload is heavy
-    const model = (totalUcs * channelCount > 30) ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
-
-    const requestBody = JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: maxTokens,
-    });
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: requestBody,
+      const body = JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: stagePrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: maxTokens,
       });
-      if (response.status !== 500) break;
-      console.warn(`AI gateway returned 500, retry ${attempt + 1}/3`);
-      if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
-    }
 
-    if (!response || !response.ok) {
-      if (response?.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      let resp: Response | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body,
         });
+        if (resp.status !== 500) break;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1500));
       }
-      if (response?.status === 402) {
-        return new Response(JSON.stringify({ error: "AI usage limit reached. Please add credits." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (!resp || !resp.ok) {
+        const txt = resp ? await resp.text() : "no response";
+        throw new Error(`stage "${stageName}": ${resp?.status} ${txt.substring(0, 160)}`);
       }
-      const errorText = await response!.text();
-      console.error("AI gateway error:", response!.status, errorText);
-      return new Response(JSON.stringify({ error: "AI augmentation failed." }), {
+      const aiJson = await resp.json();
+      const content = aiJson.choices?.[0]?.message?.content;
+      if (!content) throw new Error(`stage "${stageName}": empty content`);
+      const parsed = robustJsonExtract(content);
+      return parsed?.augmented_use_cases || [];
+    };
+
+    // Run with concurrency limit to stay well under 150s
+    const CONCURRENCY = 3;
+    const allUseCases: any[] = [];
+    const errors: string[] = [];
+    for (let i = 0; i < stagesList.length; i += CONCURRENCY) {
+      const batch = stagesList.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(stage => callAIForStage(stage, useCasesByStage[stage] || []))
+      );
+      results.forEach((r, idx) => {
+        if (r.status === "fulfilled") {
+          allUseCases.push(...r.value);
+        } else {
+          console.error(`Stage "${batch[idx]}" failed:`, r.reason);
+          errors.push(`${batch[idx]}: ${r.reason?.message || r.reason}`);
+        }
+      });
+    }
+
+    if (allUseCases.length === 0) {
+      return new Response(JSON.stringify({ error: `All stages failed. ${errors.join("; ")}` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const aiResponse = await response.json();
-    const content = aiResponse.choices?.[0]?.message?.content;
-    const finishReason = aiResponse.choices?.[0]?.finish_reason;
-
-    if (!content) {
-      return new Response(JSON.stringify({ error: "No AI response." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const isTruncated = finishReason === "length" || finishReason === "max_tokens";
-    if (isTruncated) {
-      console.warn("AI response was truncated (finish_reason:", finishReason, "). Attempting recovery...");
-    }
-
-    let parsed;
-    try {
-      parsed = robustJsonExtract(content);
-    } catch (parseErr) {
-      console.error("Failed to parse AI response:", content.substring(0, 500));
-      return new Response(JSON.stringify({ error: "Failed to parse AI output. The response was likely too large. Try selecting fewer channels or reducing use case count." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true, data: parsed }), {
+    return new Response(JSON.stringify({
+      success: true,
+      data: { augmented_use_cases: allUseCases },
+      partial_errors: errors.length > 0 ? errors : undefined,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (e) {
     console.error("use-case-augment error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
