@@ -334,12 +334,19 @@ Return ONLY the JSON object.`;
 
     // Retry up to 3 times on 500 errors
     let response: Response | null = null;
-    // Scale max_tokens based on use case count
+    // Scale max_tokens based on use case count + channels (each UC must include execution_details for every channel)
     const ucCount = allInternalUseCases?.length || 0;
-    const maxTokens = Math.min(64000, Math.max(8000, ucCount * 3000));
+    const channelCount = Math.max(1, channels?.length || 1);
+    const totalUcs = ucCount + (lifecycleStages?.length || 0) * 2;
+    // ~1200 tokens per UC base + ~600 per channel block per UC
+    const estimated = totalUcs * (1200 + channelCount * 600);
+    const maxTokens = Math.min(128000, Math.max(16000, estimated));
+
+    // Use gemini-2.5-pro for larger output capacity when payload is heavy
+    const model = (totalUcs * channelCount > 30) ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 
     const requestBody = JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
