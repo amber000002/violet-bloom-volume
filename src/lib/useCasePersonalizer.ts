@@ -90,12 +90,13 @@ function getChannelStrategy(channel: string, brand: CoreBrandJSON | null, stage:
 }
 
 function generateObjective(title: string, brand: CoreBrandJSON | null, stage: string): string {
-  if (!brand) return `Drive ${stage} engagement through ${title.toLowerCase()}.`;
+  if (!brand || !brand.brand_identity) return `Drive ${stage} engagement through ${title.toLowerCase()}.`;
   
-  const positioning = brand.brand_identity.positioning || brand.brand_identity.tagline;
-  const segment = brand.audience_intelligence.primary_segments[0] || "target users";
+  const positioning = brand.brand_identity?.positioning || brand.brand_identity?.tagline;
+  const segment = brand.audience_intelligence?.primary_segments?.[0] || "target users";
+  const brandName = brand.brand_identity?.brand_name || "your brand";
   
-  return `Leverage ${brand.brand_identity.brand_name}'s ${positioning ? `positioning around "${positioning.slice(0, 60)}..."` : "core value proposition"} to drive ${stage} engagement among ${segment} through personalized ${title.toLowerCase()}.`;
+  return `Leverage ${brandName}'s ${positioning ? `positioning around "${positioning.slice(0, 60)}..."` : "core value proposition"} to drive ${stage} engagement among ${segment} through personalized ${title.toLowerCase()}.`;
 }
 
 function generateWhyItMatters(brand: CoreBrandJSON | null, stage: string): string {
