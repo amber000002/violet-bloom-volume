@@ -34,35 +34,36 @@ function scoreBrandClarity(profile: CoreBrandJSON | null): number {
   if (!profile) return 0;
   let score = 0;
   const bi = profile.brand_identity;
-  if (bi.brand_name && bi.brand_name !== "Unknown Brand") score += 15;
-  if (bi.tagline) score += 10;
-  if (bi.positioning) score += 15;
-  if (bi.tone_of_voice) score += 10;
-  if (profile.business_model.monetization_model !== "Not detected") score += 15;
-  if (profile.product_ecosystem.core_products.length > 0) score += 15;
-  if (profile.audience_intelligence.primary_segments.length > 0) score += 10;
-  if (profile.value_framework.value_propositions.length > 0) score += 10;
+  if (bi?.brand_name && bi.brand_name !== "Unknown Brand") score += 15;
+  if (bi?.tagline) score += 10;
+  if (bi?.positioning) score += 15;
+  if (bi?.tone_of_voice) score += 10;
+  if (profile.business_model?.monetization_model && profile.business_model.monetization_model !== "Not detected") score += 15;
+  if ((profile.product_ecosystem?.core_products?.length ?? 0) > 0) score += 15;
+  if ((profile.audience_intelligence?.primary_segments?.length ?? 0) > 0) score += 10;
+  if ((profile.value_framework?.value_propositions?.length ?? 0) > 0) score += 10;
   return Math.min(score, 100);
 }
 
 function scoreLifecycleAlignment(profile: CoreBrandJSON | null, stage: string, hasInternal: boolean): number {
-  if (hasInternal) return 90; // Internal content = strong alignment
+  if (hasInternal) return 90;
   if (!profile) return 20;
   
   let score = 30;
   const lsm = profile.lifecycle_signal_map;
+  if (!lsm) return score;
   
   const stageL = stage.toLowerCase();
   if (stageL.includes("activation") || stageL.includes("onboarding")) {
-    if (lsm.activation_events.length > 0) score += 30;
-    if (lsm.key_user_actions.length > 0) score += 20;
+    if ((lsm.activation_events?.length ?? 0) > 0) score += 30;
+    if ((lsm.key_user_actions?.length ?? 0) > 0) score += 20;
   } else if (stageL.includes("retention") || stageL.includes("win")) {
-    if (lsm.churn_signals.length > 0) score += 30;
-    if (lsm.inactivity_markers.length > 0) score += 20;
+    if ((lsm.churn_signals?.length ?? 0) > 0) score += 30;
+    if ((lsm.inactivity_markers?.length ?? 0) > 0) score += 20;
   } else if (stageL.includes("monetization") || stageL.includes("revenue")) {
-    if (lsm.monetization_events.length > 0) score += 30;
+    if ((lsm.monetization_events?.length ?? 0) > 0) score += 30;
   } else {
-    if (lsm.key_user_events.length > 0) score += 20;
+    if ((lsm.key_user_events?.length ?? 0) > 0) score += 20;
   }
   
   return Math.min(score, 100);
@@ -76,24 +77,25 @@ function scoreTriggerEventMatch(profile: CoreBrandJSON | null, triggerType?: str
   const ea = profile.engagement_architecture;
   
   if (triggerType === "live-event" || triggerType === "event") {
-    if (ea.event_based_triggers.length > 0) score += 40;
-    if (lsm.key_user_events.length > 0) score += 20;
+    if ((ea?.event_based_triggers?.length ?? 0) > 0) score += 40;
+    if ((lsm?.key_user_events?.length ?? 0) > 0) score += 20;
   } else if (triggerType === "time-based" || triggerType === "schedule") {
-    if (ea.seasonal_triggers.length > 0) score += 30;
-    score += 20; // time-based always somewhat applicable
+    if ((ea?.seasonal_triggers?.length ?? 0) > 0) score += 30;
+    score += 20;
   } else if (triggerType === "segment-change" || triggerType === "segment") {
-    if (profile.audience_intelligence.primary_segments.length > 0) score += 40;
+    if ((profile.audience_intelligence?.primary_segments?.length ?? 0) > 0) score += 40;
   } else if (triggerType === "past-behavior") {
-    if (lsm.key_user_actions.length > 0) score += 40;
+    if ((lsm?.key_user_actions?.length ?? 0) > 0) score += 40;
   }
   
   return Math.min(score, 100);
 }
 
 function scoreRegulatoryConsistency(profile: CoreBrandJSON | null): number {
-  if (!profile) return 50; // neutral
+  if (!profile) return 50;
   const rcl = profile.risk_compliance_layer;
-  if (rcl.regulatory_environment.length > 0) return 80;
+  if (!rcl) return 50;
+  if ((rcl.regulatory_environment?.length ?? 0) > 0) return 80;
   if (rcl.compliance_intensity === "High") return 90;
   if (rcl.compliance_intensity === "Medium") return 70;
   return 40;
@@ -101,7 +103,7 @@ function scoreRegulatoryConsistency(profile: CoreBrandJSON | null): number {
 
 function scoreVocabularyDensity(profile: CoreBrandJSON | null): number {
   if (!profile) return 0;
-  const vocab = profile.industry_signal_layer.industry_vocabulary;
+  const vocab = profile.industry_signal_layer?.industry_vocabulary ?? [];
   if (vocab.length >= 10) return 100;
   if (vocab.length >= 5) return 70;
   if (vocab.length >= 2) return 40;
@@ -110,13 +112,13 @@ function scoreVocabularyDensity(profile: CoreBrandJSON | null): number {
 
 function scoreVolumeScale(profile: CoreBrandJSON | null): number {
   if (!profile) return 30;
-  const band = profile.tech_scale_layer.monthly_active_users_band;
+  const band = profile.tech_scale_layer?.monthly_active_users_band ?? "";
   if (band.includes("Hyper-scale")) return 100;
   if (band.includes("Enterprise")) return 90;
   if (band.includes("Large")) return 75;
   if (band.includes("Growth")) return 60;
   if (band.includes("Emerging")) return 40;
-  return 20; // Not detected
+  return 20;
 }
 
 export function calculateConfidence(ctx: ScoringContext): ConfidenceResult {
