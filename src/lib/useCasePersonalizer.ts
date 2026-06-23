@@ -218,7 +218,7 @@ export function personalizeUseCase(
     personalizationLayers: generatePersonalizationLayers(brand),
     campaignLogic: generateCampaignLogic(brand, useCaseData.stage, useCaseData.triggerType, applicableChannels),
     metricsToImpact: getMetricsForStage(brand, useCaseData.stage),
-    businessKPIs: brand?.kpi_framework.primary_kpis.slice(0, 3) || [],
+    businessKPIs: brand?.kpi_framework?.primary_kpis?.slice(0, 3) || [],
     whyThisFitsYourBrand: generateWhyFits(brand, useCaseData.stage),
     source: useCaseData.source,
     sourceLabel: useCaseData.sourceLabel,
