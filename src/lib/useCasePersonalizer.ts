@@ -50,8 +50,8 @@ const channelLabels: Record<string, string> = {
 };
 
 function getChannelStrategy(channel: string, brand: CoreBrandJSON | null, stage: string): ChannelStrategy {
-  const brandName = brand?.brand_identity.brand_name || "your brand";
-  const tone = brand?.brand_identity.tone_of_voice || "Professional";
+  const brandName = brand?.brand_identity?.brand_name || "your brand";
+  const tone = brand?.brand_identity?.tone_of_voice || "Professional";
   
   switch (channel) {
     case "email":
@@ -62,7 +62,7 @@ function getChannelStrategy(channel: string, brand: CoreBrandJSON | null, stage:
     case "push":
       return {
         channel: "Push Notification",
-        direction: `Short, action-oriented copy. Trigger timing aligned to ${stage} signals. Urgency mechanism: ${brand?.engagement_architecture.urgency_patterns[0] || "time-sensitive context"}.`,
+        direction: `Short, action-oriented copy. Trigger timing aligned to ${stage} signals. Urgency mechanism: ${brand?.engagement_architecture?.urgency_patterns?.[0] || "time-sensitive context"}.`,
       };
     case "sms":
       return {
@@ -72,7 +72,7 @@ function getChannelStrategy(channel: string, brand: CoreBrandJSON | null, stage:
     case "whatsapp":
       return {
         channel: "WhatsApp",
-        direction: `Conversational flow with quick replies. Rich media support. ${brand?.risk_compliance_layer.compliance_intensity === "High" ? "Include regulatory disclaimers." : "Focus on engagement and CTA clarity."}`,
+        direction: `Conversational flow with quick replies. Rich media support. ${brand?.risk_compliance_layer?.compliance_intensity === "High" ? "Include regulatory disclaimers." : "Focus on engagement and CTA clarity."}`,
       };
     case "in-app":
       return {
@@ -90,20 +90,21 @@ function getChannelStrategy(channel: string, brand: CoreBrandJSON | null, stage:
 }
 
 function generateObjective(title: string, brand: CoreBrandJSON | null, stage: string): string {
-  if (!brand) return `Drive ${stage} engagement through ${title.toLowerCase()}.`;
+  if (!brand || !brand.brand_identity) return `Drive ${stage} engagement through ${title.toLowerCase()}.`;
   
-  const positioning = brand.brand_identity.positioning || brand.brand_identity.tagline;
-  const segment = brand.audience_intelligence.primary_segments[0] || "target users";
+  const positioning = brand.brand_identity?.positioning || brand.brand_identity?.tagline;
+  const segment = brand.audience_intelligence?.primary_segments?.[0] || "target users";
+  const brandName = brand.brand_identity?.brand_name || "your brand";
   
-  return `Leverage ${brand.brand_identity.brand_name}'s ${positioning ? `positioning around "${positioning.slice(0, 60)}..."` : "core value proposition"} to drive ${stage} engagement among ${segment} through personalized ${title.toLowerCase()}.`;
+  return `Leverage ${brandName}'s ${positioning ? `positioning around "${positioning.slice(0, 60)}..."` : "core value proposition"} to drive ${stage} engagement among ${segment} through personalized ${title.toLowerCase()}.`;
 }
 
 function generateWhyItMatters(brand: CoreBrandJSON | null, stage: string): string {
   if (!brand) return `This use case aligns with standard ${stage} best practices for your industry.`;
   
-  const model = brand.business_model.business_model_description;
-  const scale = brand.tech_scale_layer.monthly_active_users_band;
-  const risk = brand.risk_compliance_layer.compliance_intensity;
+  const model = brand.business_model?.business_model_description || "this business";
+  const scale = brand.tech_scale_layer?.monthly_active_users_band || "Not detected";
+  const risk = brand.risk_compliance_layer?.compliance_intensity || "Low";
   
   return `For a ${model} model${scale !== "Not detected" ? ` at ${scale} scale` : ""}, ${stage} engagement directly impacts retention and LTV. ${risk === "High" ? "Regulatory compliance adds importance to precise, compliant messaging." : "Timely, relevant communication builds trust and repeat engagement."}`;
 }
@@ -113,25 +114,23 @@ function generateWhyFits(brand: CoreBrandJSON | null, stage: string): string {
   
   const parts: string[] = [];
   
-  // Business model alignment
-  parts.push(`Business model: ${brand.business_model.business_model_description} — ${stage} use cases directly support ${brand.business_model.monetization_model !== "Not detected" ? brand.business_model.monetization_model : "core revenue"} goals.`);
-  
-  // Audience match
-  if (brand.audience_intelligence.primary_segments.length > 0) {
-    parts.push(`Audience: Tailored for ${brand.audience_intelligence.primary_segments.slice(0, 2).join(", ")} segments detected from your brand profile.`);
+  if (brand.business_model?.business_model_description) {
+    parts.push(`Business model: ${brand.business_model.business_model_description} — ${stage} use cases directly support ${brand.business_model.monetization_model && brand.business_model.monetization_model !== "Not detected" ? brand.business_model.monetization_model : "core revenue"} goals.`);
   }
   
-  // Risk sensitivity
-  if (brand.risk_compliance_layer.compliance_intensity !== "Low") {
-    parts.push(`Risk: ${brand.risk_compliance_layer.compliance_intensity} compliance intensity — messaging respects ${brand.risk_compliance_layer.regulatory_environment.join(", ") || "regulatory"} requirements.`);
+  if ((brand.audience_intelligence?.primary_segments?.length ?? 0) > 0) {
+    parts.push(`Audience: Tailored for ${brand.audience_intelligence!.primary_segments.slice(0, 2).join(", ")} segments detected from your brand profile.`);
   }
   
-  // Scale suitability
-  if (brand.tech_scale_layer.monthly_active_users_band !== "Not detected") {
+  if (brand.risk_compliance_layer?.compliance_intensity && brand.risk_compliance_layer.compliance_intensity !== "Low") {
+    parts.push(`Risk: ${brand.risk_compliance_layer.compliance_intensity} compliance intensity — messaging respects ${brand.risk_compliance_layer.regulatory_environment?.join(", ") || "regulatory"} requirements.`);
+  }
+  
+  if (brand.tech_scale_layer?.monthly_active_users_band && brand.tech_scale_layer.monthly_active_users_band !== "Not detected") {
     parts.push(`Scale: ${brand.tech_scale_layer.monthly_active_users_band} — segmentation depth and volume ramp logic adjusted accordingly.`);
   }
   
-  return parts.join(" ");
+  return parts.join(" ") || "Brand profile loaded with partial data — add more context for deeper fit analysis.";
 }
 
 function generatePersonalizationLayers(brand: CoreBrandJSON | null): PersonalizationLayer[] {
@@ -139,22 +138,22 @@ function generatePersonalizationLayers(brand: CoreBrandJSON | null): Personaliza
   
   const layers: PersonalizationLayer[] = [];
   
-  if (brand.audience_intelligence.primary_segments.length > 0) {
-    layers.push({ layer: "Audience Segment", value: brand.audience_intelligence.primary_segments.join(", ") });
+  if ((brand.audience_intelligence?.primary_segments?.length ?? 0) > 0) {
+    layers.push({ layer: "Audience Segment", value: brand.audience_intelligence!.primary_segments.join(", ") });
   }
-  if (brand.product_ecosystem.core_products.length > 0) {
-    layers.push({ layer: "Product Module", value: brand.product_ecosystem.core_products.slice(0, 3).join(", ") });
+  if ((brand.product_ecosystem?.core_products?.length ?? 0) > 0) {
+    layers.push({ layer: "Product Module", value: brand.product_ecosystem!.core_products.slice(0, 3).join(", ") });
   }
-  if (brand.engagement_architecture.event_based_triggers.length > 0) {
-    layers.push({ layer: "Trigger Event", value: brand.engagement_architecture.event_based_triggers.slice(0, 3).join(", ") });
+  if ((brand.engagement_architecture?.event_based_triggers?.length ?? 0) > 0) {
+    layers.push({ layer: "Trigger Event", value: brand.engagement_architecture!.event_based_triggers.slice(0, 3).join(", ") });
   }
-  if (brand.risk_compliance_layer.regulatory_environment.length > 0) {
-    layers.push({ layer: "Risk Overlay", value: brand.risk_compliance_layer.regulatory_environment.join(", ") });
+  if ((brand.risk_compliance_layer?.regulatory_environment?.length ?? 0) > 0) {
+    layers.push({ layer: "Risk Overlay", value: brand.risk_compliance_layer!.regulatory_environment.join(", ") });
   }
-  if (brand.engagement_architecture.seasonal_triggers.length > 0) {
-    layers.push({ layer: "Engagement Timing", value: brand.engagement_architecture.seasonal_triggers.slice(0, 3).join(", ") });
+  if ((brand.engagement_architecture?.seasonal_triggers?.length ?? 0) > 0) {
+    layers.push({ layer: "Engagement Timing", value: brand.engagement_architecture!.seasonal_triggers.slice(0, 3).join(", ") });
   }
-  if (brand.risk_compliance_layer.compliance_intensity !== "Low") {
+  if (brand.risk_compliance_layer?.compliance_intensity && brand.risk_compliance_layer.compliance_intensity !== "Low") {
     layers.push({ layer: "Regulatory Nuance", value: `${brand.risk_compliance_layer.compliance_intensity} compliance intensity` });
   }
   
@@ -162,19 +161,19 @@ function generatePersonalizationLayers(brand: CoreBrandJSON | null): Personaliza
 }
 
 function generateCampaignLogic(brand: CoreBrandJSON | null, stage: string, triggerType?: string, channels?: string[]): CampaignLogicStructure {
-  const brandName = brand?.brand_identity.brand_name || "Brand";
+  const brandName = brand?.brand_identity?.brand_name || "Brand";
   
   return {
     triggerEvent: triggerType 
-      ? `${triggerType} trigger — ${brand?.lifecycle_signal_map.key_user_events[0] || `${stage}-related user action`}`
+      ? `${triggerType} trigger — ${brand?.lifecycle_signal_map?.key_user_events?.[0] || `${stage}-related user action`}`
       : `${stage} lifecycle signal detected`,
-    segmentationRule: brand?.audience_intelligence.primary_segments.length 
-      ? `Target: ${brand.audience_intelligence.primary_segments[0]} with ${stage} signals active`
+    segmentationRule: (brand?.audience_intelligence?.primary_segments?.length ?? 0) > 0
+      ? `Target: ${brand!.audience_intelligence.primary_segments[0]} with ${stage} signals active`
       : `Users entering ${stage} stage with qualifying behavior`,
     channelFlow: channels && channels.length > 1 
       ? channels.map(c => channelLabels[c] || c).join(" → ")
       : channels?.[0] ? channelLabels[channels[0]] || channels[0] : "Email (primary)",
-    contentTheme: `${brandName} ${stage} value reinforcement with ${brand?.brand_identity.tone_of_voice?.toLowerCase() || "professional"} tone`,
+    contentTheme: `${brandName} ${stage} value reinforcement with ${brand?.brand_identity?.tone_of_voice?.toLowerCase() || "professional"} tone`,
   };
 }
 
@@ -182,7 +181,6 @@ function getMetricsForStage(brand: CoreBrandJSON | null, stage: string): string[
   const stageL = stage.toLowerCase();
   const baseMetrics: string[] = [];
   
-  // Stage-specific metrics
   if (stageL.includes("activation") || stageL.includes("onboarding")) {
     baseMetrics.push("Activation rate", "Onboarding completion %", "Time to first action");
   } else if (stageL.includes("retention") || stageL.includes("win")) {
@@ -195,9 +193,8 @@ function getMetricsForStage(brand: CoreBrandJSON | null, stage: string): string[
     baseMetrics.push("Engagement rate", "Click-through rate", "Conversion rate");
   }
   
-  // Brand-specific KPIs
-  if (brand?.kpi_framework.primary_kpis.length) {
-    baseMetrics.push(...brand.kpi_framework.primary_kpis.slice(0, 2));
+  if ((brand?.kpi_framework?.primary_kpis?.length ?? 0) > 0) {
+    baseMetrics.push(...brand!.kpi_framework.primary_kpis.slice(0, 2));
   }
   
   return [...new Set(baseMetrics)].slice(0, 5);
@@ -221,7 +218,7 @@ export function personalizeUseCase(
     personalizationLayers: generatePersonalizationLayers(brand),
     campaignLogic: generateCampaignLogic(brand, useCaseData.stage, useCaseData.triggerType, applicableChannels),
     metricsToImpact: getMetricsForStage(brand, useCaseData.stage),
-    businessKPIs: brand?.kpi_framework.primary_kpis.slice(0, 3) || [],
+    businessKPIs: brand?.kpi_framework?.primary_kpis?.slice(0, 3) || [],
     whyThisFitsYourBrand: generateWhyFits(brand, useCaseData.stage),
     source: useCaseData.source,
     sourceLabel: useCaseData.sourceLabel,
