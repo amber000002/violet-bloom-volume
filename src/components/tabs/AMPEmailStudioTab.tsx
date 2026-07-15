@@ -14,6 +14,7 @@ import { ViewMode } from "@/hooks/usePresentationMode";
 import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
 import { TemplateEngineMode } from "./TemplateEngineMode";
 import { AmpTemplatesMode } from "./AmpTemplatesMode";
+import { EmailRepositoryMode } from "./EmailRepositoryMode";
 
 interface AMPEmailStudioTabProps {
   industry: string;
