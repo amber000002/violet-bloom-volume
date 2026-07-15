@@ -8,6 +8,7 @@ import {
   UseCaseTemplate,
   EMAIL_USE_CASE_CATEGORIES,
 } from "@/lib/useCaseTemplateService";
+import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
 
 export const EmailRepositoryMode: React.FC = () => {
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
@@ -16,6 +17,7 @@ export const EmailRepositoryMode: React.FC = () => {
   const [filterCustomer, setFilterCustomer] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterIndustry, setFilterIndustry] = useState<string>("all");
   const [selected, setSelected] = useState<UseCaseTemplate | null>(null);
   const [reclassifyingId, setReclassifyingId] = useState<string | null>(null);
 
@@ -44,19 +46,26 @@ export const EmailRepositoryMode: React.FC = () => {
     return Array.from(set).sort();
   }, [templates]);
 
+  const industries = useMemo(() => {
+    const set = new Set<string>();
+    templates.forEach((t) => t.industry && set.add(t.industry));
+    return Array.from(set).sort();
+  }, [templates]);
+
   const filtered = useMemo(() => {
     return templates.filter((t) => {
       if (filterCustomer !== "all" && (t.customerName ?? "") !== filterCustomer) return false;
       if (filterType !== "all" && t.templateType !== filterType) return false;
       if (filterCategory !== "all" && (t.useCaseCategory ?? "") !== filterCategory) return false;
+      if (filterIndustry !== "all" && (t.industry ?? "") !== filterIndustry) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
-        const hay = `${t.label} ${t.customerName ?? ""} ${t.useCaseCategory ?? ""}`.toLowerCase();
+        const hay = `${t.label} ${t.customerName ?? ""} ${t.useCaseCategory ?? ""} ${industryLabel(t.industry)}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [templates, filterCustomer, filterType, filterCategory, search]);
+  }, [templates, filterCustomer, filterType, filterCategory, filterIndustry, search]);
 
   const handleCopy = async (html: string) => {
     try {
@@ -130,6 +139,11 @@ export const EmailRepositoryMode: React.FC = () => {
                 {selected.customerName}
               </span>
             )}
+            {selected.industry && (
+              <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px]">
+                {industryLabel(selected.industry)}
+              </span>
+            )}
             {selected.useCaseCategory && (
               <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px]">
                 {selected.useCaseCategory}
@@ -184,7 +198,7 @@ export const EmailRepositoryMode: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
         <div className="relative col-span-2 md:col-span-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -203,6 +217,16 @@ export const EmailRepositoryMode: React.FC = () => {
           <option value="all">All customers</option>
           {customers.map((c) => (
             <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <select
+          value={filterIndustry}
+          onChange={(e) => setFilterIndustry(e.target.value)}
+          className="px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="all">All industries</option>
+          {(industries.length ? industries : EMAIL_TEMPLATE_INDUSTRIES.map((i) => i.value)).map((v) => (
+            <option key={v} value={v}>{industryLabel(v)}</option>
           ))}
         </select>
         <select
@@ -275,6 +299,11 @@ export const EmailRepositoryMode: React.FC = () => {
                     {t.customerName && (
                       <span className="px-1.5 py-0.5 rounded bg-muted text-foreground/80 text-[10px]">
                         {t.customerName}
+                      </span>
+                    )}
+                    {t.industry && (
+                      <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px]">
+                        {industryLabel(t.industry)}
                       </span>
                     )}
                     {t.useCaseCategory ? (

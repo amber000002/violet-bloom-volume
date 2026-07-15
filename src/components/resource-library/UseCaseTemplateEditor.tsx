@@ -25,6 +25,7 @@ import {
   UseCaseTemplate,
   TemplateType,
 } from "@/lib/useCaseTemplateService";
+import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
 
 interface UseCaseTemplateEditorProps {
   onClose: () => void;
@@ -58,6 +59,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCustomer, setUploadCustomer] = useState("");
+  const [uploadIndustry, setUploadIndustry] = useState<string>("");
   const [uploadType, setUploadType] = useState<TemplateType>("amp");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -123,21 +125,25 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
       return;
     }
     setUploadFile(f);
-    if (!uploadLabel) {
-      // suggest label = filename without extension
-      setUploadLabel(f.name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
-    }
+    // Always derive label from filename (Label field removed from UI)
+    setUploadLabel(f.name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadFile || !uploadLabel.trim()) return;
+    if (!uploadFile) return;
+    const derivedLabel = (uploadLabel || uploadFile.name.replace(/\.html?$/i, "")).slice(0, TEMPLATE_LABEL_MAX);
+    if (!derivedLabel.trim()) {
+      toast.error("Could not derive a name from the file");
+      return;
+    }
     setUploading(true);
     try {
       const html = await readFileAsText(uploadFile);
       const created = await uploadUseCaseTemplate({
-        label: uploadLabel,
+        label: derivedLabel,
         html,
         customerName: uploadCustomer,
+        industry: uploadIndustry,
         templateType: uploadType,
       });
       setTemplates((prev) => [created, ...prev]);
@@ -146,6 +152,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
       setUploadFile(null);
       setUploadLabel("");
       setUploadCustomer("");
+      setUploadIndustry("");
       setUploadType("amp");
     } catch (e: any) {
       toast.error(e?.message || "Failed to upload template");
@@ -363,6 +370,11 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                       {t.customerName}
                     </span>
                   )}
+                  {t.industry && (
+                    <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px]">
+                      {industryLabel(t.industry)}
+                    </span>
+                  )}
                   {t.useCaseCategory && (
                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px]">
                       {t.useCaseCategory}
@@ -473,25 +485,6 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                 </button>
               </div>
 
-              {/* Label */}
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Label <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="text"
-                  maxLength={TEMPLATE_LABEL_MAX}
-                  value={uploadLabel}
-                  onChange={(e) => setUploadLabel(e.target.value)}
-                  placeholder="e.g. Welcome Mailer"
-                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  This is what users will see in the AMP Templates dropdown. {uploadLabel.length}/
-                  {TEMPLATE_LABEL_MAX}
-                </p>
-              </div>
-
               {/* Customer */}
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1">Customer name</label>
@@ -502,6 +495,26 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   placeholder="e.g. Carousell"
                   className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+              </div>
+
+              {/* Industry */}
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Industry</label>
+                <select
+                  value={uploadIndustry}
+                  onChange={(e) => setUploadIndustry(e.target.value)}
+                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Select industry…</option>
+                  {EMAIL_TEMPLATE_INDUSTRIES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Used to filter templates in the Email Repository.
+                </p>
               </div>
 
               {/* Template type */}
@@ -542,7 +555,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
               </button>
               <button
                 onClick={handleUploadSubmit}
-                disabled={!uploadFile || !uploadLabel.trim() || uploading}
+                disabled={!uploadFile || uploading}
                 className="px-4 py-2 rounded-lg bg-gradient-magic text-primary-foreground text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {uploading && <Loader2 className="w-4 h-4 animate-spin" />}

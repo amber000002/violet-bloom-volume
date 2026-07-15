@@ -535,6 +535,7 @@ export type Database = {
           file_size_bytes: number
           html_content: string
           id: string
+          industry: string | null
           is_active: boolean
           label: string
           template_type: string
@@ -552,6 +553,7 @@ export type Database = {
           file_size_bytes?: number
           html_content: string
           id?: string
+          industry?: string | null
           is_active?: boolean
           label: string
           template_type?: string
@@ -569,6 +571,7 @@ export type Database = {
           file_size_bytes?: number
           html_content?: string
           id?: string
+          industry?: string | null
           is_active?: boolean
           label?: string
           template_type?: string

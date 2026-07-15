@@ -8,6 +8,7 @@ export interface UseCaseTemplate {
   id: string;
   label: string;
   customerName: string | null;
+  industry: string | null;
   templateType: TemplateType;
   useCaseCategory: string | null;
   useCaseCategoryConfidence: number | null;
@@ -31,6 +32,7 @@ function rowToTemplate(row: any): UseCaseTemplate {
     id: row.id,
     label: row.label,
     customerName: row.customer_name ?? null,
+    industry: row.industry ?? null,
     templateType: (row.template_type ?? "amp") as TemplateType,
     useCaseCategory: row.use_case_category ?? null,
     useCaseCategoryConfidence: row.use_case_category_confidence != null ? Number(row.use_case_category_confidence) : null,
@@ -81,6 +83,7 @@ export async function uploadUseCaseTemplate(params: {
   label: string;
   html: string;
   customerName?: string;
+  industry?: string;
   templateType?: TemplateType;
 }): Promise<UseCaseTemplate> {
   const label = params.label.trim();
@@ -94,6 +97,7 @@ export async function uploadUseCaseTemplate(params: {
   }
 
   const customerName = (params.customerName ?? "").trim() || null;
+  const industry = (params.industry ?? "").trim() || null;
   const templateType: TemplateType = params.templateType === "html" ? "html" : "amp";
 
   // Duplicate label check (case-insensitive)
@@ -119,6 +123,7 @@ export async function uploadUseCaseTemplate(params: {
   const insertPayload: any = {
     label,
     customer_name: customerName,
+    industry,
     template_type: templateType,
     use_case_category: classification?.category ?? null,
     use_case_category_confidence: classification?.confidence ?? null,
@@ -165,11 +170,13 @@ export async function renameUseCaseTemplate(id: string, label: string): Promise<
 
 export async function updateUseCaseTemplateMeta(id: string, patch: {
   customerName?: string | null;
+  industry?: string | null;
   templateType?: TemplateType;
   useCaseCategory?: string | null;
 }): Promise<UseCaseTemplate> {
   const update: any = {};
   if (patch.customerName !== undefined) update.customer_name = patch.customerName;
+  if (patch.industry !== undefined) update.industry = patch.industry;
   if (patch.templateType !== undefined) update.template_type = patch.templateType;
   if (patch.useCaseCategory !== undefined) {
     update.use_case_category = patch.useCaseCategory;
