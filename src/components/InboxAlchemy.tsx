@@ -8,6 +8,7 @@ import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
 import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
 import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
 import { InboxDiagnosticsTab } from "./tabs/InboxDiagnosticsTab";
+import { EmailRepositoryMode } from "./tabs/EmailRepositoryMode";
 import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
