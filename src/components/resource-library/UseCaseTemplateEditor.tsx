@@ -98,6 +98,24 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [templates]);
 
+  // Map customer name (case-insensitive) → most recent industry used for that customer.
+  const customerIndustryMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const sorted = [...templates].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+    for (const t of sorted) {
+      if (!t.customerName || !t.industry) continue;
+      const key = t.customerName.trim().toLowerCase();
+      if (!map.has(key)) map.set(key, t.industry);
+    }
+    return map;
+  }, [templates]);
+
+  const handleCustomerChange = (value: string) => {
+    setUploadCustomer(value);
+    const match = customerIndustryMap.get(value.trim().toLowerCase());
+    if (match) setUploadIndustry(match);
+  };
+
   const filtered = useMemo(() => {
     let list = templates;
     if (search.trim()) {
@@ -499,7 +517,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   type="text"
                   list="uct-customer-suggestions"
                   value={uploadCustomer}
-                  onChange={(e) => setUploadCustomer(e.target.value)}
+                  onChange={(e) => handleCustomerChange(e.target.value)}
                   placeholder="e.g. Carousell"
                   className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
