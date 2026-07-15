@@ -61,7 +61,7 @@ Category cues (use these to disambiguate — do NOT default to "Promotional" whe
 - Event / Webinar: invite/reminder for an event.
 
 Respond as STRICT JSON: {"category": "<one of the categories>", "confidence": <0-1>}. No prose.`;
-    const user = `Label: ${label}\nCustomer: ${customer}\nType: ${templateType}\n\nEmail content (text only):\n${text}`;
+    const user = `Label: ${label}\nCustomer: ${customer}\nType: ${templateType}\nInteractive tags detected: ${uniqueTags || "none"}\n\nEmail content (text only):\n${text}`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
