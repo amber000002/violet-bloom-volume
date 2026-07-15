@@ -284,7 +284,8 @@ export const EmailRepositoryMode: React.FC = () => {
                   <iframe
                     title={t.label}
                     srcDoc={t.htmlContent}
-                    sandbox=""
+                    sandbox="allow-scripts allow-same-origin allow-popups"
+                    referrerPolicy="no-referrer"
                     className="w-[200%] h-[200%] origin-top-left scale-50 pointer-events-none"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
