@@ -32,6 +32,7 @@ function rowToTemplate(row: any): UseCaseTemplate {
     id: row.id,
     label: row.label,
     customerName: row.customer_name ?? null,
+    industry: row.industry ?? null,
     templateType: (row.template_type ?? "amp") as TemplateType,
     useCaseCategory: row.use_case_category ?? null,
     useCaseCategoryConfidence: row.use_case_category_confidence != null ? Number(row.use_case_category_confidence) : null,
