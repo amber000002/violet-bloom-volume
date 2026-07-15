@@ -301,6 +301,11 @@ export const EmailRepositoryMode: React.FC = () => {
                         {t.customerName}
                       </span>
                     )}
+                    {t.industry && (
+                      <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px]">
+                        {industryLabel(t.industry)}
+                      </span>
+                    )}
                     {t.useCaseCategory ? (
                       <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px] flex items-center gap-1">
                         <Sparkles className="w-2.5 h-2.5" />
