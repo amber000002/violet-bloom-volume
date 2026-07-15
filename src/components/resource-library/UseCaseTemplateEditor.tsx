@@ -134,12 +134,19 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     setUploading(true);
     try {
       const html = await readFileAsText(uploadFile);
-      const created = await uploadUseCaseTemplate({ label: uploadLabel, html });
+      const created = await uploadUseCaseTemplate({
+        label: uploadLabel,
+        html,
+        customerName: uploadCustomer,
+        templateType: uploadType,
+      });
       setTemplates((prev) => [created, ...prev]);
       toast.success("Template uploaded");
       setUploadOpen(false);
       setUploadFile(null);
       setUploadLabel("");
+      setUploadCustomer("");
+      setUploadType("amp");
     } catch (e: any) {
       toast.error(e?.message || "Failed to upload template");
     } finally {
