@@ -354,6 +354,21 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   </p>
                   {t.ampValid && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
                 </div>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium uppercase">
+                    {t.templateType}
+                  </span>
+                  {t.customerName && (
+                    <span className="px-1.5 py-0.5 rounded bg-muted text-foreground/80 text-[10px]">
+                      {t.customerName}
+                    </span>
+                  )}
+                  {t.useCaseCategory && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px]">
+                      {t.useCaseCategory}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1 truncate">
                   {formatBytes(t.fileSizeBytes)} · {formatDate(t.updatedAt)} · Used {t.usageCount} time
                   {t.usageCount === 1 ? "" : "s"}
