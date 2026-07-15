@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, RefreshCw, User, ArrowRight, Star, Gift,
   ChevronLeft, ChevronRight, Globe, Check, Percent, Trophy,
-  Layout, Wand2
+  Layout, Wand2, Mail
 } from "lucide-react";
 import { MagicSelect } from "../ui/MagicSelect";
 import { MagicInput } from "../ui/MagicInput";
