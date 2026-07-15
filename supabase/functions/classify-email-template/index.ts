@@ -30,8 +30,12 @@ Deno.serve(async (req) => {
     }
 
     const { html = "", label = "", customer = "", templateType = "" } = await req.json();
+    const rawHtml = String(html);
+    // Collect AMP/interactive component tag names as signal
+    const tagMatches = Array.from(rawHtml.matchAll(/<(amp-[a-z0-9-]+|button|form)\b/gi)).map((m) => m[1].toLowerCase());
+    const uniqueTags = Array.from(new Set(tagMatches)).slice(0, 30).join(", ");
     // Strip tags for cheaper classification
-    const text = String(html)
+    const text = rawHtml
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<[^>]+>/g, " ")
