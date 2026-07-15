@@ -234,7 +234,7 @@ export const EmailRepositoryMode: React.FC = () => {
           onChange={(e) => setFilterType(e.target.value)}
           className="px-3 py-2 bg-input border border-border rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-ring"
         >
-          <option value="all">All types</option>
+          <option value="all">All Types</option>
           <option value="amp">AMP</option>
           <option value="html">HTML</option>
         </select>
