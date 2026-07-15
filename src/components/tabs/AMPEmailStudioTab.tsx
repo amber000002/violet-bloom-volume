@@ -24,7 +24,7 @@ interface AMPEmailStudioTabProps {
 }
 
 type TemplateStyle = "brand-carousel" | "gamified";
-type StudioMode = "interactive" | "template-engine" | "amp-templates";
+type StudioMode = "interactive" | "template-engine" | "amp-templates" | "email-repository";
 
 const templateStyleOptions = [
   { id: "brand-carousel" as const, label: "Brand-led Carousel" },
