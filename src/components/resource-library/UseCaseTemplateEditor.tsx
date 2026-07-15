@@ -555,7 +555,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
               </button>
               <button
                 onClick={handleUploadSubmit}
-                disabled={!uploadFile || !uploadLabel.trim() || uploading}
+                disabled={!uploadFile || uploading}
                 className="px-4 py-2 rounded-lg bg-gradient-magic text-primary-foreground text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
