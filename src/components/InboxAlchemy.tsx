@@ -35,6 +35,7 @@ const industryOptions = Object.entries(industryConfigs).map(([key, config]) => (
 }));
 
 const tabs = [
+  { id: "email-repository", label: "Email Repository", icon: Mail },
   { id: "inbox-diagnostics", label: "Inbox Diagnostics", icon: Activity },
   { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
   { id: "amp-email-studio", label: "AMP Email Studio (In Progress)", icon: Zap },
