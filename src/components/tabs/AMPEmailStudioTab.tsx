@@ -230,6 +230,10 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
         />
       )}
 
+      {/* Email Repository Mode */}
+      {studioMode === "email-repository" && <EmailRepositoryMode />}
+
+
       {/* Template Engine Mode */}
       {studioMode === "template-engine" && (
         <TemplateEngineMode
