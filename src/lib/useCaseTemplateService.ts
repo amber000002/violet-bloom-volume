@@ -83,6 +83,7 @@ export async function uploadUseCaseTemplate(params: {
   label: string;
   html: string;
   customerName?: string;
+  industry?: string;
   templateType?: TemplateType;
 }): Promise<UseCaseTemplate> {
   const label = params.label.trim();
@@ -96,6 +97,7 @@ export async function uploadUseCaseTemplate(params: {
   }
 
   const customerName = (params.customerName ?? "").trim() || null;
+  const industry = (params.industry ?? "").trim() || null;
   const templateType: TemplateType = params.templateType === "html" ? "html" : "amp";
 
   // Duplicate label check (case-insensitive)
@@ -121,6 +123,7 @@ export async function uploadUseCaseTemplate(params: {
   const insertPayload: any = {
     label,
     customer_name: customerName,
+    industry,
     template_type: templateType,
     use_case_category: classification?.category ?? null,
     use_case_category_confidence: classification?.confidence ?? null,
