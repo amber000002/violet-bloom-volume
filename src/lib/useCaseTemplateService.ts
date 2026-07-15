@@ -8,6 +8,7 @@ export interface UseCaseTemplate {
   id: string;
   label: string;
   customerName: string | null;
+  industry: string | null;
   templateType: TemplateType;
   useCaseCategory: string | null;
   useCaseCategoryConfidence: number | null;
