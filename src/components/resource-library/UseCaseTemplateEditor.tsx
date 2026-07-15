@@ -526,24 +526,30 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   ref={fileInputRef}
                   type="file"
                   accept=".html,.htm,text/html"
+                  multiple
                   className="hidden"
-                  onChange={(e) => onPickUploadFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = "";
+                    onPickUploadFiles(files);
+                  }}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full p-4 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors flex flex-col items-center gap-2"
                 >
                   <Upload className="w-5 h-5" />
-                  {uploadFile ? (
-                    <span className="text-foreground">
-                      {uploadFile.name} ({formatBytes(uploadFile.size)})
+                  {uploadFiles.length > 0 ? (
+                    <span className="text-foreground text-center">
+                      {uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected · click to add more
                     </span>
                   ) : (
                     <>
-                      <span>Click to choose .html file</span>
-                      <span className="text-[10px]">Max 500 KB</span>
+                      <span>Click to choose .html files (multi-select)</span>
+                      <span className="text-[10px]">Max 500 KB each</span>
                     </>
                   )}
+
                 </button>
               </div>
 
