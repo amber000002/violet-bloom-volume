@@ -187,17 +187,6 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
           AMP Templates
         </button>
         <button
-          onClick={() => setStudioMode("email-repository")}
-          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            studioMode === "email-repository"
-              ? "bg-gradient-magic text-primary-foreground shadow-magic"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Mail className="w-4 h-4" />
-          Email Repository
-        </button>
-        <button
           onClick={() => setStudioMode("template-engine")}
           className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
             studioMode === "template-engine"
@@ -230,7 +219,7 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
         />
       )}
 
-      {/* Email Repository Mode */}
+      {/* Email Repository moved to top-level tab */}
       {studioMode === "email-repository" && <EmailRepositoryMode />}
 
 

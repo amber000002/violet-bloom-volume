@@ -8,6 +8,7 @@ import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
 import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
 import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
 import { InboxDiagnosticsTab } from "./tabs/InboxDiagnosticsTab";
+import { EmailRepositoryMode } from "./tabs/EmailRepositoryMode";
 import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
@@ -34,6 +35,7 @@ const industryOptions = Object.entries(industryConfigs).map(([key, config]) => (
 }));
 
 const tabs = [
+  { id: "email-repository", label: "Email Repository", icon: Mail },
   { id: "inbox-diagnostics", label: "Inbox Diagnostics", icon: Activity },
   { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
   { id: "amp-email-studio", label: "AMP Email Studio (In Progress)", icon: Zap },
@@ -46,7 +48,7 @@ type TabId = typeof tabs[number]["id"];
 const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
   const { loadResourcesForIndustry } = useResourceLibrary();
-  const [activeTab, setActiveTab] = useState<TabId>("inbox-potential");
+  const [activeTab, setActiveTab] = useState<TabId>("email-repository");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
   const [brandProfile, setBrandProfile] = useState<CoreBrandJSON | null>(null);
@@ -655,6 +657,7 @@ const InboxAlchemyContent: React.FC = () => {
             transition={{ duration: 0.3 }}
             className="max-w-6xl mx-auto"
           >
+            {activeTab === "email-repository" && <EmailRepositoryMode />}
             {activeTab === "inbox-potential" && (
               <InboxPotentialTab 
                 industry={industry} 
