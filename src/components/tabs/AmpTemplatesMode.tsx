@@ -12,6 +12,7 @@ import { CoreBrandJSON, BrandDesignProfile } from "@/types/brandProfile";
 import { validateAmpEmail, AmpValidationError } from "@/lib/ampEmailValidator";
 import { autoFixAmpHtml } from "@/lib/ampAutoFix";
 import { listAmpDrafts, saveAmpDraft, deleteAmpDraft, AmpDraft } from "@/lib/ampDraftService";
+import { AmpEmailPreviewFrame } from "@/components/email/AmpEmailPreviewFrame";
 
 interface AmpTemplatesModeProps {
   brandProfile: CoreBrandJSON | null;
@@ -478,10 +479,9 @@ export const AmpTemplatesMode: React.FC<AmpTemplatesModeProps> = ({
 
               <TabsContent value="preview" className="p-4">
                 <div className="rounded-lg overflow-hidden border border-border bg-background">
-                  <iframe
+                  <AmpEmailPreviewFrame
                     title="amp-preview"
-                    srcDoc={outputHtml}
-                    sandbox="allow-same-origin"
+                    html={outputHtml}
                     className="w-full"
                     style={{ minHeight: 600 }}
                   />

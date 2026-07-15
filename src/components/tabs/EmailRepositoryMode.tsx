@@ -9,6 +9,7 @@ import {
   EMAIL_USE_CASE_CATEGORIES,
 } from "@/lib/useCaseTemplateService";
 import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
+import { AmpEmailPreviewFrame } from "@/components/email/AmpEmailPreviewFrame";
 
 export const EmailRepositoryMode: React.FC = () => {
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
@@ -174,11 +175,9 @@ export const EmailRepositoryMode: React.FC = () => {
             <div className="px-3 py-2 border-b border-border">
               <span className="text-xs font-medium text-muted-foreground">Preview</span>
             </div>
-            <iframe
+            <AmpEmailPreviewFrame
               title={selected.label}
-              srcDoc={selected.htmlContent}
-              sandbox="allow-scripts allow-same-origin allow-popups"
-              referrerPolicy="no-referrer"
+              html={selected.htmlContent}
               className="w-full h-[70vh] bg-white"
             />
           </div>
@@ -281,12 +280,11 @@ export const EmailRepositoryMode: React.FC = () => {
                 className="text-left group rounded-xl border border-border bg-card/40 overflow-hidden hover:border-primary/50 transition-colors"
               >
                 <div className="relative aspect-[4/5] bg-white overflow-hidden">
-                  <iframe
+                  <AmpEmailPreviewFrame
                     title={t.label}
-                    srcDoc={t.htmlContent}
-                    sandbox="allow-scripts allow-same-origin allow-popups"
-                    referrerPolicy="no-referrer"
-                    className="w-[200%] h-[200%] origin-top-left scale-50 pointer-events-none"
+                    html={t.htmlContent}
+                    allowInteraction={false}
+                    className="w-[200%] h-[200%] origin-top-left scale-50"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
