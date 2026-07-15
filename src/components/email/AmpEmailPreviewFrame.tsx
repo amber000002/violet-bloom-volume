@@ -6,6 +6,7 @@ const AMP_PREVIEW_SANDBOX = [
   "allow-popups",
   "allow-popups-to-escape-sandbox",
   "allow-forms",
+  "allow-downloads",
   "allow-top-navigation-by-user-activation",
 ].join(" ");
 
