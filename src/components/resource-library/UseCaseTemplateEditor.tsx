@@ -551,7 +551,30 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   )}
 
                 </button>
+                {uploadFiles.length > 0 && (
+                  <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs">
+                    {uploadFiles.map((f, idx) => (
+                      <li
+                        key={`${f.name}:${idx}`}
+                        className="flex items-center gap-2 px-2 py-1 rounded bg-muted/40 border border-border"
+                      >
+                        <FileCode className="w-3 h-3 text-primary flex-shrink-0" />
+                        <span className="truncate flex-1" title={f.name}>{f.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatBytes(f.size)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setUploadFiles((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-muted-foreground hover:text-destructive"
+                          disabled={uploading}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+
 
               {/* Customer */}
               <div>
