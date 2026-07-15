@@ -174,10 +174,10 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   return (
     <div className="space-y-8">
       {/* Mode Toggle */}
-      <div className="flex justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-2xl mx-auto">
+      <div className="flex flex-wrap justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-3xl mx-auto">
         <button
           onClick={() => setStudioMode("amp-templates")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
             studioMode === "amp-templates"
               ? "bg-gradient-magic text-primary-foreground shadow-magic"
               : "text-muted-foreground hover:text-foreground"
@@ -187,8 +187,19 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
           AMP Templates
         </button>
         <button
+          onClick={() => setStudioMode("email-repository")}
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            studioMode === "email-repository"
+              ? "bg-gradient-magic text-primary-foreground shadow-magic"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Mail className="w-4 h-4" />
+          Email Repository
+        </button>
+        <button
           onClick={() => setStudioMode("template-engine")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
             studioMode === "template-engine"
               ? "bg-gradient-magic text-primary-foreground shadow-magic"
               : "text-muted-foreground hover:text-foreground"
@@ -199,7 +210,7 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
         </button>
         <button
           onClick={() => setStudioMode("interactive")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
             studioMode === "interactive"
               ? "bg-gradient-magic text-primary-foreground shadow-magic"
               : "text-muted-foreground hover:text-foreground"
