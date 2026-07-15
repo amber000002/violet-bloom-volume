@@ -125,21 +125,25 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
       return;
     }
     setUploadFile(f);
-    if (!uploadLabel) {
-      // suggest label = filename without extension
-      setUploadLabel(f.name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
-    }
+    // Always derive label from filename (Label field removed from UI)
+    setUploadLabel(f.name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadFile || !uploadLabel.trim()) return;
+    if (!uploadFile) return;
+    const derivedLabel = (uploadLabel || uploadFile.name.replace(/\.html?$/i, "")).slice(0, TEMPLATE_LABEL_MAX);
+    if (!derivedLabel.trim()) {
+      toast.error("Could not derive a name from the file");
+      return;
+    }
     setUploading(true);
     try {
       const html = await readFileAsText(uploadFile);
       const created = await uploadUseCaseTemplate({
-        label: uploadLabel,
+        label: derivedLabel,
         html,
         customerName: uploadCustomer,
+        industry: uploadIndustry,
         templateType: uploadType,
       });
       setTemplates((prev) => [created, ...prev]);
@@ -148,6 +152,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
       setUploadFile(null);
       setUploadLabel("");
       setUploadCustomer("");
+      setUploadIndustry("");
       setUploadType("amp");
     } catch (e: any) {
       toast.error(e?.message || "Failed to upload template");
