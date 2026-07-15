@@ -219,7 +219,7 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
         />
       )}
 
-      {/* Email Repository Mode */}
+      {/* Email Repository moved to top-level tab */}
       {studioMode === "email-repository" && <EmailRepositoryMode />}
 
 
