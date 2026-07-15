@@ -139,6 +139,11 @@ export const EmailRepositoryMode: React.FC = () => {
                 {selected.customerName}
               </span>
             )}
+            {selected.industry && (
+              <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[10px]">
+                {industryLabel(selected.industry)}
+              </span>
+            )}
             {selected.useCaseCategory && (
               <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px]">
                 {selected.useCaseCategory}
