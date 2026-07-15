@@ -92,6 +92,12 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     })();
   }, []);
 
+  const customerSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    templates.forEach((t) => t.customerName && set.add(t.customerName));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [templates]);
+
   const filtered = useMemo(() => {
     let list = templates;
     if (search.trim()) {
@@ -491,11 +497,22 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                 <label className="block text-xs font-medium text-foreground mb-1">Customer name</label>
                 <input
                   type="text"
+                  list="uct-customer-suggestions"
                   value={uploadCustomer}
                   onChange={(e) => setUploadCustomer(e.target.value)}
                   placeholder="e.g. Carousell"
                   className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+                <datalist id="uct-customer-suggestions">
+                  {customerSuggestions.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                {customerSuggestions.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Start typing to reuse an existing customer name.
+                  </p>
+                )}
               </div>
 
               {/* Industry */}
