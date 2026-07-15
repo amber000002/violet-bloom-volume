@@ -17,6 +17,7 @@ export const EmailRepositoryMode: React.FC = () => {
   const [filterCustomer, setFilterCustomer] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterIndustry, setFilterIndustry] = useState<string>("all");
   const [selected, setSelected] = useState<UseCaseTemplate | null>(null);
   const [reclassifyingId, setReclassifyingId] = useState<string | null>(null);
 
