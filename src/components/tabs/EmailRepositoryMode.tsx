@@ -177,7 +177,8 @@ export const EmailRepositoryMode: React.FC = () => {
             <iframe
               title={selected.label}
               srcDoc={selected.htmlContent}
-              sandbox="allow-same-origin"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+              referrerPolicy="no-referrer"
               className="w-full h-[70vh] bg-white"
             />
           </div>
