@@ -25,6 +25,7 @@ import {
   UseCaseTemplate,
   TemplateType,
 } from "@/lib/useCaseTemplateService";
+import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
 
 interface UseCaseTemplateEditorProps {
   onClose: () => void;
