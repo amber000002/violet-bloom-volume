@@ -485,25 +485,6 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                 </button>
               </div>
 
-              {/* Label */}
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Label <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="text"
-                  maxLength={TEMPLATE_LABEL_MAX}
-                  value={uploadLabel}
-                  onChange={(e) => setUploadLabel(e.target.value)}
-                  placeholder="e.g. Welcome Mailer"
-                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  This is what users will see in the AMP Templates dropdown. {uploadLabel.length}/
-                  {TEMPLATE_LABEL_MAX}
-                </p>
-              </div>
-
               {/* Customer */}
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1">Customer name</label>
@@ -514,6 +495,26 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   placeholder="e.g. Carousell"
                   className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+              </div>
+
+              {/* Industry */}
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Industry</label>
+                <select
+                  value={uploadIndustry}
+                  onChange={(e) => setUploadIndustry(e.target.value)}
+                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Select industry…</option>
+                  {EMAIL_TEMPLATE_INDUSTRIES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Used to filter templates in the Email Repository.
+                </p>
               </div>
 
               {/* Template type */}
