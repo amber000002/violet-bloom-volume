@@ -39,7 +39,24 @@ Deno.serve(async (req) => {
       .trim()
       .slice(0, 6000);
 
-    const system = `You classify marketing/lifecycle emails into exactly one of these categories: ${CATEGORIES.join(", ")}. Respond as strict JSON: {"category": "<one of the categories>", "confidence": <0-1 number>}. No prose.`;
+    const system = `You classify marketing/lifecycle emails into EXACTLY ONE of these categories: ${CATEGORIES.join(", ")}.
+
+Category cues (use these to disambiguate — do NOT default to "Promotional" when a more specific category fits):
+- Gamification: interactive game mechanics inside the email — spin-the-wheel, scratch card, scratch-to-reveal, quiz, trivia, poll with reward, tap-to-reveal, mystery box, streaks, points/leaderboard, "play now", "reveal your prize", "unlock reward", or AMP components used as game surfaces (amp-carousel/amp-selector/amp-bind driving reveal-a-prize flows, amp-form submitting quiz answers). Presence of ANY of these outranks a generic promo framing.
+- Cart Abandonment: references items left in cart/bag, "complete your purchase", "still thinking?".
+- Browse Abandonment: viewed products without add-to-cart, "picking up where you left off".
+- Welcome: first email after sign-up, "welcome to", account activation.
+- Onboarding: multi-step setup, "get started", "next step", feature tours.
+- Re-engagement: "we miss you", "it's been a while", win-back.
+- Loyalty / Rewards: tier updates, points balance, member perks (without a game mechanic).
+- Promotional: pure discount/sale/offer with no game mechanic and no lifecycle trigger.
+- Transactional: order confirmation, receipt, shipping, OTP, password reset.
+- Newsletter: editorial digest, roundup.
+- Product Announcement: new feature/product launch.
+- Feedback / Survey: NPS, review request.
+- Event / Webinar: invite/reminder for an event.
+
+Respond as STRICT JSON: {"category": "<one of the categories>", "confidence": <0-1>}. No prose.`;
     const user = `Label: ${label}\nCustomer: ${customer}\nType: ${templateType}\n\nEmail content (text only):\n${text}`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
