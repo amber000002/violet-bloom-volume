@@ -23,6 +23,7 @@ import {
   TEMPLATE_MAX_BYTES,
   TEMPLATE_LABEL_MAX,
   UseCaseTemplate,
+  TemplateType,
 } from "@/lib/useCaseTemplateService";
 
 interface UseCaseTemplateEditorProps {
