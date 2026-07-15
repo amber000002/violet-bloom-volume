@@ -300,7 +300,8 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                 <iframe
                   title={t.label}
                   srcDoc={t.htmlContent}
-                  sandbox=""
+                  sandbox="allow-scripts allow-same-origin allow-popups"
+                  referrerPolicy="no-referrer"
                   className="w-[200%] h-[200%] origin-top-left scale-50 pointer-events-none"
                 />
                 {!t.ampValid && (
