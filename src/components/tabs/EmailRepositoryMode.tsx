@@ -193,7 +193,7 @@ export const EmailRepositoryMode: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
         <div className="relative col-span-2 md:col-span-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -212,6 +212,16 @@ export const EmailRepositoryMode: React.FC = () => {
           <option value="all">All customers</option>
           {customers.map((c) => (
             <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <select
+          value={filterIndustry}
+          onChange={(e) => setFilterIndustry(e.target.value)}
+          className="px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="all">All industries</option>
+          {(industries.length ? industries : EMAIL_TEMPLATE_INDUSTRIES.map((i) => i.value)).map((v) => (
+            <option key={v} value={v}>{industryLabel(v)}</option>
           ))}
         </select>
         <select
