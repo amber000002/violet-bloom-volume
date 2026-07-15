@@ -26,6 +26,7 @@ import {
   TemplateType,
 } from "@/lib/useCaseTemplateService";
 import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
+import { AmpEmailPreviewFrame } from "@/components/email/AmpEmailPreviewFrame";
 
 interface UseCaseTemplateEditorProps {
   onClose: () => void;
@@ -297,12 +298,11 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
             >
               {/* Thumbnail */}
               <div className="relative aspect-[16/10] bg-muted/40 overflow-hidden">
-                <iframe
+                <AmpEmailPreviewFrame
                   title={t.label}
-                  srcDoc={t.htmlContent}
-                  sandbox="allow-scripts allow-same-origin allow-popups"
-                  referrerPolicy="no-referrer"
-                  className="w-[200%] h-[200%] origin-top-left scale-50 pointer-events-none"
+                  html={t.htmlContent}
+                  allowInteraction={false}
+                  className="w-[200%] h-[200%] origin-top-left scale-50"
                 />
                 {!t.ampValid && (
                   <button
