@@ -306,28 +306,28 @@ export const EmailRepositoryMode: React.FC = () => {
                         {industryLabel(t.industry)}
                       </span>
                     )}
-                    {t.useCaseCategory ? (
+                    {t.useCaseCategory && (
                       <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px] flex items-center gap-1">
                         <Sparkles className="w-2.5 h-2.5" />
                         {t.useCaseCategory}
                       </span>
-                    ) : (
-                      <span
-                        role="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReclassify(t);
-                        }}
-                        className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] flex items-center gap-1 cursor-pointer hover:bg-amber-500/20"
-                      >
-                        {reclassifyingId === t.id ? (
-                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-2.5 h-2.5" />
-                        )}
-                        Classify
-                      </span>
                     )}
+                    <span
+                      role="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReclassify(t);
+                      }}
+                      title="Re-run AI classification"
+                      className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 text-[10px] flex items-center gap-1 cursor-pointer hover:bg-amber-500/20"
+                    >
+                      {reclassifyingId === t.id ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-2.5 h-2.5" />
+                      )}
+                      {t.useCaseCategory ? "Reclassify" : "Classify"}
+                    </span>
                   </div>
                 </div>
               </motion.button>
