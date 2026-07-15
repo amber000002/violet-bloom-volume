@@ -170,11 +170,13 @@ export async function renameUseCaseTemplate(id: string, label: string): Promise<
 
 export async function updateUseCaseTemplateMeta(id: string, patch: {
   customerName?: string | null;
+  industry?: string | null;
   templateType?: TemplateType;
   useCaseCategory?: string | null;
 }): Promise<UseCaseTemplate> {
   const update: any = {};
   if (patch.customerName !== undefined) update.customer_name = patch.customerName;
+  if (patch.industry !== undefined) update.industry = patch.industry;
   if (patch.templateType !== undefined) update.template_type = patch.templateType;
   if (patch.useCaseCategory !== undefined) {
     update.use_case_category = patch.useCaseCategory;
