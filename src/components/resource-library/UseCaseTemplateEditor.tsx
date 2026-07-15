@@ -92,6 +92,12 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     })();
   }, []);
 
+  const customerSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    templates.forEach((t) => t.customerName && set.add(t.customerName));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [templates]);
+
   const filtered = useMemo(() => {
     let list = templates;
     if (search.trim()) {
