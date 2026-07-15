@@ -8,6 +8,7 @@ import {
   UseCaseTemplate,
   EMAIL_USE_CASE_CATEGORIES,
 } from "@/lib/useCaseTemplateService";
+import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
 
 export const EmailRepositoryMode: React.FC = () => {
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
