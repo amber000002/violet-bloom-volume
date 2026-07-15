@@ -59,6 +59,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCustomer, setUploadCustomer] = useState("");
+  const [uploadIndustry, setUploadIndustry] = useState<string>("");
   const [uploadType, setUploadType] = useState<TemplateType>("amp");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
