@@ -491,7 +491,46 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   {TEMPLATE_LABEL_MAX}
                 </p>
               </div>
+
+              {/* Customer */}
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Customer name</label>
+                <input
+                  type="text"
+                  value={uploadCustomer}
+                  onChange={(e) => setUploadCustomer(e.target.value)}
+                  placeholder="e.g. Carousell"
+                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              {/* Template type */}
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Template type <span className="text-destructive">*</span>
+                </label>
+                <div className="flex gap-2">
+                  {(["amp", "html"] as TemplateType[]).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setUploadType(t)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium uppercase transition-all ${
+                        uploadType === t
+                          ? "bg-gradient-magic text-primary-foreground shadow-magic"
+                          : "bg-muted/50 text-muted-foreground border border-border hover:bg-muted"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  The use case is auto-classified by AI (welcome, cart abandonment, gamification, etc.).
+                </p>
+              </div>
             </div>
+
 
             <div className="flex justify-end gap-2 mt-6">
               <button
