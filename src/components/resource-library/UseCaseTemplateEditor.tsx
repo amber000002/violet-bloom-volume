@@ -23,6 +23,7 @@ import {
   TEMPLATE_MAX_BYTES,
   TEMPLATE_LABEL_MAX,
   UseCaseTemplate,
+  TemplateType,
 } from "@/lib/useCaseTemplateService";
 
 interface UseCaseTemplateEditorProps {
@@ -56,6 +57,8 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLabel, setUploadLabel] = useState("");
+  const [uploadCustomer, setUploadCustomer] = useState("");
+  const [uploadType, setUploadType] = useState<TemplateType>("amp");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,12 +134,19 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     setUploading(true);
     try {
       const html = await readFileAsText(uploadFile);
-      const created = await uploadUseCaseTemplate({ label: uploadLabel, html });
+      const created = await uploadUseCaseTemplate({
+        label: uploadLabel,
+        html,
+        customerName: uploadCustomer,
+        templateType: uploadType,
+      });
       setTemplates((prev) => [created, ...prev]);
       toast.success("Template uploaded");
       setUploadOpen(false);
       setUploadFile(null);
       setUploadLabel("");
+      setUploadCustomer("");
+      setUploadType("amp");
     } catch (e: any) {
       toast.error(e?.message || "Failed to upload template");
     } finally {
@@ -344,6 +354,21 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   </p>
                   {t.ampValid && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
                 </div>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium uppercase">
+                    {t.templateType}
+                  </span>
+                  {t.customerName && (
+                    <span className="px-1.5 py-0.5 rounded bg-muted text-foreground/80 text-[10px]">
+                      {t.customerName}
+                    </span>
+                  )}
+                  {t.useCaseCategory && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px]">
+                      {t.useCaseCategory}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1 truncate">
                   {formatBytes(t.fileSizeBytes)} · {formatDate(t.updatedAt)} · Used {t.usageCount} time
                   {t.usageCount === 1 ? "" : "s"}
@@ -466,7 +491,46 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   {TEMPLATE_LABEL_MAX}
                 </p>
               </div>
+
+              {/* Customer */}
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Customer name</label>
+                <input
+                  type="text"
+                  value={uploadCustomer}
+                  onChange={(e) => setUploadCustomer(e.target.value)}
+                  placeholder="e.g. Carousell"
+                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              {/* Template type */}
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Template type <span className="text-destructive">*</span>
+                </label>
+                <div className="flex gap-2">
+                  {(["amp", "html"] as TemplateType[]).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setUploadType(t)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium uppercase transition-all ${
+                        uploadType === t
+                          ? "bg-gradient-magic text-primary-foreground shadow-magic"
+                          : "bg-muted/50 text-muted-foreground border border-border hover:bg-muted"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  The use case is auto-classified by AI (welcome, cart abandonment, gamification, etc.).
+                </p>
+              </div>
             </div>
+
 
             <div className="flex justify-end gap-2 mt-6">
               <button

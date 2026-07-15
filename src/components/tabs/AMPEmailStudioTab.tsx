@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, RefreshCw, User, ArrowRight, Star, Gift,
   ChevronLeft, ChevronRight, Globe, Check, Percent, Trophy,
-  Layout, Wand2
+  Layout, Wand2, Mail
 } from "lucide-react";
 import { MagicSelect } from "../ui/MagicSelect";
 import { MagicInput } from "../ui/MagicInput";
@@ -14,6 +14,7 @@ import { ViewMode } from "@/hooks/usePresentationMode";
 import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
 import { TemplateEngineMode } from "./TemplateEngineMode";
 import { AmpTemplatesMode } from "./AmpTemplatesMode";
+import { EmailRepositoryMode } from "./EmailRepositoryMode";
 
 interface AMPEmailStudioTabProps {
   industry: string;
@@ -23,7 +24,7 @@ interface AMPEmailStudioTabProps {
 }
 
 type TemplateStyle = "brand-carousel" | "gamified";
-type StudioMode = "interactive" | "template-engine" | "amp-templates";
+type StudioMode = "interactive" | "template-engine" | "amp-templates" | "email-repository";
 
 const templateStyleOptions = [
   { id: "brand-carousel" as const, label: "Brand-led Carousel" },
@@ -173,10 +174,10 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
   return (
     <div className="space-y-8">
       {/* Mode Toggle */}
-      <div className="flex justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-2xl mx-auto">
+      <div className="flex flex-wrap justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-3xl mx-auto">
         <button
           onClick={() => setStudioMode("amp-templates")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
             studioMode === "amp-templates"
               ? "bg-gradient-magic text-primary-foreground shadow-magic"
               : "text-muted-foreground hover:text-foreground"
@@ -186,8 +187,19 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
           AMP Templates
         </button>
         <button
+          onClick={() => setStudioMode("email-repository")}
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            studioMode === "email-repository"
+              ? "bg-gradient-magic text-primary-foreground shadow-magic"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Mail className="w-4 h-4" />
+          Email Repository
+        </button>
+        <button
           onClick={() => setStudioMode("template-engine")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
             studioMode === "template-engine"
               ? "bg-gradient-magic text-primary-foreground shadow-magic"
               : "text-muted-foreground hover:text-foreground"
@@ -198,7 +210,7 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
         </button>
         <button
           onClick={() => setStudioMode("interactive")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
             studioMode === "interactive"
               ? "bg-gradient-magic text-primary-foreground shadow-magic"
               : "text-muted-foreground hover:text-foreground"
@@ -217,6 +229,10 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
           websiteUrl={brandProfile?.brand_identity?.website}
         />
       )}
+
+      {/* Email Repository Mode */}
+      {studioMode === "email-repository" && <EmailRepositoryMode />}
+
 
       {/* Template Engine Mode */}
       {studioMode === "template-engine" && (

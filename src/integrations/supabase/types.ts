@@ -531,40 +531,52 @@ export type Database = {
           amp_valid: boolean
           amp_validator_errors: Json | null
           created_at: string
+          customer_name: string | null
           file_size_bytes: number
           html_content: string
           id: string
           is_active: boolean
           label: string
+          template_type: string
           thumbnail_url: string | null
           updated_at: string
           usage_count: number
+          use_case_category: string | null
+          use_case_category_confidence: number | null
         }
         Insert: {
           amp_valid?: boolean
           amp_validator_errors?: Json | null
           created_at?: string
+          customer_name?: string | null
           file_size_bytes?: number
           html_content: string
           id?: string
           is_active?: boolean
           label: string
+          template_type?: string
           thumbnail_url?: string | null
           updated_at?: string
           usage_count?: number
+          use_case_category?: string | null
+          use_case_category_confidence?: number | null
         }
         Update: {
           amp_valid?: boolean
           amp_validator_errors?: Json | null
           created_at?: string
+          customer_name?: string | null
           file_size_bytes?: number
           html_content?: string
           id?: string
           is_active?: boolean
           label?: string
+          template_type?: string
           thumbnail_url?: string | null
           updated_at?: string
           usage_count?: number
+          use_case_category?: string | null
+          use_case_category_confidence?: number | null
         }
         Relationships: []
       }
