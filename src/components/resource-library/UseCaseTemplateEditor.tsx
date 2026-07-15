@@ -57,13 +57,15 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
 
   // Upload modal
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCustomer, setUploadCustomer] = useState("");
   const [uploadIndustry, setUploadIndustry] = useState<string>("");
   const [uploadType, setUploadType] = useState<TemplateType>("amp");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   // Rename
   const [renameTarget, setRenameTarget] = useState<UseCaseTemplate | null>(null);
@@ -142,49 +144,84 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     return null;
   };
 
-  const onPickUploadFile = (f: File | null) => {
-    if (!f) return;
-    const err = validateUploadFile(f);
-    if (err) {
-      toast.error(err);
-      return;
+  const onPickUploadFiles = (files: File[]) => {
+    const valid: File[] = [];
+    for (const f of files) {
+      const err = validateUploadFile(f);
+      if (err) {
+        toast.error(`${f.name}: ${err}`);
+        continue;
+      }
+      valid.push(f);
     }
-    setUploadFile(f);
-    // Always derive label from filename (Label field removed from UI)
-    setUploadLabel(f.name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
+    if (valid.length === 0) return;
+    setUploadFiles((prev) => {
+      const seen = new Set(prev.map((p) => `${p.name}:${p.size}`));
+      const merged = [...prev];
+      for (const f of valid) {
+        const k = `${f.name}:${f.size}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          merged.push(f);
+        }
+      }
+      return merged;
+    });
+    if (valid.length === 1 && !uploadLabel) {
+      setUploadLabel(valid[0].name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
+    }
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadFile) return;
-    const derivedLabel = (uploadLabel || uploadFile.name.replace(/\.html?$/i, "")).slice(0, TEMPLATE_LABEL_MAX);
-    if (!derivedLabel.trim()) {
-      toast.error("Could not derive a name from the file");
-      return;
-    }
+    if (uploadFiles.length === 0) return;
     setUploading(true);
-    try {
-      const html = await readFileAsText(uploadFile);
-      const created = await uploadUseCaseTemplate({
-        label: derivedLabel,
-        html,
-        customerName: uploadCustomer,
-        industry: uploadIndustry,
-        templateType: uploadType,
-      });
-      setTemplates((prev) => [created, ...prev]);
-      toast.success("Template uploaded");
+    setUploadProgress({ done: 0, total: uploadFiles.length });
+    const created: UseCaseTemplate[] = [];
+    const failures: string[] = [];
+    for (let i = 0; i < uploadFiles.length; i++) {
+      const file = uploadFiles[i];
+      const derivedLabel = (uploadFiles.length === 1 && uploadLabel
+        ? uploadLabel
+        : file.name.replace(/\.html?$/i, "")
+      ).slice(0, TEMPLATE_LABEL_MAX);
+      try {
+        const html = await readFileAsText(file);
+        const t = await uploadUseCaseTemplate({
+          label: derivedLabel,
+          html,
+          customerName: uploadCustomer,
+          industry: uploadIndustry,
+          templateType: uploadType,
+        });
+        created.push(t);
+      } catch (e: any) {
+        failures.push(`${file.name}: ${e?.message || e}`);
+      }
+      setUploadProgress({ done: i + 1, total: uploadFiles.length });
+    }
+    if (created.length > 0) {
+      setTemplates((prev) => [...created, ...prev]);
+      toast.success(
+        created.length === 1
+          ? "Template uploaded"
+          : `${created.length} templates uploaded`
+      );
+    }
+    if (failures.length > 0) {
+      toast.error(`Failed: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "…" : ""}`);
+    }
+    if (failures.length === 0) {
       setUploadOpen(false);
-      setUploadFile(null);
+      setUploadFiles([]);
       setUploadLabel("");
       setUploadCustomer("");
       setUploadIndustry("");
       setUploadType("amp");
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to upload template");
-    } finally {
-      setUploading(false);
     }
+    setUploading(false);
+    setUploadProgress(null);
   };
+
 
   const handleRenameSubmit = async () => {
     if (!renameTarget) return;
@@ -489,26 +526,55 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   ref={fileInputRef}
                   type="file"
                   accept=".html,.htm,text/html"
+                  multiple
                   className="hidden"
-                  onChange={(e) => onPickUploadFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = "";
+                    onPickUploadFiles(files);
+                  }}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full p-4 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors flex flex-col items-center gap-2"
                 >
                   <Upload className="w-5 h-5" />
-                  {uploadFile ? (
-                    <span className="text-foreground">
-                      {uploadFile.name} ({formatBytes(uploadFile.size)})
+                  {uploadFiles.length > 0 ? (
+                    <span className="text-foreground text-center">
+                      {uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected · click to add more
                     </span>
                   ) : (
                     <>
-                      <span>Click to choose .html file</span>
-                      <span className="text-[10px]">Max 500 KB</span>
+                      <span>Click to choose .html files (multi-select)</span>
+                      <span className="text-[10px]">Max 500 KB each</span>
                     </>
                   )}
+
                 </button>
+                {uploadFiles.length > 0 && (
+                  <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs">
+                    {uploadFiles.map((f, idx) => (
+                      <li
+                        key={`${f.name}:${idx}`}
+                        className="flex items-center gap-2 px-2 py-1 rounded bg-muted/40 border border-border"
+                      >
+                        <FileCode className="w-3 h-3 text-primary flex-shrink-0" />
+                        <span className="truncate flex-1" title={f.name}>{f.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatBytes(f.size)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setUploadFiles((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-muted-foreground hover:text-destructive"
+                          disabled={uploading}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+
 
               {/* Customer */}
               <div>
@@ -591,12 +657,17 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
               </button>
               <button
                 onClick={handleUploadSubmit}
-                disabled={!uploadFile || uploading}
+                disabled={uploadFiles.length === 0 || uploading}
                 className="px-4 py-2 rounded-lg bg-gradient-magic text-primary-foreground text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Save Template
+                {uploading && uploadProgress
+                  ? `Uploading ${uploadProgress.done}/${uploadProgress.total}…`
+                  : uploadFiles.length > 1
+                    ? `Save ${uploadFiles.length} Templates`
+                    : "Save Template"}
               </button>
+
             </div>
           </motion.div>
         </div>
