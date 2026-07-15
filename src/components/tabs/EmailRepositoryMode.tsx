@@ -46,19 +46,26 @@ export const EmailRepositoryMode: React.FC = () => {
     return Array.from(set).sort();
   }, [templates]);
 
+  const industries = useMemo(() => {
+    const set = new Set<string>();
+    templates.forEach((t) => t.industry && set.add(t.industry));
+    return Array.from(set).sort();
+  }, [templates]);
+
   const filtered = useMemo(() => {
     return templates.filter((t) => {
       if (filterCustomer !== "all" && (t.customerName ?? "") !== filterCustomer) return false;
       if (filterType !== "all" && t.templateType !== filterType) return false;
       if (filterCategory !== "all" && (t.useCaseCategory ?? "") !== filterCategory) return false;
+      if (filterIndustry !== "all" && (t.industry ?? "") !== filterIndustry) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
-        const hay = `${t.label} ${t.customerName ?? ""} ${t.useCaseCategory ?? ""}`.toLowerCase();
+        const hay = `${t.label} ${t.customerName ?? ""} ${t.useCaseCategory ?? ""} ${industryLabel(t.industry)}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [templates, filterCustomer, filterType, filterCategory, search]);
+  }, [templates, filterCustomer, filterType, filterCategory, filterIndustry, search]);
 
   const handleCopy = async (html: string) => {
     try {
