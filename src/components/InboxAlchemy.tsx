@@ -48,7 +48,7 @@ type TabId = typeof tabs[number]["id"];
 const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
   const { loadResourcesForIndustry } = useResourceLibrary();
-  const [activeTab, setActiveTab] = useState<TabId>("inbox-potential");
+  const [activeTab, setActiveTab] = useState<TabId>("email-repository");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
   const [brandProfile, setBrandProfile] = useState<CoreBrandJSON | null>(null);
