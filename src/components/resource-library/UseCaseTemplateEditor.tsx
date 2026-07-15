@@ -144,49 +144,84 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     return null;
   };
 
-  const onPickUploadFile = (f: File | null) => {
-    if (!f) return;
-    const err = validateUploadFile(f);
-    if (err) {
-      toast.error(err);
-      return;
+  const onPickUploadFiles = (files: File[]) => {
+    const valid: File[] = [];
+    for (const f of files) {
+      const err = validateUploadFile(f);
+      if (err) {
+        toast.error(`${f.name}: ${err}`);
+        continue;
+      }
+      valid.push(f);
     }
-    setUploadFile(f);
-    // Always derive label from filename (Label field removed from UI)
-    setUploadLabel(f.name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
+    if (valid.length === 0) return;
+    setUploadFiles((prev) => {
+      const seen = new Set(prev.map((p) => `${p.name}:${p.size}`));
+      const merged = [...prev];
+      for (const f of valid) {
+        const k = `${f.name}:${f.size}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          merged.push(f);
+        }
+      }
+      return merged;
+    });
+    if (valid.length === 1 && !uploadLabel) {
+      setUploadLabel(valid[0].name.replace(/\.html?$/i, "").slice(0, TEMPLATE_LABEL_MAX));
+    }
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadFile) return;
-    const derivedLabel = (uploadLabel || uploadFile.name.replace(/\.html?$/i, "")).slice(0, TEMPLATE_LABEL_MAX);
-    if (!derivedLabel.trim()) {
-      toast.error("Could not derive a name from the file");
-      return;
-    }
+    if (uploadFiles.length === 0) return;
     setUploading(true);
-    try {
-      const html = await readFileAsText(uploadFile);
-      const created = await uploadUseCaseTemplate({
-        label: derivedLabel,
-        html,
-        customerName: uploadCustomer,
-        industry: uploadIndustry,
-        templateType: uploadType,
-      });
-      setTemplates((prev) => [created, ...prev]);
-      toast.success("Template uploaded");
+    setUploadProgress({ done: 0, total: uploadFiles.length });
+    const created: UseCaseTemplate[] = [];
+    const failures: string[] = [];
+    for (let i = 0; i < uploadFiles.length; i++) {
+      const file = uploadFiles[i];
+      const derivedLabel = (uploadFiles.length === 1 && uploadLabel
+        ? uploadLabel
+        : file.name.replace(/\.html?$/i, "")
+      ).slice(0, TEMPLATE_LABEL_MAX);
+      try {
+        const html = await readFileAsText(file);
+        const t = await uploadUseCaseTemplate({
+          label: derivedLabel,
+          html,
+          customerName: uploadCustomer,
+          industry: uploadIndustry,
+          templateType: uploadType,
+        });
+        created.push(t);
+      } catch (e: any) {
+        failures.push(`${file.name}: ${e?.message || e}`);
+      }
+      setUploadProgress({ done: i + 1, total: uploadFiles.length });
+    }
+    if (created.length > 0) {
+      setTemplates((prev) => [...created, ...prev]);
+      toast.success(
+        created.length === 1
+          ? "Template uploaded"
+          : `${created.length} templates uploaded`
+      );
+    }
+    if (failures.length > 0) {
+      toast.error(`Failed: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "…" : ""}`);
+    }
+    if (failures.length === 0) {
       setUploadOpen(false);
-      setUploadFile(null);
+      setUploadFiles([]);
       setUploadLabel("");
       setUploadCustomer("");
       setUploadIndustry("");
       setUploadType("amp");
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to upload template");
-    } finally {
-      setUploading(false);
     }
+    setUploading(false);
+    setUploadProgress(null);
   };
+
 
   const handleRenameSubmit = async () => {
     if (!renameTarget) return;
