@@ -90,7 +90,11 @@ export const EmailRepositoryMode: React.FC = () => {
   };
 
   const handleDownloadMockup = (t: UseCaseTemplate) => {
-    const mockupHtml = generateEmailMockup(t.htmlContent, t.customerName);
+    const mockupHtml = generateEmailMockup(t.htmlContent, {
+      brandName: t.customerName ?? undefined,
+      useCase: t.useCaseCategory,
+      industry: t.industry,
+    });
     const blob = new Blob([mockupHtml], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
