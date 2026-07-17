@@ -136,6 +136,13 @@ export const EmailRepositoryMode: React.FC = () => {
               <Copy className="w-4 h-4" /> Copy code
             </button>
             <button
+              onClick={() => handleDownloadMockup(selected)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted/50"
+              title="Download a branding-masked mockup version"
+            >
+              <Download className="w-4 h-4" /> Download mockup
+            </button>
+            <button
               onClick={() => handleDownload(selected)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-magic text-primary-foreground text-sm font-medium"
             >
