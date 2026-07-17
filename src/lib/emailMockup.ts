@@ -33,6 +33,10 @@ const DOMAIN_STOPWORDS = new Set([
   "amazonaws", "cloudfront", "googleusercontent", "gstatic", "google",
   "facebook", "twitter", "instagram", "youtube", "linkedin", "tiktok",
   "unsubscribe", "preferences", "list", "manage", "notification",
+  // Infra/CDN — never treat as brand
+  "ampproject", "amp", "gmail", "outlook", "yahoo", "apple", "microsoft",
+  "cloudflare", "akamai", "fastly", "jsdelivr", "unpkg", "bootstrapcdn",
+  "placehold", "loremflickr", "unsplash", "gravatar",
 ]);
 
 const KEYWORD_STOPWORDS = new Set([
@@ -222,7 +226,22 @@ export function generateEmailMockup(
   out = maskBackgroundImages(out, opts);
   out = maskLinks(out);
   out = maskEmailsAndPhones(out);
+
+  // Stash <script> and <style> blocks so brand-token masking cannot corrupt
+  // the AMP boilerplate (e.g. cdn.ampproject.org). Without this, mangling
+  // the AMP runtime URL leaves body{visibility:hidden} in place forever and
+  // the downloaded file renders blank.
+  const stash: string[] = [];
+  out = out.replace(
+    /<(script|style)\b[\s\S]*?<\/\1>/gi,
+    (m) => {
+      const i = stash.push(m) - 1;
+      return `__MOCKUP_STASH_${i}__`;
+    },
+  );
   out = maskBrandTokens(out, tokens);
+  out = out.replace(/__MOCKUP_STASH_(\d+)__/g, (_m, i) => stash[Number(i)] ?? "");
+
   out = maskTitleAndPreheader(out);
   return out;
 }
