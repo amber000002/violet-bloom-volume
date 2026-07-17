@@ -10,6 +10,7 @@ import {
 } from "@/lib/useCaseTemplateService";
 import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
 import { AmpEmailPreviewFrame } from "@/components/email/AmpEmailPreviewFrame";
+import { generateEmailMockup } from "@/lib/emailMockup";
 
 export const EmailRepositoryMode: React.FC = () => {
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
@@ -88,6 +89,20 @@ export const EmailRepositoryMode: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadMockup = (t: UseCaseTemplate) => {
+    const mockupHtml = generateEmailMockup(t.htmlContent, t.customerName);
+    const blob = new Blob([mockupHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safe = t.label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    a.download = `${safe || "email"}-mockup.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Mockup downloaded (branding masked)");
+  };
+
+
   const handleReclassify = async (t: UseCaseTemplate) => {
     setReclassifyingId(t.id);
     try {
@@ -119,6 +134,13 @@ export const EmailRepositoryMode: React.FC = () => {
               className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted/50"
             >
               <Copy className="w-4 h-4" /> Copy code
+            </button>
+            <button
+              onClick={() => handleDownloadMockup(selected)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted/50"
+              title="Download a branding-masked mockup version"
+            >
+              <Download className="w-4 h-4" /> Download mockup
             </button>
             <button
               onClick={() => handleDownload(selected)}
