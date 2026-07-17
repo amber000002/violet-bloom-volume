@@ -89,6 +89,20 @@ export const EmailRepositoryMode: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadMockup = (t: UseCaseTemplate) => {
+    const mockupHtml = generateEmailMockup(t.htmlContent, t.customerName);
+    const blob = new Blob([mockupHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safe = t.label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    a.download = `${safe || "email"}-mockup.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Mockup downloaded (branding masked)");
+  };
+
+
   const handleReclassify = async (t: UseCaseTemplate) => {
     setReclassifyingId(t.id);
     try {
