@@ -33,6 +33,10 @@ const DOMAIN_STOPWORDS = new Set([
   "amazonaws", "cloudfront", "googleusercontent", "gstatic", "google",
   "facebook", "twitter", "instagram", "youtube", "linkedin", "tiktok",
   "unsubscribe", "preferences", "list", "manage", "notification",
+  // Infra/CDN — never treat as brand
+  "ampproject", "amp", "gmail", "outlook", "yahoo", "apple", "microsoft",
+  "cloudflare", "akamai", "fastly", "jsdelivr", "unpkg", "bootstrapcdn",
+  "placehold", "loremflickr", "unsplash", "gravatar",
 ]);
 
 const KEYWORD_STOPWORDS = new Set([
