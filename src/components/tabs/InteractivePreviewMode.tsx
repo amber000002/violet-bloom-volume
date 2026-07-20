@@ -108,6 +108,27 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.href === "string" && el.tagName === "A") el.setAttribute("href", d.href);
     if (typeof d.color === "string") el.style.color = d.color;
     if (typeof d.backgroundColor === "string") el.style.backgroundColor = d.backgroundColor;
+    if (typeof d.src === "string" && d.src) {
+      const tn = el.tagName;
+      if (tn === "IMG" || tn === "AMP-IMG" || tn === "AMP-ANIM") {
+        el.setAttribute("src", d.src);
+        // amp-img sometimes renders via an inner <img>; sync it
+        const inner = el.querySelector && el.querySelector("img");
+        if (inner) inner.setAttribute("src", d.src);
+      }
+    }
+    if (typeof d.alt === "string") {
+      const tn = el.tagName;
+      if (tn === "IMG" || tn === "AMP-IMG" || tn === "AMP-ANIM") el.setAttribute("alt", d.alt);
+    }
+    if (typeof d.bgImage === "string") {
+      const cur = el.getAttribute("style") || "";
+      const cleaned = cur.replace(/background(-image)?\\s*:[^;]*;?/gi, "").trim();
+      const next = d.bgImage
+        ? (cleaned ? cleaned + ";" : "") + "background-image:url('" + d.bgImage + "');background-size:cover;background-position:center;"
+        : cleaned;
+      el.setAttribute("style", next);
+    }
   });
 
   parent.postMessage({ type: "lovable-ready" }, "*");
