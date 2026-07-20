@@ -148,19 +148,6 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
     return items[industry] || ["Option 1", "Option 2", "Option 3"];
   };
 
-  if (!industry) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-          <span className="text-3xl">⚡</span>
-        </div>
-        <p className="text-muted-foreground max-w-md">
-          Select an industry above to explore AMP email templates.
-        </p>
-      </div>
-    );
-  }
-
   // Presentation view
   if (viewMode === "presentation") {
     return (
@@ -172,10 +159,32 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
     );
   }
 
+  const industryRequiredNotice = (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+        <span className="text-3xl">⚡</span>
+      </div>
+      <p className="text-muted-foreground max-w-md">
+        Select an industry above to use this mode.
+      </p>
+    </div>
+  );
+
   return (
     <div className="space-y-8">
-      {/* Mode Toggle */}
+      {/* Mode Toggle — Interactive Preview first */}
       <div className="flex flex-wrap justify-center gap-2 p-1 rounded-xl bg-muted/30 border border-border max-w-3xl mx-auto">
+        <button
+          onClick={() => setStudioMode("interactive")}
+          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            studioMode === "interactive"
+              ? "bg-gradient-magic text-primary-foreground shadow-magic"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Layout className="w-4 h-4" />
+          Interactive Preview
+        </button>
         <button
           onClick={() => setStudioMode("amp-templates")}
           className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
@@ -198,206 +207,35 @@ export const AMPEmailStudioTab: React.FC<AMPEmailStudioTabProps> = ({
           <Wand2 className="w-4 h-4" />
           Template Engine
         </button>
-        <button
-          onClick={() => setStudioMode("interactive")}
-          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            studioMode === "interactive"
-              ? "bg-gradient-magic text-primary-foreground shadow-magic"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Layout className="w-4 h-4" />
-          Interactive Preview
-        </button>
       </div>
+
+      {/* Interactive Preview — visual editor for saved / uploaded templates */}
+      {studioMode === "interactive" && <InteractivePreviewMode />}
 
       {/* AMP Templates Mode (Phase 2: brand-aware generation) */}
       {studioMode === "amp-templates" && (
-        <AmpTemplatesMode
-          brandProfile={brandProfile}
-          brandDesignProfile={brandProfile?.brand_design_profile || null}
-          websiteUrl={brandProfile?.brand_identity?.website}
-        />
+        industry ? (
+          <AmpTemplatesMode
+            brandProfile={brandProfile}
+            brandDesignProfile={brandProfile?.brand_design_profile || null}
+            websiteUrl={brandProfile?.brand_identity?.website}
+          />
+        ) : industryRequiredNotice
       )}
-
-      {/* Email Repository moved to top-level tab */}
-      {studioMode === "email-repository" && <EmailRepositoryMode />}
-
 
       {/* Template Engine Mode */}
       {studioMode === "template-engine" && (
-        <TemplateEngineMode
-          industry={industry}
-          brandProfile={brandProfile}
-        />
-      )}
-
-      {/* Interactive Preview Mode (existing) */}
-      {studioMode === "interactive" && (
-      <div className="space-y-8">
-      {/* Controls */}
-      <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-        {/* Use Case Dropdown */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Use Case
-          </label>
-          <MagicSelect
-            value={selectedUseCase}
-            onValueChange={setSelectedUseCase}
-            placeholder="Select a use case"
-            options={useCaseOptions}
+        industry ? (
+          <TemplateEngineMode
+            industry={industry}
+            brandProfile={brandProfile}
           />
-        </div>
-
-        {/* Template Style */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Template Layout
-          </label>
-          <div className="flex gap-2">
-            {templateStyleOptions.map((option) => {
-              const isDisabled = option.id === "gamified" && !supportsGamification;
-              return (
-                <motion.button
-                  key={option.id}
-                  whileHover={!isDisabled ? { scale: 1.02 } : undefined}
-                  whileTap={!isDisabled ? { scale: 0.98 } : undefined}
-                  onClick={() => !isDisabled && setTemplateStyle(option.id)}
-                  disabled={isDisabled}
-                  className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-300 ${
-                    templateStyle === option.id
-                      ? "bg-gradient-magic text-primary-foreground shadow-magic"
-                      : isDisabled
-                      ? "bg-muted/30 text-muted-foreground/50 cursor-not-allowed"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted border border-border"
-                  }`}
-                >
-                  {option.label}
-                </motion.button>
-              );
-            })}
-          </div>
-          {!supportsGamification && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Gamification not recommended for {config?.name}
-            </p>
-          )}
-        </div>
-
-        {/* Website URL */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Website URL <span className="text-muted-foreground">(optional)</span>
-          </label>
-          <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="url"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-              placeholder="https://yoursite.com"
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-muted/50 border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Used to simulate relevant imagery.
-          </p>
-        </div>
-      </div>
-
-      {/* Email Preview */}
-      {selectedUseCase && (
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${selectedUseCase}-${templateStyle}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="max-w-lg mx-auto"
-          >
-            {/* Email Frame */}
-            <div className="magic-card rounded-2xl overflow-hidden">
-              {/* Email Header */}
-              <div className="bg-muted/50 px-4 py-3 border-b border-border flex items-center gap-3">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-destructive/50" />
-                  <div className="w-3 h-3 rounded-full bg-stardust/50" />
-                  <div className="w-3 h-3 rounded-full bg-accent/50" />
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  AMP Email Preview — {templateStyle === "brand-carousel" ? "Brand-led Carousel" : "Gamified Interactive"}
-                </span>
-              </div>
-
-              {/* Email Content */}
-              <div className="p-6 space-y-6">
-                {templateStyle === "brand-carousel" ? (
-                  <BrandCarouselTemplate 
-                    emoji={getIndustryEmoji()} 
-                    industryName={config?.name || ""}
-                    useCaseName={selectedUseCaseData?.name || ""}
-                    carouselItems={getCarouselItems()}
-                    websiteUrl={websiteUrl}
-                  />
-                ) : (
-                  <GamifiedTemplate 
-                    emoji={getIndustryEmoji()} 
-                    industryName={config?.name || ""}
-                    useCaseName={selectedUseCaseData?.name || ""}
-                  />
-                )}
-
-                {/* Footer */}
-                <div className="pt-4 border-t border-border">
-                  <div className="flex justify-center gap-4 mb-3">
-                    {["📘", "📸", "🐦", "💼"].map((icon, i) => (
-                      <div key={i} className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center text-sm">
-                        {icon}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-center gap-4 text-xs text-muted-foreground">
-                    <span className="hover:text-foreground cursor-pointer">Preferences</span>
-                    <span>•</span>
-                    <span className="hover:text-foreground cursor-pointer">Unsubscribe</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-      )}
-
-      {/* Personalization Tags */}
-      {selectedUseCase && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="flex flex-wrap justify-center gap-2"
-        >
-          {[
-            { icon: User, label: "Personalized using past behavior" },
-            { icon: RefreshCw, label: "Updated in real time" },
-            { icon: Sparkles, label: "No app required" },
-          ].map(({ icon: Icon, label }) => (
-            <div
-              key={label}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/30 border border-border text-xs text-muted-foreground"
-            >
-              <Icon className="w-3 h-3" />
-              {label}
-            </div>
-          ))}
-        </motion.div>
-      )}
-    </div>
+        ) : industryRequiredNotice
       )}
     </div>
   );
 };
+
 
 // Brand-led Carousel Template Component
 const BrandCarouselTemplate: React.FC<{
