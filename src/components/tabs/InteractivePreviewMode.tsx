@@ -1,0 +1,460 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw } from "lucide-react";
+import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
+import { saveAmpDraft } from "@/lib/ampDraftService";
+
+// ---------- Editor bridge (runs inside the iframe) ----------
+const EDITOR_ATTR = "data-edit-id";
+const EDITOR_STYLE_ID = "__lovable_editor_style__";
+const EDITOR_SCRIPT_ID = "__lovable_editor_script__";
+
+const EDITOR_CSS = `
+  [${EDITOR_ATTR}]{outline:1px dashed transparent;outline-offset:2px;cursor:pointer;transition:outline-color .15s;}
+  [${EDITOR_ATTR}]:hover{outline-color:#a855f7 !important;}
+  [${EDITOR_ATTR}].__lovable_selected__{outline:2px solid #a855f7 !important;}
+  a[${EDITOR_ATTR}]::after{content:" \\1F517";font-size:10px;opacity:.5;}
+`;
+
+// Injected inside iframe: tag elements, capture clicks, apply patches
+const EDITOR_SCRIPT = `(() => {
+  const ATTR = "${EDITOR_ATTR}";
+  let counter = 0;
+  const isTextish = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = el.tagName;
+    if (["SCRIPT","STYLE","META","LINK","HEAD","HTML","BODY"].includes(tag)) return false;
+    // Must have direct text child of some length
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim().length > 0) return true;
+    }
+    return false;
+  };
+  const walk = (root) => {
+    const all = root.querySelectorAll("*");
+    all.forEach((el) => {
+      const tag = el.tagName;
+      if (["SCRIPT","STYLE","META","LINK","HEAD","TITLE"].includes(tag)) return;
+      // Tag text-carrying elements and anchors and elements with inline color/bg
+      const st = el.getAttribute("style") || "";
+      const isLink = tag === "A";
+      const hasColor = /(background|color)\\s*:/i.test(st);
+      if (isTextish(el) || isLink || hasColor) {
+        if (!el.getAttribute(ATTR)) el.setAttribute(ATTR, "e" + (counter++));
+      }
+    });
+  };
+  walk(document);
+
+  document.addEventListener("click", (e) => {
+    let el = e.target;
+    while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
+    if (!el || !el.getAttribute) return;
+    e.preventDefault();
+    e.stopPropagation();
+    document.querySelectorAll(".__lovable_selected__").forEach(n => n.classList.remove("__lovable_selected__"));
+    el.classList.add("__lovable_selected__");
+    const id = el.getAttribute(ATTR);
+    const cs = getComputedStyle(el);
+    const payload = {
+      type: "lovable-select",
+      id,
+      tag: el.tagName.toLowerCase(),
+      text: (() => {
+        // Get concatenated direct-child text
+        let s = "";
+        for (const n of el.childNodes) if (n.nodeType === 3) s += n.nodeValue;
+        return s;
+      })(),
+      innerText: el.innerText || "",
+      href: el.getAttribute("href") || "",
+      color: rgbToHex(cs.color),
+      backgroundColor: rgbToHex(cs.backgroundColor),
+    };
+    parent.postMessage(payload, "*");
+  }, true);
+
+  function rgbToHex(rgb){
+    if(!rgb) return "";
+    const m = rgb.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+    if(!m) return "";
+    const to = (n) => ("0" + parseInt(n,10).toString(16)).slice(-2);
+    return "#" + to(m[1]) + to(m[2]) + to(m[3]);
+  }
+
+  window.addEventListener("message", (ev) => {
+    const d = ev.data;
+    if (!d || d.type !== "lovable-patch") return;
+    const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
+    if (!el) return;
+    if (typeof d.text === "string") {
+      // Replace only direct text child(ren); if none, set textContent
+      let replaced = false;
+      for (const n of Array.from(el.childNodes)) {
+        if (n.nodeType === 3) { if (!replaced) { n.nodeValue = d.text; replaced = true; } else { n.remove(); } }
+      }
+      if (!replaced) el.textContent = d.text;
+    }
+    if (typeof d.href === "string" && el.tagName === "A") el.setAttribute("href", d.href);
+    if (typeof d.color === "string") el.style.color = d.color;
+    if (typeof d.backgroundColor === "string") el.style.backgroundColor = d.backgroundColor;
+  });
+
+  parent.postMessage({ type: "lovable-ready" }, "*");
+})();`;
+
+function injectEditor(html: string): string {
+  const styleTag = `<style id="${EDITOR_STYLE_ID}">${EDITOR_CSS}</style>`;
+  const scriptTag = `<script id="${EDITOR_SCRIPT_ID}">${EDITOR_SCRIPT}</script>`;
+  if (/<\/head>/i.test(html)) {
+    html = html.replace(/<\/head>/i, `${styleTag}</head>`);
+  } else {
+    html = styleTag + html;
+  }
+  if (/<\/body>/i.test(html)) {
+    html = html.replace(/<\/body>/i, `${scriptTag}</body>`);
+  } else {
+    html = html + scriptTag;
+  }
+  return html;
+}
+
+function stripEditor(html: string): string {
+  return html
+    .replace(new RegExp(`<style id="${EDITOR_STYLE_ID}"[^>]*>[\\s\\S]*?</style>`, "i"), "")
+    .replace(new RegExp(`<script id="${EDITOR_SCRIPT_ID}"[^>]*>[\\s\\S]*?</script>`, "i"), "")
+    .replace(new RegExp(`\\s${EDITOR_ATTR}="[^"]*"`, "g"), "")
+    .replace(/\s*class="__lovable_selected__"/g, "")
+    .replace(/(\sclass="[^"]*)\s?__lovable_selected__\s?([^"]*")/g, "$1$2");
+}
+
+// ---------- Component ----------
+interface Selected {
+  id: string;
+  tag: string;
+  text: string;
+  innerText: string;
+  href: string;
+  color: string;
+  backgroundColor: string;
+}
+
+export const InteractivePreviewMode: React.FC = () => {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [sourceHtml, setSourceHtml] = useState<string>("");
+  const [srcDoc, setSrcDoc] = useState<string>("");
+  const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [selected, setSelected] = useState<Selected | null>(null);
+  const [draftName, setDraftName] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await listUseCaseTemplates();
+        setTemplates(data);
+      } catch (e: any) {
+        // silent
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const handler = (ev: MessageEvent) => {
+      const d = ev.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "lovable-select") setSelected(d as Selected);
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  const loadHtml = (html: string) => {
+    setSourceHtml(html);
+    setSrcDoc(injectEditor(html));
+    setSelected(null);
+  };
+
+  const handlePickTemplate = (id: string) => {
+    setSelectedTemplateId(id);
+    const t = templates.find((x) => x.id === id);
+    if (t) {
+      loadHtml(t.htmlContent);
+      if (!draftName) setDraftName(`${t.label} — tweaked`);
+    }
+  };
+
+  const handleFile = async (file: File) => {
+    if (!file) return;
+    const txt = await file.text();
+    loadHtml(txt);
+    if (!draftName) setDraftName(file.name.replace(/\.html?$/i, "") + " — tweaked");
+  };
+
+  const sendPatch = (patch: Partial<Selected>) => {
+    if (!selected || !iframeRef.current?.contentWindow) return;
+    iframeRef.current.contentWindow.postMessage({ type: "lovable-patch", id: selected.id, ...patch }, "*");
+    setSelected({ ...selected, ...patch } as Selected);
+  };
+
+  const currentHtml = (): string => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return sourceHtml;
+    const raw = "<!doctype html>\n" + doc.documentElement.outerHTML;
+    return stripEditor(raw);
+  };
+
+  const handleDownload = () => {
+    const html = currentHtml();
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (draftName || "edited-template") + ".html";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!draftName.trim()) {
+      toast.error("Give this draft a name first.");
+      return;
+    }
+    if (!sourceHtml) {
+      toast.error("Load a template first.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const html = currentHtml();
+      const t = templates.find((x) => x.id === selectedTemplateId) || null;
+      await saveAmpDraft({
+        name: draftName.trim(),
+        htmlContent: html,
+        templateId: t?.id ?? null,
+        templateLabel: t?.label ?? null,
+        brandName: t?.customerName ?? null,
+        ampValid: true,
+      });
+      toast.success("Draft saved");
+    } catch (e: any) {
+      toast.error(`Save failed: ${e?.message || e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    if (sourceHtml) {
+      setSrcDoc(injectEditor(sourceHtml));
+      setSelected(null);
+    }
+  };
+
+  const hasTemplate = !!srcDoc;
+
+  return (
+    <div className="space-y-4">
+      {/* Source controls */}
+      <div className="magic-card rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <MousePointerClick className="w-4 h-4 text-primary" />
+          Interactive Preview — click any element to tweak text, links or colors
+        </div>
+        <div className="grid md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Load from Email Repository</label>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => handlePickTemplate(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm"
+            >
+              <option value="">Select a template…</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.customerName ? `${t.customerName} — ` : ""}{t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Or upload .html</label>
+            <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm cursor-pointer hover:bg-muted">
+              <Upload className="w-4 h-4" />
+              <span className="truncate">Choose file…</span>
+              <input
+                type="file"
+                accept=".html,text/html"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+            </label>
+          </div>
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Draft name</label>
+            <input
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="My tweaked template"
+              className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            onClick={handleSaveDraft}
+            disabled={!hasTemplate || saving}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-magic text-primary-foreground text-sm font-medium disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save as draft"}
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={!hasTemplate}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" /> Download .html
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={!hasTemplate}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <RotateCcw className="w-4 h-4" /> Reset changes
+          </button>
+        </div>
+      </div>
+
+      {/* Editor surface */}
+      {!hasTemplate ? (
+        <div className="magic-card rounded-xl p-12 text-center text-muted-foreground">
+          <FileCode className="w-8 h-8 mx-auto mb-3 opacity-60" />
+          Pick a template from the Email Repository or upload an .html file to start editing.
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-[1fr_320px] gap-4">
+          {/* Preview */}
+          <div className="magic-card rounded-xl overflow-hidden bg-white">
+            <iframe
+              ref={iframeRef}
+              srcDoc={srcDoc}
+              title="Interactive preview"
+              sandbox="allow-scripts allow-same-origin"
+              className="w-full"
+              style={{ height: 780, border: 0, background: "white" }}
+            />
+          </div>
+
+          {/* Inspector */}
+          <div className="magic-card rounded-xl p-4 space-y-4 h-fit sticky top-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold flex items-center gap-2">
+                <Palette className="w-4 h-4 text-primary" /> Inspector
+              </div>
+              {selected && (
+                <button
+                  onClick={() => setSelected(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {!selected ? (
+              <p className="text-xs text-muted-foreground">
+                Click any text, button, link, or block in the preview to edit it here. Changes stay
+                local until you save the draft or download.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-xs text-muted-foreground">
+                  Selected: <span className="font-mono text-foreground">&lt;{selected.tag}&gt;</span>
+                </div>
+
+                {/* Text */}
+                {(selected.text?.trim() || selected.innerText?.trim()) && (
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+                      <Type className="w-3.5 h-3.5" /> Text
+                    </label>
+                    <textarea
+                      value={selected.text}
+                      onChange={(e) => sendPatch({ text: e.target.value })}
+                      rows={3}
+                      className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-sm"
+                    />
+                    {selected.innerText && selected.innerText.trim() !== selected.text.trim() && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Only this element's direct text is edited. Nested elements keep their own text
+                        — click them individually to edit.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Link */}
+                {selected.tag === "a" && (
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+                      <LinkIcon className="w-3.5 h-3.5" /> Link URL
+                    </label>
+                    <input
+                      type="url"
+                      value={selected.href}
+                      onChange={(e) => sendPatch({ href: e.target.value })}
+                      placeholder="https://…"
+                      className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-sm"
+                    />
+                  </div>
+                )}
+
+                {/* Colors */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Text color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={selected.color || "#000000"}
+                        onChange={(e) => sendPatch({ color: e.target.value })}
+                        className="w-8 h-8 rounded border border-border cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={selected.color}
+                        onChange={(e) => sendPatch({ color: e.target.value })}
+                        className="flex-1 px-2 py-1 rounded-md bg-muted/50 border border-border text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Background</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={selected.backgroundColor || "#ffffff"}
+                        onChange={(e) => sendPatch({ backgroundColor: e.target.value })}
+                        className="w-8 h-8 rounded border border-border cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={selected.backgroundColor}
+                        onChange={(e) => sendPatch({ backgroundColor: e.target.value })}
+                        className="flex-1 px-2 py-1 rounded-md bg-muted/50 border border-border text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default InteractivePreviewMode;
