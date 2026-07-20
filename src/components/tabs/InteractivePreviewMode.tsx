@@ -203,6 +203,14 @@ interface Selected {
   src?: string;
   alt?: string;
   bgImage?: string;
+  imageHref?: string;
+}
+
+type PatchKeys = keyof Omit<Selected, "id" | "tag" | "innerText" | "isImage">;
+interface HistoryEntry {
+  id: string;
+  prev: Partial<Selected>;
+  next: Partial<Selected>;
 }
 
 export const InteractivePreviewMode: React.FC = () => {
