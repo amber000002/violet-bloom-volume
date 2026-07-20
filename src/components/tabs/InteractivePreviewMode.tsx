@@ -449,6 +449,22 @@ export const InteractivePreviewMode: React.FC = () => {
             <Download className="w-4 h-4" /> Download .html
           </button>
           <button
+            onClick={handleUndo}
+            disabled={!hasTemplate || undoStack.length === 0}
+            title="Undo (Ctrl/Cmd+Z)"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <Undo2 className="w-4 h-4" /> Undo{undoStack.length ? ` (${undoStack.length})` : ""}
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={!hasTemplate || redoStack.length === 0}
+            title="Redo (Ctrl/Cmd+Shift+Z)"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <Redo2 className="w-4 h-4" /> Redo{redoStack.length ? ` (${redoStack.length})` : ""}
+          </button>
+          <button
             onClick={handleReset}
             disabled={!hasTemplate}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
