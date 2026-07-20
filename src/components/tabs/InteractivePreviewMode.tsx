@@ -58,10 +58,14 @@ const EDITOR_SCRIPT = `(() => {
     el.classList.add("__lovable_selected__");
     const id = el.getAttribute(ATTR);
     const cs = getComputedStyle(el);
+    const tagName = el.tagName;
+    const isImg = tagName === "IMG" || tagName === "AMP-IMG" || tagName === "AMP-ANIM";
+    const inlineStyle = el.getAttribute("style") || "";
+    const bgMatch = inlineStyle.match(/background(?:-image)?\\s*:[^;]*url\\((['"]?)([^'")]+)\\1\\)/i);
     const payload = {
       type: "lovable-select",
       id,
-      tag: el.tagName.toLowerCase(),
+      tag: tagName.toLowerCase(),
       text: (() => {
         // Get concatenated direct-child text
         let s = "";
@@ -72,6 +76,10 @@ const EDITOR_SCRIPT = `(() => {
       href: el.getAttribute("href") || "",
       color: rgbToHex(cs.color),
       backgroundColor: rgbToHex(cs.backgroundColor),
+      isImage: isImg,
+      src: isImg ? (el.getAttribute("src") || "") : "",
+      alt: isImg ? (el.getAttribute("alt") || "") : "",
+      bgImage: bgMatch ? bgMatch[2] : "",
     };
     parent.postMessage(payload, "*");
   }, true);
