@@ -62,6 +62,13 @@ const EDITOR_SCRIPT = `(() => {
     const isImg = tagName === "IMG" || tagName === "AMP-IMG" || tagName === "AMP-ANIM";
     const inlineStyle = el.getAttribute("style") || "";
     const bgMatch = inlineStyle.match(/background(?:-image)?\\s*:[^;]*url\\((['"]?)([^'")]+)\\1\\)/i);
+    // If image is wrapped in an anchor, expose that link
+    let imageHref = "";
+    if (isImg) {
+      let p = el.parentElement;
+      while (p && p.tagName !== "A" && p.tagName !== "BODY") p = p.parentElement;
+      if (p && p.tagName === "A") imageHref = p.getAttribute("href") || "";
+    }
     const payload = {
       type: "lovable-select",
       id,
@@ -80,6 +87,7 @@ const EDITOR_SCRIPT = `(() => {
       src: isImg ? (el.getAttribute("src") || "") : "",
       alt: isImg ? (el.getAttribute("alt") || "") : "",
       bgImage: bgMatch ? bgMatch[2] : "",
+      imageHref,
     };
     parent.postMessage(payload, "*");
   }, true);
