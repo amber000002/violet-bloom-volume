@@ -610,6 +610,26 @@ export const InteractivePreviewMode: React.FC = () => {
                         className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
                       />
                     </div>
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+                        <LinkIcon className="w-3.5 h-3.5" /> Click-through URL
+                      </label>
+                      <input
+                        type="url"
+                        value={selected.imageHref || ""}
+                        onChange={(e) => sendPatch({ imageHref: e.target.value })}
+                        placeholder="https://… destination when image is clicked"
+                        className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
+                      />
+                      {selected.imageHref && (
+                        <button
+                          onClick={() => sendPatch({ imageHref: "" })}
+                          className="text-[10px] text-muted-foreground hover:text-foreground underline mt-1"
+                        >
+                          Remove link
+                        </button>
+                      )}
+                    </div>
                     <p className="text-[10px] text-muted-foreground">
                       Tip: uploads are embedded as base64 into the HTML. For AMP-valid emails, host the
                       image and paste an https:// URL instead.
