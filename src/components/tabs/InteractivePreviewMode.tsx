@@ -270,11 +270,62 @@ export const InteractivePreviewMode: React.FC = () => {
     if (!draftName) setDraftName(file.name.replace(/\.html?$/i, "") + " — tweaked");
   };
 
-  const sendPatch = (patch: Partial<Selected>) => {
+  const postPatch = useCallback((id: string, patch: Partial<Selected>) => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-patch", id, ...patch }, "*");
+  }, []);
+
+  const sendPatch = (patch: Partial<Selected>, options: { record?: boolean } = { record: true }) => {
     if (!selected || !iframeRef.current?.contentWindow) return;
-    iframeRef.current.contentWindow.postMessage({ type: "lovable-patch", id: selected.id, ...patch }, "*");
+    // Build prev state snapshot for keys we're changing
+    const prev: Partial<Selected> = {};
+    (Object.keys(patch) as (keyof Selected)[]).forEach((k) => {
+      // @ts-expect-error index
+      prev[k] = (selected as any)[k] ?? "";
+    });
+    postPatch(selected.id, patch);
     setSelected({ ...selected, ...patch } as Selected);
+    if (options.record !== false) {
+      setUndoStack((s) => [...s, { id: selected.id, prev, next: patch }]);
+      setRedoStack([]);
+    }
   };
+
+  const handleUndo = useCallback(() => {
+    setUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const entry = stack[stack.length - 1];
+      postPatch(entry.id, entry.prev);
+      setRedoStack((r) => [...r, entry]);
+      setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.prev } as Selected) : sel));
+      return stack.slice(0, -1);
+    });
+  }, [postPatch]);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const entry = stack[stack.length - 1];
+      postPatch(entry.id, entry.next);
+      setUndoStack((u) => [...u, entry]);
+      setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.next } as Selected) : sel));
+      return stack.slice(0, -1);
+    });
+  }, [postPatch]);
+
+  // Keyboard shortcuts: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z (or Ctrl+Y)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (target && target.isContentEditable)) return;
+      if (e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); handleUndo(); }
+      else if ((e.key.toLowerCase() === "z" && e.shiftKey) || e.key.toLowerCase() === "y") { e.preventDefault(); handleRedo(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleUndo, handleRedo]);
 
   const currentHtml = (): string => {
     const doc = iframeRef.current?.contentDocument;
