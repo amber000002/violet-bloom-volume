@@ -400,8 +400,8 @@ export const InteractivePreviewMode: React.FC = () => {
 
             {!selected ? (
               <p className="text-xs text-muted-foreground">
-                Click any text, button, link, or block in the preview to edit it here. Changes stay
-                local until you save the draft or download.
+                Click any text, button, link, or image in the preview to edit it here. Replace images
+                by URL or by uploading a file. Changes stay local until you save the draft or download.
               </p>
             ) : (
               <div className="space-y-4">
