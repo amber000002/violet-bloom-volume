@@ -375,9 +375,12 @@ export const InteractivePreviewMode: React.FC = () => {
   };
 
   const handleReset = () => {
+  const handleReset = () => {
     if (sourceHtml) {
       setSrcDoc(injectEditor(sourceHtml));
       setSelected(null);
+      setUndoStack([]);
+      setRedoStack([]);
     }
   };
 
