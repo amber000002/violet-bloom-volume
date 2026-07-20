@@ -222,6 +222,8 @@ export const InteractivePreviewMode: React.FC = () => {
   const [selected, setSelected] = useState<Selected | null>(null);
   const [draftName, setDraftName] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
     (async () => {
