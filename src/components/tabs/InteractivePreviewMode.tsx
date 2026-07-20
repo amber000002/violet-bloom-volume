@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 
@@ -35,11 +35,13 @@ const EDITOR_SCRIPT = `(() => {
     all.forEach((el) => {
       const tag = el.tagName;
       if (["SCRIPT","STYLE","META","LINK","HEAD","TITLE"].includes(tag)) return;
-      // Tag text-carrying elements and anchors and elements with inline color/bg
+      // Tag text-carrying elements, anchors, images, and elements with inline color/bg
       const st = el.getAttribute("style") || "";
       const isLink = tag === "A";
+      const isImg = tag === "IMG" || tag === "AMP-IMG" || tag === "AMP-ANIM";
       const hasColor = /(background|color)\\s*:/i.test(st);
-      if (isTextish(el) || isLink || hasColor) {
+      const hasBgImg = /background(-image)?\\s*:[^;]*url\\(/i.test(st);
+      if (isTextish(el) || isLink || isImg || hasColor || hasBgImg) {
         if (!el.getAttribute(ATTR)) el.setAttribute(ATTR, "e" + (counter++));
       }
     });
@@ -56,10 +58,14 @@ const EDITOR_SCRIPT = `(() => {
     el.classList.add("__lovable_selected__");
     const id = el.getAttribute(ATTR);
     const cs = getComputedStyle(el);
+    const tagName = el.tagName;
+    const isImg = tagName === "IMG" || tagName === "AMP-IMG" || tagName === "AMP-ANIM";
+    const inlineStyle = el.getAttribute("style") || "";
+    const bgMatch = inlineStyle.match(/background(?:-image)?\\s*:[^;]*url\\((['"]?)([^'")]+)\\1\\)/i);
     const payload = {
       type: "lovable-select",
       id,
-      tag: el.tagName.toLowerCase(),
+      tag: tagName.toLowerCase(),
       text: (() => {
         // Get concatenated direct-child text
         let s = "";
@@ -70,6 +76,10 @@ const EDITOR_SCRIPT = `(() => {
       href: el.getAttribute("href") || "",
       color: rgbToHex(cs.color),
       backgroundColor: rgbToHex(cs.backgroundColor),
+      isImage: isImg,
+      src: isImg ? (el.getAttribute("src") || "") : "",
+      alt: isImg ? (el.getAttribute("alt") || "") : "",
+      bgImage: bgMatch ? bgMatch[2] : "",
     };
     parent.postMessage(payload, "*");
   }, true);
@@ -98,6 +108,27 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.href === "string" && el.tagName === "A") el.setAttribute("href", d.href);
     if (typeof d.color === "string") el.style.color = d.color;
     if (typeof d.backgroundColor === "string") el.style.backgroundColor = d.backgroundColor;
+    if (typeof d.src === "string" && d.src) {
+      const tn = el.tagName;
+      if (tn === "IMG" || tn === "AMP-IMG" || tn === "AMP-ANIM") {
+        el.setAttribute("src", d.src);
+        // amp-img sometimes renders via an inner <img>; sync it
+        const inner = el.querySelector && el.querySelector("img");
+        if (inner) inner.setAttribute("src", d.src);
+      }
+    }
+    if (typeof d.alt === "string") {
+      const tn = el.tagName;
+      if (tn === "IMG" || tn === "AMP-IMG" || tn === "AMP-ANIM") el.setAttribute("alt", d.alt);
+    }
+    if (typeof d.bgImage === "string") {
+      const cur = el.getAttribute("style") || "";
+      const cleaned = cur.replace(/background(-image)?\\s*:[^;]*;?/gi, "").trim();
+      const next = d.bgImage
+        ? (cleaned ? cleaned + ";" : "") + "background-image:url('" + d.bgImage + "');background-size:cover;background-position:center;"
+        : cleaned;
+      el.setAttribute("style", next);
+    }
   });
 
   parent.postMessage({ type: "lovable-ready" }, "*");
@@ -137,6 +168,10 @@ interface Selected {
   href: string;
   color: string;
   backgroundColor: string;
+  isImage?: boolean;
+  src?: string;
+  alt?: string;
+  bgImage?: string;
 }
 
 export const InteractivePreviewMode: React.FC = () => {
@@ -365,8 +400,8 @@ export const InteractivePreviewMode: React.FC = () => {
 
             {!selected ? (
               <p className="text-xs text-muted-foreground">
-                Click any text, button, link, or block in the preview to edit it here. Changes stay
-                local until you save the draft or download.
+                Click any text, button, link, or image in the preview to edit it here. Replace images
+                by URL or by uploading a file. Changes stay local until you save the draft or download.
               </p>
             ) : (
               <div className="space-y-4">
@@ -408,6 +443,87 @@ export const InteractivePreviewMode: React.FC = () => {
                       placeholder="https://…"
                       className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-sm"
                     />
+                  </div>
+                )}
+
+                {/* Image */}
+                {selected.isImage && (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-1.5 text-xs font-medium">
+                      <ImageIcon className="w-3.5 h-3.5" /> Image
+                    </label>
+                    {selected.src && (
+                      <div className="rounded-md border border-border bg-muted/30 p-2">
+                        <img
+                          src={selected.src}
+                          alt=""
+                          className="max-h-24 mx-auto object-contain"
+                          onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+                        />
+                      </div>
+                    )}
+                    <input
+                      type="url"
+                      value={selected.src || ""}
+                      onChange={(e) => sendPatch({ src: e.target.value })}
+                      placeholder="https://… image URL"
+                      className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs font-mono"
+                    />
+                    <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs cursor-pointer hover:bg-muted">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload replacement…</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const dataUrl = String(reader.result || "");
+                            if (dataUrl) sendPatch({ src: dataUrl });
+                          };
+                          reader.readAsDataURL(f);
+                        }}
+                      />
+                    </label>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Alt text</label>
+                      <input
+                        type="text"
+                        value={selected.alt || ""}
+                        onChange={(e) => sendPatch({ alt: e.target.value })}
+                        placeholder="Describe the image"
+                        className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Tip: uploads are embedded as base64 into the HTML. For AMP-valid emails, host the
+                      image and paste an https:// URL instead.
+                    </p>
+                  </div>
+                )}
+
+                {/* Background image */}
+                {!selected.isImage && (selected.bgImage || false) && (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-1.5 text-xs font-medium">
+                      <ImageIcon className="w-3.5 h-3.5" /> Background image
+                    </label>
+                    <input
+                      type="url"
+                      value={selected.bgImage || ""}
+                      onChange={(e) => sendPatch({ bgImage: e.target.value })}
+                      placeholder="https://… image URL"
+                      className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs font-mono"
+                    />
+                    <button
+                      onClick={() => sendPatch({ bgImage: "" })}
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                      Remove background image
+                    </button>
                   </div>
                 )}
 
