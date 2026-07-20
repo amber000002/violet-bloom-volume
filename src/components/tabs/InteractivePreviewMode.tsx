@@ -250,6 +250,8 @@ export const InteractivePreviewMode: React.FC = () => {
     setSourceHtml(html);
     setSrcDoc(injectEditor(html));
     setSelected(null);
+    setUndoStack([]);
+    setRedoStack([]);
   };
 
   const handlePickTemplate = (id: string) => {
