@@ -15,6 +15,7 @@ import { AMPStudioSlides } from "../presentation/AMPStudioSlides";
 import { TemplateEngineMode } from "./TemplateEngineMode";
 import { AmpTemplatesMode } from "./AmpTemplatesMode";
 import { EmailRepositoryMode } from "./EmailRepositoryMode";
+import { InteractivePreviewMode } from "./InteractivePreviewMode";
 
 interface AMPEmailStudioTabProps {
   industry: string;
