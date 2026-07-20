@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2 } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 
@@ -62,6 +62,13 @@ const EDITOR_SCRIPT = `(() => {
     const isImg = tagName === "IMG" || tagName === "AMP-IMG" || tagName === "AMP-ANIM";
     const inlineStyle = el.getAttribute("style") || "";
     const bgMatch = inlineStyle.match(/background(?:-image)?\\s*:[^;]*url\\((['"]?)([^'")]+)\\1\\)/i);
+    // If image is wrapped in an anchor, expose that link
+    let imageHref = "";
+    if (isImg) {
+      let p = el.parentElement;
+      while (p && p.tagName !== "A" && p.tagName !== "BODY") p = p.parentElement;
+      if (p && p.tagName === "A") imageHref = p.getAttribute("href") || "";
+    }
     const payload = {
       type: "lovable-select",
       id,
@@ -80,6 +87,7 @@ const EDITOR_SCRIPT = `(() => {
       src: isImg ? (el.getAttribute("src") || "") : "",
       alt: isImg ? (el.getAttribute("alt") || "") : "",
       bgImage: bgMatch ? bgMatch[2] : "",
+      imageHref,
     };
     parent.postMessage(payload, "*");
   }, true);
@@ -129,6 +137,29 @@ const EDITOR_SCRIPT = `(() => {
         : cleaned;
       el.setAttribute("style", next);
     }
+    if (typeof d.imageHref === "string") {
+      const tn = el.tagName;
+      if (tn === "IMG" || tn === "AMP-IMG" || tn === "AMP-ANIM") {
+        // Find existing wrapping anchor
+        let p = el.parentElement;
+        while (p && p.tagName !== "A" && p.tagName !== "BODY") p = p.parentElement;
+        if (d.imageHref) {
+          if (p && p.tagName === "A") {
+            p.setAttribute("href", d.imageHref);
+          } else {
+            const a = document.createElement("a");
+            a.setAttribute("href", d.imageHref);
+            a.setAttribute("target", "_blank");
+            el.parentElement && el.parentElement.insertBefore(a, el);
+            a.appendChild(el);
+          }
+        } else if (p && p.tagName === "A") {
+          // Unwrap
+          const parent = p.parentElement;
+          if (parent) { while (p.firstChild) parent.insertBefore(p.firstChild, p); parent.removeChild(p); }
+        }
+      }
+    }
   });
 
   parent.postMessage({ type: "lovable-ready" }, "*");
@@ -172,6 +203,14 @@ interface Selected {
   src?: string;
   alt?: string;
   bgImage?: string;
+  imageHref?: string;
+}
+
+type PatchKeys = keyof Omit<Selected, "id" | "tag" | "innerText" | "isImage">;
+interface HistoryEntry {
+  id: string;
+  prev: Partial<Selected>;
+  next: Partial<Selected>;
 }
 
 export const InteractivePreviewMode: React.FC = () => {
@@ -183,6 +222,8 @@ export const InteractivePreviewMode: React.FC = () => {
   const [selected, setSelected] = useState<Selected | null>(null);
   const [draftName, setDraftName] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -209,6 +250,8 @@ export const InteractivePreviewMode: React.FC = () => {
     setSourceHtml(html);
     setSrcDoc(injectEditor(html));
     setSelected(null);
+    setUndoStack([]);
+    setRedoStack([]);
   };
 
   const handlePickTemplate = (id: string) => {
@@ -227,11 +270,62 @@ export const InteractivePreviewMode: React.FC = () => {
     if (!draftName) setDraftName(file.name.replace(/\.html?$/i, "") + " — tweaked");
   };
 
-  const sendPatch = (patch: Partial<Selected>) => {
+  const postPatch = useCallback((id: string, patch: Partial<Selected>) => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-patch", id, ...patch }, "*");
+  }, []);
+
+  const sendPatch = (patch: Partial<Selected>, options: { record?: boolean } = { record: true }) => {
     if (!selected || !iframeRef.current?.contentWindow) return;
-    iframeRef.current.contentWindow.postMessage({ type: "lovable-patch", id: selected.id, ...patch }, "*");
+    // Build prev state snapshot for keys we're changing
+    const prev: Partial<Selected> = {};
+    (Object.keys(patch) as (keyof Selected)[]).forEach((k) => {
+      // @ts-expect-error index
+      prev[k] = (selected as any)[k] ?? "";
+    });
+    postPatch(selected.id, patch);
     setSelected({ ...selected, ...patch } as Selected);
+    if (options.record !== false) {
+      setUndoStack((s) => [...s, { id: selected.id, prev, next: patch }]);
+      setRedoStack([]);
+    }
   };
+
+  const handleUndo = useCallback(() => {
+    setUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const entry = stack[stack.length - 1];
+      postPatch(entry.id, entry.prev);
+      setRedoStack((r) => [...r, entry]);
+      setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.prev } as Selected) : sel));
+      return stack.slice(0, -1);
+    });
+  }, [postPatch]);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const entry = stack[stack.length - 1];
+      postPatch(entry.id, entry.next);
+      setUndoStack((u) => [...u, entry]);
+      setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.next } as Selected) : sel));
+      return stack.slice(0, -1);
+    });
+  }, [postPatch]);
+
+  // Keyboard shortcuts: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z (or Ctrl+Y)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (target && target.isContentEditable)) return;
+      if (e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); handleUndo(); }
+      else if ((e.key.toLowerCase() === "z" && e.shiftKey) || e.key.toLowerCase() === "y") { e.preventDefault(); handleRedo(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleUndo, handleRedo]);
 
   const currentHtml = (): string => {
     const doc = iframeRef.current?.contentDocument;
@@ -284,6 +378,8 @@ export const InteractivePreviewMode: React.FC = () => {
     if (sourceHtml) {
       setSrcDoc(injectEditor(sourceHtml));
       setSelected(null);
+      setUndoStack([]);
+      setRedoStack([]);
     }
   };
 
@@ -351,6 +447,22 @@ export const InteractivePreviewMode: React.FC = () => {
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> Download .html
+          </button>
+          <button
+            onClick={handleUndo}
+            disabled={!hasTemplate || undoStack.length === 0}
+            title="Undo (Ctrl/Cmd+Z)"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <Undo2 className="w-4 h-4" /> Undo{undoStack.length ? ` (${undoStack.length})` : ""}
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={!hasTemplate || redoStack.length === 0}
+            title="Redo (Ctrl/Cmd+Shift+Z)"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <Redo2 className="w-4 h-4" /> Redo{redoStack.length ? ` (${redoStack.length})` : ""}
           </button>
           <button
             onClick={handleReset}
@@ -497,6 +609,26 @@ export const InteractivePreviewMode: React.FC = () => {
                         placeholder="Describe the image"
                         className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
                       />
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-medium mb-1">
+                        <LinkIcon className="w-3.5 h-3.5" /> Click-through URL
+                      </label>
+                      <input
+                        type="url"
+                        value={selected.imageHref || ""}
+                        onChange={(e) => sendPatch({ imageHref: e.target.value })}
+                        placeholder="https://… destination when image is clicked"
+                        className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
+                      />
+                      {selected.imageHref && (
+                        <button
+                          onClick={() => sendPatch({ imageHref: "" })}
+                          className="text-[10px] text-muted-foreground hover:text-foreground underline mt-1"
+                        >
+                          Remove link
+                        </button>
+                      )}
                     </div>
                     <p className="text-[10px] text-muted-foreground">
                       Tip: uploads are embedded as base64 into the HTML. For AMP-valid emails, host the
