@@ -35,11 +35,13 @@ const EDITOR_SCRIPT = `(() => {
     all.forEach((el) => {
       const tag = el.tagName;
       if (["SCRIPT","STYLE","META","LINK","HEAD","TITLE"].includes(tag)) return;
-      // Tag text-carrying elements and anchors and elements with inline color/bg
+      // Tag text-carrying elements, anchors, images, and elements with inline color/bg
       const st = el.getAttribute("style") || "";
       const isLink = tag === "A";
+      const isImg = tag === "IMG" || tag === "AMP-IMG" || tag === "AMP-ANIM";
       const hasColor = /(background|color)\\s*:/i.test(st);
-      if (isTextish(el) || isLink || hasColor) {
+      const hasBgImg = /background(-image)?\\s*:[^;]*url\\(/i.test(st);
+      if (isTextish(el) || isLink || isImg || hasColor || hasBgImg) {
         if (!el.getAttribute(ATTR)) el.setAttribute(ATTR, "e" + (counter++));
       }
     });
