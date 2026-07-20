@@ -446,6 +446,87 @@ export const InteractivePreviewMode: React.FC = () => {
                   </div>
                 )}
 
+                {/* Image */}
+                {selected.isImage && (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-1.5 text-xs font-medium">
+                      <ImageIcon className="w-3.5 h-3.5" /> Image
+                    </label>
+                    {selected.src && (
+                      <div className="rounded-md border border-border bg-muted/30 p-2">
+                        <img
+                          src={selected.src}
+                          alt=""
+                          className="max-h-24 mx-auto object-contain"
+                          onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+                        />
+                      </div>
+                    )}
+                    <input
+                      type="url"
+                      value={selected.src || ""}
+                      onChange={(e) => sendPatch({ src: e.target.value })}
+                      placeholder="https://… image URL"
+                      className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs font-mono"
+                    />
+                    <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs cursor-pointer hover:bg-muted">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload replacement…</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const dataUrl = String(reader.result || "");
+                            if (dataUrl) sendPatch({ src: dataUrl });
+                          };
+                          reader.readAsDataURL(f);
+                        }}
+                      />
+                    </label>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Alt text</label>
+                      <input
+                        type="text"
+                        value={selected.alt || ""}
+                        onChange={(e) => sendPatch({ alt: e.target.value })}
+                        placeholder="Describe the image"
+                        className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Tip: uploads are embedded as base64 into the HTML. For AMP-valid emails, host the
+                      image and paste an https:// URL instead.
+                    </p>
+                  </div>
+                )}
+
+                {/* Background image */}
+                {!selected.isImage && (selected.bgImage || false) && (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-1.5 text-xs font-medium">
+                      <ImageIcon className="w-3.5 h-3.5" /> Background image
+                    </label>
+                    <input
+                      type="url"
+                      value={selected.bgImage || ""}
+                      onChange={(e) => sendPatch({ bgImage: e.target.value })}
+                      placeholder="https://… image URL"
+                      className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs font-mono"
+                    />
+                    <button
+                      onClick={() => sendPatch({ bgImage: "" })}
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                      Remove background image
+                    </button>
+                  </div>
+                )}
+
                 {/* Colors */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
