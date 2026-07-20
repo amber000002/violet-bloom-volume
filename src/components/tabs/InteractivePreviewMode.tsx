@@ -137,6 +137,29 @@ const EDITOR_SCRIPT = `(() => {
         : cleaned;
       el.setAttribute("style", next);
     }
+    if (typeof d.imageHref === "string") {
+      const tn = el.tagName;
+      if (tn === "IMG" || tn === "AMP-IMG" || tn === "AMP-ANIM") {
+        // Find existing wrapping anchor
+        let p = el.parentElement;
+        while (p && p.tagName !== "A" && p.tagName !== "BODY") p = p.parentElement;
+        if (d.imageHref) {
+          if (p && p.tagName === "A") {
+            p.setAttribute("href", d.imageHref);
+          } else {
+            const a = document.createElement("a");
+            a.setAttribute("href", d.imageHref);
+            a.setAttribute("target", "_blank");
+            el.parentElement && el.parentElement.insertBefore(a, el);
+            a.appendChild(el);
+          }
+        } else if (p && p.tagName === "A") {
+          // Unwrap
+          const parent = p.parentElement;
+          if (parent) { while (p.firstChild) parent.insertBefore(p.firstChild, p); parent.removeChild(p); }
+        }
+      }
+    }
   });
 
   parent.postMessage({ type: "lovable-ready" }, "*");
