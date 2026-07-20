@@ -168,6 +168,10 @@ interface Selected {
   href: string;
   color: string;
   backgroundColor: string;
+  isImage?: boolean;
+  src?: string;
+  alt?: string;
+  bgImage?: string;
 }
 
 export const InteractivePreviewMode: React.FC = () => {
