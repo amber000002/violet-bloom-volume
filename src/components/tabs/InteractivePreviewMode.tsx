@@ -357,9 +357,22 @@ export const InteractivePreviewMode: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = (draftName || "edited-template") + ".html";
+    const fileName = (draftName || "edited-template") + ".html";
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    const t = templates.find((x) => x.id === selectedTemplateId) || null;
+    logHtmlDownload({
+      fileName,
+      source: "interactive-preview",
+      content: html,
+      templateId: t?.id ?? null,
+      templateLabel: t?.label ?? draftName,
+      customerName: t?.customerName ?? null,
+      industry: t?.industry ?? null,
+      useCaseCategory: t?.useCaseCategory ?? null,
+      variant: `Edited · ${undoStack.length} change${undoStack.length === 1 ? "" : "s"}`,
+    });
   };
 
   const handleSaveDraft = async () => {
