@@ -41,7 +41,6 @@ const tabs = [
   { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
   { id: "amp-email-studio", label: "AMP Email Studio (In Progress)", icon: Zap },
   { id: "inbox-potential", label: "Inbox Potential", icon: Mail },
-  { id: "downloads", label: "Downloads", icon: Download },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
