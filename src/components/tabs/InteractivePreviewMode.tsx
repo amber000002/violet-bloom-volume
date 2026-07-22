@@ -651,18 +651,31 @@ export const InteractivePreviewMode: React.FC = () => {
                         placeholder="https://… destination when image is clicked"
                         className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
                       />
-                      {selected.imageHref && (
-                        <button
-                          onClick={() => sendPatch({ imageHref: "" })}
-                          className="text-[10px] text-muted-foreground hover:text-foreground underline mt-1"
-                        >
-                          Remove link
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {selected.imageHref && (
+                          <>
+                            <button
+                              onClick={() => {
+                                try { window.open(selected.imageHref!, "_blank", "noopener"); } catch {}
+                                toast.success("Opened click-through in a new tab");
+                              }}
+                              className="text-[11px] px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 inline-flex items-center gap-1"
+                            >
+                              <LinkIcon className="w-3 h-3" /> Test link
+                            </button>
+                            <button
+                              onClick={() => sendPatch({ imageHref: "" })}
+                              className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                            >
+                              Remove link
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
                       Tip: uploads are embedded as base64 into the HTML. For AMP-valid emails, host the
-                      image and paste an https:// URL instead.
+                      image and paste an https:// URL instead. Hold <kbd className="px-1 rounded bg-muted border border-border text-[10px]">Alt</kbd> and click any linked image in the preview to open its click-through URL in a new tab.
                     </p>
                   </div>
                 )}
