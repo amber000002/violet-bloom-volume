@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2 } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 import { logHtmlDownload } from "@/lib/htmlDownloadsService";
+import { DownloadsMode } from "./DownloadsMode";
 
 // ---------- Editor bridge (runs inside the iframe) ----------
 const EDITOR_ATTR = "data-edit-id";
