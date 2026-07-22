@@ -9,6 +9,7 @@ import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
 import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
 import { InboxDiagnosticsTab } from "./tabs/InboxDiagnosticsTab";
 import { EmailRepositoryMode } from "./tabs/EmailRepositoryMode";
+import { DownloadsMode } from "./tabs/DownloadsMode";
 import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
@@ -40,6 +41,7 @@ const tabs = [
   { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
   { id: "amp-email-studio", label: "AMP Email Studio (In Progress)", icon: Zap },
   { id: "inbox-potential", label: "Inbox Potential", icon: Mail },
+  { id: "downloads", label: "Downloads", icon: Download },
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
@@ -707,6 +709,7 @@ const InboxAlchemyContent: React.FC = () => {
                 userPropertiesCSV={persistedUserPropertiesCSV || brandInputs.userPropertiesCSV || undefined}
               />
             )}
+            {activeTab === "downloads" && <DownloadsMode />}
           </motion.div>
         </AnimatePresence>
 

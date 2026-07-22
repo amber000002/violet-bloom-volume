@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2 } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
+import { logHtmlDownload } from "@/lib/htmlDownloadsService";
 
 // ---------- Editor bridge (runs inside the iframe) ----------
 const EDITOR_ATTR = "data-edit-id";
@@ -52,6 +53,19 @@ const EDITOR_SCRIPT = `(() => {
     let el = e.target;
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     if (!el || !el.getAttribute) return;
+    // Alt/Option-click bypasses the editor and lets the link navigate — used to
+    // verify click-through URLs on wrapped images actually work inside the iframe.
+    if (e.altKey) {
+      let a = el;
+      while (a && a.tagName !== "A" && a.tagName !== "BODY") a = a.parentElement;
+      if (a && a.tagName === "A" && a.getAttribute("href")) {
+        try { window.open(a.getAttribute("href"), "_blank", "noopener"); } catch (_) {}
+        e.preventDefault();
+        e.stopPropagation();
+        parent.postMessage({ type: "lovable-link-test", href: a.getAttribute("href") }, "*");
+        return;
+      }
+    }
     e.preventDefault();
     e.stopPropagation();
     document.querySelectorAll(".__lovable_selected__").forEach(n => n.classList.remove("__lovable_selected__"));
@@ -241,6 +255,9 @@ export const InteractivePreviewMode: React.FC = () => {
       const d = ev.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "lovable-select") setSelected(d as Selected);
+      if (d.type === "lovable-link-test" && d.href) {
+        toast.success(`Opened link → ${String(d.href).slice(0, 60)}`);
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
@@ -340,9 +357,22 @@ export const InteractivePreviewMode: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = (draftName || "edited-template") + ".html";
+    const fileName = (draftName || "edited-template") + ".html";
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    const t = templates.find((x) => x.id === selectedTemplateId) || null;
+    logHtmlDownload({
+      fileName,
+      source: "interactive-preview",
+      content: html,
+      templateId: t?.id ?? null,
+      templateLabel: t?.label ?? draftName,
+      customerName: t?.customerName ?? null,
+      industry: t?.industry ?? null,
+      useCaseCategory: t?.useCaseCategory ?? null,
+      variant: `Edited · ${undoStack.length} change${undoStack.length === 1 ? "" : "s"}`,
+    });
   };
 
   const handleSaveDraft = async () => {
@@ -621,18 +651,31 @@ export const InteractivePreviewMode: React.FC = () => {
                         placeholder="https://… destination when image is clicked"
                         className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs"
                       />
-                      {selected.imageHref && (
-                        <button
-                          onClick={() => sendPatch({ imageHref: "" })}
-                          className="text-[10px] text-muted-foreground hover:text-foreground underline mt-1"
-                        >
-                          Remove link
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {selected.imageHref && (
+                          <>
+                            <button
+                              onClick={() => {
+                                try { window.open(selected.imageHref!, "_blank", "noopener"); } catch {}
+                                toast.success("Opened click-through in a new tab");
+                              }}
+                              className="text-[11px] px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 inline-flex items-center gap-1"
+                            >
+                              <LinkIcon className="w-3 h-3" /> Test link
+                            </button>
+                            <button
+                              onClick={() => sendPatch({ imageHref: "" })}
+                              className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                            >
+                              Remove link
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
                       Tip: uploads are embedded as base64 into the HTML. For AMP-valid emails, host the
-                      image and paste an https:// URL instead.
+                      image and paste an https:// URL instead. Hold <kbd className="px-1 rounded bg-muted border border-border text-[10px]">Alt</kbd> and click any linked image in the preview to open its click-through URL in a new tab.
                     </p>
                   </div>
                 )}

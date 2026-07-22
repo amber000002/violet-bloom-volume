@@ -11,6 +11,7 @@ import {
 import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
 import { AmpEmailPreviewFrame } from "@/components/email/AmpEmailPreviewFrame";
 import { generateEmailMockup } from "@/lib/emailMockup";
+import { logHtmlDownload } from "@/lib/htmlDownloadsService";
 
 export const EmailRepositoryMode: React.FC = () => {
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
@@ -84,9 +85,21 @@ export const EmailRepositoryMode: React.FC = () => {
     const a = document.createElement("a");
     a.href = url;
     const safe = t.label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    a.download = `${safe || "email"}.html`;
+    const fileName = `${safe || "email"}.html`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    logHtmlDownload({
+      fileName,
+      source: "email-repository",
+      content: t.htmlContent,
+      templateId: t.id,
+      templateLabel: t.label,
+      customerName: t.customerName,
+      industry: t.industry,
+      useCaseCategory: t.useCaseCategory,
+      variant: `${t.templateType?.toUpperCase() || "HTML"} · original`,
+    });
   };
 
   const handleDownloadMockup = (t: UseCaseTemplate) => {
@@ -100,10 +113,22 @@ export const EmailRepositoryMode: React.FC = () => {
     const a = document.createElement("a");
     a.href = url;
     const safe = t.label.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    a.download = `${safe || "email"}-mockup.html`;
+    const fileName = `${safe || "email"}-mockup.html`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Mockup downloaded (branding masked)");
+    logHtmlDownload({
+      fileName,
+      source: "email-repository-mockup",
+      content: mockupHtml,
+      templateId: t.id,
+      templateLabel: t.label,
+      customerName: t.customerName,
+      industry: t.industry,
+      useCaseCategory: t.useCaseCategory,
+      variant: "Branding masked mockup",
+    });
   };
 
 
