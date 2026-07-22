@@ -503,8 +503,38 @@ export const InteractivePreviewMode: React.FC = () => {
           >
             <RotateCcw className="w-4 h-4" /> Reset changes
           </button>
+          <button
+            onClick={() => setShowDownloads(true)}
+            title="View downloads log"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted"
+          >
+            <FolderDown className="w-4 h-4" /> Downloads
+          </button>
         </div>
       </div>
+
+      {showDownloads && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center p-6 overflow-y-auto"
+          onClick={() => setShowDownloads(false)}
+        >
+          <div
+            className="w-full max-w-5xl bg-background border border-border rounded-2xl p-6 shadow-2xl my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm text-muted-foreground">Downloads log</div>
+              <button
+                onClick={() => setShowDownloads(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <DownloadsMode />
+          </div>
+        </div>
+      )}
 
       {/* Editor surface */}
       {!hasTemplate ? (
