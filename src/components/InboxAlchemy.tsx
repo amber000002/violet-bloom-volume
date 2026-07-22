@@ -708,7 +708,7 @@ const InboxAlchemyContent: React.FC = () => {
                 userPropertiesCSV={persistedUserPropertiesCSV || brandInputs.userPropertiesCSV || undefined}
               />
             )}
-            {activeTab === "downloads" && <DownloadsMode />}
+
           </motion.div>
         </AnimatePresence>
 
