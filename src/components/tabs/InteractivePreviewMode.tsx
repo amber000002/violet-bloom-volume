@@ -53,6 +53,19 @@ const EDITOR_SCRIPT = `(() => {
     let el = e.target;
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     if (!el || !el.getAttribute) return;
+    // Alt/Option-click bypasses the editor and lets the link navigate — used to
+    // verify click-through URLs on wrapped images actually work inside the iframe.
+    if (e.altKey) {
+      let a = el;
+      while (a && a.tagName !== "A" && a.tagName !== "BODY") a = a.parentElement;
+      if (a && a.tagName === "A" && a.getAttribute("href")) {
+        try { window.open(a.getAttribute("href"), "_blank", "noopener"); } catch (_) {}
+        e.preventDefault();
+        e.stopPropagation();
+        parent.postMessage({ type: "lovable-link-test", href: a.getAttribute("href") }, "*");
+        return;
+      }
+    }
     e.preventDefault();
     e.stopPropagation();
     document.querySelectorAll(".__lovable_selected__").forEach(n => n.classList.remove("__lovable_selected__"));
