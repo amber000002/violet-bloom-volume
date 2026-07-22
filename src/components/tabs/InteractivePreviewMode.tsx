@@ -255,6 +255,9 @@ export const InteractivePreviewMode: React.FC = () => {
       const d = ev.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "lovable-select") setSelected(d as Selected);
+      if (d.type === "lovable-link-test" && d.href) {
+        toast.success(`Opened link → ${String(d.href).slice(0, 60)}`);
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
