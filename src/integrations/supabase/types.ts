@@ -328,6 +328,57 @@ export type Database = {
         }
         Relationships: []
       }
+      html_downloads: {
+        Row: {
+          content_hash: string | null
+          created_at: string
+          customer_name: string | null
+          file_name: string
+          file_size_bytes: number
+          id: string
+          industry: string | null
+          notes: string | null
+          source: string
+          template_id: string | null
+          template_label: string | null
+          use_case_category: string | null
+          variant: string | null
+          version: number
+        }
+        Insert: {
+          content_hash?: string | null
+          created_at?: string
+          customer_name?: string | null
+          file_name: string
+          file_size_bytes?: number
+          id?: string
+          industry?: string | null
+          notes?: string | null
+          source: string
+          template_id?: string | null
+          template_label?: string | null
+          use_case_category?: string | null
+          variant?: string | null
+          version?: number
+        }
+        Update: {
+          content_hash?: string | null
+          created_at?: string
+          customer_name?: string | null
+          file_name?: string
+          file_size_bytes?: number
+          id?: string
+          industry?: string | null
+          notes?: string | null
+          source?: string
+          template_id?: string | null
+          template_label?: string | null
+          use_case_category?: string | null
+          variant?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
       resource_files: {
         Row: {
           channels: string[]
