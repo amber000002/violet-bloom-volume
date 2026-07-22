@@ -11,6 +11,7 @@ import {
 import { EMAIL_TEMPLATE_INDUSTRIES, industryLabel } from "@/lib/emailTemplateIndustries";
 import { AmpEmailPreviewFrame } from "@/components/email/AmpEmailPreviewFrame";
 import { generateEmailMockup } from "@/lib/emailMockup";
+import { logHtmlDownload } from "@/lib/htmlDownloadsService";
 
 export const EmailRepositoryMode: React.FC = () => {
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
