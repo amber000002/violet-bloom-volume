@@ -239,6 +239,7 @@ export const InteractivePreviewMode: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
+  const [showDownloads, setShowDownloads] = useState(false);
 
   useEffect(() => {
     (async () => {
