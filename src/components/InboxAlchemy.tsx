@@ -9,6 +9,7 @@ import { UseCaseStudioTab } from "./tabs/UseCaseStudioTab";
 import { AMPEmailStudioTab } from "./tabs/AMPEmailStudioTab";
 import { InboxDiagnosticsTab } from "./tabs/InboxDiagnosticsTab";
 import { EmailRepositoryMode } from "./tabs/EmailRepositoryMode";
+import { DownloadsMode } from "./tabs/DownloadsMode";
 import { industryConfigs, getInferredBusinessModel, getBusinessModelLabel } from "@/data/industryConfig";
 import { PresentationProvider, usePresentationMode, ViewMode, DeckType } from "@/hooks/usePresentationMode";
 import { exportToPPT } from "@/lib/pptExport";
