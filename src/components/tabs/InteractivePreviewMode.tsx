@@ -120,6 +120,16 @@ const EDITOR_SCRIPT = `(() => {
     if (!d || d.type !== "lovable-patch") return;
     const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
     if (!el) return;
+    if (d.remove === true) {
+      // If wrapped in an anchor with no other meaningful children, remove the anchor too
+      let p = el.parentElement;
+      el.remove();
+      if (p && p.tagName === "A" && !p.textContent.trim() && p.children.length === 0) {
+        p.remove();
+      }
+      parent.postMessage({ type: "lovable-removed", id: d.id }, "*");
+      return;
+    }
     if (typeof d.text === "string") {
       // Replace only direct text child(ren); if none, set textContent
       let replaced = false;
