@@ -657,7 +657,7 @@ const InboxAlchemyContent: React.FC = () => {
             transition={{ duration: 0.3 }}
             className="max-w-6xl mx-auto"
           >
-            {activeTab === "email-repository" && <EmailRepositoryMode />}
+            
             {activeTab === "inbox-potential" && (
               <InboxPotentialTab 
                 industry={industry} 
