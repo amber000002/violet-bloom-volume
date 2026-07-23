@@ -939,6 +939,7 @@ export const InteractivePreviewMode: React.FC = () => {
                             { id: selected.id, prev: { src: selected.src, imageHref: selected.imageHref, alt: selected.alt }, next: { remove: true } as any },
                           ]);
                           setRedoStack([]);
+                          setEditPatches((s) => [...s, { id: selected.id, patch: { remove: true, src: selected.src } }]);
                           iframeRef.current?.contentWindow?.postMessage(
                             { type: "lovable-patch", id: selected.id, remove: true },
                             "*"
