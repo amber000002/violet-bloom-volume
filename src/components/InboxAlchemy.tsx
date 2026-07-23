@@ -643,6 +643,11 @@ const InboxAlchemyContent: React.FC = () => {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
+              {"isNew" in tab && tab.isNew && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gradient-magic text-primary-foreground">
+                  New
+                </span>
+              )}
             </motion.button>
           ))}
         </motion.div>
