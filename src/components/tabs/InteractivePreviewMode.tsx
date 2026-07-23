@@ -417,7 +417,7 @@ type PatchKeys = keyof Omit<Selected, "id" | "tag" | "innerText" | "isImage">;
 interface HistoryEntry {
   id: string;
   prev: Partial<Selected>;
-  next: Partial<Selected>;
+  next: HtmlEditPatch;
 }
 
 export const InteractivePreviewMode: React.FC = () => {
@@ -431,6 +431,7 @@ export const InteractivePreviewMode: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
+  const [editPatches, setEditPatches] = useState<Array<{ id: string; patch: HtmlEditPatch }>>([]);
   const [showDownloads, setShowDownloads] = useState(false);
 
   useEffect(() => {
@@ -464,6 +465,7 @@ export const InteractivePreviewMode: React.FC = () => {
     setSelected(null);
     setUndoStack([]);
     setRedoStack([]);
+    setEditPatches([]);
   };
 
   const handleRefresh = () => {
@@ -509,6 +511,7 @@ export const InteractivePreviewMode: React.FC = () => {
     if (options.record !== false) {
       setUndoStack((s) => [...s, { id: selected.id, prev, next: patch }]);
       setRedoStack([]);
+      setEditPatches((s) => [...s, { id: selected.id, patch }]);
     }
   };
 
@@ -518,6 +521,7 @@ export const InteractivePreviewMode: React.FC = () => {
       const entry = stack[stack.length - 1];
       postPatch(entry.id, entry.prev);
       setRedoStack((r) => [...r, entry]);
+      setEditPatches((patches) => patches.slice(0, -1));
       setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.prev } as Selected) : sel));
       return stack.slice(0, -1);
     });
@@ -529,6 +533,7 @@ export const InteractivePreviewMode: React.FC = () => {
       const entry = stack[stack.length - 1];
       postPatch(entry.id, entry.next);
       setUndoStack((u) => [...u, entry]);
+      setEditPatches((patches) => [...patches, { id: entry.id, patch: entry.next }]);
       setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.next } as Selected) : sel));
       return stack.slice(0, -1);
     });
@@ -550,12 +555,11 @@ export const InteractivePreviewMode: React.FC = () => {
   }, [handleUndo, handleRedo]);
 
   const currentHtml = (): string => {
-    const doc = iframeRef.current?.contentDocument;
-    if (!doc) return sourceHtml;
-    // Clone into a detached document so we don't mutate the live preview.
-    const cloneRoot = doc.documentElement.cloneNode(true) as HTMLElement;
-    const cloneDoc = document.implementation.createHTMLDocument("");
-    cloneDoc.replaceChild(cloneRoot, cloneDoc.documentElement);
+    const source = sourceHtml || iframeRef.current?.contentDocument?.documentElement?.outerHTML || "";
+    if (!source) return "";
+    const cloneDoc = new DOMParser().parseFromString(source, "text/html");
+    tagEditableElements(cloneDoc);
+    editPatches.forEach(({ id, patch }) => applyHtmlEditPatch(cloneDoc, id, patch));
     sanitizeAmpRuntimeState(cloneDoc);
     const raw = "<!doctype html>\n" + cloneDoc.documentElement.outerHTML;
     return stripEditor(raw);
@@ -655,6 +659,7 @@ export const InteractivePreviewMode: React.FC = () => {
       setSelected(null);
       setUndoStack([]);
       setRedoStack([]);
+      setEditPatches([]);
     }
   };
 
