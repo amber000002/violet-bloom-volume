@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2 } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 import { logHtmlDownload } from "@/lib/htmlDownloadsService";
@@ -120,6 +120,16 @@ const EDITOR_SCRIPT = `(() => {
     if (!d || d.type !== "lovable-patch") return;
     const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
     if (!el) return;
+    if (d.remove === true) {
+      // If wrapped in an anchor with no other meaningful children, remove the anchor too
+      let p = el.parentElement;
+      el.remove();
+      if (p && p.tagName === "A" && !p.textContent.trim() && p.children.length === 0) {
+        p.remove();
+      }
+      parent.postMessage({ type: "lovable-removed", id: d.id }, "*");
+      return;
+    }
     if (typeof d.text === "string") {
       // Replace only direct text child(ren); if none, set textContent
       let replaced = false;
@@ -257,6 +267,7 @@ export const InteractivePreviewMode: React.FC = () => {
       const d = ev.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "lovable-select") setSelected(d as Selected);
+      if (d.type === "lovable-removed") setSelected(null);
       if (d.type === "lovable-link-test" && d.href) {
         toast.success(`Opened link → ${String(d.href).slice(0, 60)}`);
       }
@@ -271,6 +282,16 @@ export const InteractivePreviewMode: React.FC = () => {
     setSelected(null);
     setUndoStack([]);
     setRedoStack([]);
+  };
+
+  const handleRefresh = () => {
+    // Reload the iframe with the current edited HTML so interactive AMP state
+    // (forms, quizzes, carousels) resets and the user can tap another answer.
+    const html = currentHtml();
+    if (!html) return;
+    setSrcDoc(injectEditor(html));
+    setSelected(null);
+    toast.success("Preview refreshed");
   };
 
   const handlePickTemplate = (id: string) => {
@@ -497,6 +518,14 @@ export const InteractivePreviewMode: React.FC = () => {
             <Redo2 className="w-4 h-4" /> Redo{redoStack.length ? ` (${redoStack.length})` : ""}
           </button>
           <button
+            onClick={handleRefresh}
+            disabled={!hasTemplate}
+            title="Reload the preview to reset AMP interactive state (forms, quizzes, carousels)"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+          <button
             onClick={handleReset}
             disabled={!hasTemplate}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
@@ -643,25 +672,47 @@ export const InteractivePreviewMode: React.FC = () => {
                       placeholder="https://… image URL"
                       className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs font-mono"
                     />
-                    <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs cursor-pointer hover:bg-muted">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload replacement…</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            const dataUrl = String(reader.result || "");
-                            if (dataUrl) sendPatch({ src: dataUrl });
-                          };
-                          reader.readAsDataURL(f);
+                    <div className="flex items-center gap-2">
+                      <label className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs cursor-pointer hover:bg-muted">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Upload replacement…</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const dataUrl = String(reader.result || "");
+                              if (dataUrl) sendPatch({ src: dataUrl });
+                            };
+                            reader.readAsDataURL(f);
+                          }}
+                        />
+                      </label>
+                      <button
+                        onClick={() => {
+                          if (!selected) return;
+                          // Record for undo, then instruct iframe to remove the element entirely
+                          setUndoStack((s) => [
+                            ...s,
+                            { id: selected.id, prev: { src: selected.src, imageHref: selected.imageHref, alt: selected.alt }, next: { remove: true } as any },
+                          ]);
+                          setRedoStack([]);
+                          iframeRef.current?.contentWindow?.postMessage(
+                            { type: "lovable-patch", id: selected.id, remove: true },
+                            "*"
+                          );
+                          setSelected(null);
                         }}
-                      />
-                    </label>
+                        title="Remove this image from the email entirely"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-destructive/40 text-destructive text-xs hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Remove
+                      </button>
+                    </div>
                     <div>
                       <label className="block text-xs font-medium mb-1">Alt text</label>
                       <input
