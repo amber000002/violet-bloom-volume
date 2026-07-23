@@ -267,6 +267,7 @@ export const InteractivePreviewMode: React.FC = () => {
       const d = ev.data;
       if (!d || typeof d !== "object") return;
       if (d.type === "lovable-select") setSelected(d as Selected);
+      if (d.type === "lovable-removed") setSelected(null);
       if (d.type === "lovable-link-test" && d.href) {
         toast.success(`Opened link → ${String(d.href).slice(0, 60)}`);
       }
@@ -281,6 +282,16 @@ export const InteractivePreviewMode: React.FC = () => {
     setSelected(null);
     setUndoStack([]);
     setRedoStack([]);
+  };
+
+  const handleRefresh = () => {
+    // Reload the iframe with the current edited HTML so interactive AMP state
+    // (forms, quizzes, carousels) resets and the user can tap another answer.
+    const html = currentHtml();
+    if (!html) return;
+    setSrcDoc(injectEditor(html));
+    setSelected(null);
+    toast.success("Preview refreshed");
   };
 
   const handlePickTemplate = (id: string) => {
