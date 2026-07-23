@@ -438,8 +438,42 @@ export const InteractivePreviewMode: React.FC = () => {
     return stripEditor(raw);
   };
 
+  // Parse the sanitized HTML and confirm no amp-selector interaction state
+  // (selected / aria-selected / amp-selected / i-amphtml-*) survived. Returns
+  // a list of human-readable artifacts if any are found.
+  const verifyNoAmpArtifacts = (html: string): string[] => {
+    const issues: string[] = [];
+    try {
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      parsed.querySelectorAll("amp-selector [option]").forEach((opt) => {
+        if (opt.hasAttribute("selected")) issues.push(`amp-selector option has selected="${opt.getAttribute("selected") ?? ""}"`);
+        if (opt.hasAttribute("aria-selected")) issues.push(`amp-selector option has aria-selected`);
+        if (opt.classList.contains("amp-selected")) issues.push(`amp-selector option has .amp-selected class`);
+      });
+      parsed.querySelectorAll("*").forEach((el) => {
+        el.classList.forEach((c) => {
+          if (c.startsWith("i-amphtml-")) issues.push(`stray class .${c} on <${el.tagName.toLowerCase()}>`);
+        });
+        for (const a of Array.from(el.attributes)) {
+          if (a.name.startsWith("i-amphtml-")) issues.push(`stray attr ${a.name} on <${el.tagName.toLowerCase()}>`);
+        }
+      });
+    } catch {
+      /* ignore parse errors */
+    }
+    // Dedup + cap for readability
+    return Array.from(new Set(issues)).slice(0, 5);
+  };
+
   const handleDownload = () => {
     const html = currentHtml();
+    const artifacts = verifyNoAmpArtifacts(html);
+    if (artifacts.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn("[InteractivePreview] AMP artifacts detected in export:", artifacts);
+      toast.error(`Download blocked — ${artifacts.length} AMP interaction artifact(s) remained: ${artifacts[0]}. Try Refresh, then download again.`);
+      return;
+    }
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -460,6 +494,7 @@ export const InteractivePreviewMode: React.FC = () => {
       useCaseCategory: t?.useCaseCategory ?? null,
       variant: `Edited · ${undoStack.length} change${undoStack.length === 1 ? "" : "s"}`,
     });
+    toast.success("Downloaded — verified no lingering amp-selector state");
   };
 
   const handleSaveDraft = async () => {
