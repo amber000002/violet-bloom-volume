@@ -518,6 +518,14 @@ export const InteractivePreviewMode: React.FC = () => {
             <Redo2 className="w-4 h-4" /> Redo{redoStack.length ? ` (${redoStack.length})` : ""}
           </button>
           <button
+            onClick={handleRefresh}
+            disabled={!hasTemplate}
+            title="Reload the preview to reset AMP interactive state (forms, quizzes, carousels)"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+          <button
             onClick={handleReset}
             disabled={!hasTemplate}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm hover:bg-muted disabled:opacity-50"
