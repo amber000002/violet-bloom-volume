@@ -343,11 +343,17 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
 // <img> children AMP injects into amp-img, etc.). Without this, whatever option
 // the user tapped while tweaking becomes locked in the downloaded HTML.
 function sanitizeAmpRuntimeState(doc: Document): void {
-  // amp-selector: strip runtime selection state on options
+  // amp-selector: strip runtime selection state from selector, options, and
+  // descendants. AMP can place state on nested nodes depending on runtime/version.
   doc.querySelectorAll("amp-selector").forEach((sel) => {
-    sel.querySelectorAll("[option]").forEach((opt) => {
+    sel.removeAttribute("selected");
+    sel.removeAttribute("aria-selected");
+    sel.removeAttribute("aria-checked");
+    sel.classList.remove("amp-selected");
+    sel.querySelectorAll("*").forEach((opt) => {
       opt.removeAttribute("selected");
       opt.removeAttribute("aria-selected");
+      opt.removeAttribute("aria-checked");
       opt.removeAttribute("aria-disabled");
       opt.removeAttribute("tabindex");
       opt.classList.remove("amp-selected");
@@ -473,6 +479,10 @@ export const InteractivePreviewMode: React.FC = () => {
     // (forms, quizzes, carousels) resets and the user can tap another answer.
     const html = currentHtml();
     if (!html) return;
+    setSourceHtml(html);
+    setEditPatches([]);
+    setUndoStack([]);
+    setRedoStack([]);
     setSrcDoc(injectEditor(html));
     setSelected(null);
     toast.success("Preview refreshed");
@@ -494,11 +504,11 @@ export const InteractivePreviewMode: React.FC = () => {
     if (!draftName) setDraftName(file.name.replace(/\.html?$/i, "") + " — tweaked");
   };
 
-  const postPatch = useCallback((id: string, patch: Partial<Selected>) => {
+  const postPatch = useCallback((id: string, patch: HtmlEditPatch) => {
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-patch", id, ...patch }, "*");
   }, []);
 
-  const sendPatch = (patch: Partial<Selected>, options: { record?: boolean } = { record: true }) => {
+  const sendPatch = (patch: HtmlEditPatch, options: { record?: boolean } = { record: true }) => {
     if (!selected || !iframeRef.current?.contentWindow) return;
     // Build prev state snapshot for keys we're changing
     const prev: Partial<Selected> = {};
@@ -572,9 +582,10 @@ export const InteractivePreviewMode: React.FC = () => {
     const issues: string[] = [];
     try {
       const parsed = new DOMParser().parseFromString(html, "text/html");
-      parsed.querySelectorAll("amp-selector [option]").forEach((opt) => {
+      parsed.querySelectorAll("amp-selector, amp-selector *").forEach((opt) => {
         if (opt.hasAttribute("selected")) issues.push(`amp-selector option has selected="${opt.getAttribute("selected") ?? ""}"`);
         if (opt.hasAttribute("aria-selected")) issues.push(`amp-selector option has aria-selected`);
+        if (opt.hasAttribute("aria-checked")) issues.push(`amp-selector option has aria-checked`);
         if (opt.classList.contains("amp-selected")) issues.push(`amp-selector option has .amp-selected class`);
       });
       parsed.querySelectorAll("*").forEach((el) => {
