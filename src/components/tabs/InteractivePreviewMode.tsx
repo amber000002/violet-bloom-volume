@@ -37,6 +37,9 @@ const EDITOR_SCRIPT = `(() => {
     all.forEach((el) => {
       const tag = el.tagName;
       if (["SCRIPT","STYLE","META","LINK","HEAD","TITLE"].includes(tag)) return;
+      if (tag === "I-AMPHTML-SIZER") return;
+      if ((tag === "IMG" || tag === "I-AMPHTML-IMG") && el.closest("amp-img,amp-anim")) return;
+      if (el.className && String(el.className).includes("i-amphtml-")) return;
       // Tag text-carrying elements, anchors, images, and elements with inline color/bg
       const st = el.getAttribute("style") || "";
       const isLink = tag === "A";
@@ -52,6 +55,10 @@ const EDITOR_SCRIPT = `(() => {
 
   document.addEventListener("click", (e) => {
     let el = e.target;
+    if (el && el.nodeType === 1 && ["IMG","I-AMPHTML-IMG","I-AMPHTML-SIZER"].includes(el.tagName || "")) {
+      const ampImage = el.closest && el.closest("amp-img,amp-anim");
+      if (ampImage && ampImage.getAttribute(ATTR)) el = ampImage;
+    }
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     if (!el || !el.getAttribute) return;
     // Alt/Option-click bypasses the editor and lets the link navigate — used to
@@ -141,13 +148,17 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.href === "string" && el.tagName === "A") el.setAttribute("href", d.href);
     if (typeof d.color === "string") el.style.color = d.color;
     if (typeof d.backgroundColor === "string") el.style.backgroundColor = d.backgroundColor;
-    if (typeof d.src === "string" && d.src) {
+    if (typeof d.src === "string") {
       const tn = el.tagName;
       if (tn === "IMG" || tn === "AMP-IMG" || tn === "AMP-ANIM") {
-        el.setAttribute("src", d.src);
+        if (d.src) el.setAttribute("src", d.src);
+        else el.removeAttribute("src");
         // amp-img sometimes renders via an inner <img>; sync it
         const inner = el.querySelector && el.querySelector("img");
-        if (inner) inner.setAttribute("src", d.src);
+        if (inner) {
+          if (d.src) inner.setAttribute("src", d.src);
+          else inner.removeAttribute("src");
+        }
       }
     }
     if (typeof d.alt === "string") {
@@ -213,6 +224,118 @@ function stripEditor(html: string): string {
     .replace(new RegExp(`\\s${EDITOR_ATTR}="[^"]*"`, "g"), "")
     .replace(/\s*class="__lovable_selected__"/g, "")
     .replace(/(\sclass="[^"]*)\s?__lovable_selected__\s?([^"]*")/g, "$1$2");
+}
+
+function tagEditableElements(doc: Document): void {
+  let counter = 0;
+  const isTextish = (el: Element) => {
+    const tag = el.tagName;
+    if (["SCRIPT", "STYLE", "META", "LINK", "HEAD", "HTML", "BODY"].includes(tag)) return false;
+    return Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && (n.nodeValue || "").trim().length > 0);
+  };
+
+  doc.querySelectorAll("*").forEach((el) => {
+    const tag = el.tagName;
+    if (["SCRIPT", "STYLE", "META", "LINK", "HEAD", "TITLE"].includes(tag)) return;
+    if (tag === "I-AMPHTML-SIZER") return;
+    if ((tag === "IMG" || tag === "I-AMPHTML-IMG") && el.closest("amp-img,amp-anim")) return;
+    if ((el.getAttribute("class") || "").includes("i-amphtml-")) return;
+
+    const st = el.getAttribute("style") || "";
+    const isLink = tag === "A";
+    const isImg = tag === "IMG" || tag === "AMP-IMG" || tag === "AMP-ANIM";
+    const hasColor = /(background|color)\s*:/i.test(st);
+    const hasBgImg = /background(-image)?\s*:[^;]*url\(/i.test(st);
+    if (isTextish(el) || isLink || isImg || hasColor || hasBgImg) {
+      if (!el.getAttribute(EDITOR_ATTR)) el.setAttribute(EDITOR_ATTR, `e${counter++}`);
+    }
+  });
+}
+
+type HtmlEditPatch = Partial<Selected> & { remove?: boolean };
+
+function cleanupEmptyAnchorAfterRemoval(el: Element): void {
+  const parent = el.parentElement;
+  el.remove();
+  if (parent && parent.tagName === "A" && !parent.textContent?.trim() && parent.children.length === 0) {
+    parent.remove();
+  }
+}
+
+function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): void {
+  let el = doc.querySelector(`[${EDITOR_ATTR}="${CSS.escape(id)}"]`) as HTMLElement | null;
+
+  // Older sessions could have selected AMP's generated inner <img> instead of the
+  // canonical <amp-img>. If that id is not present in the clean source document,
+  // fall back to the image src so removals still apply to the real source element.
+  if (!el && patch.remove && patch.src) {
+    const escapedSrc = CSS.escape(patch.src);
+    el = doc.querySelector(`amp-img[src="${escapedSrc}"], amp-anim[src="${escapedSrc}"], img[src="${escapedSrc}"]`) as HTMLElement | null;
+  }
+
+  if (!el) return;
+
+  if (patch.remove === true) {
+    cleanupEmptyAnchorAfterRemoval(el);
+    return;
+  }
+
+  if (typeof patch.text === "string") {
+    let replaced = false;
+    Array.from(el.childNodes).forEach((n) => {
+      if (n.nodeType === Node.TEXT_NODE) {
+        if (!replaced) {
+          n.nodeValue = patch.text || "";
+          replaced = true;
+        } else {
+          n.remove();
+        }
+      }
+    });
+    if (!replaced) el.textContent = patch.text;
+  }
+
+  if (typeof patch.href === "string" && el.tagName === "A") el.setAttribute("href", patch.href);
+  if (typeof patch.color === "string") el.style.color = patch.color;
+  if (typeof patch.backgroundColor === "string") el.style.backgroundColor = patch.backgroundColor;
+
+  if (typeof patch.src === "string" && ["IMG", "AMP-IMG", "AMP-ANIM"].includes(el.tagName)) {
+    if (patch.src) el.setAttribute("src", patch.src);
+    else el.removeAttribute("src");
+  }
+
+  if (typeof patch.alt === "string" && ["IMG", "AMP-IMG", "AMP-ANIM"].includes(el.tagName)) {
+    el.setAttribute("alt", patch.alt);
+  }
+
+  if (typeof patch.bgImage === "string") {
+    const cur = el.getAttribute("style") || "";
+    const cleaned = cur.replace(/background(-image)?\s*:[^;]*;?/gi, "").trim();
+    const next = patch.bgImage
+      ? `${cleaned ? `${cleaned};` : ""}background-image:url('${patch.bgImage}');background-size:cover;background-position:center;`
+      : cleaned;
+    if (next) el.setAttribute("style", next);
+    else el.removeAttribute("style");
+  }
+
+  if (typeof patch.imageHref === "string" && ["IMG", "AMP-IMG", "AMP-ANIM"].includes(el.tagName)) {
+    let parent = el.parentElement;
+    while (parent && parent.tagName !== "A" && parent.tagName !== "BODY") parent = parent.parentElement;
+    if (patch.imageHref) {
+      if (parent && parent.tagName === "A") {
+        parent.setAttribute("href", patch.imageHref);
+      } else if (el.parentElement) {
+        const anchor = doc.createElement("a");
+        anchor.setAttribute("href", patch.imageHref);
+        anchor.setAttribute("target", "_blank");
+        el.parentElement.insertBefore(anchor, el);
+        anchor.appendChild(el);
+      }
+    } else if (parent && parent.tagName === "A" && parent.parentElement) {
+      while (parent.firstChild) parent.parentElement.insertBefore(parent.firstChild, parent);
+      parent.remove();
+    }
+  }
 }
 
 // Remove AMP runtime state that gets baked into the DOM after the user interacts
