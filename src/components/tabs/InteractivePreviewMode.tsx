@@ -215,6 +215,65 @@ function stripEditor(html: string): string {
     .replace(/(\sclass="[^"]*)\s?__lovable_selected__\s?([^"]*")/g, "$1$2");
 }
 
+// Remove AMP runtime state that gets baked into the DOM after the user interacts
+// with the preview (amp-selector `selected` attrs, `i-amphtml-*` classes, runtime
+// <img> children AMP injects into amp-img, etc.). Without this, whatever option
+// the user tapped while tweaking becomes locked in the downloaded HTML.
+function sanitizeAmpRuntimeState(doc: Document): void {
+  // amp-selector: strip runtime selection state on options
+  doc.querySelectorAll("amp-selector").forEach((sel) => {
+    sel.querySelectorAll("[option]").forEach((opt) => {
+      opt.removeAttribute("selected");
+      opt.removeAttribute("aria-selected");
+      opt.removeAttribute("aria-disabled");
+      opt.removeAttribute("tabindex");
+      opt.classList.remove("amp-selected");
+      if (opt.classList.length === 0) opt.removeAttribute("class");
+    });
+    sel.removeAttribute("role");
+    sel.removeAttribute("aria-multiselectable");
+  });
+
+  // amp-form runtime state classes
+  doc.querySelectorAll("form").forEach((f) => {
+    ["submitting", "submit-success", "submit-error", "verify-error", "valid", "invalid", "user-valid", "user-invalid"].forEach((c) => {
+      f.classList.remove(`amp-form-${c}`);
+    });
+    if (f.classList.length === 0) f.removeAttribute("class");
+  });
+
+  // amp-img / amp-anim: strip runtime-injected children (<img>, <i-amphtml-sizer>)
+  doc.querySelectorAll("amp-img, amp-anim").forEach((el) => {
+    Array.from(el.children).forEach((child) => {
+      const tag = child.tagName.toLowerCase();
+      if (tag === "i-amphtml-sizer") child.remove();
+      else if (tag === "img" && (child.className || "").toString().includes("i-amphtml-")) child.remove();
+    });
+  });
+
+  // Global: strip i-amphtml-* classes/attrs and common runtime toggle classes
+  const RUNTIME_CLASS_RE = /^(i-amphtml-|amp-notbuilt$|amp-hidden$|amp-active$|amp-selected$)/;
+  doc.querySelectorAll("*").forEach((el) => {
+    if (el.classList && el.classList.length) {
+      const toRemove: string[] = [];
+      el.classList.forEach((c) => {
+        if (RUNTIME_CLASS_RE.test(c)) toRemove.push(c);
+      });
+      toRemove.forEach((c) => el.classList.remove(c));
+      if (el.classList.length === 0) el.removeAttribute("class");
+    }
+    for (const a of Array.from(el.attributes)) {
+      if (a.name.startsWith("i-amphtml-")) el.removeAttribute(a.name);
+    }
+  });
+
+  // Runtime-injected style tags
+  doc.querySelectorAll("style[amp-runtime], style[amp-extension]").forEach((n) => n.remove());
+
+  // html element runtime attrs
+  ["amp-version", "transformed"].forEach((a) => doc.documentElement.removeAttribute(a));
+}
+
 // ---------- Component ----------
 interface Selected {
   id: string;
@@ -370,7 +429,12 @@ export const InteractivePreviewMode: React.FC = () => {
   const currentHtml = (): string => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return sourceHtml;
-    const raw = "<!doctype html>\n" + doc.documentElement.outerHTML;
+    // Clone into a detached document so we don't mutate the live preview.
+    const cloneRoot = doc.documentElement.cloneNode(true) as HTMLElement;
+    const cloneDoc = document.implementation.createHTMLDocument("");
+    cloneDoc.replaceChild(cloneRoot, cloneDoc.documentElement);
+    sanitizeAmpRuntimeState(cloneDoc);
+    const raw = "<!doctype html>\n" + cloneDoc.documentElement.outerHTML;
     return stripEditor(raw);
   };
 
