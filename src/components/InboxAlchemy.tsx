@@ -36,10 +36,9 @@ const industryOptions = Object.entries(industryConfigs).map(([key, config]) => (
 }));
 
 const tabs = [
-  { id: "email-repository", label: "Email Repository", icon: Mail },
+  { id: "amp-email-studio", label: "Template Generator", icon: Zap, isNew: true },
   { id: "inbox-diagnostics", label: "Inbox Diagnostics", icon: Activity },
   { id: "use-case-studio", label: "Use Case Studio", icon: SparklesIcon },
-  { id: "amp-email-studio", label: "Template Generator", icon: Zap },
   { id: "inbox-potential", label: "Inbox Potential", icon: Mail },
 ] as const;
 
@@ -49,7 +48,7 @@ type TabId = typeof tabs[number]["id"];
 const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
   const { loadResourcesForIndustry } = useResourceLibrary();
-  const [activeTab, setActiveTab] = useState<TabId>("email-repository");
+  const [activeTab, setActiveTab] = useState<TabId>("amp-email-studio");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
   const [brandProfile, setBrandProfile] = useState<CoreBrandJSON | null>(null);
