@@ -429,7 +429,12 @@ export const InteractivePreviewMode: React.FC = () => {
   const currentHtml = (): string => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return sourceHtml;
-    const raw = "<!doctype html>\n" + doc.documentElement.outerHTML;
+    // Clone into a detached document so we don't mutate the live preview.
+    const cloneRoot = doc.documentElement.cloneNode(true) as HTMLElement;
+    const cloneDoc = document.implementation.createHTMLDocument("");
+    cloneDoc.replaceChild(cloneRoot, cloneDoc.documentElement);
+    sanitizeAmpRuntimeState(cloneDoc);
+    const raw = "<!doctype html>\n" + cloneDoc.documentElement.outerHTML;
     return stripEditor(raw);
   };
 
