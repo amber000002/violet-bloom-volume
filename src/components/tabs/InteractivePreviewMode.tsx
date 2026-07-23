@@ -269,8 +269,9 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   // canonical <amp-img>. If that id is not present in the clean source document,
   // fall back to the image src so removals still apply to the real source element.
   if (!el && patch.remove && patch.src) {
-    const escapedSrc = CSS.escape(patch.src);
-    el = doc.querySelector(`amp-img[src="${escapedSrc}"], amp-anim[src="${escapedSrc}"], img[src="${escapedSrc}"]`) as HTMLElement | null;
+    el = (Array.from(doc.querySelectorAll("amp-img, amp-anim, img")) as HTMLElement[]).find(
+      (candidate) => candidate.getAttribute("src") === patch.src
+    ) || null;
   }
 
   if (!el) return;
@@ -936,7 +937,7 @@ export const InteractivePreviewMode: React.FC = () => {
                           // Record for undo, then instruct iframe to remove the element entirely
                           setUndoStack((s) => [
                             ...s,
-                            { id: selected.id, prev: { src: selected.src, imageHref: selected.imageHref, alt: selected.alt }, next: { remove: true } as any },
+                            { id: selected.id, prev: { src: selected.src, imageHref: selected.imageHref, alt: selected.alt }, next: { remove: true, src: selected.src } },
                           ]);
                           setRedoStack([]);
                           setEditPatches((s) => [...s, { id: selected.id, patch: { remove: true, src: selected.src } }]);
