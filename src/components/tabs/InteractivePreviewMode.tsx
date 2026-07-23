@@ -672,25 +672,47 @@ export const InteractivePreviewMode: React.FC = () => {
                       placeholder="https://… image URL"
                       className="w-full px-2 py-1.5 rounded-md bg-muted/50 border border-border text-xs font-mono"
                     />
-                    <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs cursor-pointer hover:bg-muted">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Upload replacement…</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            const dataUrl = String(reader.result || "");
-                            if (dataUrl) sendPatch({ src: dataUrl });
-                          };
-                          reader.readAsDataURL(f);
+                    <div className="flex items-center gap-2">
+                      <label className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs cursor-pointer hover:bg-muted">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Upload replacement…</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const dataUrl = String(reader.result || "");
+                              if (dataUrl) sendPatch({ src: dataUrl });
+                            };
+                            reader.readAsDataURL(f);
+                          }}
+                        />
+                      </label>
+                      <button
+                        onClick={() => {
+                          if (!selected) return;
+                          // Record for undo, then instruct iframe to remove the element entirely
+                          setUndoStack((s) => [
+                            ...s,
+                            { id: selected.id, prev: { src: selected.src, imageHref: selected.imageHref, alt: selected.alt }, next: { remove: true } as any },
+                          ]);
+                          setRedoStack([]);
+                          iframeRef.current?.contentWindow?.postMessage(
+                            { type: "lovable-patch", id: selected.id, remove: true },
+                            "*"
+                          );
+                          setSelected(null);
                         }}
-                      />
-                    </label>
+                        title="Remove this image from the email entirely"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-destructive/40 text-destructive text-xs hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Remove
+                      </button>
+                    </div>
                     <div>
                       <label className="block text-xs font-medium mb-1">Alt text</label>
                       <input
