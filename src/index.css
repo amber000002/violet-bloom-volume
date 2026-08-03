@@ -233,12 +233,12 @@
   /* Glass card — primary container style */
   .magic-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.16);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 8px 32px rgba(120, 90, 200, 0.15);
-    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 20px 50px rgba(255, 182, 193, 0.18);
+    border-radius: 28px;
     overflow: hidden;
   }
 
@@ -253,20 +253,38 @@
     background: var(--gradient-magic);
     border-radius: inherit;
     z-index: -1;
-    opacity: 0.15;
+    opacity: 0.2;
     filter: blur(24px);
   }
 
   /* Glass effect — used on sticky controls, panels */
   .glass-effect {
     position: relative;
-    background: rgba(255, 255, 255, 0.14);
-    backdrop-filter: blur(22px) saturate(1.6);
-    -webkit-backdrop-filter: blur(22px) saturate(1.6);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 8px 32px rgba(120, 90, 200, 0.15);
-    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 20px 50px rgba(255, 182, 193, 0.18);
+    border-radius: 28px;
     overflow: visible;
+  }
+
+  /* Frosted left rail */
+  .glass-rail {
+    background: rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(28px) saturate(1.5);
+    -webkit-backdrop-filter: blur(28px) saturate(1.5);
+    border-right: 1px solid rgba(255, 255, 255, 0.7);
+  }
+
+  /* Floating content island */
+  .work-surface {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(36px) saturate(1.5);
+    -webkit-backdrop-filter: blur(36px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    border-radius: 2.5rem;
+    box-shadow: 0 20px 50px rgba(255, 182, 193, 0.18);
   }
 
   /* Subtle inner highlight on glass cards */
@@ -275,7 +293,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%);
+    background: linear-gradient(135deg, rgba(255,255,255,0.35) 0%, transparent 55%);
     pointer-events: none;
   }
 
@@ -285,7 +303,7 @@
 
   .card-hover-lift:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(120, 90, 200, 0.2), 0 0 40px rgba(186, 146, 255, 0.15);
+    box-shadow: 0 24px 60px rgba(255, 133, 179, 0.25), 0 0 40px rgba(177, 156, 217, 0.2);
   }
 
   /* Navigation pill styles */
@@ -296,21 +314,21 @@
   }
 
   .nav-pill-inactive {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.7);
     color: hsl(var(--muted-foreground));
   }
 
   .nav-pill-inactive:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.75);
     color: hsl(var(--foreground));
   }
 
   .nav-pill-active {
-    background: linear-gradient(135deg, #CBA6FF, #F4B8D6);
+    background: var(--gradient-magic);
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 24px rgba(255, 133, 179, 0.35);
   }
 
   .sparkle {
