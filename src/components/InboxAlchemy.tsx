@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, CheckCircle2 } from "lucide-react";
+import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, CheckCircle2, ChevronLeft, ChevronRight, Library } from "lucide-react";
 import { MagicSelect } from "./ui/MagicSelect";
 import { Sparkles } from "./Sparkles";
 import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
@@ -47,7 +47,8 @@ type TabId = typeof tabs[number]["id"];
 // Separate component to use the context
 const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
-  const { loadResourcesForIndustry } = useResourceLibrary();
+  const { loadResourcesForIndustry, setIsLibraryOpen } = useResourceLibrary();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("amp-email-studio");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
@@ -365,38 +366,125 @@ const InboxAlchemyContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="flex min-h-screen w-full relative overflow-hidden">
       <Sparkles count={viewMode === "presentation" ? 20 : 40} />
 
       {/* Aurora atmospheric glow blobs */}
       <div className="aurora-center-glow" />
-      <div className="absolute -top-40 -right-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(168,130,247,0.18) 0%, rgba(99,102,241,0.08) 40%, transparent 70%)', filter: 'blur(100px)' }} />
-      <div className="absolute -bottom-40 -left-40 w-[800px] h-[800px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(251,113,133,0.15) 0%, rgba(245,180,160,0.08) 40%, transparent 70%)', filter: 'blur(100px)' }} />
 
-      <div className="relative z-10 container mx-auto px-4 py-8 md:py-12">
-        {/* Header */}
+      {/* Persistent Left Rail */}
+      <aside className={`${sidebarCollapsed ? "w-20" : "w-72"} hidden lg:flex sticky top-0 h-screen flex-col glass-rail p-4 z-30 transition-all duration-300`}>
+        <div className="flex items-center justify-between mb-10 px-2">
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-xl bg-gradient-magic shadow-magic flex items-center justify-center">
+                <Mail className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <span className="font-display font-bold text-xl tracking-tight text-foreground">Alchemy</span>
+            </div>
+          )}
+          <button
+            onClick={() => setSidebarCollapsed((c) => !c)}
+            className="p-2 rounded-full hover:bg-white/60 transition-colors text-muted-foreground"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-2">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                title={tab.label}
+                className={`group w-full flex items-center justify-between p-3 rounded-2xl transition-all ${
+                  active
+                    ? "bg-gradient-magic text-primary-foreground shadow-[0_8px_24px_hsl(var(--primary)/0.35)]"
+                    : "text-foreground/70 hover:bg-white/60"
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${active ? "bg-white/20" : "bg-accent"}`}>
+                    <tab.icon className="w-5 h-5" />
+                  </div>
+                  {!sidebarCollapsed && <span className="font-semibold text-sm truncate">{tab.label}</span>}
+                </div>
+                {!sidebarCollapsed && "isNew" in tab && tab.isNew && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${active ? "bg-white/20" : "bg-gradient-magic text-primary-foreground"}`}>
+                    New
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => setIsLibraryOpen(true)}
+            title="Resource Library"
+            className="w-full flex items-center gap-3 p-3 rounded-2xl text-foreground/70 hover:bg-white/60 transition-all"
+          >
+            <div className="p-1.5 rounded-lg bg-accent flex-shrink-0">
+              <Library className="w-5 h-5" />
+            </div>
+            {!sidebarCollapsed && <span className="font-semibold text-sm">Resource Library</span>}
+          </button>
+        </nav>
+
+        {!sidebarCollapsed && (
+          <div className="mt-auto p-4 rounded-3xl bg-white/50 border border-white/70">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Brand context</div>
+            <div className="text-sm font-bold text-foreground mb-3 truncate">
+              {brandProfile?.brand_identity?.brand_name || "No profile loaded"}
+            </div>
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-magic rounded-full transition-all"
+                style={{ width: `${brandMeta?.completenessScore ?? 0}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </aside>
+
+      {/* Main Work Surface */}
+      <main className="flex-1 min-w-0 relative z-10 px-4 md:px-8 py-8 md:py-10 overflow-x-hidden">
+        {/* Mobile nav */}
+        <div className="lg:hidden flex flex-wrap gap-2 mb-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-medium nav-pill ${
+                activeTab === tab.id ? "nav-pill-active" : "nav-pill-inactive"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Centered Brand Header */}
         <motion.div
           className="text-center mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-magic flex items-center justify-center shadow-magic float">
-              <Mail className="w-6 h-6 text-primary-foreground" />
-            </div>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-display font-extrabold text-gradient-magic text-glow-aurora mb-3">
+          <h1 className="text-4xl md:text-5xl font-display font-extrabold text-gradient-magic mb-2">
             Inbox Alchemy
           </h1>
-          <p className="text-lg text-muted-foreground/85 max-w-2xl mx-auto tracking-wide">
-            Design lifecycle-led emails your customers actually want to receive.
+          <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-[0.2em] font-medium">
+            Transmuting Engagement
           </p>
         </motion.div>
 
-        {/* Global Controls - Sticky Header */}
+        {/* Global Controls */}
         <motion.div
-          className="sticky top-4 z-20 rounded-2xl p-4 md:p-6 mb-8 glass-effect"
+          className="sticky top-4 z-20 rounded-[2rem] p-4 md:p-6 mb-8 glass-effect"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -622,36 +710,6 @@ const InboxAlchemyContent: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Tab Navigation */}
-        <motion.div
-          className="flex flex-wrap justify-center gap-2 mb-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          {tabs.map((tab) => (
-            <motion.button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-medium nav-pill ${
-                activeTab === tab.id
-                  ? "nav-pill-active"
-                  : "nav-pill-inactive"
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-              {"isNew" in tab && tab.isNew && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gradient-magic text-primary-foreground">
-                  New
-                </span>
-              )}
-            </motion.button>
-          ))}
-        </motion.div>
-
         {/* Tab Content */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -660,7 +718,7 @@ const InboxAlchemyContent: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="max-w-6xl mx-auto"
+            className="max-w-6xl mx-auto work-surface p-5 md:p-8"
           >
             
             {activeTab === "inbox-potential" && (
@@ -725,7 +783,7 @@ const InboxAlchemyContent: React.FC = () => {
         >
           "Inbox excellence is built on relevance, not volume."
         </motion.p>
-      </div>
+      </main>
 
       {/* Click outside to close dropdown */}
       {showDeckOptions && (

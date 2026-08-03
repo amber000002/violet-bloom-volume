@@ -15,11 +15,11 @@ export default {
   	extend: {
   		fontFamily: {
   			display: [
-  				'Plus Jakarta Sans',
+  				'Sora',
   				'sans-serif'
   			],
   			sans: [
-  				'Poppins',
+  				'Manrope',
   				'ui-sans-serif',
   				'system-ui',
   				'-apple-system',
@@ -32,7 +32,7 @@ export default {
   				'sans-serif'
   			],
   			body: [
-  				'Inter',
+  				'Manrope',
   				'sans-serif'
   			],
   			serif: [
