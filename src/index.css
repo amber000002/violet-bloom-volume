@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 @import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap");
@@ -17,34 +16,34 @@
 
 @layer base {
   :root {
-    /* Vibrant Aurora Glass — candy pink + lavender */
-    --background: 310 100% 97%;
-    --foreground: 333 45% 22%;
+    /* Core premium palette */
+    --background: 240 4% 95%;
+    --foreground: 240 5% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 333 45% 22%;
+    --card: 0 0% 98%;
+    --card-foreground: 240 5% 10%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 333 45% 22%;
+    --popover: 240 5% 90%;
+    --popover-foreground: 240 5% 10%;
 
-    --primary: 339 100% 76%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 333 71% 50%;
+    --primary-foreground: 327 73% 97%;
 
-    --secondary: 260 41% 73%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 240 5% 33%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 320 60% 95%;
-    --muted-foreground: 333 25% 48%;
+    --muted: 240 4% 83%;
+    --muted-foreground: 240 5% 10%;
 
-    --accent: 300 100% 96%;
-    --accent-foreground: 339 70% 45%;
+    --accent: 355 100% 97%;
+    --accent-foreground: 349 89% 60%;
 
-    --destructive: 0 78% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 85% 97%;
 
-    --border: 320 55% 92%;
-    --input: 320 55% 92%;
-    --ring: 339 100% 76%;
+    --border: 240 4% 83%;
+    --input: 240 4% 83%;
+    --ring: 333 71% 50%;
 
     --radius: 1.5rem;
 
@@ -58,35 +57,35 @@
     --stardust: 271 81% 56%;
 
     /* Aurora Gradients */
-    --gradient-magic: linear-gradient(135deg, #FF85B3, #B19CD9);
-    --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.7), rgba(255,255,255,0.35));
-    --gradient-glow: radial-gradient(ellipse at 30% 20%, #FDE7F5 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, #EDE4FB 0%, transparent 50%);
-    --gradient-aurora: linear-gradient(135deg, #FDE7F3 0%, #FAE8FF 25%, #F3E9FF 50%, #FFE9F2 75%, #FDE7F3 100%);
-    --gradient-text: linear-gradient(135deg, #FF5C9E, #B19CD9);
-    --gradient-pill-active: linear-gradient(135deg, #FF85B3, #B19CD9);
+    --gradient-magic: linear-gradient(135deg, #A855F7, #FB7185);
+    --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
+    --gradient-glow: radial-gradient(ellipse at 30% 20%, #F5F3FF 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, #FFF1F2 0%, transparent 50%);
+    --gradient-aurora: linear-gradient(135deg, #E8E0F0 0%, #F5E6F0 25%, #E0E8F5 50%, #F5E0E0 75%, #E8E0F0 100%);
+    --gradient-text: linear-gradient(135deg, #4338CA, #A855F7, #FB7185);
+    --gradient-pill-active: linear-gradient(135deg, #CBA6FF, #F4B8D6);
 
     /* Aurora Shadows */
-    --shadow-glow: 0 0 18px rgba(255, 133, 179, 0.35);
-    --shadow-card: 0 20px 50px rgba(255, 182, 193, 0.18);
-    --shadow-button: 0 8px 24px rgba(255, 133, 179, 0.35);
-    --shadow-glass: 0 20px 50px rgba(255, 182, 193, 0.18);
-    --shadow-aurora: 0 0 40px rgba(177, 156, 217, 0.28);
+    --shadow-glow: 0 0 15px rgba(168, 85, 247, 0.3);
+    --shadow-card: 0 8px 32px rgba(120, 90, 200, 0.15);
+    --shadow-button: 0 4px 20px rgba(168, 85, 247, 0.25);
+    --shadow-glass: 0 8px 32px rgba(120, 90, 200, 0.15);
+    --shadow-aurora: 0 0 40px rgba(186, 146, 255, 0.25);
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 333 45% 22%;
-    --sidebar-primary: 339 100% 76%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 260 41% 73%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 320 55% 92%;
-    --sidebar-ring: 339 100% 76%;
-    --chart-1: 339 100% 76%;
-    --chart-2: 260 41% 73%;
-    --chart-3: 320 87% 81%;
-    --chart-4: 280 60% 78%;
-    --chart-5: 333 25% 60%;
-    --sidebar: 0 0% 100%;
-    --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    --sidebar-foreground: 240 5% 10%;
+    --sidebar-primary: 333 71% 50%;
+    --sidebar-primary-foreground: 327 73% 97%;
+    --sidebar-accent: 240 5% 33%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 4% 83%;
+    --sidebar-ring: 333 71% 50%;
+    --chart-1: 328 85% 70%;
+    --chart-2: 351 94% 71%;
+    --chart-3: 327 87% 81%;
+    --chart-4: 352 95% 81%;
+    --chart-5: 240 3% 46%;
+    --sidebar: 0 0% 98%;
+    --font-sans: 'Poppins', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
     --font-serif: 'Merriweather', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
     --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
@@ -153,7 +152,7 @@
 
   body {
     @apply text-foreground antialiased;
-    font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+    font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
     background: var(--gradient-aurora);
     background-size: 400% 400%;
     animation: auroraShift 14s ease-in-out infinite;
@@ -162,7 +161,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Sora', ui-sans-serif, sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-weight: 700;
     letter-spacing: -0.025em;
   }
@@ -184,7 +183,7 @@
     height: 60vw;
     max-width: 900px;
     max-height: 900px;
-    background: radial-gradient(circle, rgba(255, 133, 179, 0.28) 0%, rgba(177, 156, 217, 0.12) 40%, transparent 70%);
+    background: radial-gradient(circle, rgba(168, 130, 247, 0.18) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 70%);
     filter: blur(100px);
   }
 
@@ -195,7 +194,7 @@
     height: 55vw;
     max-width: 850px;
     max-height: 850px;
-    background: radial-gradient(circle, rgba(177, 156, 217, 0.24) 0%, rgba(255, 182, 193, 0.12) 40%, transparent 70%);
+    background: radial-gradient(circle, rgba(251, 113, 133, 0.15) 0%, rgba(245, 180, 160, 0.08) 40%, transparent 70%);
     filter: blur(100px);
   }
 }
@@ -233,12 +232,12 @@
   /* Glass card — primary container style */
   .magic-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.62);
-    backdrop-filter: blur(24px) saturate(1.5);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5);
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 20px 50px rgba(255, 182, 193, 0.18);
-    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 32px rgba(120, 90, 200, 0.15);
+    border-radius: 24px;
     overflow: hidden;
   }
 
@@ -253,38 +252,20 @@
     background: var(--gradient-magic);
     border-radius: inherit;
     z-index: -1;
-    opacity: 0.2;
+    opacity: 0.15;
     filter: blur(24px);
   }
 
   /* Glass effect — used on sticky controls, panels */
   .glass-effect {
     position: relative;
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(24px) saturate(1.5);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5);
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    box-shadow: 0 20px 50px rgba(255, 182, 193, 0.18);
-    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(22px) saturate(1.6);
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 32px rgba(120, 90, 200, 0.15);
+    border-radius: 24px;
     overflow: visible;
-  }
-
-  /* Frosted left rail */
-  .glass-rail {
-    background: rgba(255, 255, 255, 0.42);
-    backdrop-filter: blur(28px) saturate(1.5);
-    -webkit-backdrop-filter: blur(28px) saturate(1.5);
-    border-right: 1px solid rgba(255, 255, 255, 0.7);
-  }
-
-  /* Floating content island */
-  .work-surface {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(36px) saturate(1.5);
-    -webkit-backdrop-filter: blur(36px) saturate(1.5);
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    border-radius: 2.5rem;
-    box-shadow: 0 20px 50px rgba(255, 182, 193, 0.18);
   }
 
   /* Subtle inner highlight on glass cards */
@@ -293,8 +274,26 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(135deg, rgba(255,255,255,0.35) 0%, transparent 55%);
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%);
     pointer-events: none;
+  }
+
+  /* Frosted left rail */
+  .glass-rail {
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(26px) saturate(1.6);
+    -webkit-backdrop-filter: blur(26px) saturate(1.6);
+    border-right: 1px solid rgba(255, 255, 255, 0.25);
+  }
+
+  /* Floating content island */
+  .work-surface {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(30px) saturate(1.6);
+    -webkit-backdrop-filter: blur(30px) saturate(1.6);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 2rem;
+    box-shadow: 0 8px 32px rgba(120, 90, 200, 0.15);
   }
 
   .card-hover-lift {
@@ -303,7 +302,7 @@
 
   .card-hover-lift:hover {
     transform: translateY(-4px);
-    box-shadow: 0 24px 60px rgba(255, 133, 179, 0.25), 0 0 40px rgba(177, 156, 217, 0.2);
+    box-shadow: 0 12px 40px rgba(120, 90, 200, 0.2), 0 0 40px rgba(186, 146, 255, 0.15);
   }
 
   /* Navigation pill styles */
@@ -314,21 +313,21 @@
   }
 
   .nav-pill-inactive {
-    background: rgba(255, 255, 255, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     color: hsl(var(--muted-foreground));
   }
 
   .nav-pill-inactive:hover {
-    background: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.22);
     color: hsl(var(--foreground));
   }
 
   .nav-pill-active {
-    background: var(--gradient-magic);
+    background: linear-gradient(135deg, #CBA6FF, #F4B8D6);
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 8px 24px rgba(255, 133, 179, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3);
   }
 
   .sparkle {
