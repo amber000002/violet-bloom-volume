@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: "/violet-bloom-volume/", // <-- Insert your GitHub repository name here
   server: {
     host: "::",
     port: 8080,
