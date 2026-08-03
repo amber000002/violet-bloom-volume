@@ -17,34 +17,34 @@
 
 @layer base {
   :root {
-    /* Core premium palette */
-    --background: 240 4% 95%;
-    --foreground: 240 5% 10%;
+    /* Vibrant Aurora Glass — candy pink + lavender */
+    --background: 310 100% 97%;
+    --foreground: 333 45% 22%;
 
-    --card: 0 0% 98%;
-    --card-foreground: 240 5% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 333 45% 22%;
 
-    --popover: 240 5% 90%;
-    --popover-foreground: 240 5% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 333 45% 22%;
 
-    --primary: 333 71% 50%;
-    --primary-foreground: 327 73% 97%;
+    --primary: 339 100% 76%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 33%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 260 41% 73%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 4% 83%;
-    --muted-foreground: 240 5% 10%;
+    --muted: 320 60% 95%;
+    --muted-foreground: 333 25% 48%;
 
-    --accent: 355 100% 97%;
-    --accent-foreground: 349 89% 60%;
+    --accent: 300 100% 96%;
+    --accent-foreground: 339 70% 45%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 85% 97%;
+    --destructive: 0 78% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 83%;
-    --input: 240 4% 83%;
-    --ring: 333 71% 50%;
+    --border: 320 55% 92%;
+    --input: 320 55% 92%;
+    --ring: 339 100% 76%;
 
     --radius: 1.5rem;
 
