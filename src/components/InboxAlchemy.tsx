@@ -47,7 +47,8 @@ type TabId = typeof tabs[number]["id"];
 // Separate component to use the context
 const InboxAlchemyContent: React.FC = () => {
   const [industry, setIndustry] = useState("");
-  const { loadResourcesForIndustry } = useResourceLibrary();
+  const { loadResourcesForIndustry, setIsLibraryOpen } = useResourceLibrary();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("amp-email-studio");
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [brandInputs, setBrandInputs] = useState<BrandInputs>(emptyBrandInputs);
