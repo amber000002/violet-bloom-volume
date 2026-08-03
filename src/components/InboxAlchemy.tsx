@@ -709,36 +709,6 @@ const InboxAlchemyContent: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Tab Navigation */}
-        <motion.div
-          className="flex flex-wrap justify-center gap-2 mb-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          {tabs.map((tab) => (
-            <motion.button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-medium nav-pill ${
-                activeTab === tab.id
-                  ? "nav-pill-active"
-                  : "nav-pill-inactive"
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-              {"isNew" in tab && tab.isNew && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gradient-magic text-primary-foreground">
-                  New
-                </span>
-              )}
-            </motion.button>
-          ))}
-        </motion.div>
-
         {/* Tab Content */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -747,7 +717,7 @@ const InboxAlchemyContent: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="max-w-6xl mx-auto"
+            className="max-w-6xl mx-auto work-surface p-5 md:p-8"
           >
             
             {activeTab === "inbox-potential" && (
@@ -812,7 +782,7 @@ const InboxAlchemyContent: React.FC = () => {
         >
           "Inbox excellence is built on relevance, not volume."
         </motion.p>
-      </div>
+      </main>
 
       {/* Click outside to close dropdown */}
       {showDeckOptions && (
