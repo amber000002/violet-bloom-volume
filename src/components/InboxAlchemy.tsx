@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, CheckCircle2 } from "lucide-react";
+import { Mail, Sparkles as SparklesIcon, Zap, Monitor, Presentation, Download, FileText, Activity, CheckCircle2, ChevronLeft, ChevronRight, Library } from "lucide-react";
 import { MagicSelect } from "./ui/MagicSelect";
 import { Sparkles } from "./Sparkles";
 import { InboxPotentialTab } from "./tabs/InboxPotentialTab";
