@@ -47,21 +47,7 @@ export const ResourceLibrary: React.FC = () => {
 
   return (
     <>
-      {/* Floating Button */}
-      <motion.button
-        onClick={() => setIsLibraryOpen(true)}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-magic text-primary-foreground shadow-magic hover:shadow-lg transition-all"
-      >
-        <Library className="w-5 h-5" />
-        <span className="font-medium">Resource Library</span>
-        {resources.length > 0 && (
-          <span className="ml-1 px-2 py-0.5 rounded-full bg-primary-foreground/20 text-xs">
-            {enabledCount}/{resources.length}
-          </span>
-        )}
-      </motion.button>
+      {/* Opened from the left rail nav */}
 
       {/* Slide-over Panel */}
       <AnimatePresence>
