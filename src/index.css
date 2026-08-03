@@ -153,7 +153,7 @@
 
   body {
     @apply text-foreground antialiased;
-    font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
     background: var(--gradient-aurora);
     background-size: 400% 400%;
     animation: auroraShift 14s ease-in-out infinite;
@@ -162,7 +162,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Sora', ui-sans-serif, sans-serif;
     font-weight: 700;
     letter-spacing: -0.025em;
   }
@@ -184,7 +184,7 @@
     height: 60vw;
     max-width: 900px;
     max-height: 900px;
-    background: radial-gradient(circle, rgba(168, 130, 247, 0.18) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 133, 179, 0.28) 0%, rgba(177, 156, 217, 0.12) 40%, transparent 70%);
     filter: blur(100px);
   }
 
@@ -195,7 +195,7 @@
     height: 55vw;
     max-width: 850px;
     max-height: 850px;
-    background: radial-gradient(circle, rgba(251, 113, 133, 0.15) 0%, rgba(245, 180, 160, 0.08) 40%, transparent 70%);
+    background: radial-gradient(circle, rgba(177, 156, 217, 0.24) 0%, rgba(255, 182, 193, 0.12) 40%, transparent 70%);
     filter: blur(100px);
   }
 }
