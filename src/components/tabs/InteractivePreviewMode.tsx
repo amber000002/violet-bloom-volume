@@ -1007,15 +1007,28 @@ export const InteractivePreviewMode: React.FC = () => {
       }
       if (d.type === "lovable-drag-drop" && d.id && d.newLoc) {
         // The iframe already moved the node; just record the patch + undo entry.
-        setEditPatches((s) => [...s, { id: d.id, patch: { moveTo: d.newLoc as BlockLoc } }]);
+        const snap = (d.snap || null) as { marginTop?: number; marginBottom?: number; align?: string } | null;
+        const snapPatch: HtmlEditPatch | null = snap
+          ? {
+              ...(typeof snap.marginTop === "number" ? { marginTop: snap.marginTop } : {}),
+              ...(typeof snap.marginBottom === "number" ? { marginBottom: snap.marginBottom } : {}),
+              ...(snap.align ? { align: snap.align } : {}),
+            }
+          : null;
+        setEditPatches((s) => [
+          ...s,
+          { id: d.id, patch: { moveTo: d.newLoc as BlockLoc } },
+          ...(snapPatch && Object.keys(snapPatch).length ? [{ id: d.id as string, patch: snapPatch }] : []),
+        ]);
         setUndoStack((s) => [
           ...s,
           { id: d.id, prev: { moveTo: d.prevLoc as BlockLoc }, next: { moveTo: d.newLoc as BlockLoc } },
         ]);
         setRedoStack([]);
-        toast.success("Block moved");
+        toast.success(snapPatch && Object.keys(snapPatch).length ? "Block moved · snapped to grid" : "Block moved");
         return;
       }
+
       if (d.type === "lovable-moved" && d.prevLoc) {
         setUndoStack((s) => [
           ...s,
