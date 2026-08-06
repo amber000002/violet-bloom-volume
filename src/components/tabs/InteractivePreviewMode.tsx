@@ -429,6 +429,23 @@ const EDITOR_SCRIPT = `(() => {
     }
   });
 
+  const reportHeight = () => {
+    const h = Math.max(
+      document.body ? document.body.scrollHeight : 0,
+      document.documentElement ? document.documentElement.scrollHeight : 0
+    );
+    if (h > 0) parent.postMessage({ type: "lovable-height", height: h }, "*");
+  };
+  try {
+    new ResizeObserver(reportHeight).observe(document.documentElement);
+    if (document.body) new ResizeObserver(reportHeight).observe(document.body);
+  } catch (_) {}
+  window.addEventListener("load", reportHeight);
+  setTimeout(reportHeight, 60);
+  setTimeout(reportHeight, 400);
+  setTimeout(reportHeight, 1200);
+  setInterval(reportHeight, 2000);
+
   parent.postMessage({ type: "lovable-ready" }, "*");
 })();`;
 
@@ -785,6 +802,7 @@ export const InteractivePreviewMode: React.FC = () => {
   const [dragMode, setDragMode] = useState(false);
   const [multiIds, setMultiIds] = useState<string[]>([]);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
+  const [frameHeight, setFrameHeight] = useState<number>(780);
 
 
   useEffect(() => {
@@ -805,6 +823,12 @@ export const InteractivePreviewMode: React.FC = () => {
       if (d.type === "lovable-select") setSelected(d as Selected);
       if (d.type === "lovable-removed") setSelected(null);
       if (d.type === "lovable-multi-select" && Array.isArray(d.ids)) setMultiIds(d.ids as string[]);
+      if (d.type === "lovable-height" && typeof d.height === "number") {
+        setFrameHeight((h) => {
+          const next = Math.max(360, Math.round(d.height) + 8);
+          return Math.abs(next - h) > 4 ? next : h;
+        });
+      }
       if (d.type === "lovable-link-test" && d.href) {
         toast.success(`Opened link → ${String(d.href).slice(0, 60)}`);
       }
@@ -1366,7 +1390,7 @@ export const InteractivePreviewMode: React.FC = () => {
                 sandbox="allow-scripts allow-same-origin"
                 className={viewport === "mobile" ? "rounded-xl shadow-lg" : "w-full"}
                 style={{
-                  height: 780,
+                  height: frameHeight,
                   border: 0,
                   background: "white",
                   width: viewport === "mobile" ? 375 : undefined,
