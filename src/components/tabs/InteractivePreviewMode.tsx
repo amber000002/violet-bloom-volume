@@ -315,6 +315,19 @@ const EDITOR_SCRIPT = `(() => {
     parent.postMessage(payload, "*");
   }, true);
 
+  // Arrow keys pressed while focus is inside the preview are forwarded to the
+  // parent, which decides the step size and issues the nudge.
+  document.addEventListener("keydown", (e) => {
+    if (e.key && e.key.indexOf("Arrow") === 0) {
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      parent.postMessage({ type: "lovable-key-nudge", key: e.key, shift: !!e.shiftKey }, "*");
+    }
+  }, true);
+
+
+
   function rgbToHex(rgb){
     if(!rgb) return "";
     const m = rgb.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
