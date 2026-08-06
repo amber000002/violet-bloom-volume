@@ -112,16 +112,75 @@ const EDITOR_SCRIPT = `(() => {
     return true;
   }
 
-  document.addEventListener("mousemove", (e) => {
-    if (!moveMode) return;
-    let el = e.target;
+  // ---- true drag & drop ----
+  let dragMode = false;
+  let dragging = null;
+  let dragMoved = false;
+  const tagged = (node) => {
+    let el = node;
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
+    return el && el.getAttribute ? el : null;
+  };
+
+  document.addEventListener("mousedown", (e) => {
+    if (!dragMode || e.button !== 0) return;
+    const el = tagged(e.target);
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragging = el;
+    dragMoved = false;
+    el.classList.add("__lovable_dragging__");
+    document.body.classList.add("__lovable_dragging_active__");
+  }, true);
+
+  document.addEventListener("mousemove", (e) => {
+    if (dragging) {
+      e.preventDefault();
+      dragMoved = true;
+      const el = tagged(e.target);
+      clearHover();
+      if (!el || el === dragging || dragging.contains(el)) return;
+      const r = el.getBoundingClientRect();
+      el.classList.add(e.clientY < r.top + r.height / 2 ? "__lovable_drop_before__" : "__lovable_drop_after__");
+      lastHover = el;
+      return;
+    }
+    if (!moveMode) return;
+    const el = tagged(e.target);
     clearHover();
-    if (!el || !el.getAttribute || !el.getBoundingClientRect) return;
+    if (!el || !el.getBoundingClientRect) return;
     const r = el.getBoundingClientRect();
     el.classList.add(e.clientY < r.top + r.height / 2 ? "__lovable_drop_before__" : "__lovable_drop_after__");
     lastHover = el;
   }, true);
+
+  const endDrag = (e) => {
+    if (!dragging) return;
+    const src = dragging;
+    dragging = null;
+    src.classList.remove("__lovable_dragging__");
+    document.body.classList.remove("__lovable_dragging_active__");
+    const el = tagged(e.target);
+    clearHover();
+    if (!dragMoved || !el || el === src || src.contains(el) || !el.parentElement) return;
+    const r = el.getBoundingClientRect();
+    const after = e.clientY >= r.top + r.height / 2;
+    const par = el.parentElement;
+    const idx = Array.prototype.indexOf.call(par.children, el);
+    const prev = locOf(src);
+    const target = { path: pathOf(par), index: after ? idx + 1 : idx };
+    moveElTo(src, target);
+    window.parent.postMessage({
+      type: "lovable-drag-drop",
+      id: src.getAttribute(ATTR),
+      prevLoc: prev,
+      newLoc: target,
+    }, "*");
+  };
+  document.addEventListener("mouseup", endDrag, true);
+  document.addEventListener("mouseleave", (e) => { if (dragging) endDrag(e); }, true);
+
 
   document.addEventListener("click", (e) => {
     let el = e.target;
