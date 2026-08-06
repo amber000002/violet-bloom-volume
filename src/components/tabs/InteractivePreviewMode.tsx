@@ -783,6 +783,8 @@ export const InteractivePreviewMode: React.FC = () => {
   const [showDownloads, setShowDownloads] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
   const [dragMode, setDragMode] = useState(false);
+  const [multiIds, setMultiIds] = useState<string[]>([]);
+  const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
 
 
   useEffect(() => {
