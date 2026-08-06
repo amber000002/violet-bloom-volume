@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus, ArrowUp, ArrowDown, Move } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 import { logHtmlDownload } from "@/lib/htmlDownloadsService";
@@ -16,6 +16,10 @@ const EDITOR_CSS = `
   [${EDITOR_ATTR}]:hover{outline-color:#a855f7 !important;}
   [${EDITOR_ATTR}].__lovable_selected__{outline:2px solid #a855f7 !important;}
   a[${EDITOR_ATTR}]::after{content:" \\1F517";font-size:10px;opacity:.5;}
+  body.__lovable_move_mode__ [${EDITOR_ATTR}]{cursor:crosshair;outline-color:rgba(16,185,129,.35) !important;}
+  body.__lovable_move_mode__ [${EDITOR_ATTR}]:hover{outline:2px dashed #10b981 !important;}
+  .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
+  .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
 `;
 
 // Injected inside iframe: tag elements, capture clicks, apply patches
@@ -53,6 +57,67 @@ const EDITOR_SCRIPT = `(() => {
   };
   walk(document);
 
+  // ---- block position helpers (index-path based so the export can replay them) ----
+  let moveMode = false;
+  let lastHover = null;
+  const clearHover = () => {
+    if (lastHover) {
+      lastHover.classList.remove("__lovable_drop_before__", "__lovable_drop_after__");
+      lastHover = null;
+    }
+  };
+  function pathOf(node){
+    const p = [];
+    let n = node;
+    while (n && n !== document.body) {
+      const par = n.parentElement;
+      if (!par) break;
+      p.unshift(Array.prototype.indexOf.call(par.children, n));
+      n = par;
+    }
+    return p;
+  }
+  function resolvePath(p){
+    let n = document.body;
+    for (let i = 0; i < p.length; i++) { n = n && n.children[p[i]]; }
+    return n;
+  }
+  function moveElTo(el, loc){
+    const par = resolvePath(loc.path);
+    if (!par || !el.parentElement) return;
+    const same = par === el.parentElement;
+    const old = Array.prototype.indexOf.call(el.parentElement.children, el);
+    el.remove();
+    let idx = loc.index;
+    if (same && old < idx) idx--;
+    const ref = par.children[idx] || null;
+    par.insertBefore(el, ref);
+  }
+  function locOf(el){
+    const par = el.parentElement;
+    return { path: pathOf(par), index: Array.prototype.indexOf.call(par.children, el) };
+  }
+  function moveElStep(el, step){
+    const par = el.parentElement;
+    if (!par) return false;
+    const idx = Array.prototype.indexOf.call(par.children, el);
+    const t = idx + step;
+    if (t < 0 || t >= par.children.length) return false;
+    moveElTo(el, { path: pathOf(par), index: step > 0 ? t + 1 : t });
+    return true;
+  }
+
+  document.addEventListener("mousemove", (e) => {
+    if (!moveMode) return;
+    let el = e.target;
+    while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
+    clearHover();
+    if (!el || !el.getAttribute || !el.getBoundingClientRect) return;
+    const r = el.getBoundingClientRect();
+    el.classList.add(e.clientY < r.top + r.height / 2 ? "__lovable_drop_before__" : "__lovable_drop_after__");
+    lastHover = el;
+  }, true);
+
   document.addEventListener("click", (e) => {
     let el = e.target;
     if (el && el.nodeType === 1 && ["IMG","I-AMPHTML-IMG","I-AMPHTML-SIZER"].includes(el.tagName || "")) {
@@ -61,6 +126,21 @@ const EDITOR_SCRIPT = `(() => {
     }
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     if (!el || !el.getAttribute) return;
+    if (moveMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      const r = el.getBoundingClientRect();
+      const after = e.clientY >= r.top + r.height / 2;
+      const par = el.parentElement;
+      if (!par) return;
+      const idx = Array.prototype.indexOf.call(par.children, el);
+      clearHover();
+      window.parent.postMessage({
+        type: "lovable-move-drop",
+        loc: { path: pathOf(par), index: after ? idx + 1 : idx },
+      }, "*");
+      return;
+    }
     // Alt/Option-click bypasses the editor and lets the link navigate — used to
     // verify click-through URLs on wrapped images actually work inside the iframe.
     if (e.altKey) {
@@ -130,9 +210,29 @@ const EDITOR_SCRIPT = `(() => {
 
   window.addEventListener("message", (ev) => {
     const d = ev.data;
+    if (d && d.type === "lovable-move-mode") {
+      moveMode = !!d.active;
+      clearHover();
+      document.body.classList.toggle("__lovable_move_mode__", moveMode);
+      return;
+    }
     if (!d || d.type !== "lovable-patch") return;
     const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
     if (!el) return;
+    if (typeof d.moveStep === "number" && d.moveStep) {
+      const prev = locOf(el);
+      if (moveElStep(el, d.moveStep)) {
+        window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev, newLoc: locOf(el) }, "*");
+      }
+      return;
+    }
+    if (d.moveTo && d.moveTo.path) {
+      const prev = locOf(el);
+      moveElTo(el, d.moveTo);
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev, newLoc: locOf(el) }, "*");
+      return;
+    }
     if (d.remove === true) {
       // If wrapped in an anchor with no other meaningful children, remove the anchor too
       let p = el.parentElement;
@@ -276,13 +376,60 @@ function tagEditableElements(doc: Document): void {
   });
 }
 
+interface BlockLoc {
+  path: number[];
+  index: number;
+}
+
 type HtmlEditPatch = Partial<Selected> & {
   remove?: boolean;
   duplicate?: boolean;
   insertHtml?: string;
   insertPosition?: "before" | "after";
   newId?: string;
+  /** Move the block one slot up (-1) or down (+1) among its siblings. */
+  moveStep?: number;
+  /** Move the block to an arbitrary position: parent index-path + child index. */
+  moveTo?: BlockLoc;
 };
+
+function resolvePathDom(doc: Document, path: number[]): Element | null {
+  let n: Element | null = doc.body;
+  for (const i of path) n = (n?.children[i] as Element | undefined) ?? null;
+  return n;
+}
+
+function moveElToDom(doc: Document, el: Element, loc: BlockLoc): void {
+  const par = resolvePathDom(doc, loc.path);
+  if (!par || !el.parentElement) return;
+  const same = par === el.parentElement;
+  const old = Array.prototype.indexOf.call(el.parentElement.children, el);
+  el.remove();
+  let idx = loc.index;
+  if (same && old < idx) idx--;
+  par.insertBefore(el, par.children[idx] || null);
+}
+
+function pathOfDom(doc: Document, node: Element): number[] {
+  const p: number[] = [];
+  let n: Element | null = node;
+  while (n && n !== doc.body) {
+    const par: Element | null = n.parentElement;
+    if (!par) break;
+    p.unshift(Array.prototype.indexOf.call(par.children, n));
+    n = par;
+  }
+  return p;
+}
+
+function moveElStepDom(doc: Document, el: Element, step: number): void {
+  const par = el.parentElement;
+  if (!par) return;
+  const idx = Array.prototype.indexOf.call(par.children, el);
+  const t = idx + step;
+  if (t < 0 || t >= par.children.length) return;
+  moveElToDom(doc, el, { path: pathOfDom(doc, par), index: step > 0 ? t + 1 : t });
+}
 
 function tagSubtreeDom(root: Element, baseId: string): void {
   root.setAttribute(EDITOR_ATTR, baseId);
@@ -311,6 +458,16 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   }
 
   if (!el) return;
+
+  if (typeof patch.moveStep === "number" && patch.moveStep) {
+    moveElStepDom(doc, el, patch.moveStep);
+    return;
+  }
+
+  if (patch.moveTo && patch.moveTo.path) {
+    moveElToDom(doc, el, patch.moveTo);
+    return;
+  }
 
   if (patch.remove === true) {
     cleanupEmptyAnchorAfterRemoval(el);
@@ -499,6 +656,7 @@ export const InteractivePreviewMode: React.FC = () => {
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [editPatches, setEditPatches] = useState<Array<{ id: string; patch: HtmlEditPatch }>>([]);
   const [showDownloads, setShowDownloads] = useState(false);
+  const [moveMode, setMoveMode] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -526,6 +684,7 @@ export const InteractivePreviewMode: React.FC = () => {
   }, []);
 
   const loadHtml = (html: string) => {
+    setMoveMode(false);
     setSourceHtml(html);
     setSrcDoc(injectEditor(html));
     setSelected(null);
@@ -597,6 +756,53 @@ export const InteractivePreviewMode: React.FC = () => {
     setRedoStack([]);
     setEditPatches((s) => [...s, { id: selected.id, patch }]);
   };
+
+  // ---- Block moving: reorder within siblings, or drop anywhere in the creative ----
+  const sendMove = useCallback(
+    (patch: HtmlEditPatch, id: string) => {
+      postPatch(id, patch);
+      setEditPatches((s) => [...s, { id, patch }]);
+      setRedoStack([]);
+    },
+    [postPatch]
+  );
+
+  const handleMoveStep = (step: number) => {
+    if (!selected) return;
+    sendMove({ moveStep: step }, selected.id);
+  };
+
+  // Keep the iframe's move-mode flag in sync with the toolbar toggle
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-move-mode", active: moveMode }, "*");
+  }, [moveMode, srcDoc]);
+
+  // Move-mode drop target + undo bookkeeping for moves
+  useEffect(() => {
+    const handler = (ev: MessageEvent) => {
+      const d = ev.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "lovable-move-drop" && d.loc && selected) {
+        sendMove({ moveTo: d.loc as BlockLoc }, selected.id);
+        setMoveMode(false);
+        toast.success("Block moved");
+        return;
+      }
+      if (d.type === "lovable-moved" && d.prevLoc) {
+        setUndoStack((s) => [
+          ...s,
+          {
+            id: d.id,
+            prev: { moveTo: d.prevLoc as BlockLoc },
+            next: { moveTo: (d.newLoc ?? d.prevLoc) as BlockLoc },
+          },
+        ]);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [selected, sendMove]);
+
 
   const makeBlockHtml = (kind: "image" | "text" | "cta"): string => {
     const useAmp = /<amp-img\b/i.test(sourceHtml) || /amp4email/i.test(sourceHtml);
@@ -981,7 +1187,34 @@ export const InteractivePreviewMode: React.FC = () => {
                       <Trash2 className="w-3.5 h-3.5" /> Remove
                     </button>
                   </div>
+                  <div className="text-[10px] text-muted-foreground pt-1">Move this block</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleMoveStep(-1)}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" /> Move up
+                    </button>
+                    <button
+                      onClick={() => handleMoveStep(1)}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" /> Move down
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setMoveMode((v) => !v)}
+                    className={`w-full px-2 py-1.5 rounded-md text-[11px] flex items-center justify-center gap-1 ${
+                      moveMode
+                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/40"
+                        : "border border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <Move className="w-3 h-3" />
+                    {moveMode ? "Click a spot in the preview… (cancel)" : "Place anywhere"}
+                  </button>
                   <div className="text-[10px] text-muted-foreground pt-1">Add a new block below</div>
+
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => handleInsertBlock("image", "after")}
