@@ -1550,12 +1550,28 @@ export const InteractivePreviewMode: React.FC = () => {
           <div className="magic-card rounded-xl overflow-hidden bg-white">
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/40">
               <span className="text-[11px] text-muted-foreground">
-                {viewport === "mobile" ? "Mobile · 375 × 812" : "Desktop · full width"}
+                {viewport === "mobile" ? "Mobile · 375 × 812" : "Desktop · full width"} · arrow keys nudge {snapMode ? "8px" : "1px"} (Shift = 4×)
               </span>
               <div className="flex items-center gap-1">
                 <button
+                  onClick={() => {
+                    setMultiMode((m) => {
+                      if (m) clearMulti();
+                      return !m;
+                    });
+                  }}
+                  title="Multi-select mode: click blocks one after another to select several — no modifier keys needed"
+                  className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
+                    multiMode
+                      ? "bg-amber-500/15 text-amber-600 border-amber-500/40"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" /> Multi-select {multiMode ? "on" : "off"}
+                </button>
+                <button
                   onClick={() => setSnapMode((s) => !s)}
-                  title="Snap dragged blocks to an 8px grid and align to neighbouring block edges"
+                  title="Snap: keeps spacing on a tidy 8px grid — dragged blocks land on the grid and arrow-key nudges move in 8px steps instead of 1px"
                   className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
                     snapMode
                       ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/40"
@@ -1564,6 +1580,7 @@ export const InteractivePreviewMode: React.FC = () => {
                 >
                   <Grid3X3 className="w-3.5 h-3.5" /> Snap {snapMode ? "on" : "off"}
                 </button>
+
                 <button
                   onClick={() => setViewport("desktop")}
                   title="Desktop preview"
