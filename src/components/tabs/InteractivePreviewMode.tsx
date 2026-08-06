@@ -343,7 +343,14 @@ const EDITOR_SCRIPT = `(() => {
       }
       return;
     }
+    if (typeof d.align === "string" && d.align) el.style.textAlign = d.align;
+    if (typeof d.paddingTop === "number") el.style.paddingTop = d.paddingTop + "px";
+    if (typeof d.paddingBottom === "number") el.style.paddingBottom = d.paddingBottom + "px";
+    if (typeof d.paddingX === "number") { el.style.paddingLeft = d.paddingX + "px"; el.style.paddingRight = d.paddingX + "px"; }
+    if (typeof d.marginTop === "number") el.style.marginTop = d.marginTop + "px";
+    if (typeof d.marginBottom === "number") el.style.marginBottom = d.marginBottom + "px";
     if (typeof d.text === "string") {
+
       // Replace only direct text child(ren); if none, set textContent
       let replaced = false;
       for (const n of Array.from(el.childNodes)) {
