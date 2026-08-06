@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2 } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 import { logHtmlDownload } from "@/lib/htmlDownloadsService";
@@ -122,6 +122,12 @@ const EDITOR_SCRIPT = `(() => {
     return "#" + to(m[1]) + to(m[2]) + to(m[3]);
   }
 
+  function tagSubtree(root, baseId) {
+    root.setAttribute(ATTR, baseId);
+    let i = 0;
+    root.querySelectorAll("*").forEach((n) => { n.setAttribute(ATTR, baseId + "-" + (i++)); });
+  }
+
   window.addEventListener("message", (ev) => {
     const d = ev.data;
     if (!d || d.type !== "lovable-patch") return;
@@ -135,6 +141,24 @@ const EDITOR_SCRIPT = `(() => {
         p.remove();
       }
       parent.postMessage({ type: "lovable-removed", id: d.id }, "*");
+      return;
+    }
+    if (d.duplicate === true && d.newId) {
+      const clone = el.cloneNode(true);
+      clone.classList && clone.classList.remove("__lovable_selected__");
+      tagSubtree(clone, d.newId);
+      el.parentNode && el.parentNode.insertBefore(clone, el.nextSibling);
+      return;
+    }
+    if (typeof d.insertHtml === "string" && d.insertHtml && d.newId) {
+      const holder = document.createElement("div");
+      holder.innerHTML = d.insertHtml;
+      const node = holder.firstElementChild;
+      if (node) {
+        tagSubtree(node, d.newId);
+        if (d.insertPosition === "before") el.parentNode && el.parentNode.insertBefore(node, el);
+        else el.parentNode && el.parentNode.insertBefore(node, el.nextSibling);
+      }
       return;
     }
     if (typeof d.text === "string") {
@@ -252,7 +276,19 @@ function tagEditableElements(doc: Document): void {
   });
 }
 
-type HtmlEditPatch = Partial<Selected> & { remove?: boolean };
+type HtmlEditPatch = Partial<Selected> & {
+  remove?: boolean;
+  duplicate?: boolean;
+  insertHtml?: string;
+  insertPosition?: "before" | "after";
+  newId?: string;
+};
+
+function tagSubtreeDom(root: Element, baseId: string): void {
+  root.setAttribute(EDITOR_ATTR, baseId);
+  let i = 0;
+  root.querySelectorAll("*").forEach((n) => n.setAttribute(EDITOR_ATTR, `${baseId}-${i++}`));
+}
 
 function cleanupEmptyAnchorAfterRemoval(el: Element): void {
   const parent = el.parentElement;
@@ -280,6 +316,27 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
     cleanupEmptyAnchorAfterRemoval(el);
     return;
   }
+
+  if (patch.duplicate === true && patch.newId) {
+    const clone = el.cloneNode(true) as Element;
+    clone.classList?.remove("__lovable_selected__");
+    tagSubtreeDom(clone, patch.newId);
+    el.parentNode?.insertBefore(clone, el.nextSibling);
+    return;
+  }
+
+  if (patch.insertHtml && patch.newId) {
+    const holder = doc.createElement("div");
+    holder.innerHTML = patch.insertHtml;
+    const node = holder.firstElementChild;
+    if (node) {
+      tagSubtreeDom(node, patch.newId);
+      if (patch.insertPosition === "before") el.parentNode?.insertBefore(node, el);
+      else el.parentNode?.insertBefore(node, el.nextSibling);
+    }
+    return;
+  }
+
 
   if (typeof patch.text === "string") {
     let replaced = false;
@@ -423,8 +480,10 @@ interface Selected {
 type PatchKeys = keyof Omit<Selected, "id" | "tag" | "innerText" | "isImage">;
 interface HistoryEntry {
   id: string;
-  prev: Partial<Selected>;
+  prev: Partial<Selected> | HtmlEditPatch;
   next: HtmlEditPatch;
+  /** Target element for the undo patch (structural ops undo a different node). */
+  undoId?: string;
 }
 
 export const InteractivePreviewMode: React.FC = () => {
@@ -526,17 +585,69 @@ export const InteractivePreviewMode: React.FC = () => {
     }
   };
 
+  // Structural block ops (duplicate / insert). They target a newly created node
+  // for undo, so they bypass sendPatch's field-diff bookkeeping.
+  const sendStructural = (patch: HtmlEditPatch) => {
+    if (!selected || !iframeRef.current?.contentWindow) return;
+    postPatch(selected.id, patch);
+    setUndoStack((s) => [
+      ...s,
+      { id: selected.id, prev: { remove: true }, next: patch, undoId: patch.newId },
+    ]);
+    setRedoStack([]);
+    setEditPatches((s) => [...s, { id: selected.id, patch }]);
+  };
+
+  const makeBlockHtml = (kind: "image" | "text" | "cta"): string => {
+    const useAmp = /<amp-img\b/i.test(sourceHtml) || /amp4email/i.test(sourceHtml);
+    if (kind === "image") {
+      const img = useAmp
+        ? `<amp-img src="https://placehold.co/600x300/png" width="600" height="300" layout="responsive" alt="New image"></amp-img>`
+        : `<img src="https://placehold.co/600x300/png" alt="New image" style="max-width:100%;height:auto;display:block;margin:0 auto;" />`;
+      return `<div style="padding:16px;text-align:center;">${img}</div>`;
+    }
+    if (kind === "cta") {
+      return `<div style="padding:16px;text-align:center;"><a href="https://example.com" style="display:inline-block;padding:12px 28px;background-color:#7c3aed;color:#ffffff;border-radius:6px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;">Shop now</a></div>`;
+    }
+    return `<div style="padding:16px;text-align:center;font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#333333;">Add your copy here.</div>`;
+  };
+
+  const handleDuplicateBlock = () => {
+    if (!selected) return;
+    sendStructural({ duplicate: true, newId: `dup-${Date.now().toString(36)}` });
+    toast.success("Block duplicated below");
+  };
+
+  const handleInsertBlock = (kind: "image" | "text" | "cta", position: "before" | "after") => {
+    if (!selected) return;
+    sendStructural({
+      insertHtml: makeBlockHtml(kind),
+      insertPosition: position,
+      newId: `new-${Date.now().toString(36)}`,
+    });
+    toast.success(`${kind === "cta" ? "Button" : kind === "image" ? "Image" : "Text"} block added`);
+  };
+
+  const handleRemoveBlock = () => {
+    if (!selected) return;
+    setEditPatches((s) => [...s, { id: selected.id, patch: { remove: true } }]);
+    postPatch(selected.id, { remove: true });
+    setSelected(null);
+    toast.success("Block removed");
+  };
+
   const handleUndo = useCallback(() => {
     setUndoStack((stack) => {
       if (stack.length === 0) return stack;
       const entry = stack[stack.length - 1];
-      postPatch(entry.id, entry.prev);
+      postPatch(entry.undoId ?? entry.id, entry.prev as HtmlEditPatch);
       setRedoStack((r) => [...r, entry]);
       setEditPatches((patches) => patches.slice(0, -1));
       setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.prev } as Selected) : sel));
       return stack.slice(0, -1);
     });
   }, [postPatch]);
+
 
   const handleRedo = useCallback(() => {
     setRedoStack((stack) => {
@@ -850,6 +961,55 @@ export const InteractivePreviewMode: React.FC = () => {
                 <div className="text-xs text-muted-foreground">
                   Selected: <span className="font-mono text-foreground">&lt;{selected.tag}&gt;</span>
                 </div>
+
+                {/* Block actions */}
+                <div className="rounded-lg border border-border p-2.5 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Copy className="w-3.5 h-3.5" /> Block actions
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleDuplicateBlock}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Duplicate
+                    </button>
+                    <button
+                      onClick={handleRemoveBlock}
+                      className="px-2 py-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 text-xs flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remove
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground pt-1">Add a new block below</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleInsertBlock("image", "after")}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" /> Image
+                    </button>
+                    <button
+                      onClick={() => handleInsertBlock("text", "after")}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <Type className="w-3.5 h-3.5" /> Text
+                    </button>
+                    <button
+                      onClick={() => handleInsertBlock("cta", "after")}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <MousePointerClick className="w-3.5 h-3.5" /> CTA
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleInsertBlock("text", "before")}
+                    className="w-full px-2 py-1.5 rounded-md border border-border hover:bg-muted/50 text-[11px] flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Add text block above
+                  </button>
+                </div>
+
 
                 {/* Text */}
                 {(selected.text?.trim() || selected.innerText?.trim()) && (
