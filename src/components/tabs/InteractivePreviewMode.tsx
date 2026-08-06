@@ -794,6 +794,8 @@ export const InteractivePreviewMode: React.FC = () => {
 
   const loadHtml = (html: string) => {
     setMoveMode(false);
+    setDragMode(false);
+
     setSourceHtml(html);
     setSrcDoc(injectEditor(html));
     setSelected(null);
