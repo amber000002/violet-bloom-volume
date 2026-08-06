@@ -804,6 +804,7 @@ export const InteractivePreviewMode: React.FC = () => {
       if (!d || typeof d !== "object") return;
       if (d.type === "lovable-select") setSelected(d as Selected);
       if (d.type === "lovable-removed") setSelected(null);
+      if (d.type === "lovable-multi-select" && Array.isArray(d.ids)) setMultiIds(d.ids as string[]);
       if (d.type === "lovable-link-test" && d.href) {
         toast.success(`Opened link → ${String(d.href).slice(0, 60)}`);
       }
