@@ -823,6 +823,7 @@ export const InteractivePreviewMode: React.FC = () => {
     setUndoStack([]);
     setRedoStack([]);
     setEditPatches([]);
+    clearMulti();
   };
 
   const handleRefresh = () => {
