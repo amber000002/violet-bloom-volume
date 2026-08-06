@@ -348,6 +348,37 @@ const EDITOR_SCRIPT = `(() => {
       document.body.classList.toggle("__lovable_snap__", snapEnabled);
       return;
     }
+    if (d && d.type === "lovable-multi-mode") {
+      multiMode = !!d.active;
+      document.body.classList.toggle("__lovable_multi_mode__", multiMode);
+      return;
+    }
+    // Arrow-key nudging: shift blocks by dx/dy using margins, computed per element
+    // so it works for one block or a whole multi-selection.
+    if (d && d.type === "lovable-nudge" && Array.isArray(d.ids)) {
+      const out = [];
+      d.ids.forEach((id) => {
+        const node = document.querySelector('[' + ATTR + '="' + id + '"]');
+        if (!node) return;
+        const cs = getComputedStyle(node);
+        const patch = {};
+        if (d.dy) {
+          const mt = Math.round((parseFloat(cs.marginTop) || 0) + d.dy);
+          node.style.marginTop = mt + "px";
+          patch.marginTop = mt;
+        }
+        if (d.dx) {
+          const ml = Math.round((parseFloat(cs.marginLeft) || 0) + d.dx);
+          node.style.marginLeft = ml + "px";
+          patch.marginLeft = ml;
+        }
+        if (Object.keys(patch).length) out.push({ id: id, patch: patch });
+      });
+      if (out.length) parent.postMessage({ type: "lovable-nudged", changes: out }, "*");
+      return;
+    }
+
+
 
     if (d && d.type === "lovable-clear-multi") {
       document.querySelectorAll(".__lovable_multi__").forEach(n => n.classList.remove("__lovable_multi__"));
