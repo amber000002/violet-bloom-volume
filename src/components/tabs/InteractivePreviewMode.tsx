@@ -1186,7 +1186,34 @@ export const InteractivePreviewMode: React.FC = () => {
                       <Trash2 className="w-3.5 h-3.5" /> Remove
                     </button>
                   </div>
+                  <div className="text-[10px] text-muted-foreground pt-1">Move this block</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleMoveStep(-1)}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" /> Move up
+                    </button>
+                    <button
+                      onClick={() => handleMoveStep(1)}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" /> Move down
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setMoveMode((v) => !v)}
+                    className={`w-full px-2 py-1.5 rounded-md text-[11px] flex items-center justify-center gap-1 ${
+                      moveMode
+                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/40"
+                        : "border border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <Move className="w-3 h-3" />
+                    {moveMode ? "Click a spot in the preview… (cancel)" : "Place anywhere"}
+                  </button>
                   <div className="text-[10px] text-muted-foreground pt-1">Add a new block below</div>
+
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => handleInsertBlock("image", "after")}
