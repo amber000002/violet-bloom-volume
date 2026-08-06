@@ -16,6 +16,10 @@ const EDITOR_CSS = `
   [${EDITOR_ATTR}]:hover{outline-color:#a855f7 !important;}
   [${EDITOR_ATTR}].__lovable_selected__{outline:2px solid #a855f7 !important;}
   a[${EDITOR_ATTR}]::after{content:" \\1F517";font-size:10px;opacity:.5;}
+  body.__lovable_move_mode__ [${EDITOR_ATTR}]{cursor:crosshair;outline-color:rgba(16,185,129,.35) !important;}
+  body.__lovable_move_mode__ [${EDITOR_ATTR}]:hover{outline:2px dashed #10b981 !important;}
+  .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
+  .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
 `;
 
 // Injected inside iframe: tag elements, capture clicks, apply patches
