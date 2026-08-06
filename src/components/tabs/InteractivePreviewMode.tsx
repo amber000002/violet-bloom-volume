@@ -584,7 +584,18 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   }
 
 
+  if (typeof patch.align === "string" && patch.align) el.style.textAlign = patch.align;
+  if (typeof patch.paddingTop === "number") el.style.paddingTop = `${patch.paddingTop}px`;
+  if (typeof patch.paddingBottom === "number") el.style.paddingBottom = `${patch.paddingBottom}px`;
+  if (typeof patch.paddingX === "number") {
+    el.style.paddingLeft = `${patch.paddingX}px`;
+    el.style.paddingRight = `${patch.paddingX}px`;
+  }
+  if (typeof patch.marginTop === "number") el.style.marginTop = `${patch.marginTop}px`;
+  if (typeof patch.marginBottom === "number") el.style.marginBottom = `${patch.marginBottom}px`;
+
   if (typeof patch.text === "string") {
+
     let replaced = false;
     Array.from(el.childNodes).forEach((n) => {
       if (n.nodeType === Node.TEXT_NODE) {
