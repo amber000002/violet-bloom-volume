@@ -764,6 +764,8 @@ export const InteractivePreviewMode: React.FC = () => {
   const [editPatches, setEditPatches] = useState<Array<{ id: string; patch: HtmlEditPatch }>>([]);
   const [showDownloads, setShowDownloads] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
+  const [dragMode, setDragMode] = useState(false);
+
 
   useEffect(() => {
     (async () => {
