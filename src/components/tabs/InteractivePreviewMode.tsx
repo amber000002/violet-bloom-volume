@@ -376,13 +376,60 @@ function tagEditableElements(doc: Document): void {
   });
 }
 
+interface BlockLoc {
+  path: number[];
+  index: number;
+}
+
 type HtmlEditPatch = Partial<Selected> & {
   remove?: boolean;
   duplicate?: boolean;
   insertHtml?: string;
   insertPosition?: "before" | "after";
   newId?: string;
+  /** Move the block one slot up (-1) or down (+1) among its siblings. */
+  moveStep?: number;
+  /** Move the block to an arbitrary position: parent index-path + child index. */
+  moveTo?: BlockLoc;
 };
+
+function resolvePathDom(doc: Document, path: number[]): Element | null {
+  let n: Element | null = doc.body;
+  for (const i of path) n = (n?.children[i] as Element | undefined) ?? null;
+  return n;
+}
+
+function moveElToDom(doc: Document, el: Element, loc: BlockLoc): void {
+  const par = resolvePathDom(doc, loc.path);
+  if (!par || !el.parentElement) return;
+  const same = par === el.parentElement;
+  const old = Array.prototype.indexOf.call(el.parentElement.children, el);
+  el.remove();
+  let idx = loc.index;
+  if (same && old < idx) idx--;
+  par.insertBefore(el, par.children[idx] || null);
+}
+
+function pathOfDom(doc: Document, node: Element): number[] {
+  const p: number[] = [];
+  let n: Element | null = node;
+  while (n && n !== doc.body) {
+    const par: Element | null = n.parentElement;
+    if (!par) break;
+    p.unshift(Array.prototype.indexOf.call(par.children, n));
+    n = par;
+  }
+  return p;
+}
+
+function moveElStepDom(doc: Document, el: Element, step: number): void {
+  const par = el.parentElement;
+  if (!par) return;
+  const idx = Array.prototype.indexOf.call(par.children, el);
+  const t = idx + step;
+  if (t < 0 || t >= par.children.length) return;
+  moveElToDom(doc, el, { path: pathOfDom(doc, par), index: step > 0 ? t + 1 : t });
+}
 
 function tagSubtreeDom(root: Element, baseId: string): void {
   root.setAttribute(EDITOR_ATTR, baseId);
