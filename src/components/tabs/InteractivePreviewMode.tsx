@@ -222,7 +222,7 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.moveStep === "number" && d.moveStep) {
       const prev = locOf(el);
       if (moveElStep(el, d.moveStep)) {
-        window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev }, "*");
+        window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev, newLoc: locOf(el) }, "*");
       }
       return;
     }
@@ -230,7 +230,7 @@ const EDITOR_SCRIPT = `(() => {
       const prev = locOf(el);
       moveElTo(el, d.moveTo);
       el.scrollIntoView({ block: "center", behavior: "smooth" });
-      window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev }, "*");
+      window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev, newLoc: locOf(el) }, "*");
       return;
     }
     if (d.remove === true) {
@@ -790,7 +790,11 @@ export const InteractivePreviewMode: React.FC = () => {
       if (d.type === "lovable-moved" && d.prevLoc) {
         setUndoStack((s) => [
           ...s,
-          { id: d.id, prev: { moveTo: d.prevLoc as BlockLoc }, next: { moveTo: d.prevLoc as BlockLoc } },
+          {
+            id: d.id,
+            prev: { moveTo: d.prevLoc as BlockLoc },
+            next: { moveTo: (d.newLoc ?? d.prevLoc) as BlockLoc },
+          },
         ]);
       }
     };
