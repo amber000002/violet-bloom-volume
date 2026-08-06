@@ -25,8 +25,10 @@ const EDITOR_CSS = `
   .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
   .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
   [${EDITOR_ATTR}].__lovable_multi__{outline:2px solid #f59e0b !important;background-image:linear-gradient(rgba(245,158,11,.08),rgba(245,158,11,.08));}
-
+  body.__lovable_dragging_active__.__lovable_snap__{background-image:repeating-linear-gradient(to bottom,rgba(16,185,129,.16) 0 1px,transparent 1px 8px);}
+  .__lovable_snap_guide__{outline:1px dashed rgba(16,185,129,.8) !important;}
 `;
+
 
 
 // Injected inside iframe: tag elements, capture clicks, apply patches
