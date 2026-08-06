@@ -120,7 +120,30 @@ const EDITOR_SCRIPT = `(() => {
   let dragMode = false;
   let dragging = null;
   let dragMoved = false;
-  const tagged = (node) => {
+  let snapEnabled = true;
+  const SNAP_GRID = 8;
+  function applySnap(el){
+    if (!snapEnabled || !el) return null;
+    const cs = getComputedStyle(el);
+    const mt = Math.max(0, Math.round((parseFloat(cs.marginTop) || 0) / SNAP_GRID) * SNAP_GRID);
+    const mb = Math.max(0, Math.round((parseFloat(cs.marginBottom) || 0) / SNAP_GRID) * SNAP_GRID);
+    el.style.marginTop = mt + "px";
+    el.style.marginBottom = mb + "px";
+    // edge alignment: inherit horizontal alignment from an adjacent sibling block
+    const sib = el.previousElementSibling || el.nextElementSibling;
+    let align;
+    if (sib && sib.nodeType === 1) {
+      const scs = getComputedStyle(sib);
+      const a = scs.textAlign;
+      if (["left","center","right"].indexOf(a) >= 0) { el.style.textAlign = a; align = a; }
+      el.style.marginLeft = scs.marginLeft;
+      el.style.marginRight = scs.marginRight;
+      sib.classList.add("__lovable_snap_guide__");
+      setTimeout(() => sib.classList.remove("__lovable_snap_guide__"), 600);
+    }
+    return { marginTop: mt, marginBottom: mb, align: align };
+  }
+
     let el = node;
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     return el && el.getAttribute ? el : null;
