@@ -183,7 +183,9 @@ const EDITOR_SCRIPT = `(() => {
 
 
   document.addEventListener("click", (e) => {
+    if (dragMode && dragMoved) { dragMoved = false; e.preventDefault(); e.stopPropagation(); return; }
     let el = e.target;
+
     if (el && el.nodeType === 1 && ["IMG","I-AMPHTML-IMG","I-AMPHTML-SIZER"].includes(el.tagName || "")) {
       const ampImage = el.closest && el.closest("amp-img,amp-anim");
       if (ampImage && ampImage.getAttribute(ATTR)) el = ampImage;
