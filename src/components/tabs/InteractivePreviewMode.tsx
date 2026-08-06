@@ -289,7 +289,16 @@ const EDITOR_SCRIPT = `(() => {
       document.body.classList.toggle("__lovable_move_mode__", moveMode);
       return;
     }
+    if (d && d.type === "lovable-drag-mode") {
+      dragMode = !!d.active;
+      dragging = null;
+      clearHover();
+      document.body.classList.remove("__lovable_dragging_active__");
+      document.body.classList.toggle("__lovable_drag_mode__", dragMode);
+      return;
+    }
     if (!d || d.type !== "lovable-patch") return;
+
     const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
     if (!el) return;
     if (typeof d.moveStep === "number" && d.moveStep) {
