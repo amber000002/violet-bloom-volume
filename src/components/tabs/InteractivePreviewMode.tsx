@@ -224,6 +224,18 @@ const EDITOR_SCRIPT = `(() => {
     }
     e.preventDefault();
     e.stopPropagation();
+    // Shift / Ctrl / Cmd click toggles the element in the multi-selection set
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      el.classList.toggle("__lovable_multi__");
+      const ids = Array.prototype.map.call(
+        document.querySelectorAll(".__lovable_multi__"),
+        (n) => n.getAttribute(ATTR)
+      ).filter(Boolean);
+      parent.postMessage({ type: "lovable-multi-select", ids: ids }, "*");
+      return;
+    }
+    document.querySelectorAll(".__lovable_multi__").forEach(n => n.classList.remove("__lovable_multi__"));
+    parent.postMessage({ type: "lovable-multi-select", ids: [] }, "*");
     document.querySelectorAll(".__lovable_selected__").forEach(n => n.classList.remove("__lovable_selected__"));
     el.classList.add("__lovable_selected__");
     const id = el.getAttribute(ATTR);
