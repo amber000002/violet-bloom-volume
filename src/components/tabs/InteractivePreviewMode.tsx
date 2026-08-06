@@ -732,6 +732,13 @@ interface Selected {
   alt?: string;
   bgImage?: string;
   imageHref?: string;
+  align?: string;
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingX?: number;
+  marginTop?: number;
+  marginBottom?: number;
+
 }
 
 type PatchKeys = keyof Omit<Selected, "id" | "tag" | "innerText" | "isImage">;
