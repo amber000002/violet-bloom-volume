@@ -480,8 +480,10 @@ interface Selected {
 type PatchKeys = keyof Omit<Selected, "id" | "tag" | "innerText" | "isImage">;
 interface HistoryEntry {
   id: string;
-  prev: Partial<Selected>;
+  prev: Partial<Selected> | HtmlEditPatch;
   next: HtmlEditPatch;
+  /** Target element for the undo patch (structural ops undo a different node). */
+  undoId?: string;
 }
 
 export const InteractivePreviewMode: React.FC = () => {
