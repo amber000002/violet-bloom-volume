@@ -24,6 +24,8 @@ const EDITOR_CSS = `
   .__lovable_dragging__{opacity:.45;outline:2px solid #10b981 !important;}
   .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
   .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
+  [${EDITOR_ATTR}].__lovable_multi__{outline:2px solid #f59e0b !important;background-image:linear-gradient(rgba(245,158,11,.08),rgba(245,158,11,.08));}
+
 `;
 
 
