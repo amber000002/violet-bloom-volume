@@ -1428,9 +1428,20 @@ export const InteractivePreviewMode: React.FC = () => {
           <div className="magic-card rounded-xl overflow-hidden bg-white">
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/40">
               <span className="text-[11px] text-muted-foreground">
-                {viewport === "mobile" ? "Mobile · 375px" : "Desktop · full width"}
+                {viewport === "mobile" ? "Mobile · 375 × 812" : "Desktop · full width"}
               </span>
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setSnapMode((s) => !s)}
+                  title="Snap dragged blocks to an 8px grid and align to neighbouring block edges"
+                  className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
+                    snapMode
+                      ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/40"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <Grid3X3 className="w-3.5 h-3.5" /> Snap {snapMode ? "on" : "off"}
+                </button>
                 <button
                   onClick={() => setViewport("desktop")}
                   title="Desktop preview"
@@ -1444,7 +1455,7 @@ export const InteractivePreviewMode: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setViewport("mobile")}
-                  title="Mobile preview (375px)"
+                  title="Mobile preview (375 × 812)"
                   className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
                     viewport === "mobile"
                       ? "bg-primary/15 text-primary border-primary/40"
@@ -1456,20 +1467,31 @@ export const InteractivePreviewMode: React.FC = () => {
               </div>
             </div>
             <div className={viewport === "mobile" ? "flex justify-center bg-muted/30 py-4" : ""}>
-              <iframe
-                ref={iframeRef}
-                srcDoc={srcDoc}
-                title="Interactive preview"
-                sandbox="allow-scripts allow-same-origin"
-                className={viewport === "mobile" ? "rounded-xl shadow-lg" : "w-full"}
-                style={{
-                  height: frameHeight,
-                  border: 0,
-                  background: "white",
-                  width: viewport === "mobile" ? 375 : undefined,
-                }}
-              />
+              {viewport === "mobile" ? (
+                <div
+                  className="rounded-[28px] shadow-lg border-[6px] border-neutral-800 bg-white overflow-y-auto overflow-x-hidden"
+                  style={{ width: 375 + 12, height: 812 }}
+                >
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={srcDoc}
+                    title="Interactive preview"
+                    sandbox="allow-scripts allow-same-origin"
+                    style={{ height: frameHeight, width: 375, border: 0, background: "white", display: "block" }}
+                  />
+                </div>
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  srcDoc={srcDoc}
+                  title="Interactive preview"
+                  sandbox="allow-scripts allow-same-origin"
+                  className="w-full"
+                  style={{ height: frameHeight, border: 0, background: "white" }}
+                />
+              )}
             </div>
+
           </div>
 
           {/* Inspector */}
