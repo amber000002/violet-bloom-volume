@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus, ArrowUp, ArrowDown, Move } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus, ArrowUp, ArrowDown, Move, GripVertical, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 import { logHtmlDownload } from "@/lib/htmlDownloadsService";
@@ -18,9 +18,14 @@ const EDITOR_CSS = `
   a[${EDITOR_ATTR}]::after{content:" \\1F517";font-size:10px;opacity:.5;}
   body.__lovable_move_mode__ [${EDITOR_ATTR}]{cursor:crosshair;outline-color:rgba(16,185,129,.35) !important;}
   body.__lovable_move_mode__ [${EDITOR_ATTR}]:hover{outline:2px dashed #10b981 !important;}
+  body.__lovable_drag_mode__ [${EDITOR_ATTR}]{cursor:grab;outline-color:rgba(16,185,129,.3) !important;}
+  body.__lovable_dragging_active__{user-select:none;cursor:grabbing !important;}
+  body.__lovable_dragging_active__ [${EDITOR_ATTR}]{cursor:grabbing !important;}
+  .__lovable_dragging__{opacity:.45;outline:2px solid #10b981 !important;}
   .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
   .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
 `;
+
 
 // Injected inside iframe: tag elements, capture clicks, apply patches
 const EDITOR_SCRIPT = `(() => {
@@ -107,19 +112,80 @@ const EDITOR_SCRIPT = `(() => {
     return true;
   }
 
-  document.addEventListener("mousemove", (e) => {
-    if (!moveMode) return;
-    let el = e.target;
+  // ---- true drag & drop ----
+  let dragMode = false;
+  let dragging = null;
+  let dragMoved = false;
+  const tagged = (node) => {
+    let el = node;
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
+    return el && el.getAttribute ? el : null;
+  };
+
+  document.addEventListener("mousedown", (e) => {
+    if (!dragMode || e.button !== 0) return;
+    const el = tagged(e.target);
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragging = el;
+    dragMoved = false;
+    el.classList.add("__lovable_dragging__");
+    document.body.classList.add("__lovable_dragging_active__");
+  }, true);
+
+  document.addEventListener("mousemove", (e) => {
+    if (dragging) {
+      e.preventDefault();
+      dragMoved = true;
+      const el = tagged(e.target);
+      clearHover();
+      if (!el || el === dragging || dragging.contains(el)) return;
+      const r = el.getBoundingClientRect();
+      el.classList.add(e.clientY < r.top + r.height / 2 ? "__lovable_drop_before__" : "__lovable_drop_after__");
+      lastHover = el;
+      return;
+    }
+    if (!moveMode) return;
+    const el = tagged(e.target);
     clearHover();
-    if (!el || !el.getAttribute || !el.getBoundingClientRect) return;
+    if (!el || !el.getBoundingClientRect) return;
     const r = el.getBoundingClientRect();
     el.classList.add(e.clientY < r.top + r.height / 2 ? "__lovable_drop_before__" : "__lovable_drop_after__");
     lastHover = el;
   }, true);
 
+  const endDrag = (e) => {
+    if (!dragging) return;
+    const src = dragging;
+    dragging = null;
+    src.classList.remove("__lovable_dragging__");
+    document.body.classList.remove("__lovable_dragging_active__");
+    const el = tagged(e.target);
+    clearHover();
+    if (!dragMoved || !el || el === src || src.contains(el) || !el.parentElement) return;
+    const r = el.getBoundingClientRect();
+    const after = e.clientY >= r.top + r.height / 2;
+    const par = el.parentElement;
+    const idx = Array.prototype.indexOf.call(par.children, el);
+    const prev = locOf(src);
+    const target = { path: pathOf(par), index: after ? idx + 1 : idx };
+    moveElTo(src, target);
+    window.parent.postMessage({
+      type: "lovable-drag-drop",
+      id: src.getAttribute(ATTR),
+      prevLoc: prev,
+      newLoc: target,
+    }, "*");
+  };
+  document.addEventListener("mouseup", endDrag, true);
+  document.addEventListener("mouseleave", (e) => { if (dragging) endDrag(e); }, true);
+
+
   document.addEventListener("click", (e) => {
+    if (dragMode && dragMoved) { dragMoved = false; e.preventDefault(); e.stopPropagation(); return; }
     let el = e.target;
+
     if (el && el.nodeType === 1 && ["IMG","I-AMPHTML-IMG","I-AMPHTML-SIZER"].includes(el.tagName || "")) {
       const ampImage = el.closest && el.closest("amp-img,amp-anim");
       if (ampImage && ampImage.getAttribute(ATTR)) el = ampImage;
@@ -190,7 +256,14 @@ const EDITOR_SCRIPT = `(() => {
       alt: isImg ? (el.getAttribute("alt") || "") : "",
       bgImage: bgMatch ? bgMatch[2] : "",
       imageHref,
+      align: (cs.textAlign === "start" ? "left" : cs.textAlign) || "left",
+      paddingTop: Math.round(parseFloat(cs.paddingTop) || 0),
+      paddingBottom: Math.round(parseFloat(cs.paddingBottom) || 0),
+      paddingX: Math.round(parseFloat(cs.paddingLeft) || 0),
+      marginTop: Math.round(parseFloat(cs.marginTop) || 0),
+      marginBottom: Math.round(parseFloat(cs.marginBottom) || 0),
     };
+
     parent.postMessage(payload, "*");
   }, true);
 
@@ -216,7 +289,16 @@ const EDITOR_SCRIPT = `(() => {
       document.body.classList.toggle("__lovable_move_mode__", moveMode);
       return;
     }
+    if (d && d.type === "lovable-drag-mode") {
+      dragMode = !!d.active;
+      dragging = null;
+      clearHover();
+      document.body.classList.remove("__lovable_dragging_active__");
+      document.body.classList.toggle("__lovable_drag_mode__", dragMode);
+      return;
+    }
     if (!d || d.type !== "lovable-patch") return;
+
     const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
     if (!el) return;
     if (typeof d.moveStep === "number" && d.moveStep) {
@@ -261,7 +343,14 @@ const EDITOR_SCRIPT = `(() => {
       }
       return;
     }
+    if (typeof d.align === "string" && d.align) el.style.textAlign = d.align;
+    if (typeof d.paddingTop === "number") el.style.paddingTop = d.paddingTop + "px";
+    if (typeof d.paddingBottom === "number") el.style.paddingBottom = d.paddingBottom + "px";
+    if (typeof d.paddingX === "number") { el.style.paddingLeft = d.paddingX + "px"; el.style.paddingRight = d.paddingX + "px"; }
+    if (typeof d.marginTop === "number") el.style.marginTop = d.marginTop + "px";
+    if (typeof d.marginBottom === "number") el.style.marginBottom = d.marginBottom + "px";
     if (typeof d.text === "string") {
+
       // Replace only direct text child(ren); if none, set textContent
       let replaced = false;
       for (const n of Array.from(el.childNodes)) {
@@ -495,7 +584,18 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   }
 
 
+  if (typeof patch.align === "string" && patch.align) el.style.textAlign = patch.align;
+  if (typeof patch.paddingTop === "number") el.style.paddingTop = `${patch.paddingTop}px`;
+  if (typeof patch.paddingBottom === "number") el.style.paddingBottom = `${patch.paddingBottom}px`;
+  if (typeof patch.paddingX === "number") {
+    el.style.paddingLeft = `${patch.paddingX}px`;
+    el.style.paddingRight = `${patch.paddingX}px`;
+  }
+  if (typeof patch.marginTop === "number") el.style.marginTop = `${patch.marginTop}px`;
+  if (typeof patch.marginBottom === "number") el.style.marginBottom = `${patch.marginBottom}px`;
+
   if (typeof patch.text === "string") {
+
     let replaced = false;
     Array.from(el.childNodes).forEach((n) => {
       if (n.nodeType === Node.TEXT_NODE) {
@@ -632,6 +732,13 @@ interface Selected {
   alt?: string;
   bgImage?: string;
   imageHref?: string;
+  align?: string;
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingX?: number;
+  marginTop?: number;
+  marginBottom?: number;
+
 }
 
 type PatchKeys = keyof Omit<Selected, "id" | "tag" | "innerText" | "isImage">;
@@ -657,6 +764,8 @@ export const InteractivePreviewMode: React.FC = () => {
   const [editPatches, setEditPatches] = useState<Array<{ id: string; patch: HtmlEditPatch }>>([]);
   const [showDownloads, setShowDownloads] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
+  const [dragMode, setDragMode] = useState(false);
+
 
   useEffect(() => {
     (async () => {
@@ -685,6 +794,8 @@ export const InteractivePreviewMode: React.FC = () => {
 
   const loadHtml = (html: string) => {
     setMoveMode(false);
+    setDragMode(false);
+
     setSourceHtml(html);
     setSrcDoc(injectEditor(html));
     setSelected(null);
@@ -772,10 +883,14 @@ export const InteractivePreviewMode: React.FC = () => {
     sendMove({ moveStep: step }, selected.id);
   };
 
-  // Keep the iframe's move-mode flag in sync with the toolbar toggle
+  // Keep the iframe's move-mode / drag-mode flags in sync with the toolbar toggles
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-move-mode", active: moveMode }, "*");
   }, [moveMode, srcDoc]);
+
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-drag-mode", active: dragMode }, "*");
+  }, [dragMode, srcDoc]);
 
   // Move-mode drop target + undo bookkeeping for moves
   useEffect(() => {
@@ -785,6 +900,17 @@ export const InteractivePreviewMode: React.FC = () => {
       if (d.type === "lovable-move-drop" && d.loc && selected) {
         sendMove({ moveTo: d.loc as BlockLoc }, selected.id);
         setMoveMode(false);
+        toast.success("Block moved");
+        return;
+      }
+      if (d.type === "lovable-drag-drop" && d.id && d.newLoc) {
+        // The iframe already moved the node; just record the patch + undo entry.
+        setEditPatches((s) => [...s, { id: d.id, patch: { moveTo: d.newLoc as BlockLoc } }]);
+        setUndoStack((s) => [
+          ...s,
+          { id: d.id, prev: { moveTo: d.prevLoc as BlockLoc }, next: { moveTo: d.newLoc as BlockLoc } },
+        ]);
+        setRedoStack([]);
         toast.success("Block moved");
         return;
       }
@@ -802,6 +928,7 @@ export const InteractivePreviewMode: React.FC = () => {
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [selected, sendMove]);
+
 
 
   const makeBlockHtml = (kind: "image" | "text" | "cta"): string => {
@@ -1203,7 +1330,7 @@ export const InteractivePreviewMode: React.FC = () => {
                     </button>
                   </div>
                   <button
-                    onClick={() => setMoveMode((v) => !v)}
+                    onClick={() => { setDragMode(false); setMoveMode((v) => !v); }}
                     className={`w-full px-2 py-1.5 rounded-md text-[11px] flex items-center justify-center gap-1 ${
                       moveMode
                         ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/40"
@@ -1213,6 +1340,21 @@ export const InteractivePreviewMode: React.FC = () => {
                     <Move className="w-3 h-3" />
                     {moveMode ? "Click a spot in the preview… (cancel)" : "Place anywhere"}
                   </button>
+                  <button
+                    onClick={() => {
+                      setMoveMode(false);
+                      setDragMode((v) => !v);
+                    }}
+                    className={`w-full px-2 py-1.5 rounded-md text-[11px] flex items-center justify-center gap-1 ${
+                      dragMode
+                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/40"
+                        : "border border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <GripVertical className="w-3 h-3" />
+                    {dragMode ? "Drag & drop on — click to exit" : "Drag & drop blocks"}
+                  </button>
+
                   <div className="text-[10px] text-muted-foreground pt-1">Add a new block below</div>
 
                   <div className="grid grid-cols-3 gap-2">
@@ -1242,6 +1384,61 @@ export const InteractivePreviewMode: React.FC = () => {
                     <Plus className="w-3 h-3" /> Add text block above
                   </button>
                 </div>
+
+                {/* Alignment & spacing */}
+                <div className="rounded-lg border border-border p-2.5 space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <AlignCenter className="w-3.5 h-3.5" /> Alignment &amp; spacing
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { v: "left", Icon: AlignLeft },
+                      { v: "center", Icon: AlignCenter },
+                      { v: "right", Icon: AlignRight },
+                    ] as const).map(({ v, Icon }) => (
+                      <button
+                        key={v}
+                        onClick={() => sendPatch({ align: v })}
+                        className={`px-2 py-1.5 rounded-md text-xs flex items-center justify-center ${
+                          selected.align === v
+                            ? "bg-primary/15 text-primary border border-primary/40"
+                            : "bg-muted/60 hover:bg-muted border border-transparent"
+                        }`}
+                        title={`Align ${v}`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                      </button>
+                    ))}
+                  </div>
+
+                  {([
+                    { key: "paddingTop", label: "Padding top" },
+                    { key: "paddingBottom", label: "Padding bottom" },
+                    { key: "paddingX", label: "Padding sides" },
+                    { key: "marginTop", label: "Space above" },
+                    { key: "marginBottom", label: "Space below" },
+                  ] as const).map(({ key, label }) => {
+                    const value = Number(selected[key] ?? 0);
+                    return (
+                      <div key={key}>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>{label}</span>
+                          <span className="font-mono text-foreground">{value}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={2}
+                          value={value}
+                          onChange={(e) => sendPatch({ [key]: Number(e.target.value) } as HtmlEditPatch)}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
 
 
                 {/* Text */}
