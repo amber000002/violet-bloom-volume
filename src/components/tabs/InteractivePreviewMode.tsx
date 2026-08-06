@@ -57,6 +57,67 @@ const EDITOR_SCRIPT = `(() => {
   };
   walk(document);
 
+  // ---- block position helpers (index-path based so the export can replay them) ----
+  let moveMode = false;
+  let lastHover = null;
+  const clearHover = () => {
+    if (lastHover) {
+      lastHover.classList.remove("__lovable_drop_before__", "__lovable_drop_after__");
+      lastHover = null;
+    }
+  };
+  function pathOf(node){
+    const p = [];
+    let n = node;
+    while (n && n !== document.body) {
+      const par = n.parentElement;
+      if (!par) break;
+      p.unshift(Array.prototype.indexOf.call(par.children, n));
+      n = par;
+    }
+    return p;
+  }
+  function resolvePath(p){
+    let n = document.body;
+    for (let i = 0; i < p.length; i++) { n = n && n.children[p[i]]; }
+    return n;
+  }
+  function moveElTo(el, loc){
+    const par = resolvePath(loc.path);
+    if (!par || !el.parentElement) return;
+    const same = par === el.parentElement;
+    const old = Array.prototype.indexOf.call(el.parentElement.children, el);
+    el.remove();
+    let idx = loc.index;
+    if (same && old < idx) idx--;
+    const ref = par.children[idx] || null;
+    par.insertBefore(el, ref);
+  }
+  function locOf(el){
+    const par = el.parentElement;
+    return { path: pathOf(par), index: Array.prototype.indexOf.call(par.children, el) };
+  }
+  function moveElStep(el, step){
+    const par = el.parentElement;
+    if (!par) return false;
+    const idx = Array.prototype.indexOf.call(par.children, el);
+    const t = idx + step;
+    if (t < 0 || t >= par.children.length) return false;
+    moveElTo(el, { path: pathOf(par), index: step > 0 ? t + 1 : t });
+    return true;
+  }
+
+  document.addEventListener("mousemove", (e) => {
+    if (!moveMode) return;
+    let el = e.target;
+    while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
+    clearHover();
+    if (!el || !el.getAttribute || !el.getBoundingClientRect) return;
+    const r = el.getBoundingClientRect();
+    el.classList.add(e.clientY < r.top + r.height / 2 ? "__lovable_drop_before__" : "__lovable_drop_after__");
+    lastHover = el;
+  }, true);
+
   document.addEventListener("click", (e) => {
     let el = e.target;
     if (el && el.nodeType === 1 && ["IMG","I-AMPHTML-IMG","I-AMPHTML-SIZER"].includes(el.tagName || "")) {
@@ -65,6 +126,21 @@ const EDITOR_SCRIPT = `(() => {
     }
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     if (!el || !el.getAttribute) return;
+    if (moveMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      const r = el.getBoundingClientRect();
+      const after = e.clientY >= r.top + r.height / 2;
+      const par = el.parentElement;
+      if (!par) return;
+      const idx = Array.prototype.indexOf.call(par.children, el);
+      clearHover();
+      window.parent.postMessage({
+        type: "lovable-move-drop",
+        loc: { path: pathOf(par), index: after ? idx + 1 : idx },
+      }, "*");
+      return;
+    }
     // Alt/Option-click bypasses the editor and lets the link navigate — used to
     // verify click-through URLs on wrapped images actually work inside the iframe.
     if (e.altKey) {
