@@ -200,12 +200,15 @@ const EDITOR_SCRIPT = `(() => {
     const prev = locOf(src);
     const target = { path: pathOf(par), index: after ? idx + 1 : idx };
     moveElTo(src, target);
+    const snapped = applySnap(src);
     window.parent.postMessage({
       type: "lovable-drag-drop",
       id: src.getAttribute(ATTR),
       prevLoc: prev,
       newLoc: target,
+      snap: snapped,
     }, "*");
+
   };
   document.addEventListener("mouseup", endDrag, true);
   document.addEventListener("mouseleave", (e) => { if (dragging) endDrag(e); }, true);
