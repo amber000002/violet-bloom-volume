@@ -18,9 +18,14 @@ const EDITOR_CSS = `
   a[${EDITOR_ATTR}]::after{content:" \\1F517";font-size:10px;opacity:.5;}
   body.__lovable_move_mode__ [${EDITOR_ATTR}]{cursor:crosshair;outline-color:rgba(16,185,129,.35) !important;}
   body.__lovable_move_mode__ [${EDITOR_ATTR}]:hover{outline:2px dashed #10b981 !important;}
+  body.__lovable_drag_mode__ [${EDITOR_ATTR}]{cursor:grab;outline-color:rgba(16,185,129,.3) !important;}
+  body.__lovable_dragging_active__{user-select:none;cursor:grabbing !important;}
+  body.__lovable_dragging_active__ [${EDITOR_ATTR}]{cursor:grabbing !important;}
+  .__lovable_dragging__{opacity:.45;outline:2px solid #10b981 !important;}
   .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
   .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
 `;
+
 
 // Injected inside iframe: tag elements, capture clicks, apply patches
 const EDITOR_SCRIPT = `(() => {
