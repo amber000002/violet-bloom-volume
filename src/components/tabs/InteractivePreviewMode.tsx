@@ -803,6 +803,13 @@ export const InteractivePreviewMode: React.FC = () => {
   const [multiIds, setMultiIds] = useState<string[]>([]);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
   const [frameHeight, setFrameHeight] = useState<number>(780);
+  const [bulkSpacing, setBulkSpacing] = useState({
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingX: 0,
+    marginTop: 0,
+    marginBottom: 0,
+  });
 
 
   useEffect(() => {
@@ -1054,6 +1061,16 @@ export const InteractivePreviewMode: React.FC = () => {
     setSelected(null);
     clearMulti();
     toast.success(`${ids.length} blocks removed`);
+  };
+
+  const handleBulkStyle = (patch: HtmlEditPatch, label: string) => {
+    if (multiIds.length === 0) return;
+    multiIds.forEach((id) => {
+      postPatch(id, patch);
+      setEditPatches((s) => [...s, { id, patch }]);
+    });
+    setRedoStack([]);
+    toast.success(`${label} applied to ${multiIds.length} blocks`);
   };
 
   const handleBulkMove = (step: number) => {
@@ -1452,6 +1469,52 @@ export const InteractivePreviewMode: React.FC = () => {
                     >
                       <ArrowDown className="w-3.5 h-3.5" /> Move down
                     </button>
+                  </div>
+                  <div className="pt-1 space-y-2 border-t border-amber-500/30">
+                    <div className="text-[10px] text-muted-foreground pt-1">Align all selected</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { v: "left", Icon: AlignLeft },
+                        { v: "center", Icon: AlignCenter },
+                        { v: "right", Icon: AlignRight },
+                      ] as const).map(({ v, Icon }) => (
+                        <button
+                          key={v}
+                          onClick={() => handleBulkStyle({ align: v }, `Align ${v}`)}
+                          title={`Align all ${v}`}
+                          className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center"
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                        </button>
+                      ))}
+                    </div>
+                    {([
+                      { key: "paddingTop", label: "Padding top" },
+                      { key: "paddingBottom", label: "Padding bottom" },
+                      { key: "paddingX", label: "Padding sides" },
+                      { key: "marginTop", label: "Space above" },
+                      { key: "marginBottom", label: "Space below" },
+                    ] as const).map(({ key, label }) => (
+                      <div key={key}>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>{label}</span>
+                          <span className="font-mono text-foreground">{bulkSpacing[key]}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={2}
+                          value={bulkSpacing[key]}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setBulkSpacing((b) => ({ ...b, [key]: v }));
+                            handleBulkStyle({ [key]: v } as HtmlEditPatch, label);
+                          }}
+                          className="w-full accent-amber-500"
+                        />
+                      </div>
+                    ))}
                   </div>
                   <button
                     onClick={clearMulti}
