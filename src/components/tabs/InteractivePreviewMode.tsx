@@ -210,9 +210,29 @@ const EDITOR_SCRIPT = `(() => {
 
   window.addEventListener("message", (ev) => {
     const d = ev.data;
+    if (d && d.type === "lovable-move-mode") {
+      moveMode = !!d.active;
+      clearHover();
+      document.body.classList.toggle("__lovable_move_mode__", moveMode);
+      return;
+    }
     if (!d || d.type !== "lovable-patch") return;
     const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
     if (!el) return;
+    if (typeof d.moveStep === "number" && d.moveStep) {
+      const prev = locOf(el);
+      if (moveElStep(el, d.moveStep)) {
+        window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev }, "*");
+      }
+      return;
+    }
+    if (d.moveTo && d.moveTo.path) {
+      const prev = locOf(el);
+      moveElTo(el, d.moveTo);
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      window.parent.postMessage({ type: "lovable-moved", id: d.id, prevLoc: prev }, "*");
+      return;
+    }
     if (d.remove === true) {
       // If wrapped in an anchor with no other meaningful children, remove the anchor too
       let p = el.parentElement;
