@@ -25,6 +25,8 @@ const EDITOR_CSS = `
   .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
   .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
   [${EDITOR_ATTR}].__lovable_multi__{outline:2px solid #f59e0b !important;background-image:linear-gradient(rgba(245,158,11,.08),rgba(245,158,11,.08));}
+  body.__lovable_multi_mode__ [${EDITOR_ATTR}]{cursor:copy;outline-color:rgba(245,158,11,.35) !important;}
+  body.__lovable_multi_mode__ [${EDITOR_ATTR}]:hover{outline:2px dashed #f59e0b !important;}
   body.__lovable_dragging_active__.__lovable_snap__{background-image:repeating-linear-gradient(to bottom,rgba(16,185,129,.16) 0 1px,transparent 1px 8px);}
   .__lovable_snap_guide__{outline:1px dashed rgba(16,185,129,.8) !important;}
 `;
@@ -68,6 +70,7 @@ const EDITOR_SCRIPT = `(() => {
 
   // ---- block position helpers (index-path based so the export can replay them) ----
   let moveMode = false;
+  let multiMode = false;
   let lastHover = null;
   const clearHover = () => {
     if (lastHover) {
@@ -255,7 +258,7 @@ const EDITOR_SCRIPT = `(() => {
     e.preventDefault();
     e.stopPropagation();
     // Shift / Ctrl / Cmd click toggles the element in the multi-selection set
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    if (multiMode || e.shiftKey || e.ctrlKey || e.metaKey) {
       el.classList.toggle("__lovable_multi__");
       const ids = Array.prototype.map.call(
         document.querySelectorAll(".__lovable_multi__"),
@@ -306,10 +309,24 @@ const EDITOR_SCRIPT = `(() => {
       paddingX: Math.round(parseFloat(cs.paddingLeft) || 0),
       marginTop: Math.round(parseFloat(cs.marginTop) || 0),
       marginBottom: Math.round(parseFloat(cs.marginBottom) || 0),
+      marginLeft: Math.round(parseFloat(cs.marginLeft) || 0),
     };
 
     parent.postMessage(payload, "*");
   }, true);
+
+  // Arrow keys pressed while focus is inside the preview are forwarded to the
+  // parent, which decides the step size and issues the nudge.
+  document.addEventListener("keydown", (e) => {
+    if (e.key && e.key.indexOf("Arrow") === 0) {
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      parent.postMessage({ type: "lovable-key-nudge", key: e.key, shift: !!e.shiftKey }, "*");
+    }
+  }, true);
+
+
 
   function rgbToHex(rgb){
     if(!rgb) return "";
@@ -346,6 +363,42 @@ const EDITOR_SCRIPT = `(() => {
       document.body.classList.toggle("__lovable_snap__", snapEnabled);
       return;
     }
+    if (d && d.type === "lovable-multi-mode") {
+      multiMode = !!d.active;
+      document.body.classList.toggle("__lovable_multi_mode__", multiMode);
+      return;
+    }
+    // Arrow-key nudging: shift blocks by dx/dy using margins, computed per element
+    // so it works for one block or a whole multi-selection.
+    if (d && d.type === "lovable-nudge" && Array.isArray(d.ids)) {
+      const out = [];
+      d.ids.forEach((id) => {
+        const node = document.querySelector('[' + ATTR + '="' + id + '"]');
+        if (!node) return;
+        const cs = getComputedStyle(node);
+        const patch = {};
+        const prev = {};
+        if (d.dy) {
+          const cur = Math.round(parseFloat(cs.marginTop) || 0);
+          const mt = cur + d.dy;
+          node.style.marginTop = mt + "px";
+          patch.marginTop = mt;
+          prev.marginTop = cur;
+        }
+        if (d.dx) {
+          const cur = Math.round(parseFloat(cs.marginLeft) || 0);
+          const ml = cur + d.dx;
+          node.style.marginLeft = ml + "px";
+          patch.marginLeft = ml;
+          prev.marginLeft = cur;
+        }
+        if (Object.keys(patch).length) out.push({ id: id, patch: patch, prev: prev });
+      });
+      if (out.length) parent.postMessage({ type: "lovable-nudged", changes: out }, "*");
+      return;
+    }
+
+
 
     if (d && d.type === "lovable-clear-multi") {
       document.querySelectorAll(".__lovable_multi__").forEach(n => n.classList.remove("__lovable_multi__"));
@@ -403,6 +456,7 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.paddingX === "number") { el.style.paddingLeft = d.paddingX + "px"; el.style.paddingRight = d.paddingX + "px"; }
     if (typeof d.marginTop === "number") el.style.marginTop = d.marginTop + "px";
     if (typeof d.marginBottom === "number") el.style.marginBottom = d.marginBottom + "px";
+    if (typeof d.marginLeft === "number") el.style.marginLeft = d.marginLeft + "px";
     if (typeof d.text === "string") {
 
       // Replace only direct text child(ren); if none, set textContent
@@ -664,6 +718,7 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   }
   if (typeof patch.marginTop === "number") el.style.marginTop = `${patch.marginTop}px`;
   if (typeof patch.marginBottom === "number") el.style.marginBottom = `${patch.marginBottom}px`;
+  if (typeof patch.marginLeft === "number") el.style.marginLeft = `${patch.marginLeft}px`;
 
   if (typeof patch.text === "string") {
 
@@ -809,6 +864,7 @@ interface Selected {
   paddingX?: number;
   marginTop?: number;
   marginBottom?: number;
+  marginLeft?: number;
 
 }
 
@@ -837,6 +893,7 @@ export const InteractivePreviewMode: React.FC = () => {
   const [moveMode, setMoveMode] = useState(false);
   const [dragMode, setDragMode] = useState(false);
   const [snapMode, setSnapMode] = useState(true);
+  const [multiMode, setMultiMode] = useState(false);
 
   const [multiIds, setMultiIds] = useState<string[]>([]);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
@@ -991,7 +1048,8 @@ export const InteractivePreviewMode: React.FC = () => {
 
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-snap-mode", active: snapMode }, "*");
-  }, [snapMode, srcDoc]);
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-multi-mode", active: multiMode }, "*");
+  }, [snapMode, multiMode, srcDoc]);
 
 
   // Move-mode drop target + undo bookkeeping for moves
@@ -1175,6 +1233,70 @@ export const InteractivePreviewMode: React.FC = () => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [handleUndo, handleRedo]);
+
+  // ---- Arrow-key nudging -------------------------------------------------
+  // Step = 8px when Snap is on (grid-aligned), 1px when off. Shift = 4× step.
+  const nudgeStep = useCallback((shift: boolean) => (snapMode ? 8 : 1) * (shift ? 4 : 1), [snapMode]);
+
+  const nudge = useCallback(
+    (dx: number, dy: number) => {
+      const ids = multiIds.length ? multiIds : selected ? [selected.id] : [];
+      if (!ids.length) {
+        toast.info("Select a block first, then use the arrow keys to nudge it.");
+        return;
+      }
+      iframeRef.current?.contentWindow?.postMessage({ type: "lovable-nudge", ids, dx, dy }, "*");
+    },
+    [multiIds, selected]
+  );
+
+  // Record nudges coming back from the iframe so they survive export / undo
+  useEffect(() => {
+    const handler = (ev: MessageEvent) => {
+      const d = ev.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "lovable-nudged" && Array.isArray(d.changes)) {
+        const changes = d.changes as Array<{ id: string; patch: HtmlEditPatch; prev: HtmlEditPatch }>;
+        setEditPatches((s) => [...s, ...changes.map((c) => ({ id: c.id, patch: c.patch }))]);
+        setUndoStack((s) => [...s, ...changes.map((c) => ({ id: c.id, prev: c.prev, next: c.patch }))]);
+        setRedoStack([]);
+        setSelected((sel) => {
+          const hit = sel ? changes.find((c) => c.id === sel.id) : undefined;
+          return sel && hit ? ({ ...sel, ...hit.patch } as Selected) : sel;
+        });
+      }
+      if (d.type === "lovable-key-nudge" && typeof d.key === "string") {
+        const step = nudgeStep(!!d.shift);
+        if (d.key === "ArrowUp") nudge(0, -step);
+        else if (d.key === "ArrowDown") nudge(0, step);
+        else if (d.key === "ArrowLeft") nudge(-step, 0);
+        else if (d.key === "ArrowRight") nudge(step, 0);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [nudge, nudgeStep]);
+
+  // Arrow keys pressed while focus is outside the iframe
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.key.startsWith("Arrow")) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (target && target.isContentEditable)) return;
+      if (!selected && multiIds.length === 0) return;
+      e.preventDefault();
+      const step = nudgeStep(e.shiftKey);
+      if (e.key === "ArrowUp") nudge(0, -step);
+      else if (e.key === "ArrowDown") nudge(0, step);
+      else if (e.key === "ArrowLeft") nudge(-step, 0);
+      else if (e.key === "ArrowRight") nudge(step, 0);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nudge, nudgeStep, selected, multiIds.length]);
+
 
   const currentHtml = (): string => {
     const source = sourceHtml || iframeRef.current?.contentDocument?.documentElement?.outerHTML || "";
@@ -1428,12 +1550,28 @@ export const InteractivePreviewMode: React.FC = () => {
           <div className="magic-card rounded-xl overflow-hidden bg-white">
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/40">
               <span className="text-[11px] text-muted-foreground">
-                {viewport === "mobile" ? "Mobile · 375 × 812" : "Desktop · full width"}
+                {viewport === "mobile" ? "Mobile · 375 × 812" : "Desktop · full width"} · arrow keys nudge {snapMode ? "8px" : "1px"} (Shift = 4×)
               </span>
               <div className="flex items-center gap-1">
                 <button
+                  onClick={() => {
+                    setMultiMode((m) => {
+                      if (m) clearMulti();
+                      return !m;
+                    });
+                  }}
+                  title="Multi-select mode: click blocks one after another to select several — no modifier keys needed"
+                  className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
+                    multiMode
+                      ? "bg-amber-500/15 text-amber-600 border-amber-500/40"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" /> Multi-select {multiMode ? "on" : "off"}
+                </button>
+                <button
                   onClick={() => setSnapMode((s) => !s)}
-                  title="Snap dragged blocks to an 8px grid and align to neighbouring block edges"
+                  title="Snap: keeps spacing on a tidy 8px grid — dragged blocks land on the grid and arrow-key nudges move in 8px steps instead of 1px"
                   className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
                     snapMode
                       ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/40"
@@ -1442,6 +1580,7 @@ export const InteractivePreviewMode: React.FC = () => {
                 >
                   <Grid3X3 className="w-3.5 h-3.5" /> Snap {snapMode ? "on" : "off"}
                 </button>
+
                 <button
                   onClick={() => setViewport("desktop")}
                   title="Desktop preview"
