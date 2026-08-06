@@ -276,7 +276,19 @@ function tagEditableElements(doc: Document): void {
   });
 }
 
-type HtmlEditPatch = Partial<Selected> & { remove?: boolean };
+type HtmlEditPatch = Partial<Selected> & {
+  remove?: boolean;
+  duplicate?: boolean;
+  insertHtml?: string;
+  insertPosition?: "before" | "after";
+  newId?: string;
+};
+
+function tagSubtreeDom(root: Element, baseId: string): void {
+  root.setAttribute(EDITOR_ATTR, baseId);
+  let i = 0;
+  root.querySelectorAll("*").forEach((n) => n.setAttribute(EDITOR_ATTR, `${baseId}-${i++}`));
+}
 
 function cleanupEmptyAnchorAfterRemoval(el: Element): void {
   const parent = el.parentElement;
