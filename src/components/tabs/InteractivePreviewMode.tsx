@@ -122,6 +122,12 @@ const EDITOR_SCRIPT = `(() => {
     return "#" + to(m[1]) + to(m[2]) + to(m[3]);
   }
 
+  function tagSubtree(root, baseId) {
+    root.setAttribute(ATTR, baseId);
+    let i = 0;
+    root.querySelectorAll("*").forEach((n) => { n.setAttribute(ATTR, baseId + "-" + (i++)); });
+  }
+
   window.addEventListener("message", (ev) => {
     const d = ev.data;
     if (!d || d.type !== "lovable-patch") return;
@@ -135,6 +141,24 @@ const EDITOR_SCRIPT = `(() => {
         p.remove();
       }
       parent.postMessage({ type: "lovable-removed", id: d.id }, "*");
+      return;
+    }
+    if (d.duplicate === true && d.newId) {
+      const clone = el.cloneNode(true);
+      clone.classList && clone.classList.remove("__lovable_selected__");
+      tagSubtree(clone, d.newId);
+      el.parentNode && el.parentNode.insertBefore(clone, el.nextSibling);
+      return;
+    }
+    if (typeof d.insertHtml === "string" && d.insertHtml && d.newId) {
+      const holder = document.createElement("div");
+      holder.innerHTML = d.insertHtml;
+      const node = holder.firstElementChild;
+      if (node) {
+        tagSubtree(node, d.newId);
+        if (d.insertPosition === "before") el.parentNode && el.parentNode.insertBefore(node, el);
+        else el.parentNode && el.parentNode.insertBefore(node, el.nextSibling);
+      }
       return;
     }
     if (typeof d.text === "string") {
