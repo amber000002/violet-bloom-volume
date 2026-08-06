@@ -1330,7 +1330,7 @@ export const InteractivePreviewMode: React.FC = () => {
                     </button>
                   </div>
                   <button
-                    onClick={() => setMoveMode((v) => !v)}
+                    onClick={() => { setDragMode(false); setMoveMode((v) => !v); }}
                     className={`w-full px-2 py-1.5 rounded-md text-[11px] flex items-center justify-center gap-1 ${
                       moveMode
                         ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/40"
