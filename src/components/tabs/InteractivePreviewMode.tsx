@@ -875,6 +875,7 @@ export const InteractivePreviewMode: React.FC = () => {
   const [moveMode, setMoveMode] = useState(false);
   const [dragMode, setDragMode] = useState(false);
   const [snapMode, setSnapMode] = useState(true);
+  const [multiMode, setMultiMode] = useState(false);
 
   const [multiIds, setMultiIds] = useState<string[]>([]);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
@@ -1029,6 +1030,7 @@ export const InteractivePreviewMode: React.FC = () => {
 
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-snap-mode", active: snapMode }, "*");
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-multi-mode", active: multiMode }, "*");
   }, [snapMode, srcDoc]);
 
 
