@@ -364,17 +364,22 @@ const EDITOR_SCRIPT = `(() => {
         if (!node) return;
         const cs = getComputedStyle(node);
         const patch = {};
+        const prev = {};
         if (d.dy) {
-          const mt = Math.round((parseFloat(cs.marginTop) || 0) + d.dy);
+          const cur = Math.round(parseFloat(cs.marginTop) || 0);
+          const mt = cur + d.dy;
           node.style.marginTop = mt + "px";
           patch.marginTop = mt;
+          prev.marginTop = cur;
         }
         if (d.dx) {
-          const ml = Math.round((parseFloat(cs.marginLeft) || 0) + d.dx);
+          const cur = Math.round(parseFloat(cs.marginLeft) || 0);
+          const ml = cur + d.dx;
           node.style.marginLeft = ml + "px";
           patch.marginLeft = ml;
+          prev.marginLeft = cur;
         }
-        if (Object.keys(patch).length) out.push({ id: id, patch: patch });
+        if (Object.keys(patch).length) out.push({ id: id, patch: patch, prev: prev });
       });
       if (out.length) parent.postMessage({ type: "lovable-nudged", changes: out }, "*");
       return;
