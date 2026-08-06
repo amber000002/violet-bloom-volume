@@ -1234,6 +1234,70 @@ export const InteractivePreviewMode: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleUndo, handleRedo]);
 
+  // ---- Arrow-key nudging -------------------------------------------------
+  // Step = 8px when Snap is on (grid-aligned), 1px when off. Shift = 4× step.
+  const nudgeStep = useCallback((shift: boolean) => (snapMode ? 8 : 1) * (shift ? 4 : 1), [snapMode]);
+
+  const nudge = useCallback(
+    (dx: number, dy: number) => {
+      const ids = multiIds.length ? multiIds : selected ? [selected.id] : [];
+      if (!ids.length) {
+        toast.info("Select a block first, then use the arrow keys to nudge it.");
+        return;
+      }
+      iframeRef.current?.contentWindow?.postMessage({ type: "lovable-nudge", ids, dx, dy }, "*");
+    },
+    [multiIds, selected]
+  );
+
+  // Record nudges coming back from the iframe so they survive export / undo
+  useEffect(() => {
+    const handler = (ev: MessageEvent) => {
+      const d = ev.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "lovable-nudged" && Array.isArray(d.changes)) {
+        const changes = d.changes as Array<{ id: string; patch: HtmlEditPatch; prev: HtmlEditPatch }>;
+        setEditPatches((s) => [...s, ...changes.map((c) => ({ id: c.id, patch: c.patch }))]);
+        setUndoStack((s) => [...s, ...changes.map((c) => ({ id: c.id, prev: c.prev, next: c.patch }))]);
+        setRedoStack([]);
+        setSelected((sel) => {
+          const hit = sel ? changes.find((c) => c.id === sel.id) : undefined;
+          return sel && hit ? ({ ...sel, ...hit.patch } as Selected) : sel;
+        });
+      }
+      if (d.type === "lovable-key-nudge" && typeof d.key === "string") {
+        const step = nudgeStep(!!d.shift);
+        if (d.key === "ArrowUp") nudge(0, -step);
+        else if (d.key === "ArrowDown") nudge(0, step);
+        else if (d.key === "ArrowLeft") nudge(-step, 0);
+        else if (d.key === "ArrowRight") nudge(step, 0);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [nudge, nudgeStep]);
+
+  // Arrow keys pressed while focus is outside the iframe
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.key.startsWith("Arrow")) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (target && target.isContentEditable)) return;
+      if (!selected && multiIds.length === 0) return;
+      e.preventDefault();
+      const step = nudgeStep(e.shiftKey);
+      if (e.key === "ArrowUp") nudge(0, -step);
+      else if (e.key === "ArrowDown") nudge(0, step);
+      else if (e.key === "ArrowLeft") nudge(-step, 0);
+      else if (e.key === "ArrowRight") nudge(step, 0);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nudge, nudgeStep, selected, multiIds.length]);
+
+
   const currentHtml = (): string => {
     const source = sourceHtml || iframeRef.current?.contentDocument?.documentElement?.outerHTML || "";
     if (!source) return "";
