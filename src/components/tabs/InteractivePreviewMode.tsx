@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus, ArrowUp, ArrowDown, Move, GripVertical, AlignLeft, AlignCenter, AlignRight, Monitor, Smartphone, Layers } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus, ArrowUp, ArrowDown, Move, GripVertical, AlignLeft, AlignCenter, AlignRight, Monitor, Smartphone, Layers, Grid3X3 } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 import { logHtmlDownload } from "@/lib/htmlDownloadsService";
@@ -25,8 +25,10 @@ const EDITOR_CSS = `
   .__lovable_drop_before__{box-shadow:0 -3px 0 0 #10b981 !important;}
   .__lovable_drop_after__{box-shadow:0 3px 0 0 #10b981 !important;}
   [${EDITOR_ATTR}].__lovable_multi__{outline:2px solid #f59e0b !important;background-image:linear-gradient(rgba(245,158,11,.08),rgba(245,158,11,.08));}
-
+  body.__lovable_dragging_active__.__lovable_snap__{background-image:repeating-linear-gradient(to bottom,rgba(16,185,129,.16) 0 1px,transparent 1px 8px);}
+  .__lovable_snap_guide__{outline:1px dashed rgba(16,185,129,.8) !important;}
 `;
+
 
 
 // Injected inside iframe: tag elements, capture clicks, apply patches
@@ -118,8 +120,33 @@ const EDITOR_SCRIPT = `(() => {
   let dragMode = false;
   let dragging = null;
   let dragMoved = false;
+  let snapEnabled = true;
+  const SNAP_GRID = 8;
+  function applySnap(el){
+    if (!snapEnabled || !el) return null;
+    const cs = getComputedStyle(el);
+    const mt = Math.max(0, Math.round((parseFloat(cs.marginTop) || 0) / SNAP_GRID) * SNAP_GRID);
+    const mb = Math.max(0, Math.round((parseFloat(cs.marginBottom) || 0) / SNAP_GRID) * SNAP_GRID);
+    el.style.marginTop = mt + "px";
+    el.style.marginBottom = mb + "px";
+    // edge alignment: inherit horizontal alignment from an adjacent sibling block
+    const sib = el.previousElementSibling || el.nextElementSibling;
+    let align;
+    if (sib && sib.nodeType === 1) {
+      const scs = getComputedStyle(sib);
+      const a = scs.textAlign;
+      if (["left","center","right"].indexOf(a) >= 0) { el.style.textAlign = a; align = a; }
+      el.style.marginLeft = scs.marginLeft;
+      el.style.marginRight = scs.marginRight;
+      sib.classList.add("__lovable_snap_guide__");
+      setTimeout(() => sib.classList.remove("__lovable_snap_guide__"), 600);
+    }
+    return { marginTop: mt, marginBottom: mb, align: align };
+  }
+
   const tagged = (node) => {
     let el = node;
+
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     return el && el.getAttribute ? el : null;
   };
@@ -173,12 +200,15 @@ const EDITOR_SCRIPT = `(() => {
     const prev = locOf(src);
     const target = { path: pathOf(par), index: after ? idx + 1 : idx };
     moveElTo(src, target);
+    const snapped = applySnap(src);
     window.parent.postMessage({
       type: "lovable-drag-drop",
       id: src.getAttribute(ATTR),
       prevLoc: prev,
       newLoc: target,
+      snap: snapped,
     }, "*");
+
   };
   document.addEventListener("mouseup", endDrag, true);
   document.addEventListener("mouseleave", (e) => { if (dragging) endDrag(e); }, true);
@@ -311,6 +341,12 @@ const EDITOR_SCRIPT = `(() => {
       document.body.classList.toggle("__lovable_drag_mode__", dragMode);
       return;
     }
+    if (d && d.type === "lovable-snap-mode") {
+      snapEnabled = !!d.active;
+      document.body.classList.toggle("__lovable_snap__", snapEnabled);
+      return;
+    }
+
     if (d && d.type === "lovable-clear-multi") {
       document.querySelectorAll(".__lovable_multi__").forEach(n => n.classList.remove("__lovable_multi__"));
       return;
@@ -800,6 +836,8 @@ export const InteractivePreviewMode: React.FC = () => {
   const [showDownloads, setShowDownloads] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
   const [dragMode, setDragMode] = useState(false);
+  const [snapMode, setSnapMode] = useState(true);
+
   const [multiIds, setMultiIds] = useState<string[]>([]);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
   const [frameHeight, setFrameHeight] = useState<number>(780);
@@ -951,6 +989,11 @@ export const InteractivePreviewMode: React.FC = () => {
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-drag-mode", active: dragMode }, "*");
   }, [dragMode, srcDoc]);
 
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-snap-mode", active: snapMode }, "*");
+  }, [snapMode, srcDoc]);
+
+
   // Move-mode drop target + undo bookkeeping for moves
   useEffect(() => {
     const handler = (ev: MessageEvent) => {
@@ -964,15 +1007,28 @@ export const InteractivePreviewMode: React.FC = () => {
       }
       if (d.type === "lovable-drag-drop" && d.id && d.newLoc) {
         // The iframe already moved the node; just record the patch + undo entry.
-        setEditPatches((s) => [...s, { id: d.id, patch: { moveTo: d.newLoc as BlockLoc } }]);
+        const snap = (d.snap || null) as { marginTop?: number; marginBottom?: number; align?: string } | null;
+        const snapPatch: HtmlEditPatch | null = snap
+          ? {
+              ...(typeof snap.marginTop === "number" ? { marginTop: snap.marginTop } : {}),
+              ...(typeof snap.marginBottom === "number" ? { marginBottom: snap.marginBottom } : {}),
+              ...(snap.align ? { align: snap.align } : {}),
+            }
+          : null;
+        setEditPatches((s) => [
+          ...s,
+          { id: d.id, patch: { moveTo: d.newLoc as BlockLoc } },
+          ...(snapPatch && Object.keys(snapPatch).length ? [{ id: d.id as string, patch: snapPatch }] : []),
+        ]);
         setUndoStack((s) => [
           ...s,
           { id: d.id, prev: { moveTo: d.prevLoc as BlockLoc }, next: { moveTo: d.newLoc as BlockLoc } },
         ]);
         setRedoStack([]);
-        toast.success("Block moved");
+        toast.success(snapPatch && Object.keys(snapPatch).length ? "Block moved · snapped to grid" : "Block moved");
         return;
       }
+
       if (d.type === "lovable-moved" && d.prevLoc) {
         setUndoStack((s) => [
           ...s,
@@ -1372,9 +1428,20 @@ export const InteractivePreviewMode: React.FC = () => {
           <div className="magic-card rounded-xl overflow-hidden bg-white">
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/40">
               <span className="text-[11px] text-muted-foreground">
-                {viewport === "mobile" ? "Mobile · 375px" : "Desktop · full width"}
+                {viewport === "mobile" ? "Mobile · 375 × 812" : "Desktop · full width"}
               </span>
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setSnapMode((s) => !s)}
+                  title="Snap dragged blocks to an 8px grid and align to neighbouring block edges"
+                  className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
+                    snapMode
+                      ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/40"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <Grid3X3 className="w-3.5 h-3.5" /> Snap {snapMode ? "on" : "off"}
+                </button>
                 <button
                   onClick={() => setViewport("desktop")}
                   title="Desktop preview"
@@ -1388,7 +1455,7 @@ export const InteractivePreviewMode: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setViewport("mobile")}
-                  title="Mobile preview (375px)"
+                  title="Mobile preview (375 × 812)"
                   className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
                     viewport === "mobile"
                       ? "bg-primary/15 text-primary border-primary/40"
@@ -1400,20 +1467,31 @@ export const InteractivePreviewMode: React.FC = () => {
               </div>
             </div>
             <div className={viewport === "mobile" ? "flex justify-center bg-muted/30 py-4" : ""}>
-              <iframe
-                ref={iframeRef}
-                srcDoc={srcDoc}
-                title="Interactive preview"
-                sandbox="allow-scripts allow-same-origin"
-                className={viewport === "mobile" ? "rounded-xl shadow-lg" : "w-full"}
-                style={{
-                  height: frameHeight,
-                  border: 0,
-                  background: "white",
-                  width: viewport === "mobile" ? 375 : undefined,
-                }}
-              />
+              {viewport === "mobile" ? (
+                <div
+                  className="rounded-[28px] shadow-lg border-[6px] border-neutral-800 bg-white overflow-y-auto overflow-x-hidden"
+                  style={{ width: 375 + 12, height: 812 }}
+                >
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={srcDoc}
+                    title="Interactive preview"
+                    sandbox="allow-scripts allow-same-origin"
+                    style={{ height: frameHeight, width: 375, border: 0, background: "white", display: "block" }}
+                  />
+                </div>
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  srcDoc={srcDoc}
+                  title="Interactive preview"
+                  sandbox="allow-scripts allow-same-origin"
+                  className="w-full"
+                  style={{ height: frameHeight, border: 0, background: "white" }}
+                />
+              )}
             </div>
+
           </div>
 
           {/* Inspector */}
