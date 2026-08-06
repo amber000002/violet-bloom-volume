@@ -341,6 +341,12 @@ const EDITOR_SCRIPT = `(() => {
       document.body.classList.toggle("__lovable_drag_mode__", dragMode);
       return;
     }
+    if (d && d.type === "lovable-snap-mode") {
+      snapEnabled = !!d.active;
+      document.body.classList.toggle("__lovable_snap__", snapEnabled);
+      return;
+    }
+
     if (d && d.type === "lovable-clear-multi") {
       document.querySelectorAll(".__lovable_multi__").forEach(n => n.classList.remove("__lovable_multi__"));
       return;
