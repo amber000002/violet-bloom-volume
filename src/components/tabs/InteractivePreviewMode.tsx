@@ -429,6 +429,23 @@ const EDITOR_SCRIPT = `(() => {
     }
   });
 
+  const reportHeight = () => {
+    const h = Math.max(
+      document.body ? document.body.scrollHeight : 0,
+      document.documentElement ? document.documentElement.scrollHeight : 0
+    );
+    if (h > 0) parent.postMessage({ type: "lovable-height", height: h }, "*");
+  };
+  try {
+    new ResizeObserver(reportHeight).observe(document.documentElement);
+    if (document.body) new ResizeObserver(reportHeight).observe(document.body);
+  } catch (_) {}
+  window.addEventListener("load", reportHeight);
+  setTimeout(reportHeight, 60);
+  setTimeout(reportHeight, 400);
+  setTimeout(reportHeight, 1200);
+  setInterval(reportHeight, 2000);
+
   parent.postMessage({ type: "lovable-ready" }, "*");
 })();`;
 
@@ -785,6 +802,14 @@ export const InteractivePreviewMode: React.FC = () => {
   const [dragMode, setDragMode] = useState(false);
   const [multiIds, setMultiIds] = useState<string[]>([]);
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
+  const [frameHeight, setFrameHeight] = useState<number>(780);
+  const [bulkSpacing, setBulkSpacing] = useState({
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingX: 0,
+    marginTop: 0,
+    marginBottom: 0,
+  });
 
 
   useEffect(() => {
@@ -805,6 +830,12 @@ export const InteractivePreviewMode: React.FC = () => {
       if (d.type === "lovable-select") setSelected(d as Selected);
       if (d.type === "lovable-removed") setSelected(null);
       if (d.type === "lovable-multi-select" && Array.isArray(d.ids)) setMultiIds(d.ids as string[]);
+      if (d.type === "lovable-height" && typeof d.height === "number") {
+        setFrameHeight((h) => {
+          const next = Math.max(360, Math.round(d.height) + 8);
+          return Math.abs(next - h) > 4 ? next : h;
+        });
+      }
       if (d.type === "lovable-link-test" && d.href) {
         toast.success(`Opened link → ${String(d.href).slice(0, 60)}`);
       }
@@ -1030,6 +1061,16 @@ export const InteractivePreviewMode: React.FC = () => {
     setSelected(null);
     clearMulti();
     toast.success(`${ids.length} blocks removed`);
+  };
+
+  const handleBulkStyle = (patch: HtmlEditPatch, label: string) => {
+    if (multiIds.length === 0) return;
+    multiIds.forEach((id) => {
+      postPatch(id, patch);
+      setEditPatches((s) => [...s, { id, patch }]);
+    });
+    setRedoStack([]);
+    toast.success(`${label} applied to ${multiIds.length} blocks`);
   };
 
   const handleBulkMove = (step: number) => {
@@ -1366,7 +1407,7 @@ export const InteractivePreviewMode: React.FC = () => {
                 sandbox="allow-scripts allow-same-origin"
                 className={viewport === "mobile" ? "rounded-xl shadow-lg" : "w-full"}
                 style={{
-                  height: 780,
+                  height: frameHeight,
                   border: 0,
                   background: "white",
                   width: viewport === "mobile" ? 375 : undefined,
@@ -1428,6 +1469,52 @@ export const InteractivePreviewMode: React.FC = () => {
                     >
                       <ArrowDown className="w-3.5 h-3.5" /> Move down
                     </button>
+                  </div>
+                  <div className="pt-1 space-y-2 border-t border-amber-500/30">
+                    <div className="text-[10px] text-muted-foreground pt-1">Align all selected</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { v: "left", Icon: AlignLeft },
+                        { v: "center", Icon: AlignCenter },
+                        { v: "right", Icon: AlignRight },
+                      ] as const).map(({ v, Icon }) => (
+                        <button
+                          key={v}
+                          onClick={() => handleBulkStyle({ align: v }, `Align ${v}`)}
+                          title={`Align all ${v}`}
+                          className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center"
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                        </button>
+                      ))}
+                    </div>
+                    {([
+                      { key: "paddingTop", label: "Padding top" },
+                      { key: "paddingBottom", label: "Padding bottom" },
+                      { key: "paddingX", label: "Padding sides" },
+                      { key: "marginTop", label: "Space above" },
+                      { key: "marginBottom", label: "Space below" },
+                    ] as const).map(({ key, label }) => (
+                      <div key={key}>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>{label}</span>
+                          <span className="font-mono text-foreground">{bulkSpacing[key]}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={2}
+                          value={bulkSpacing[key]}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setBulkSpacing((b) => ({ ...b, [key]: v }));
+                            handleBulkStyle({ [key]: v } as HtmlEditPatch, label);
+                          }}
+                          className="w-full accent-amber-500"
+                        />
+                      </div>
+                    ))}
                   </div>
                   <button
                     onClick={clearMulti}
