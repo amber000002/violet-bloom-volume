@@ -1370,6 +1370,61 @@ export const InteractivePreviewMode: React.FC = () => {
                   </button>
                 </div>
 
+                {/* Alignment & spacing */}
+                <div className="rounded-lg border border-border p-2.5 space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <AlignCenter className="w-3.5 h-3.5" /> Alignment &amp; spacing
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { v: "left", Icon: AlignLeft },
+                      { v: "center", Icon: AlignCenter },
+                      { v: "right", Icon: AlignRight },
+                    ] as const).map(({ v, Icon }) => (
+                      <button
+                        key={v}
+                        onClick={() => sendPatch({ align: v })}
+                        className={`px-2 py-1.5 rounded-md text-xs flex items-center justify-center ${
+                          selected.align === v
+                            ? "bg-primary/15 text-primary border border-primary/40"
+                            : "bg-muted/60 hover:bg-muted border border-transparent"
+                        }`}
+                        title={`Align ${v}`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                      </button>
+                    ))}
+                  </div>
+
+                  {([
+                    { key: "paddingTop", label: "Padding top" },
+                    { key: "paddingBottom", label: "Padding bottom" },
+                    { key: "paddingX", label: "Padding sides" },
+                    { key: "marginTop", label: "Space above" },
+                    { key: "marginBottom", label: "Space below" },
+                  ] as const).map(({ key, label }) => {
+                    const value = Number(selected[key] ?? 0);
+                    return (
+                      <div key={key}>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>{label}</span>
+                          <span className="font-mono text-foreground">{value}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={2}
+                          value={value}
+                          onChange={(e) => sendPatch({ [key]: Number(e.target.value) } as HtmlEditPatch)}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+
 
                 {/* Text */}
                 {(selected.text?.trim() || selected.innerText?.trim()) && (
