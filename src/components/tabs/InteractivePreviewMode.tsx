@@ -256,7 +256,14 @@ const EDITOR_SCRIPT = `(() => {
       alt: isImg ? (el.getAttribute("alt") || "") : "",
       bgImage: bgMatch ? bgMatch[2] : "",
       imageHref,
+      align: (cs.textAlign === "start" ? "left" : cs.textAlign) || "left",
+      paddingTop: Math.round(parseFloat(cs.paddingTop) || 0),
+      paddingBottom: Math.round(parseFloat(cs.paddingBottom) || 0),
+      paddingX: Math.round(parseFloat(cs.paddingLeft) || 0),
+      marginTop: Math.round(parseFloat(cs.marginTop) || 0),
+      marginBottom: Math.round(parseFloat(cs.marginBottom) || 0),
     };
+
     parent.postMessage(payload, "*");
   }, true);
 
