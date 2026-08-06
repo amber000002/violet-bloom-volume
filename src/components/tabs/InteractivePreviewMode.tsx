@@ -1031,7 +1031,7 @@ export const InteractivePreviewMode: React.FC = () => {
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-snap-mode", active: snapMode }, "*");
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-multi-mode", active: multiMode }, "*");
-  }, [snapMode, srcDoc]);
+  }, [snapMode, multiMode, srcDoc]);
 
 
   // Move-mode drop target + undo bookkeeping for moves
