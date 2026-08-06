@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus, ArrowUp, ArrowDown, Move, GripVertical, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { Upload, FileCode, Download, Save, MousePointerClick, Type, Link as LinkIcon, Palette, X, RotateCcw, Image as ImageIcon, Undo2, Redo2, FolderDown, RefreshCw, Trash2, Copy, Plus, ArrowUp, ArrowDown, Move, GripVertical, AlignLeft, AlignCenter, AlignRight, Monitor, Smartphone, Layers } from "lucide-react";
 import { listUseCaseTemplates, UseCaseTemplate } from "@/lib/useCaseTemplateService";
 import { saveAmpDraft } from "@/lib/ampDraftService";
 import { logHtmlDownload } from "@/lib/htmlDownloadsService";
@@ -1329,14 +1329,50 @@ export const InteractivePreviewMode: React.FC = () => {
         <div className="grid lg:grid-cols-[1fr_320px] gap-4">
           {/* Preview */}
           <div className="magic-card rounded-xl overflow-hidden bg-white">
-            <iframe
-              ref={iframeRef}
-              srcDoc={srcDoc}
-              title="Interactive preview"
-              sandbox="allow-scripts allow-same-origin"
-              className="w-full"
-              style={{ height: 780, border: 0, background: "white" }}
-            />
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/40">
+              <span className="text-[11px] text-muted-foreground">
+                {viewport === "mobile" ? "Mobile · 375px" : "Desktop · full width"}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setViewport("desktop")}
+                  title="Desktop preview"
+                  className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
+                    viewport === "desktop"
+                      ? "bg-primary/15 text-primary border-primary/40"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <Monitor className="w-3.5 h-3.5" /> Desktop
+                </button>
+                <button
+                  onClick={() => setViewport("mobile")}
+                  title="Mobile preview (375px)"
+                  className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${
+                    viewport === "mobile"
+                      ? "bg-primary/15 text-primary border-primary/40"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" /> Mobile
+                </button>
+              </div>
+            </div>
+            <div className={viewport === "mobile" ? "flex justify-center bg-muted/30 py-4" : ""}>
+              <iframe
+                ref={iframeRef}
+                srcDoc={srcDoc}
+                title="Interactive preview"
+                sandbox="allow-scripts allow-same-origin"
+                className={viewport === "mobile" ? "rounded-xl shadow-lg" : "w-full"}
+                style={{
+                  height: 780,
+                  border: 0,
+                  background: "white",
+                  width: viewport === "mobile" ? 375 : undefined,
+                }}
+              />
+            </div>
           </div>
 
           {/* Inspector */}
@@ -1352,6 +1388,54 @@ export const InteractivePreviewMode: React.FC = () => {
                 >
                   <X className="w-4 h-4" />
                 </button>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-2">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" /> Multi-select
+                </span>
+                <span className="text-[10px] text-muted-foreground">{multiIds.length} selected</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Shift / Ctrl / Cmd + click blocks in the preview to select several, then act on them at once.
+              </p>
+              {multiIds.length > 0 && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleBulkDuplicate}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Duplicate all
+                    </button>
+                    <button
+                      onClick={handleBulkRemove}
+                      className="px-2 py-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 text-xs flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remove all
+                    </button>
+                    <button
+                      onClick={() => handleBulkMove(-1)}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" /> Move up
+                    </button>
+                    <button
+                      onClick={() => handleBulkMove(1)}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" /> Move down
+                    </button>
+                  </div>
+                  <button
+                    onClick={clearMulti}
+                    className="w-full px-2 py-1.5 rounded-md border border-border hover:bg-muted/50 text-[11px]"
+                  >
+                    Clear selection
+                  </button>
+                </>
               )}
             </div>
 
