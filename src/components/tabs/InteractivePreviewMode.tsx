@@ -68,6 +68,7 @@ const EDITOR_SCRIPT = `(() => {
 
   // ---- block position helpers (index-path based so the export can replay them) ----
   let moveMode = false;
+  let multiMode = false;
   let lastHover = null;
   const clearHover = () => {
     if (lastHover) {
@@ -255,7 +256,7 @@ const EDITOR_SCRIPT = `(() => {
     e.preventDefault();
     e.stopPropagation();
     // Shift / Ctrl / Cmd click toggles the element in the multi-selection set
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    if (multiMode || e.shiftKey || e.ctrlKey || e.metaKey) {
       el.classList.toggle("__lovable_multi__");
       const ids = Array.prototype.map.call(
         document.querySelectorAll(".__lovable_multi__"),
@@ -306,6 +307,7 @@ const EDITOR_SCRIPT = `(() => {
       paddingX: Math.round(parseFloat(cs.paddingLeft) || 0),
       marginTop: Math.round(parseFloat(cs.marginTop) || 0),
       marginBottom: Math.round(parseFloat(cs.marginBottom) || 0),
+      marginLeft: Math.round(parseFloat(cs.marginLeft) || 0),
     };
 
     parent.postMessage(payload, "*");
@@ -403,6 +405,7 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.paddingX === "number") { el.style.paddingLeft = d.paddingX + "px"; el.style.paddingRight = d.paddingX + "px"; }
     if (typeof d.marginTop === "number") el.style.marginTop = d.marginTop + "px";
     if (typeof d.marginBottom === "number") el.style.marginBottom = d.marginBottom + "px";
+    if (typeof d.marginLeft === "number") el.style.marginLeft = d.marginLeft + "px";
     if (typeof d.text === "string") {
 
       // Replace only direct text child(ren); if none, set textContent
@@ -664,6 +667,7 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   }
   if (typeof patch.marginTop === "number") el.style.marginTop = `${patch.marginTop}px`;
   if (typeof patch.marginBottom === "number") el.style.marginBottom = `${patch.marginBottom}px`;
+  if (typeof patch.marginLeft === "number") el.style.marginLeft = `${patch.marginLeft}px`;
 
   if (typeof patch.text === "string") {
 
@@ -809,6 +813,7 @@ interface Selected {
   paddingX?: number;
   marginTop?: number;
   marginBottom?: number;
+  marginLeft?: number;
 
 }
 
