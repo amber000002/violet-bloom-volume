@@ -656,6 +656,7 @@ export const InteractivePreviewMode: React.FC = () => {
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [editPatches, setEditPatches] = useState<Array<{ id: string; patch: HtmlEditPatch }>>([]);
   const [showDownloads, setShowDownloads] = useState(false);
+  const [moveMode, setMoveMode] = useState(false);
 
   useEffect(() => {
     (async () => {
