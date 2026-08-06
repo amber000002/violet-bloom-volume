@@ -311,6 +311,10 @@ const EDITOR_SCRIPT = `(() => {
       document.body.classList.toggle("__lovable_drag_mode__", dragMode);
       return;
     }
+    if (d && d.type === "lovable-clear-multi") {
+      document.querySelectorAll(".__lovable_multi__").forEach(n => n.classList.remove("__lovable_multi__"));
+      return;
+    }
     if (!d || d.type !== "lovable-patch") return;
 
     const el = document.querySelector('[' + ATTR + '="' + d.id + '"]');
