@@ -585,17 +585,69 @@ export const InteractivePreviewMode: React.FC = () => {
     }
   };
 
+  // Structural block ops (duplicate / insert). They target a newly created node
+  // for undo, so they bypass sendPatch's field-diff bookkeeping.
+  const sendStructural = (patch: HtmlEditPatch) => {
+    if (!selected || !iframeRef.current?.contentWindow) return;
+    postPatch(selected.id, patch);
+    setUndoStack((s) => [
+      ...s,
+      { id: selected.id, prev: { remove: true }, next: patch, undoId: patch.newId },
+    ]);
+    setRedoStack([]);
+    setEditPatches((s) => [...s, { id: selected.id, patch }]);
+  };
+
+  const makeBlockHtml = (kind: "image" | "text" | "cta"): string => {
+    const useAmp = /<amp-img\b/i.test(sourceHtml) || /amp4email/i.test(sourceHtml);
+    if (kind === "image") {
+      const img = useAmp
+        ? `<amp-img src="https://placehold.co/600x300/png" width="600" height="300" layout="responsive" alt="New image"></amp-img>`
+        : `<img src="https://placehold.co/600x300/png" alt="New image" style="max-width:100%;height:auto;display:block;margin:0 auto;" />`;
+      return `<div style="padding:16px;text-align:center;">${img}</div>`;
+    }
+    if (kind === "cta") {
+      return `<div style="padding:16px;text-align:center;"><a href="https://example.com" style="display:inline-block;padding:12px 28px;background-color:#7c3aed;color:#ffffff;border-radius:6px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;">Shop now</a></div>`;
+    }
+    return `<div style="padding:16px;text-align:center;font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#333333;">Add your copy here.</div>`;
+  };
+
+  const handleDuplicateBlock = () => {
+    if (!selected) return;
+    sendStructural({ duplicate: true, newId: `dup-${Date.now().toString(36)}` });
+    toast.success("Block duplicated below");
+  };
+
+  const handleInsertBlock = (kind: "image" | "text" | "cta", position: "before" | "after") => {
+    if (!selected) return;
+    sendStructural({
+      insertHtml: makeBlockHtml(kind),
+      insertPosition: position,
+      newId: `new-${Date.now().toString(36)}`,
+    });
+    toast.success(`${kind === "cta" ? "Button" : kind === "image" ? "Image" : "Text"} block added`);
+  };
+
+  const handleRemoveBlock = () => {
+    if (!selected) return;
+    setEditPatches((s) => [...s, { id: selected.id, patch: { remove: true } }]);
+    postPatch(selected.id, { remove: true });
+    setSelected(null);
+    toast.success("Block removed");
+  };
+
   const handleUndo = useCallback(() => {
     setUndoStack((stack) => {
       if (stack.length === 0) return stack;
       const entry = stack[stack.length - 1];
-      postPatch(entry.id, entry.prev);
+      postPatch(entry.undoId ?? entry.id, entry.prev as HtmlEditPatch);
       setRedoStack((r) => [...r, entry]);
       setEditPatches((patches) => patches.slice(0, -1));
       setSelected((sel) => (sel && sel.id === entry.id ? ({ ...sel, ...entry.prev } as Selected) : sel));
       return stack.slice(0, -1);
     });
   }, [postPatch]);
+
 
   const handleRedo = useCallback(() => {
     setRedoStack((stack) => {
