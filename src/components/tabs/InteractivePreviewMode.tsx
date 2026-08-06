@@ -813,6 +813,11 @@ export const InteractivePreviewMode: React.FC = () => {
     return () => window.removeEventListener("message", handler);
   }, []);
 
+  const clearMulti = useCallback(() => {
+    setMultiIds([]);
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-clear-multi" }, "*");
+  }, []);
+
   const loadHtml = (html: string) => {
     setMoveMode(false);
     setDragMode(false);
@@ -837,6 +842,7 @@ export const InteractivePreviewMode: React.FC = () => {
     setRedoStack([]);
     setSrcDoc(injectEditor(html));
     setSelected(null);
+    clearMulti();
     toast.success("Preview refreshed");
   };
 
@@ -991,6 +997,48 @@ export const InteractivePreviewMode: React.FC = () => {
     toast.success("Block removed");
   };
 
+  // ---- Multi-select bulk actions ----
+  const applyBulk = (make: (id: string, i: number) => HtmlEditPatch, ids: string[]) => {
+    ids.forEach((id, i) => {
+      const patch = make(id, i);
+      postPatch(id, patch);
+      setEditPatches((s) => [...s, { id, patch }]);
+      setUndoStack((s) => [
+        ...s,
+        patch.remove
+          ? { id, prev: {} as HtmlEditPatch, next: patch }
+          : { id, prev: { remove: true } as HtmlEditPatch, next: patch, undoId: patch.newId },
+      ]);
+    });
+    setRedoStack([]);
+  };
+
+  const handleBulkDuplicate = () => {
+    if (multiIds.length === 0) return;
+    const stamp = Date.now().toString(36);
+    applyBulk((_id, i) => ({ duplicate: true, newId: `dup-${stamp}-${i}` }), multiIds);
+    toast.success(`${multiIds.length} blocks duplicated`);
+  };
+
+  const handleBulkRemove = () => {
+    if (multiIds.length === 0) return;
+    const ids = [...multiIds];
+    ids.forEach((id) => {
+      postPatch(id, { remove: true });
+      setEditPatches((s) => [...s, { id, patch: { remove: true } }]);
+    });
+    setSelected(null);
+    clearMulti();
+    toast.success(`${ids.length} blocks removed`);
+  };
+
+  const handleBulkMove = (step: number) => {
+    if (multiIds.length === 0) return;
+    const ids = step > 0 ? [...multiIds].reverse() : [...multiIds];
+    ids.forEach((id) => sendMove({ moveStep: step }, id));
+    toast.success(`${ids.length} blocks moved ${step > 0 ? "down" : "up"}`);
+  };
+
   const handleUndo = useCallback(() => {
     setUndoStack((stack) => {
       if (stack.length === 0) return stack;
@@ -1138,6 +1186,7 @@ export const InteractivePreviewMode: React.FC = () => {
       setUndoStack([]);
       setRedoStack([]);
       setEditPatches([]);
+      clearMulti();
     }
   };
 
