@@ -144,7 +144,9 @@ const EDITOR_SCRIPT = `(() => {
     return { marginTop: mt, marginBottom: mb, align: align };
   }
 
+  const tagged = (node) => {
     let el = node;
+
     while (el && el.nodeType === 1 && !el.getAttribute(ATTR)) el = el.parentElement;
     return el && el.getAttribute ? el : null;
   };
