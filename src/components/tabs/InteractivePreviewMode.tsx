@@ -459,6 +459,16 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
 
   if (!el) return;
 
+  if (typeof patch.moveStep === "number" && patch.moveStep) {
+    moveElStepDom(doc, el, patch.moveStep);
+    return;
+  }
+
+  if (patch.moveTo && patch.moveTo.path) {
+    moveElToDom(doc, el, patch.moveTo);
+    return;
+  }
+
   if (patch.remove === true) {
     cleanupEmptyAnchorAfterRemoval(el);
     return;
