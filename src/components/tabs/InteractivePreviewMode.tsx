@@ -756,6 +756,49 @@ export const InteractivePreviewMode: React.FC = () => {
     setEditPatches((s) => [...s, { id: selected.id, patch }]);
   };
 
+  // ---- Block moving: reorder within siblings, or drop anywhere in the creative ----
+  const sendMove = useCallback(
+    (patch: HtmlEditPatch, id: string) => {
+      postPatch(id, patch);
+      setEditPatches((s) => [...s, { id, patch }]);
+      setRedoStack([]);
+    },
+    [postPatch]
+  );
+
+  const handleMoveStep = (step: number) => {
+    if (!selected) return;
+    sendMove({ moveStep: step }, selected.id);
+  };
+
+  // Keep the iframe's move-mode flag in sync with the toolbar toggle
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-move-mode", active: moveMode }, "*");
+  }, [moveMode, srcDoc]);
+
+  // Move-mode drop target + undo bookkeeping for moves
+  useEffect(() => {
+    const handler = (ev: MessageEvent) => {
+      const d = ev.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "lovable-move-drop" && d.loc && selected) {
+        sendMove({ moveTo: d.loc as BlockLoc }, selected.id);
+        setMoveMode(false);
+        toast.success("Block moved");
+        return;
+      }
+      if (d.type === "lovable-moved" && d.prevLoc) {
+        setUndoStack((s) => [
+          ...s,
+          { id: d.id, prev: { moveTo: d.prevLoc as BlockLoc }, next: { moveTo: d.prevLoc as BlockLoc } },
+        ]);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [selected, sendMove]);
+
+
   const makeBlockHtml = (kind: "image" | "text" | "cta"): string => {
     const useAmp = /<amp-img\b/i.test(sourceHtml) || /amp4email/i.test(sourceHtml);
     if (kind === "image") {
