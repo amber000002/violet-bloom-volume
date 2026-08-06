@@ -317,6 +317,27 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
     return;
   }
 
+  if (patch.duplicate === true && patch.newId) {
+    const clone = el.cloneNode(true) as Element;
+    clone.classList?.remove("__lovable_selected__");
+    tagSubtreeDom(clone, patch.newId);
+    el.parentNode?.insertBefore(clone, el.nextSibling);
+    return;
+  }
+
+  if (patch.insertHtml && patch.newId) {
+    const holder = doc.createElement("div");
+    holder.innerHTML = patch.insertHtml;
+    const node = holder.firstElementChild;
+    if (node) {
+      tagSubtreeDom(node, patch.newId);
+      if (patch.insertPosition === "before") el.parentNode?.insertBefore(node, el);
+      else el.parentNode?.insertBefore(node, el.nextSibling);
+    }
+    return;
+  }
+
+
   if (typeof patch.text === "string") {
     let replaced = false;
     Array.from(el.childNodes).forEach((n) => {
