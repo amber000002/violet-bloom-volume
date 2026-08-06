@@ -345,7 +345,7 @@ const EDITOR_SCRIPT = `(() => {
     }
     if (d.duplicate === true && d.newId) {
       const clone = el.cloneNode(true);
-      clone.classList && clone.classList.remove("__lovable_selected__");
+      if (clone.classList) { clone.classList.remove("__lovable_selected__"); clone.classList.remove("__lovable_multi__"); }
       tagSubtree(clone, d.newId);
       el.parentNode && el.parentNode.insertBefore(clone, el.nextSibling);
       return;
