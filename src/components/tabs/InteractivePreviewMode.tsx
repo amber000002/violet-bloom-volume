@@ -879,10 +879,14 @@ export const InteractivePreviewMode: React.FC = () => {
     sendMove({ moveStep: step }, selected.id);
   };
 
-  // Keep the iframe's move-mode flag in sync with the toolbar toggle
+  // Keep the iframe's move-mode / drag-mode flags in sync with the toolbar toggles
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage({ type: "lovable-move-mode", active: moveMode }, "*");
   }, [moveMode, srcDoc]);
+
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "lovable-drag-mode", active: dragMode }, "*");
+  }, [dragMode, srcDoc]);
 
   // Move-mode drop target + undo bookkeeping for moves
   useEffect(() => {
@@ -892,6 +896,17 @@ export const InteractivePreviewMode: React.FC = () => {
       if (d.type === "lovable-move-drop" && d.loc && selected) {
         sendMove({ moveTo: d.loc as BlockLoc }, selected.id);
         setMoveMode(false);
+        toast.success("Block moved");
+        return;
+      }
+      if (d.type === "lovable-drag-drop" && d.id && d.newLoc) {
+        // The iframe already moved the node; just record the patch + undo entry.
+        setEditPatches((s) => [...s, { id: d.id, patch: { moveTo: d.newLoc as BlockLoc } }]);
+        setUndoStack((s) => [
+          ...s,
+          { id: d.id, prev: { moveTo: d.prevLoc as BlockLoc }, next: { moveTo: d.newLoc as BlockLoc } },
+        ]);
+        setRedoStack([]);
         toast.success("Block moved");
         return;
       }
@@ -909,6 +924,7 @@ export const InteractivePreviewMode: React.FC = () => {
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [selected, sendMove]);
+
 
 
   const makeBlockHtml = (kind: "image" | "text" | "cta"): string => {
