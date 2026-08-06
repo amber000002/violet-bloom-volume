@@ -962,6 +962,55 @@ export const InteractivePreviewMode: React.FC = () => {
                   Selected: <span className="font-mono text-foreground">&lt;{selected.tag}&gt;</span>
                 </div>
 
+                {/* Block actions */}
+                <div className="rounded-lg border border-border p-2.5 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Copy className="w-3.5 h-3.5" /> Block actions
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleDuplicateBlock}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Duplicate
+                    </button>
+                    <button
+                      onClick={handleRemoveBlock}
+                      className="px-2 py-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 text-xs flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Remove
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground pt-1">Add a new block below</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleInsertBlock("image", "after")}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" /> Image
+                    </button>
+                    <button
+                      onClick={() => handleInsertBlock("text", "after")}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <Type className="w-3.5 h-3.5" /> Text
+                    </button>
+                    <button
+                      onClick={() => handleInsertBlock("cta", "after")}
+                      className="px-2 py-1.5 rounded-md bg-muted/60 hover:bg-muted text-xs flex items-center justify-center gap-1"
+                    >
+                      <MousePointerClick className="w-3.5 h-3.5" /> CTA
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleInsertBlock("text", "before")}
+                    className="w-full px-2 py-1.5 rounded-md border border-border hover:bg-muted/50 text-[11px] flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Add text block above
+                  </button>
+                </div>
+
+
                 {/* Text */}
                 {(selected.text?.trim() || selected.innerText?.trim()) && (
                   <div>
