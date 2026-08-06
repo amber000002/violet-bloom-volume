@@ -1340,6 +1340,21 @@ export const InteractivePreviewMode: React.FC = () => {
                     <Move className="w-3 h-3" />
                     {moveMode ? "Click a spot in the preview… (cancel)" : "Place anywhere"}
                   </button>
+                  <button
+                    onClick={() => {
+                      setMoveMode(false);
+                      setDragMode((v) => !v);
+                    }}
+                    className={`w-full px-2 py-1.5 rounded-md text-[11px] flex items-center justify-center gap-1 ${
+                      dragMode
+                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/40"
+                        : "border border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <GripVertical className="w-3 h-3" />
+                    {dragMode ? "Drag & drop on — click to exit" : "Drag & drop blocks"}
+                  </button>
+
                   <div className="text-[10px] text-muted-foreground pt-1">Add a new block below</div>
 
                   <div className="grid grid-cols-3 gap-2">
