@@ -125,19 +125,43 @@ const InboxAlchemyContent: React.FC = () => {
     if (!industry || !brandInputs.websiteUrl.trim()) return;
     setIsGeneratingBrand(true);
     try {
-      const { data, error } = await supabase.functions.invoke("brand-profile-generate", {
-        body: {
-          websiteUrl: brandInputs.websiteUrl,
-          websiteText: brandInputs.websiteText || "",
-          additionalContext: brandInputs.additionalContext,
-          industry,
-          eventSchemaCSV: brandInputs.eventSchemaCSV || "",
-          userPropertiesCSV: brandInputs.userPropertiesCSV || "",
-        },
-      });
+      const payload = {
+        websiteUrl: brandInputs.websiteUrl,
+        websiteText: brandInputs.websiteText || "",
+        additionalContext: brandInputs.additionalContext,
+        industry,
+        eventSchemaCSV: brandInputs.eventSchemaCSV || "",
+        userPropertiesCSV: brandInputs.userPropertiesCSV || "",
+      };
 
-      if (error) throw error;
+      // Generation can take 60-120s; transient network drops surface as
+      // "Failed to send a request to the Edge Function". Retry a couple of times.
+      let data: any = null;
+      let lastErr: unknown = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await supabase.functions.invoke("brand-profile-generate", { body: payload });
+        if (!res.error) {
+          data = res.data;
+          lastErr = null;
+          break;
+        }
+        lastErr = res.error;
+        const msg = String((res.error as any)?.message || "");
+        const isTransient = /Failed to send a request|Failed to fetch|network|timeout/i.test(msg);
+        if (!isTransient) break;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
+
+      if (lastErr) {
+        const msg = String((lastErr as any)?.message || lastErr);
+        throw new Error(
+          /Failed to send a request|Failed to fetch/i.test(msg)
+            ? "Could not reach the generation service (the request was interrupted). This can happen on very slow sites — please try again, or paste the website text to speed it up."
+            : msg
+        );
+      }
       if (data?.error) throw new Error(data.error);
+
 
       if (data?.success && data.data) {
         let profile: CoreBrandJSON = data.data;
