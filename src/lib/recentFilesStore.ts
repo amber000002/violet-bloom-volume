@@ -46,20 +46,57 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => Promise<T> | T): Promise<T> {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const db = await openDB();
-      const t = db.transaction(STORE, mode);
-      const store = t.objectStore(STORE);
-      const result = await run(store);
-      t.oncomplete = () => resolve(result);
-      t.onerror = () => reject(t.error);
-      t.onabort = () => reject(t.error);
-    } catch (err) {
-      reject(err);
-    }
+  return new Promise((resolve, reject) => {
+    openDB()
+      .then((db) => {
+        const t = db.transaction(STORE, mode);
+        const store = t.objectStore(STORE);
+
+        let settled = false;
+        let result: T;
+        let ran = false;
+
+        // Attach lifecycle handlers BEFORE running any request, otherwise a
+        // fast-completing transaction can fire `complete` before we listen and
+        // the promise never settles (this made the Recent dropdown look empty).
+        t.oncomplete = () => {
+          if (settled) return;
+          if (ran) {
+            settled = true;
+            resolve(result);
+          }
+        };
+        t.onerror = () => {
+          if (settled) return;
+          settled = true;
+          reject(t.error);
+        };
+        t.onabort = () => {
+          if (settled) return;
+          settled = true;
+          reject(t.error);
+        };
+
+        Promise.resolve(run(store))
+          .then((r) => {
+            result = r;
+            ran = true;
+            // Read-only work is done as soon as the requests resolve.
+            if (mode === "readonly" && !settled) {
+              settled = true;
+              resolve(result);
+            }
+          })
+          .catch((err) => {
+            if (settled) return;
+            settled = true;
+            reject(err);
+          });
+      })
+      .catch(reject);
   });
 }
+
 
 function reqAsPromise<T = unknown>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
