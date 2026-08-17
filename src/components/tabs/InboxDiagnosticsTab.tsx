@@ -1749,7 +1749,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       <td className="text-right py-2 px-3"><ColoredPercent value={p.softBouncePercent} metricType="bounceRate" /></td>
                     </tr>
                   ))}
-                  {(journeyAnalysis?.providerAggregates ?? []).map((j, i) => (
+                  {[...(journeyAnalysis?.providerAggregates ?? [])].sort((a, b) => b.totalSent - a.totalSent).map((j, i) => (
                     <tr key={`j-${i}`} className="border-b border-border/50 hover:bg-muted/20 bg-primary/[0.03]">
                       <td className="py-2 px-3">
                         <span className="font-medium">{j.providerName}</span>
