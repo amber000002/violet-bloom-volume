@@ -1515,12 +1515,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               onToggle={() => toggleSection("monthly")}
             >
               {(() => {
-                const campaignAggs = diagnostics?.analysisReport?.providerAggregates ?? [];
-                const journeyAggs = journeyAnalysis?.providerAggregates ?? [];
+                const campaignAggs = [...(diagnostics?.analysisReport?.providerAggregates ?? [])]
+                  .sort((a, b) => b.totalSentUsers - a.totalSentUsers);
+                const journeyAggs = [...(journeyAnalysis?.providerAggregates ?? [])]
+                  .sort((a, b) => b.totalSent - a.totalSent);
                 const hasCampaigns = campaignAggs.length > 0;
                 const hasJourneys = journeyAggs.length > 0;
                 const combinedAggs = (hasCampaigns && hasJourneys)
-                  ? combineProviderAggregates(campaignAggs, journeyAggs)
+                  ? [...combineProviderAggregates(campaignAggs, journeyAggs)].sort((a, b) => b.totalSent - a.totalSent)
                   : [];
 
                 // Volume-share insight: % of grand total Sent contributed by each source
@@ -1724,7 +1726,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnostics.analysisReport.providerAggregates.map((p, i) => (
+                  {[...diagnostics.analysisReport.providerAggregates].sort((a, b) => b.totalSentUsers - a.totalSentUsers).map((p, i) => (
                     <tr key={`c-${i}`} className="border-b border-border/50 hover:bg-muted/20">
                       <td className="py-2 px-3">
                         <span className="font-medium">{p.serviceProvider}</span>
@@ -1747,7 +1749,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                       <td className="text-right py-2 px-3"><ColoredPercent value={p.softBouncePercent} metricType="bounceRate" /></td>
                     </tr>
                   ))}
-                  {(journeyAnalysis?.providerAggregates ?? []).map((j, i) => (
+                  {[...(journeyAnalysis?.providerAggregates ?? [])].sort((a, b) => b.totalSent - a.totalSent).map((j, i) => (
                     <tr key={`j-${i}`} className="border-b border-border/50 hover:bg-muted/20 bg-primary/[0.03]">
                       <td className="py-2 px-3">
                         <span className="font-medium">{j.providerName}</span>
