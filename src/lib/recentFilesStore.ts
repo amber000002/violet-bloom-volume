@@ -121,36 +121,38 @@ export async function listRecentFiles(category: RecentFileCategory): Promise<Rec
 
 export async function addRecentFile(category: RecentFileCategory, file: File): Promise<void> {
   try {
-    await tx("readwrite", async (store) => {
-      const all = (await reqAsPromise(store.getAll())) as RecentFileEntry[];
-      const sameCat = all.filter((e) => e.category === category);
+    // Read first in its own transaction so the write transaction only performs
+    // synchronous requests (an awaited read can deactivate a live transaction).
+    const all = await tx("readonly", (store) => reqAsPromise(store.getAll()) as Promise<RecentFileEntry[]>);
+    const sameCat = (all || []).filter((e) => e.category === category);
+    const dupes = sameCat.filter((e) => e.name === file.name && e.size === file.size);
 
-      // De-dupe by (name + size) — replace any older entry with same identity.
-      const dupes = sameCat.filter((e) => e.name === file.name && e.size === file.size);
+    const blob = new Blob([await file.arrayBuffer()], { type: file.type || "application/octet-stream" });
+    const entry: RecentFileEntry = {
+      id: `${category}__${Date.now()}__${Math.random().toString(36).slice(2, 8)}`,
+      category,
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size,
+      addedAt: Date.now(),
+      blob,
+    };
+
+    const overflow = sameCat
+      .filter((e) => !dupes.some((d) => d.id === e.id))
+      .sort((a, b) => b.addedAt - a.addedAt)
+      .slice(MAX_PER_CATEGORY - 1);
+
+    await tx("readwrite", (store) => {
       for (const d of dupes) store.delete(d.id);
-
-      const entry: RecentFileEntry = {
-        id: `${category}__${Date.now()}__${Math.random().toString(36).slice(2, 8)}`,
-        category,
-        name: file.name,
-        type: file.type || "application/octet-stream",
-        size: file.size,
-        addedAt: Date.now(),
-        blob: file.slice(0, file.size, file.type), // store as Blob copy
-      };
       store.put(entry);
-
-      // Trim to MAX_PER_CATEGORY
-      const remaining = sameCat
-        .filter((e) => !dupes.some((d) => d.id === e.id))
-        .sort((a, b) => b.addedAt - a.addedAt);
-      const overflow = remaining.slice(MAX_PER_CATEGORY - 1); // -1 because we just added one
       for (const o of overflow) store.delete(o.id);
     });
   } catch (err) {
     console.warn("[recentFilesStore] add failed", err);
   }
 }
+
 
 export async function deleteRecentFile(id: string): Promise<void> {
   try {
