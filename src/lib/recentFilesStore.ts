@@ -46,20 +46,57 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => Promise<T> | T): Promise<T> {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const db = await openDB();
-      const t = db.transaction(STORE, mode);
-      const store = t.objectStore(STORE);
-      const result = await run(store);
-      t.oncomplete = () => resolve(result);
-      t.onerror = () => reject(t.error);
-      t.onabort = () => reject(t.error);
-    } catch (err) {
-      reject(err);
-    }
+  return new Promise((resolve, reject) => {
+    openDB()
+      .then((db) => {
+        const t = db.transaction(STORE, mode);
+        const store = t.objectStore(STORE);
+
+        let settled = false;
+        let result: T;
+        let ran = false;
+
+        // Attach lifecycle handlers BEFORE running any request, otherwise a
+        // fast-completing transaction can fire `complete` before we listen and
+        // the promise never settles (this made the Recent dropdown look empty).
+        t.oncomplete = () => {
+          if (settled) return;
+          if (ran) {
+            settled = true;
+            resolve(result);
+          }
+        };
+        t.onerror = () => {
+          if (settled) return;
+          settled = true;
+          reject(t.error);
+        };
+        t.onabort = () => {
+          if (settled) return;
+          settled = true;
+          reject(t.error);
+        };
+
+        Promise.resolve(run(store))
+          .then((r) => {
+            result = r;
+            ran = true;
+            // Read-only work is done as soon as the requests resolve.
+            if (mode === "readonly" && !settled) {
+              settled = true;
+              resolve(result);
+            }
+          })
+          .catch((err) => {
+            if (settled) return;
+            settled = true;
+            reject(err);
+          });
+      })
+      .catch(reject);
   });
 }
+
 
 function reqAsPromise<T = unknown>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -84,36 +121,38 @@ export async function listRecentFiles(category: RecentFileCategory): Promise<Rec
 
 export async function addRecentFile(category: RecentFileCategory, file: File): Promise<void> {
   try {
-    await tx("readwrite", async (store) => {
-      const all = (await reqAsPromise(store.getAll())) as RecentFileEntry[];
-      const sameCat = all.filter((e) => e.category === category);
+    // Read first in its own transaction so the write transaction only performs
+    // synchronous requests (an awaited read can deactivate a live transaction).
+    const all = await tx("readonly", (store) => reqAsPromise(store.getAll()) as Promise<RecentFileEntry[]>);
+    const sameCat = (all || []).filter((e) => e.category === category);
+    const dupes = sameCat.filter((e) => e.name === file.name && e.size === file.size);
 
-      // De-dupe by (name + size) — replace any older entry with same identity.
-      const dupes = sameCat.filter((e) => e.name === file.name && e.size === file.size);
+    const blob = new Blob([await file.arrayBuffer()], { type: file.type || "application/octet-stream" });
+    const entry: RecentFileEntry = {
+      id: `${category}__${Date.now()}__${Math.random().toString(36).slice(2, 8)}`,
+      category,
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size,
+      addedAt: Date.now(),
+      blob,
+    };
+
+    const overflow = sameCat
+      .filter((e) => !dupes.some((d) => d.id === e.id))
+      .sort((a, b) => b.addedAt - a.addedAt)
+      .slice(MAX_PER_CATEGORY - 1);
+
+    await tx("readwrite", (store) => {
       for (const d of dupes) store.delete(d.id);
-
-      const entry: RecentFileEntry = {
-        id: `${category}__${Date.now()}__${Math.random().toString(36).slice(2, 8)}`,
-        category,
-        name: file.name,
-        type: file.type || "application/octet-stream",
-        size: file.size,
-        addedAt: Date.now(),
-        blob: file.slice(0, file.size, file.type), // store as Blob copy
-      };
       store.put(entry);
-
-      // Trim to MAX_PER_CATEGORY
-      const remaining = sameCat
-        .filter((e) => !dupes.some((d) => d.id === e.id))
-        .sort((a, b) => b.addedAt - a.addedAt);
-      const overflow = remaining.slice(MAX_PER_CATEGORY - 1); // -1 because we just added one
       for (const o of overflow) store.delete(o.id);
     });
   } catch (err) {
     console.warn("[recentFilesStore] add failed", err);
   }
 }
+
 
 export async function deleteRecentFile(id: string): Promise<void> {
   try {
