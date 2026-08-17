@@ -1515,12 +1515,14 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
               onToggle={() => toggleSection("monthly")}
             >
               {(() => {
-                const campaignAggs = diagnostics?.analysisReport?.providerAggregates ?? [];
-                const journeyAggs = journeyAnalysis?.providerAggregates ?? [];
+                const campaignAggs = [...(diagnostics?.analysisReport?.providerAggregates ?? [])]
+                  .sort((a, b) => b.totalSentUsers - a.totalSentUsers);
+                const journeyAggs = [...(journeyAnalysis?.providerAggregates ?? [])]
+                  .sort((a, b) => b.totalSent - a.totalSent);
                 const hasCampaigns = campaignAggs.length > 0;
                 const hasJourneys = journeyAggs.length > 0;
                 const combinedAggs = (hasCampaigns && hasJourneys)
-                  ? combineProviderAggregates(campaignAggs, journeyAggs)
+                  ? [...combineProviderAggregates(campaignAggs, journeyAggs)].sort((a, b) => b.totalSent - a.totalSent)
                   : [];
 
                 // Volume-share insight: % of grand total Sent contributed by each source
