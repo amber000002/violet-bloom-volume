@@ -1726,7 +1726,7 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {diagnostics.analysisReport.providerAggregates.map((p, i) => (
+                  {[...diagnostics.analysisReport.providerAggregates].sort((a, b) => b.totalSentUsers - a.totalSentUsers).map((p, i) => (
                     <tr key={`c-${i}`} className="border-b border-border/50 hover:bg-muted/20">
                       <td className="py-2 px-3">
                         <span className="font-medium">{p.serviceProvider}</span>
