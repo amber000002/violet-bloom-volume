@@ -95,6 +95,10 @@ const normalizeStage = (stage: string): string => {
   return stage.toLowerCase().trim().replace(/\s+/g, "-");
 };
 
+// Canonical industry key: lowercase, hyphenated ("Food Tech" / "food_tech" -> "food-tech")
+const normalizeIndustryKey = (raw: string): string =>
+  (raw || "").toLowerCase().trim().replace(/[\s_/]+/g, "-").replace(/-+/g, "-");
+
 const stageToLabel = (stage: string): string => {
   return stage
     .split("-")
