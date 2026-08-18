@@ -165,7 +165,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
       const useCaseType = useCase.type && ["journey", "campaign"].includes(useCase.type) ? useCase.type : "campaign";
 
       // Use case-level industry → top-level JSON industry → "all" as last resort
-      const industry = useCase.industry || topLevelIndustry || "all";
+      const industry = normalizeIndustryKey(useCase.industry || topLevelIndustry || "all");
       const resourceKey = `${json.metadata.source}_${industry}`;
 
       if (!resourceMap.has(resourceKey)) {
