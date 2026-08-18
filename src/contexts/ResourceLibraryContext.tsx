@@ -120,7 +120,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     result: JSONValidationResult;
   } => {
     // Determine top-level industry from JSON (source of truth for all use cases in this file)
-    const topLevelIndustry = ((json as any)?.industry || (json?.metadata as any)?.industry || "").toLowerCase().trim();
+    const topLevelIndustry = normalizeIndustryKey((json as any)?.industry || (json?.metadata as any)?.industry || "");
 
     const errors: string[] = [];
     let parsedUseCases = 0;
