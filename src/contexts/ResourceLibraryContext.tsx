@@ -443,12 +443,12 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   }, []);
 
   const getResourcesForTab = useCallback((tab: TabRelevance, industry?: string): Resource[] => {
-    const normalizedIndustry = industry?.toLowerCase().trim();
+    const normalizedIndustry = industry ? normalizeIndustryKey(industry) : undefined;
     return resources.filter(r => {
       if (!r.isEnabled) return false;
       if (!r.tabs.includes(tab)) return false;
       if (normalizedIndustry && !r.industries.includes("all")) {
-        const resourceIndustries = r.industries.map(i => (i as string).toLowerCase().trim());
+        const resourceIndustries = r.industries.map(i => normalizeIndustryKey(i as string));
         if (!resourceIndustries.includes(normalizedIndustry)) {
           return false;
         }
