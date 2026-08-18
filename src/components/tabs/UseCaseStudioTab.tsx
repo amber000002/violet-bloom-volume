@@ -582,12 +582,12 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   // Extract unique stages from internal resources
   // Strict industry-filtered resources (case-insensitive, no "all" fallback for stages)
   const industryFilteredResources = useMemo(() => {
-    const normalizedIndustry = industry?.toLowerCase().trim();
+    const normalizedIndustry = normalizeIndustryKey(industry || "");
     if (!normalizedIndustry) return [];
     return resources.filter(r => {
       if (!r.isEnabled) return false;
       if (!r.tabs.includes("use-case-studio")) return false;
-      const resourceIndustries = r.industries.map(i => (i as string).toLowerCase().trim());
+      const resourceIndustries = r.industries.map(i => normalizeIndustryKey(i as string));
       // Only match exact industry — never "all" to prevent cross-industry leakage
       return resourceIndustries.includes(normalizedIndustry);
     });
