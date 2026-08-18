@@ -28,6 +28,11 @@ function checkIsOwner(): boolean {
   return true;
 }
 
+// Canonical industry key: lowercase, hyphenated (e.g. "Food Tech" / "food_tech" -> "food-tech")
+function normalizeIndustryKey(raw: string): string {
+  return (raw || "").toLowerCase().trim().replace(/[\s_/]+/g, "-").replace(/-+/g, "-");
+}
+
 interface ResourceLibraryContextType {
   resources: Resource[];
   isOwner: boolean;
