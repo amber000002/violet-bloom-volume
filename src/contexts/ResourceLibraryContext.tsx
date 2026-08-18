@@ -28,6 +28,11 @@ function checkIsOwner(): boolean {
   return true;
 }
 
+// Canonical industry key: lowercase, hyphenated (e.g. "Food Tech" / "food_tech" -> "food-tech")
+function normalizeIndustryKey(raw: string): string {
+  return (raw || "").toLowerCase().trim().replace(/[\s_/]+/g, "-").replace(/-+/g, "-");
+}
+
 interface ResourceLibraryContextType {
   resources: Resource[];
   isOwner: boolean;
@@ -120,7 +125,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
     result: JSONValidationResult;
   } => {
     // Determine top-level industry from JSON (source of truth for all use cases in this file)
-    const topLevelIndustry = ((json as any)?.industry || (json?.metadata as any)?.industry || "").toLowerCase().trim();
+    const topLevelIndustry = normalizeIndustryKey((json as any)?.industry || (json?.metadata as any)?.industry || "");
 
     const errors: string[] = [];
     let parsedUseCases = 0;
@@ -160,7 +165,7 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
       const useCaseType = useCase.type && ["journey", "campaign"].includes(useCase.type) ? useCase.type : "campaign";
 
       // Use case-level industry → top-level JSON industry → "all" as last resort
-      const industry = useCase.industry || topLevelIndustry || "all";
+      const industry = normalizeIndustryKey(useCase.industry || topLevelIndustry || "all");
       const resourceKey = `${json.metadata.source}_${industry}`;
 
       if (!resourceMap.has(resourceKey)) {
@@ -438,12 +443,12 @@ export const ResourceLibraryProvider: React.FC<ResourceLibraryProviderProps> = (
   }, []);
 
   const getResourcesForTab = useCallback((tab: TabRelevance, industry?: string): Resource[] => {
-    const normalizedIndustry = industry?.toLowerCase().trim();
+    const normalizedIndustry = industry ? normalizeIndustryKey(industry) : undefined;
     return resources.filter(r => {
       if (!r.isEnabled) return false;
       if (!r.tabs.includes(tab)) return false;
       if (normalizedIndustry && !r.industries.includes("all")) {
-        const resourceIndustries = r.industries.map(i => (i as string).toLowerCase().trim());
+        const resourceIndustries = r.industries.map(i => normalizeIndustryKey(i as string));
         if (!resourceIndustries.includes(normalizedIndustry)) {
           return false;
         }

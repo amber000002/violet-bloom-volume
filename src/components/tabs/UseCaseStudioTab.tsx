@@ -95,6 +95,10 @@ const normalizeStage = (stage: string): string => {
   return stage.toLowerCase().trim().replace(/\s+/g, "-");
 };
 
+// Canonical industry key: lowercase, hyphenated ("Food Tech" / "food_tech" -> "food-tech")
+const normalizeIndustryKey = (raw: string): string =>
+  (raw || "").toLowerCase().trim().replace(/[\s_/]+/g, "-").replace(/-+/g, "-");
+
 const stageToLabel = (stage: string): string => {
   return stage
     .split("-")
@@ -582,12 +586,12 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
   // Extract unique stages from internal resources
   // Strict industry-filtered resources (case-insensitive, no "all" fallback for stages)
   const industryFilteredResources = useMemo(() => {
-    const normalizedIndustry = industry?.toLowerCase().trim();
+    const normalizedIndustry = normalizeIndustryKey(industry || "");
     if (!normalizedIndustry) return [];
     return resources.filter(r => {
       if (!r.isEnabled) return false;
       if (!r.tabs.includes("use-case-studio")) return false;
-      const resourceIndustries = r.industries.map(i => (i as string).toLowerCase().trim());
+      const resourceIndustries = r.industries.map(i => normalizeIndustryKey(i as string));
       // Only match exact industry — never "all" to prevent cross-industry leakage
       return resourceIndustries.includes(normalizedIndustry);
     });
