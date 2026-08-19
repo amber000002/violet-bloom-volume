@@ -1059,6 +1059,18 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
     }
   };
 
+  // ===== EXPORT FILE NAMING =====
+  const brandLabel = useMemo(() => {
+    const raw =
+      brandProfile?.brand_identity?.brand_name ||
+      (websiteUrlProp || "").replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] ||
+      "brand";
+    return raw.trim().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
+  }, [brandProfile, websiteUrlProp]);
+
+  const buildUseCaseFileName = (ext: "csv" | "xlsx", suffix?: string) =>
+    `${brandLabel}_Use-Case-Repository${suffix ? `_${suffix}` : ""}_${new Date().toISOString().slice(0, 10)}.${ext}`;
+
   // ===== SNAPSHOT-BASED EXPORT FOR A SPECIFIC RUN =====
   const handleExportRun = async (runId: string, format: "csv" | "xlsx") => {
     try {
@@ -1068,15 +1080,17 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
         return;
       }
       const label = `${run.industry}_${new Date(run.generatedAt).toISOString().slice(0, 10)}`;
+      const name = `${brandLabel}_Use-Case-Repository_${label}.${format}`;
       if (format === "csv") {
-        exportAugmentedCSV(run.augmentedUseCases, `use-cases-${label}.csv`);
+        exportAugmentedCSV(run.augmentedUseCases, name);
       } else {
-        exportAugmentedXLSX(run.augmentedUseCases, `use-cases-${label}.xlsx`);
+        exportAugmentedXLSX(run.augmentedUseCases, name);
       }
     } catch {
       toast.error("Failed to export run");
     }
   };
+
 
   // ===== FRAMEWORK REASON =====
   const frameworkReason = useMemo(() => {
@@ -1755,8 +1769,8 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   </div>
                   <AugmentedUseCaseTable
                     useCases={augmentedUseCases}
-                    onExportCSV={() => exportAugmentedCSV(augmentedUseCases)}
-                    onExportXLSX={() => exportAugmentedXLSX(augmentedUseCases)}
+                    onExportCSV={() => exportAugmentedCSV(augmentedUseCases, buildUseCaseFileName("csv"))}
+                    onExportXLSX={() => exportAugmentedXLSX(augmentedUseCases, buildUseCaseFileName("xlsx"))}
                   />
                 </div>
               )}
