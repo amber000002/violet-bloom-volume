@@ -1769,8 +1769,8 @@ export const UseCaseStudioTab: React.FC<UseCaseStudioTabProps> = ({
                   </div>
                   <AugmentedUseCaseTable
                     useCases={augmentedUseCases}
-                    onExportCSV={() => exportAugmentedCSV(augmentedUseCases)}
-                    onExportXLSX={() => exportAugmentedXLSX(augmentedUseCases)}
+                    onExportCSV={() => exportAugmentedCSV(augmentedUseCases, buildUseCaseFileName("csv"))}
+                    onExportXLSX={() => exportAugmentedXLSX(augmentedUseCases, buildUseCaseFileName("xlsx"))}
                   />
                 </div>
               )}
