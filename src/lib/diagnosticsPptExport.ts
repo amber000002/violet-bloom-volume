@@ -1185,25 +1185,22 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         ];
         if (mUseDelivered) mGt.push({ text: formatNumber(mTotals.delivered), options: mGtOpts() });
         mGt.push(
-          { text: formatNumber(mTotals.viewed), options: mGtOpts() },
           { text: formatPercent(pct(mTotals.viewed, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.viewed, mDenom), "openRate", theme) } },
-          { text: formatNumber(mTotals.clicked), options: mGtOpts() },
           { text: formatPercent(pct(mTotals.clicked, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.clicked, mDenom), "clickRate", theme) } },
           { text: formatPercent(pct(mTotals.clicked, mTotals.viewed)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.clicked, mTotals.viewed), "clickRate", theme) } },
-          { text: formatNumber(mTotals.unsubs), options: mGtOpts() },
           { text: formatPercent(pct(mTotals.unsubs, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.unsubs, mDenom), "unsubscribeRate", theme) } },
-          { text: formatNumber(mTotals.hard), options: mGtOpts() },
           { text: formatPercent(pct(mTotals.hard, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.hard, mDenom), "bounceRate", theme) } },
-          { text: formatNumber(mTotals.soft), options: mGtOpts() },
           { text: formatPercent(pct(mTotals.soft, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.soft, mDenom), "bounceRate", theme) } },
         );
         mRows.push(mGt);
       }
 
-      // Monthly overview column widths — Month is left-aligned, all numeric no-wrap
-      const mColW = mUseDelivered
-        ? [0.95, 0.55, 0.6, 0.6, 0.6, 0.55, 0.6, 0.55, 0.55, 0.55, 0.55, 0.65, 0.55, 0.65, 0.55]
-        : [1.0, 0.6, 0.65, 0.65, 0.6, 0.65, 0.6, 0.6, 0.6, 0.55, 0.7, 0.55, 0.7, 0.55];
+      // Monthly overview column widths — Month is left-aligned, rate columns fixed
+      const mRateW = 0.8;
+      const mFixedCount = mUseDelivered ? 3 : 2; // Campaigns, Sent [+ Delivered]
+      const mNumW = 0.85;
+      const mMonthW = Math.max(TABLE_W - mFixedCount * mNumW - 6 * mRateW, 1.0);
+      const mColW = [mMonthW, ...Array(mFixedCount).fill(mNumW), ...Array(6).fill(mRateW)];
 
       s.addTable(mRows, {
         x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: mColW,
