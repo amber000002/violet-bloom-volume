@@ -1136,7 +1136,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
       if (mUseDelivered) mHeaders.push("Delivered");
-      mHeaders.push("Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
+      mHeaders.push("View %", "Click %", "CTR %", "Unsub %", "Hard %", "Soft %");
 
       const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
       const mRows: pptxgen.TableRow[] = [mHeaderRow];
