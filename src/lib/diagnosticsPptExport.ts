@@ -1680,14 +1680,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     ];
   };
 
-  // Campaign table column widths: Date(fixed), Campaign(flex), Subject(flex), then 12 numeric fixed cols
-  // Fixed cols: Date=0.55, then 12 numeric cols at their natural widths
+  // Campaign table column widths: Date(fixed), Campaign(flex), Label(fixed), Subject(flex), then 12 numeric fixed cols
   const fixedDateW = 0.55;
+  const labelW = 1.2;
   const numericWidths = [0.5, 0.45, 0.5, 0.45, 0.5, 0.45, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5]; // 12 cols
-  const totalFixedW = fixedDateW + numericWidths.reduce((s, w) => s + w, 0);
+  const totalFixedW = fixedDateW + labelW + numericWidths.reduce((s, w) => s + w, 0);
   const remainingW = TABLE_W - totalFixedW;
-  const flexW = Math.min(remainingW / 2, 2.2); // cap at 220px equivalent (~2.2")
-  const campaignColW = [fixedDateW, flexW, flexW, ...numericWidths];
+  const flexW = Math.max(Math.min(remainingW / 2, 2.2), 0.9);
+  const campaignColW = [fixedDateW, flexW, labelW, flexW, ...numericWidths];
+
 
   // Build full campaign list (≥1000 sends)
   const allCampaignsForSort: TopCampaign[] = diagnostics.rawData
