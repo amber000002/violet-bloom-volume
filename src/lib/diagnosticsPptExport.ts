@@ -1141,12 +1141,23 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
       if (mUseDelivered) mHeaders.push("Delivered");
-      mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
+      mHeaders.push("Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
       const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
       const mRows: pptxgen.TableRow[] = [mHeaderRow];
 
+      const mTotals = { campaigns: 0, sent: 0, delivered: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0 };
+
       monthlyData.forEach((m, ri) => {
+        mTotals.campaigns += m.campaignCount;
+        mTotals.sent += m.totalSentUsers;
+        mTotals.delivered += m.totalDeliveredUsers;
+        mTotals.viewed += m.uniqueViewed;
+        mTotals.clicked += m.uniqueClicked;
+        mTotals.unsubs += m.unsubscribes;
+        mTotals.hard += m.hardBounces;
+        mTotals.soft += m.softBounces;
+
         const row: pptxgen.TableCell[] = [
           { text: sanitizeText(m.month), options: bodyCellOpts(theme, ri) },
           { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "center") },
@@ -1158,6 +1169,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.viewPercent, "openRate", theme)) },
           { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
           { text: formatPercent(m.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.clickPercent, "clickRate", theme)) },
+          { text: formatPercent(m.uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.uniqueCTR, "clickRate", theme)) },
           { text: formatNumber(m.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
           { text: formatPercent(m.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.unsubscribePercent, "unsubscribeRate", theme)) },
           { text: formatNumber(m.hardBounces), options: bodyCellOpts(theme, ri, "center") },
@@ -1168,10 +1180,40 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         mRows.push(row);
       });
 
+      // --- Grand Total row across all months ---
+      if (monthlyData.length > 0) {
+        const mDenom = mUseDelivered ? mTotals.delivered : mTotals.sent;
+        const pct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
+        const mGtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({
+          bold: true, fontSize: 7, align, fill: { color: theme.headerBg },
+          fontFace: FONTS.body, valign: "middle", margin: [3, 4, 3, 4],
+        });
+        const mGt: pptxgen.TableCell[] = [
+          { text: "Grand Total", options: mGtOpts("left") },
+          { text: String(mTotals.campaigns), options: mGtOpts() },
+          { text: formatNumber(mTotals.sent), options: mGtOpts() },
+        ];
+        if (mUseDelivered) mGt.push({ text: formatNumber(mTotals.delivered), options: mGtOpts() });
+        mGt.push(
+          { text: formatNumber(mTotals.viewed), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.viewed, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.viewed, mDenom), "openRate", theme) } },
+          { text: formatNumber(mTotals.clicked), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.clicked, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.clicked, mDenom), "clickRate", theme) } },
+          { text: formatPercent(pct(mTotals.clicked, mTotals.viewed)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.clicked, mTotals.viewed), "clickRate", theme) } },
+          { text: formatNumber(mTotals.unsubs), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.unsubs, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.unsubs, mDenom), "unsubscribeRate", theme) } },
+          { text: formatNumber(mTotals.hard), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.hard, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.hard, mDenom), "bounceRate", theme) } },
+          { text: formatNumber(mTotals.soft), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.soft, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.soft, mDenom), "bounceRate", theme) } },
+        );
+        mRows.push(mGt);
+      }
+
       // Monthly overview column widths — Month is left-aligned, all numeric no-wrap
       const mColW = mUseDelivered
-        ? [0.85, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.6, 0.5, 0.6, 0.5]
-        : [0.95, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55];
+        ? [0.95, 0.55, 0.6, 0.6, 0.6, 0.55, 0.6, 0.55, 0.55, 0.55, 0.55, 0.65, 0.55, 0.65, 0.55]
+        : [1.0, 0.6, 0.65, 0.65, 0.6, 0.65, 0.6, 0.6, 0.6, 0.55, 0.7, 0.55, 0.7, 0.55];
 
       s.addTable(mRows, {
         x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: mColW,
