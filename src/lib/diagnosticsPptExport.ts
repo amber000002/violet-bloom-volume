@@ -993,6 +993,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         { text: formatPercent(p.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.viewPercent, "openRate", theme)) },
         { text: formatNumber(p.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(p.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.clickPercent, "clickRate", theme)) },
+        { text: formatPercent(p.uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.uniqueCTR, "clickRate", theme)) },
         { text: formatNumber(p.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(p.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.unsubscribePercent, "unsubscribeRate", theme)) },
         { text: formatNumber(p.hardBounces), options: bodyCellOpts(theme, ri, "center") },
