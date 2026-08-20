@@ -1028,6 +1028,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         { text: formatPercent(j.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.viewPercent, "openRate", theme)) },
         { text: formatNumber(j.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(j.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.clickPercent, "clickRate", theme)) },
+        { text: formatPercent(j.uniqueViewed > 0 ? (j.uniqueClicked / j.uniqueViewed) * 100 : 0), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.uniqueViewed > 0 ? (j.uniqueClicked / j.uniqueViewed) * 100 : 0, "clickRate", theme)) },
         { text: formatNumber(j.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(j.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.unsubscribePercent, "unsubscribeRate", theme)) },
         { text: "—", options: bodyCellOpts(theme, ri, "center") },
