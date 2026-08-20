@@ -1646,9 +1646,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   // SLIDES 8-11: Best & Underperforming Campaigns (4 slides)
   // ==========================================
+  // Derive brand-agnostic drill-down labels (region / segment / recurring attribute)
+  // from the campaign naming convention present in THIS dataset.
+  const segmentLabelFor = buildSegmentLabeler(diagnostics.rawData.map(c => c.campaignName || ""));
+
   const createFullCampaignHeader = (): pptxgen.TableRow =>
-    ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
-      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 1 || i === 2 ? "left" : "center") }));
+    ["Date", "Campaign", "Label", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
+      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 1 || i === 2 || i === 3 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
     const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
