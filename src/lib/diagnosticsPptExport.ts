@@ -968,7 +968,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const useDelivered = report.providerAggregates[0]?.useDeliveredAsDenominator;
     const headers: string[] = ["Provider", "Sent"];
     if (useDelivered) headers.push("Delivered");
-    headers.push("Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
+    headers.push("View %", "Click %", "CTR %", "Unsub %", "Hard %", "Soft %");
 
     const hRow: pptxgen.TableCell[] = headers.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
     const rows: pptxgen.TableRow[] = [hRow];
