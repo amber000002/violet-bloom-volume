@@ -14,6 +14,7 @@ import {
 import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
 import { SectionInsights, TableInsight } from "./sectionInsightEngine";
 import { JourneyAnalysisReport } from "./journeyAnalyzer";
+import { buildSegmentLabeler, buildSegmentPerformance } from "./campaignSegmentLabeler";
 
 // ============= TYPES =============
 
@@ -967,7 +968,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const useDelivered = report.providerAggregates[0]?.useDeliveredAsDenominator;
     const headers: string[] = ["Provider", "Sent"];
     if (useDelivered) headers.push("Delivered");
-    headers.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
+    headers.push("Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
     const hRow: pptxgen.TableCell[] = headers.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
     const rows: pptxgen.TableRow[] = [hRow];
@@ -993,6 +994,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         { text: formatPercent(p.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.viewPercent, "openRate", theme)) },
         { text: formatNumber(p.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(p.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.clickPercent, "clickRate", theme)) },
+        { text: formatPercent(p.uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.uniqueCTR, "clickRate", theme)) },
         { text: formatNumber(p.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(p.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(p.unsubscribePercent, "unsubscribeRate", theme)) },
         { text: formatNumber(p.hardBounces), options: bodyCellOpts(theme, ri, "center") },
@@ -1027,6 +1029,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         { text: formatPercent(j.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.viewPercent, "openRate", theme)) },
         { text: formatNumber(j.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(j.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.clickPercent, "clickRate", theme)) },
+        { text: formatPercent(j.uniqueViewed > 0 ? (j.uniqueClicked / j.uniqueViewed) * 100 : 0), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.uniqueViewed > 0 ? (j.uniqueClicked / j.uniqueViewed) * 100 : 0, "clickRate", theme)) },
         { text: formatNumber(j.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
         { text: formatPercent(j.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(j.unsubscribePercent, "unsubscribeRate", theme)) },
         { text: "—", options: bodyCellOpts(theme, ri, "center") },
@@ -1063,6 +1066,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       { text: formatPercent(denom > 0 ? (combined.viewed / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.viewed / denom) * 100 : 0, "openRate", theme) } },
       { text: formatNumber(combined.clicked), options: gtOpts() },
       { text: formatPercent(denom > 0 ? (combined.clicked / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.clicked / denom) * 100 : 0, "clickRate", theme) } },
+      { text: formatPercent(combined.viewed > 0 ? (combined.clicked / combined.viewed) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(combined.viewed > 0 ? (combined.clicked / combined.viewed) * 100 : 0, "clickRate", theme) } },
       { text: formatNumber(combined.unsubs), options: gtOpts() },
       { text: formatPercent(denom > 0 ? (combined.unsubs / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.unsubs / denom) * 100 : 0, "unsubscribeRate", theme) } },
       { text: formatNumber(combined.hard), options: gtOpts() },
@@ -1075,8 +1079,8 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     const numCols = headers.length;
     // Column widths — Provider is flex (wraps), all others no-wrap
     const baseW = useDelivered
-      ? [1.5, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.5, 0.55, 0.6, 0.55, 0.6, 0.55]
-      : [1.7, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55];
+      ? [1.6, 0.6, 0.6, 0.6, 0.55, 0.6, 0.55, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55]
+      : [1.9, 0.65, 0.65, 0.6, 0.65, 0.6, 0.6, 0.65, 0.6, 0.7, 0.6, 0.7, 0.6];
 
     s.addTable(rows, {
       x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: baseW,
@@ -1138,12 +1142,23 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
       const mHeaders: string[] = ["Month", "Campaigns", "Sent"];
       if (mUseDelivered) mHeaders.push("Delivered");
-      mHeaders.push("Viewed", "View %", "Clicked", "Click %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
+      mHeaders.push("Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %", "Hard Bounce", "Hard %", "Soft Bounce", "Soft %");
 
       const mHeaderRow: pptxgen.TableCell[] = mHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") }));
       const mRows: pptxgen.TableRow[] = [mHeaderRow];
 
+      const mTotals = { campaigns: 0, sent: 0, delivered: 0, viewed: 0, clicked: 0, unsubs: 0, hard: 0, soft: 0 };
+
       monthlyData.forEach((m, ri) => {
+        mTotals.campaigns += m.campaignCount;
+        mTotals.sent += m.totalSentUsers;
+        mTotals.delivered += m.totalDeliveredUsers;
+        mTotals.viewed += m.uniqueViewed;
+        mTotals.clicked += m.uniqueClicked;
+        mTotals.unsubs += m.unsubscribes;
+        mTotals.hard += m.hardBounces;
+        mTotals.soft += m.softBounces;
+
         const row: pptxgen.TableCell[] = [
           { text: sanitizeText(m.month), options: bodyCellOpts(theme, ri) },
           { text: String(m.campaignCount), options: bodyCellOpts(theme, ri, "center") },
@@ -1155,6 +1170,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           { text: formatPercent(m.viewPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.viewPercent, "openRate", theme)) },
           { text: formatNumber(m.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
           { text: formatPercent(m.clickPercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.clickPercent, "clickRate", theme)) },
+          { text: formatPercent(m.uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.uniqueCTR, "clickRate", theme)) },
           { text: formatNumber(m.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
           { text: formatPercent(m.unsubscribePercent), options: bodyCellOpts(theme, ri, "center", getMetricColor(m.unsubscribePercent, "unsubscribeRate", theme)) },
           { text: formatNumber(m.hardBounces), options: bodyCellOpts(theme, ri, "center") },
@@ -1165,10 +1181,40 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
         mRows.push(row);
       });
 
+      // --- Grand Total row across all months ---
+      if (monthlyData.length > 0) {
+        const mDenom = mUseDelivered ? mTotals.delivered : mTotals.sent;
+        const pct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
+        const mGtOpts = (align: "left" | "center" = "center"): pptxgen.TableCellProps => ({
+          bold: true, fontSize: 7, align, fill: { color: theme.headerBg },
+          fontFace: FONTS.body, valign: "middle", margin: [3, 4, 3, 4],
+        });
+        const mGt: pptxgen.TableCell[] = [
+          { text: "Grand Total", options: mGtOpts("left") },
+          { text: String(mTotals.campaigns), options: mGtOpts() },
+          { text: formatNumber(mTotals.sent), options: mGtOpts() },
+        ];
+        if (mUseDelivered) mGt.push({ text: formatNumber(mTotals.delivered), options: mGtOpts() });
+        mGt.push(
+          { text: formatNumber(mTotals.viewed), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.viewed, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.viewed, mDenom), "openRate", theme) } },
+          { text: formatNumber(mTotals.clicked), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.clicked, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.clicked, mDenom), "clickRate", theme) } },
+          { text: formatPercent(pct(mTotals.clicked, mTotals.viewed)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.clicked, mTotals.viewed), "clickRate", theme) } },
+          { text: formatNumber(mTotals.unsubs), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.unsubs, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.unsubs, mDenom), "unsubscribeRate", theme) } },
+          { text: formatNumber(mTotals.hard), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.hard, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.hard, mDenom), "bounceRate", theme) } },
+          { text: formatNumber(mTotals.soft), options: mGtOpts() },
+          { text: formatPercent(pct(mTotals.soft, mDenom)), options: { ...mGtOpts(), color: getMetricColor(pct(mTotals.soft, mDenom), "bounceRate", theme) } },
+        );
+        mRows.push(mGt);
+      }
+
       // Monthly overview column widths — Month is left-aligned, all numeric no-wrap
       const mColW = mUseDelivered
-        ? [0.85, 0.5, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.6, 0.5, 0.6, 0.5]
-        : [0.95, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55];
+        ? [0.95, 0.55, 0.6, 0.6, 0.6, 0.55, 0.6, 0.55, 0.55, 0.55, 0.55, 0.65, 0.55, 0.65, 0.55]
+        : [1.0, 0.6, 0.65, 0.65, 0.6, 0.65, 0.6, 0.6, 0.6, 0.55, 0.7, 0.55, 0.7, 0.55];
 
       s.addTable(mRows, {
         x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: mColW,
@@ -1601,9 +1647,13 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   // ==========================================
   // SLIDES 8-11: Best & Underperforming Campaigns (4 slides)
   // ==========================================
+  // Derive brand-agnostic drill-down labels (region / segment / recurring attribute)
+  // from the campaign naming convention present in THIS dataset.
+  const segmentLabelFor = buildSegmentLabeler(diagnostics.rawData.map(c => c.campaignName || ""));
+
   const createFullCampaignHeader = (): pptxgen.TableRow =>
-    ["Date", "Campaign", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
-      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 1 || i === 2 ? "left" : "center") }));
+    ["Date", "Campaign", "Label", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
+      .map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 1 || i === 2 || i === 3 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
     const denom = c.totalDeliveredUsers > 0 ? c.totalDeliveredUsers : c.totalSentUsers;
@@ -1614,6 +1664,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     return [
       { text: sanitizeText(c.startDate) || "\u2014", options: bodyCellOpts(theme, ri, "center") },
       { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+      { text: sanitizeText(segmentLabelFor(c.campaignName || "").label), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
@@ -1630,14 +1681,15 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     ];
   };
 
-  // Campaign table column widths: Date(fixed), Campaign(flex), Subject(flex), then 12 numeric fixed cols
-  // Fixed cols: Date=0.55, then 12 numeric cols at their natural widths
+  // Campaign table column widths: Date(fixed), Campaign(flex), Label(fixed), Subject(flex), then 12 numeric fixed cols
   const fixedDateW = 0.55;
+  const labelW = 1.2;
   const numericWidths = [0.5, 0.45, 0.5, 0.45, 0.5, 0.45, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5]; // 12 cols
-  const totalFixedW = fixedDateW + numericWidths.reduce((s, w) => s + w, 0);
+  const totalFixedW = fixedDateW + labelW + numericWidths.reduce((s, w) => s + w, 0);
   const remainingW = TABLE_W - totalFixedW;
-  const flexW = Math.min(remainingW / 2, 2.2); // cap at 220px equivalent (~2.2")
-  const campaignColW = [fixedDateW, flexW, flexW, ...numericWidths];
+  const flexW = Math.max(Math.min(remainingW / 2, 2.2), 0.9);
+  const campaignColW = [fixedDateW, flexW, labelW, flexW, ...numericWidths];
+
 
   // Build full campaign list (≥1000 sends)
   const allCampaignsForSort: TopCampaign[] = diagnostics.rawData
@@ -1827,6 +1879,71 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }
     addSlideFooter(s, theme, slideNum);
   }
+
+  // ==========================================
+  // Segment Drill-Down — performance by label derived from campaign naming
+  // (region / segment / recurring brand attribute)
+  // ==========================================
+  {
+    const segmentRows = buildSegmentPerformance(allCampaignsForSort, segmentLabelFor).slice(0, 12);
+    if (segmentRows.length > 0) {
+      slideNum++;
+      const s = pptx.addSlide();
+      addSlideBackground(s, theme);
+      addDecorativeMotif(s, theme, "corner");
+      addSlideHeader(s, "Segment Drill-Down \u2013 Performance by Campaign Label", theme, monthRange, slideNum);
+
+      const segHeaders = ["Label", "Campaigns", "Sent", "Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %"];
+      const segTable: pptxgen.TableRow[] = [
+        segHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") })),
+      ];
+
+      segmentRows.forEach((r, ri) => {
+        segTable.push([
+          { text: sanitizeText(r.label), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+          { text: String(r.campaigns), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatNumber(r.sent), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatNumber(r.viewed), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(r.openRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.openRate, "openRate", theme)) },
+          { text: formatNumber(r.clicked), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(r.clickRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.clickRate, "clickRate", theme)) },
+          { text: formatPercent(r.uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.uniqueCTR, "clickRate", theme)) },
+          { text: formatNumber(r.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(r.unsubRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.unsubRate, "unsubscribeRate", theme)) },
+        ]);
+      });
+
+      s.addTable(segTable, {
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W,
+        colW: [2.4, 0.75, 0.8, 0.8, 0.7, 0.8, 0.7, 0.7, 0.7, 0.7],
+        border: TABLE_BORDER,
+        fontFace: FONTS.body,
+      });
+
+      s.addText(
+        "* Labels are derived from the brand's own campaign naming convention (region / segment / recurring attribute); a campaign contributes to each of its labels.",
+        { x: 0.5, y: ZONE.INSIGHT_Y - 0.25, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body },
+      );
+
+      const best = segmentRows.reduce((a, b) => (b.openRate > a.openRate ? b : a));
+      const worst = segmentRows.reduce((a, b) => (b.openRate < a.openRate ? b : a));
+      addInsightBlock(s, [
+        {
+          severity: "positive",
+          text: `"${best.label}" leads on engagement at ${best.openRate.toFixed(1)}% open rate across ${formatNumber(best.sent)} sends.`,
+          source: "Segment drill-down",
+        },
+        {
+          severity: best.openRate - worst.openRate > 5 ? "warning" : "info",
+          text: `"${worst.label}" trails at ${worst.openRate.toFixed(1)}% open rate — a ${(best.openRate - worst.openRate).toFixed(1)}pp gap versus the leading label.`,
+          source: "Segment drill-down",
+        },
+      ], 0, theme);
+      addSlideFooter(s, theme, slideNum);
+    }
+  }
+
+
 
   // ==========================================
   // SLIDES 10 & 11: Creative Analyzer (Conditional)
