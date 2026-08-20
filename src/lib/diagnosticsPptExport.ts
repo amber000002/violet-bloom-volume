@@ -1874,7 +1874,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       addDecorativeMotif(s, theme, "corner");
       addSlideHeader(s, "Segment Drill-Down \u2013 Performance by Campaign Label", theme, monthRange, slideNum);
 
-      const segHeaders = ["Label", "Campaigns", "Sent", "Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %"];
+      const segHeaders = ["Label", "Campaigns", "Sent", "View %", "Click %", "CTR %", "Unsub %"];
       const segTable: pptxgen.TableRow[] = [
         segHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") })),
       ];
@@ -1884,19 +1884,16 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           { text: sanitizeText(r.label), options: bodyCellOpts(theme, ri, "left", undefined, true) },
           { text: String(r.campaigns), options: bodyCellOpts(theme, ri, "center") },
           { text: formatNumber(r.sent), options: bodyCellOpts(theme, ri, "center") },
-          { text: formatNumber(r.viewed), options: bodyCellOpts(theme, ri, "center") },
           { text: formatPercent(r.openRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.openRate, "openRate", theme)) },
-          { text: formatNumber(r.clicked), options: bodyCellOpts(theme, ri, "center") },
           { text: formatPercent(r.clickRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.clickRate, "clickRate", theme)) },
           { text: formatPercent(r.uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.uniqueCTR, "clickRate", theme)) },
-          { text: formatNumber(r.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
           { text: formatPercent(r.unsubRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.unsubRate, "unsubscribeRate", theme)) },
         ]);
       });
 
       s.addTable(segTable, {
         x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W,
-        colW: [2.4, 0.75, 0.8, 0.8, 0.7, 0.8, 0.7, 0.7, 0.7, 0.7],
+        colW: [4.05, 0.85, 0.9, 0.7, 0.7, 0.7, 0.7],
         border: TABLE_BORDER,
         fontFace: FONTS.body,
       });
