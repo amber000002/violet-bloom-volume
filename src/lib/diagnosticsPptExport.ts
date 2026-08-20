@@ -1638,7 +1638,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   const segmentLabelFor = buildSegmentLabeler(diagnostics.rawData.map(c => c.campaignName || ""));
 
   const createFullCampaignHeader = (): pptxgen.TableRow =>
-    ["Date", "Campaign", "Label", "Subject", "Sent", "Open", "Open%", "Click", "Click%", "CTR", "Unsub", "Unsub%", "Hard", "Hard%", "Soft", "Soft%"]
+    ["Date", "Campaign", "Label", "Subject", "Sent", "Open%", "Click%", "CTR", "Unsub%", "Hard%", "Soft%"]
       .map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 1 || i === 2 || i === 3 ? "left" : "center") }));
 
   const createFullCampaignRow = (c: TopCampaign, ri: number): pptxgen.TableRow => {
@@ -1653,27 +1653,22 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
       { text: sanitizeText(segmentLabelFor(c.campaignName || "").label), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
-      { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
       { text: formatPercent(c.openRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(c.openRate, "openRate", theme)) },
-      { text: formatNumber(c.uniqueClicked), options: bodyCellOpts(theme, ri, "center") },
       { text: formatPercent(c.clickRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(c.clickRate, "clickRate", theme)) },
       { text: formatPercent(uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(uniqueCTR, "clickRate", theme)) },
-      { text: formatNumber(c.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
       { text: formatPercent(unsubPct), options: bodyCellOpts(theme, ri, "center", getMetricColor(unsubPct, "unsubscribeRate", theme)) },
-      { text: formatNumber(c.hardBounces), options: bodyCellOpts(theme, ri, "center") },
       { text: formatPercent(hardPct), options: bodyCellOpts(theme, ri, "center", getMetricColor(hardPct, "bounceRate", theme)) },
-      { text: formatNumber(c.softBounces), options: bodyCellOpts(theme, ri, "center") },
       { text: formatPercent(softPct), options: bodyCellOpts(theme, ri, "center", getMetricColor(softPct, "bounceRate", theme)) },
     ];
   };
 
-  // Campaign table column widths: Date(fixed), Campaign(flex), Label(fixed), Subject(flex), then 12 numeric fixed cols
+  // Campaign table column widths: Date(fixed), Campaign(flex), Label(fixed), Subject(flex), Sent + 6 rate cols
   const fixedDateW = 0.55;
-  const labelW = 1.2;
-  const numericWidths = [0.5, 0.45, 0.5, 0.45, 0.5, 0.45, 0.4, 0.5, 0.4, 0.5, 0.4, 0.5]; // 12 cols
+  const labelW = 1.3;
+  const numericWidths = [0.7, 0.6, 0.6, 0.6, 0.6, 0.55, 0.55]; // Sent + 6 rates
   const totalFixedW = fixedDateW + labelW + numericWidths.reduce((s, w) => s + w, 0);
   const remainingW = TABLE_W - totalFixedW;
-  const flexW = Math.max(Math.min(remainingW / 2, 2.2), 0.9);
+  const flexW = Math.max(Math.min(remainingW / 2, 2.4), 0.9);
   const campaignColW = [fixedDateW, flexW, labelW, flexW, ...numericWidths];
 
 
