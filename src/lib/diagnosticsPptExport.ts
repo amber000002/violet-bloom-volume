@@ -1052,25 +1052,29 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     ];
     if (useDelivered) gt.push({ text: formatNumber(combined.delivered), options: gtOpts() });
     gt.push(
-      { text: formatNumber(combined.viewed), options: gtOpts() },
       { text: formatPercent(denom > 0 ? (combined.viewed / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.viewed / denom) * 100 : 0, "openRate", theme) } },
-      { text: formatNumber(combined.clicked), options: gtOpts() },
       { text: formatPercent(denom > 0 ? (combined.clicked / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.clicked / denom) * 100 : 0, "clickRate", theme) } },
       { text: formatPercent(combined.viewed > 0 ? (combined.clicked / combined.viewed) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(combined.viewed > 0 ? (combined.clicked / combined.viewed) * 100 : 0, "clickRate", theme) } },
-      { text: formatNumber(combined.unsubs), options: gtOpts() },
       { text: formatPercent(denom > 0 ? (combined.unsubs / denom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(denom > 0 ? (combined.unsubs / denom) * 100 : 0, "unsubscribeRate", theme) } },
-      { text: formatNumber(combined.hard), options: gtOpts() },
       { text: formatPercent(bounceDenom > 0 ? (combined.hard / bounceDenom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(bounceDenom > 0 ? (combined.hard / bounceDenom) * 100 : 0, "bounceRate", theme) } },
-      { text: formatNumber(combined.soft), options: gtOpts() },
       { text: formatPercent(bounceDenom > 0 ? (combined.soft / bounceDenom) * 100 : 0), options: { ...gtOpts(), color: getMetricColor(bounceDenom > 0 ? (combined.soft / bounceDenom) * 100 : 0, "bounceRate", theme) } },
     );
     rows.push(gt);
 
     const numCols = headers.length;
-    // Column widths — Provider is flex (wraps), all others no-wrap
-    const baseW = useDelivered
-      ? [1.6, 0.6, 0.6, 0.6, 0.55, 0.6, 0.55, 0.55, 0.6, 0.55, 0.65, 0.55, 0.65, 0.55]
-      : [1.9, 0.65, 0.65, 0.6, 0.65, 0.6, 0.6, 0.65, 0.6, 0.7, 0.6, 0.7, 0.6];
+    // Column widths — Provider is flex (wraps), all rate columns fixed no-wrap
+    const rateColW = 0.8;
+    const numericColW = 0.85;
+    const fixedNumericCount = useDelivered ? 2 : 1; // Sent [+ Delivered]
+    const providerW = Math.max(
+      TABLE_W - fixedNumericCount * numericColW - 6 * rateColW,
+      1.6,
+    );
+    const baseW = [
+      providerW,
+      ...Array(fixedNumericCount).fill(numericColW),
+      ...Array(6).fill(rateColW),
+    ];
 
     s.addTable(rows, {
       x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W, colW: baseW,
