@@ -14,6 +14,7 @@ import {
 import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
 import { SectionInsights, TableInsight } from "./sectionInsightEngine";
 import { JourneyAnalysisReport } from "./journeyAnalyzer";
+import { buildSegmentLabeler, buildSegmentPerformance } from "./campaignSegmentLabeler";
 
 // ============= TYPES =============
 
