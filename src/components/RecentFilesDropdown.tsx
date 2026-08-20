@@ -11,6 +11,7 @@ import {
   entryToFile,
   formatBytes,
   formatRelative,
+  RECENT_FILES_CHANGED_EVENT,
   RecentFileCategory,
   RecentFileEntry,
 } from "@/lib/recentFilesStore";
@@ -48,6 +49,16 @@ export const RecentFilesDropdown: React.FC<RecentFilesDropdownProps> = ({
   useEffect(() => {
     load();
   }, [load, refreshKey, open]);
+
+  useEffect(() => {
+    const handleChange = (event: Event) => {
+      const changedCategory = (event as CustomEvent<{ category?: RecentFileCategory }>).detail?.category;
+      if (!changedCategory || changedCategory === category) load();
+    };
+
+    window.addEventListener(RECENT_FILES_CHANGED_EVENT, handleChange);
+    return () => window.removeEventListener(RECENT_FILES_CHANGED_EVENT, handleChange);
+  }, [category, load]);
 
   const handlePick = (entry: RecentFileEntry) => {
     setOpen(false);
