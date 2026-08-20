@@ -29,6 +29,27 @@ const DB_NAME = "inbox-alchemy-recent-files";
 const DB_VERSION = 1;
 const STORE = "files";
 const MAX_PER_CATEGORY = 8;
+export const RECENT_FILES_CHANGED_EVENT = "inbox-alchemy:recent-files-changed";
+
+let persistenceRequested = false;
+
+async function requestPersistentStorage(): Promise<void> {
+  if (persistenceRequested || typeof navigator === "undefined") return;
+  persistenceRequested = true;
+
+  try {
+    await navigator.storage?.persist?.();
+  } catch (err) {
+    // IndexedDB still works when persistence is unavailable; the browser may
+    // simply retain the right to evict it under storage pressure.
+    console.warn("[recentFilesStore] persistent storage request failed", err);
+  }
+}
+
+function notifyRecentFilesChanged(category: RecentFileCategory): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(RECENT_FILES_CHANGED_EVENT, { detail: { category } }));
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -121,6 +142,7 @@ export async function listRecentFiles(category: RecentFileCategory): Promise<Rec
 
 export async function addRecentFile(category: RecentFileCategory, file: File): Promise<void> {
   try {
+    await requestPersistentStorage();
     // Read first in its own transaction so the write transaction only performs
     // synchronous requests (an awaited read can deactivate a live transaction).
     const all = await tx("readonly", (store) => reqAsPromise(store.getAll()) as Promise<RecentFileEntry[]>);
@@ -148,6 +170,7 @@ export async function addRecentFile(category: RecentFileCategory, file: File): P
       store.put(entry);
       for (const o of overflow) store.delete(o.id);
     });
+    notifyRecentFilesChanged(category);
   } catch (err) {
     console.warn("[recentFilesStore] add failed", err);
   }
@@ -156,9 +179,11 @@ export async function addRecentFile(category: RecentFileCategory, file: File): P
 
 export async function deleteRecentFile(id: string): Promise<void> {
   try {
+    const entries = await tx("readonly", (store) => reqAsPromise(store.get(id)) as Promise<RecentFileEntry | undefined>);
     await tx("readwrite", (store) => {
       store.delete(id);
     });
+    if (entries?.category) notifyRecentFilesChanged(entries.category);
   } catch (err) {
     console.warn("[recentFilesStore] delete failed", err);
   }
