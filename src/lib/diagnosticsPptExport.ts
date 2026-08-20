@@ -1663,6 +1663,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     return [
       { text: sanitizeText(c.startDate) || "\u2014", options: bodyCellOpts(theme, ri, "center") },
       { text: sanitizeText((c.campaignName || "").substring(0, 40)), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+      { text: sanitizeText(segmentLabelFor(c.campaignName || "").label), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: cleanSubjectLine(c.subjectLine).substring(0, 45), options: bodyCellOpts(theme, ri, "left", undefined, true) },
       { text: formatNumber(c.totalSentUsers), options: bodyCellOpts(theme, ri, "center") },
       { text: formatNumber(c.uniqueViewed), options: bodyCellOpts(theme, ri, "center") },
