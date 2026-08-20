@@ -1881,6 +1881,71 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
   }
 
   // ==========================================
+  // Segment Drill-Down — performance by label derived from campaign naming
+  // (region / segment / recurring brand attribute)
+  // ==========================================
+  {
+    const segmentRows = buildSegmentPerformance(allCampaignsForSort, segmentLabelFor).slice(0, 12);
+    if (segmentRows.length > 0) {
+      slideNum++;
+      const s = pptx.addSlide();
+      addSlideBackground(s, theme);
+      addDecorativeMotif(s, theme, "corner");
+      addSlideHeader(s, "Segment Drill-Down \u2013 Performance by Campaign Label", theme, monthRange, slideNum);
+
+      const segHeaders = ["Label", "Campaigns", "Sent", "Viewed", "View %", "Clicked", "Click %", "CTR %", "Unsubs", "Unsub %"];
+      const segTable: pptxgen.TableRow[] = [
+        segHeaders.map((h, i) => ({ text: h, options: headerCellOpts(theme, i === 0 ? "left" : "center") })),
+      ];
+
+      segmentRows.forEach((r, ri) => {
+        segTable.push([
+          { text: sanitizeText(r.label), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+          { text: String(r.campaigns), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatNumber(r.sent), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatNumber(r.viewed), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(r.openRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.openRate, "openRate", theme)) },
+          { text: formatNumber(r.clicked), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(r.clickRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.clickRate, "clickRate", theme)) },
+          { text: formatPercent(r.uniqueCTR), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.uniqueCTR, "clickRate", theme)) },
+          { text: formatNumber(r.unsubscribes), options: bodyCellOpts(theme, ri, "center") },
+          { text: formatPercent(r.unsubRate), options: bodyCellOpts(theme, ri, "center", getMetricColor(r.unsubRate, "unsubscribeRate", theme)) },
+        ]);
+      });
+
+      s.addTable(segTable, {
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W,
+        colW: [2.4, 0.75, 0.8, 0.8, 0.7, 0.8, 0.7, 0.7, 0.7, 0.7],
+        border: TABLE_BORDER,
+        fontFace: FONTS.body,
+      });
+
+      s.addText(
+        "* Labels are derived from the brand's own campaign naming convention (region / segment / recurring attribute); a campaign contributes to each of its labels.",
+        { x: 0.5, y: ZONE.INSIGHT_Y - 0.25, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body },
+      );
+
+      const best = segmentRows.reduce((a, b) => (b.openRate > a.openRate ? b : a));
+      const worst = segmentRows.reduce((a, b) => (b.openRate < a.openRate ? b : a));
+      addInsightBlock(s, [
+        {
+          severity: "positive",
+          text: `"${best.label}" leads on engagement at ${best.openRate.toFixed(1)}% open rate across ${formatNumber(best.sent)} sends.`,
+          source: "Segment drill-down",
+        },
+        {
+          severity: best.openRate - worst.openRate > 5 ? "warning" : "info",
+          text: `"${worst.label}" trails at ${worst.openRate.toFixed(1)}% open rate — a ${(best.openRate - worst.openRate).toFixed(1)}pp gap versus the leading label.`,
+          source: "Segment drill-down",
+        },
+      ], 0, theme);
+      addSlideFooter(s, theme, slideNum);
+    }
+  }
+
+
+
+  // ==========================================
   // SLIDES 10 & 11: Creative Analyzer (Conditional)
   // Only if creativeAnalysis is present
   // ==========================================
