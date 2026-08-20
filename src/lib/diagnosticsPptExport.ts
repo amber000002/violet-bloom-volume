@@ -956,7 +956,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
 
   // ==========================================
   // SLIDE 3: Campaign Overview by Provider (Table)
-  // Columns exactly match app: Provider, Sent, [Delivered], Viewed, View%, Clicked, Click%, Unsubs, Unsub%, Hard Bounce, Hard%, Soft Bounce, Soft%
+  // Columns: Provider, Sent, [Delivered], View%, Click%, CTR%, Unsub%, Hard%, Soft% (rate-only view)
   // ==========================================
   slideNum++;
   {
