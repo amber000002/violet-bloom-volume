@@ -517,7 +517,60 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
             </div>
 
             <div className="space-y-4">
-              {/* File picker */}
+              {/* Mode toggle */}
+              <div className="flex gap-2">
+                {([
+                  { k: "file" as const, label: "Upload file" },
+                  { k: "paste" as const, label: "Paste code" },
+                ]).map((m) => (
+                  <button
+                    key={m.k}
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => setUploadMode(m.k)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      uploadMode === m.k
+                        ? "bg-gradient-magic text-primary-foreground shadow-magic"
+                        : "bg-muted/50 text-muted-foreground border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {uploadMode === "paste" ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">
+                      Template name <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadLabel}
+                      maxLength={TEMPLATE_LABEL_MAX}
+                      onChange={(e) => setUploadLabel(e.target.value)}
+                      placeholder="e.g. Carousell Welcome AMP"
+                      className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">
+                      HTML / AMP code <span className="text-destructive">*</span>
+                    </label>
+                    <textarea
+                      value={pasteHtml}
+                      onChange={(e) => setPasteHtml(e.target.value)}
+                      spellCheck={false}
+                      placeholder="<!doctype html>…"
+                      className="w-full h-56 px-3 py-2 bg-input border border-border rounded-lg text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {formatBytes(new TextEncoder().encode(pasteHtml).length)} · max 500 KB. Saved as an .html file in the repository.
+                    </p>
+                  </div>
+                </>
+              ) : (
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1">
                   HTML file <span className="text-destructive">*</span>
@@ -574,6 +627,7 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
                   </ul>
                 )}
               </div>
+              )}
 
 
               {/* Customer */}
