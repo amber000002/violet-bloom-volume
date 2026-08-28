@@ -461,6 +461,10 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.marginTop === "number") el.style.marginTop = d.marginTop + "px";
     if (typeof d.marginBottom === "number") el.style.marginBottom = d.marginBottom + "px";
     if (typeof d.marginLeft === "number") el.style.marginLeft = d.marginLeft + "px";
+    if (typeof d.fontSize === "number" && d.fontSize > 0) el.style.fontSize = d.fontSize + "px";
+    if (typeof d.fontWeight === "string" && d.fontWeight) el.style.fontWeight = d.fontWeight;
+    if (typeof d.fontStyle === "string" && d.fontStyle) el.style.fontStyle = d.fontStyle;
+    if (typeof d.textDecoration === "string" && d.textDecoration) el.style.textDecoration = d.textDecoration;
     if (typeof d.text === "string") {
 
       // Replace only direct text child(ren); if none, set textContent
