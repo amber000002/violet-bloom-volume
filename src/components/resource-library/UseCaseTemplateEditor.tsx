@@ -57,6 +57,8 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
 
   // Upload modal
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"file" | "paste">("file");
+  const [pasteHtml, setPasteHtml] = useState("");
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadCustomer, setUploadCustomer] = useState("");
