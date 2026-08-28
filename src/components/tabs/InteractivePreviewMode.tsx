@@ -304,6 +304,10 @@ const EDITOR_SCRIPT = `(() => {
       bgImage: bgMatch ? bgMatch[2] : "",
       imageHref,
       align: (cs.textAlign === "start" ? "left" : cs.textAlign) || "left",
+      fontSize: Math.round(parseFloat(cs.fontSize) || 0),
+      fontWeight: (parseInt(cs.fontWeight, 10) >= 600 || cs.fontWeight === "bold") ? "bold" : "normal",
+      fontStyle: cs.fontStyle === "italic" ? "italic" : "normal",
+      textDecoration: /underline/.test(cs.textDecorationLine || cs.textDecoration || "") ? "underline" : "none",
       paddingTop: Math.round(parseFloat(cs.paddingTop) || 0),
       paddingBottom: Math.round(parseFloat(cs.paddingBottom) || 0),
       paddingX: Math.round(parseFloat(cs.paddingLeft) || 0),
@@ -457,6 +461,10 @@ const EDITOR_SCRIPT = `(() => {
     if (typeof d.marginTop === "number") el.style.marginTop = d.marginTop + "px";
     if (typeof d.marginBottom === "number") el.style.marginBottom = d.marginBottom + "px";
     if (typeof d.marginLeft === "number") el.style.marginLeft = d.marginLeft + "px";
+    if (typeof d.fontSize === "number" && d.fontSize > 0) el.style.fontSize = d.fontSize + "px";
+    if (typeof d.fontWeight === "string" && d.fontWeight) el.style.fontWeight = d.fontWeight;
+    if (typeof d.fontStyle === "string" && d.fontStyle) el.style.fontStyle = d.fontStyle;
+    if (typeof d.textDecoration === "string" && d.textDecoration) el.style.textDecoration = d.textDecoration;
     if (typeof d.text === "string") {
 
       // Replace only direct text child(ren); if none, set textContent
@@ -719,6 +727,11 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   if (typeof patch.marginTop === "number") el.style.marginTop = `${patch.marginTop}px`;
   if (typeof patch.marginBottom === "number") el.style.marginBottom = `${patch.marginBottom}px`;
   if (typeof patch.marginLeft === "number") el.style.marginLeft = `${patch.marginLeft}px`;
+  if (typeof patch.fontSize === "number" && patch.fontSize > 0) el.style.fontSize = `${patch.fontSize}px`;
+  if (patch.fontWeight) el.style.fontWeight = patch.fontWeight;
+  if (patch.fontStyle) el.style.fontStyle = patch.fontStyle;
+  if (patch.textDecoration) el.style.textDecoration = patch.textDecoration;
+
 
   if (typeof patch.text === "string") {
 
@@ -865,6 +878,10 @@ interface Selected {
   marginTop?: number;
   marginBottom?: number;
   marginLeft?: number;
+  fontSize?: number;
+  fontWeight?: string;
+  fontStyle?: string;
+  textDecoration?: string;
 
 }
 
@@ -1918,6 +1935,65 @@ export const InteractivePreviewMode: React.FC = () => {
                         — click them individually to edit.
                       </p>
                     )}
+                    {/* Typography */}
+                    <div className="mt-2 rounded-lg border border-border p-2.5 space-y-2.5">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>Font size</span>
+                        <span className="font-mono text-foreground">{Number(selected.fontSize ?? 0)}px</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            sendPatch({ fontSize: Math.max(8, Number(selected.fontSize ?? 14) - 1) })
+                          }
+                          className="w-7 h-7 rounded-md bg-muted/60 hover:bg-muted text-sm font-semibold"
+                          title="Decrease font size"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="range"
+                          min={8}
+                          max={72}
+                          step={1}
+                          value={Number(selected.fontSize ?? 14)}
+                          onChange={(e) => sendPatch({ fontSize: Number(e.target.value) })}
+                          className="flex-1 accent-primary"
+                        />
+                        <button
+                          onClick={() =>
+                            sendPatch({ fontSize: Math.min(120, Number(selected.fontSize ?? 14) + 1) })
+                          }
+                          className="w-7 h-7 rounded-md bg-muted/60 hover:bg-muted text-sm font-semibold"
+                          title="Increase font size"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([
+                          { key: "fontWeight", on: "bold", off: "normal", label: "B", cls: "font-bold", title: "Bold" },
+                          { key: "fontStyle", on: "italic", off: "normal", label: "I", cls: "italic", title: "Italic" },
+                          { key: "textDecoration", on: "underline", off: "none", label: "U", cls: "underline", title: "Underline" },
+                        ] as const).map(({ key, on, off, label, cls, title }) => {
+                          const active = (selected as any)[key] === on;
+                          return (
+                            <button
+                              key={key}
+                              title={title}
+                              onClick={() => sendPatch({ [key]: active ? off : on } as HtmlEditPatch)}
+                              className={`px-2 py-1.5 rounded-md text-xs ${cls} ${
+                                active
+                                  ? "bg-primary/15 text-primary border border-primary/40"
+                                  : "bg-muted/60 hover:bg-muted border border-transparent"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
 
