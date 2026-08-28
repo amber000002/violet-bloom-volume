@@ -657,15 +657,17 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
               </button>
               <button
                 onClick={handleUploadSubmit}
-                disabled={uploadFiles.length === 0 || uploading}
+                disabled={(uploadMode === "file" ? uploadFiles.length === 0 : !pasteHtml.trim() || !uploadLabel.trim()) || uploading}
                 className="px-4 py-2 rounded-lg bg-gradient-magic text-primary-foreground text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
                 {uploading && uploadProgress
                   ? `Uploading ${uploadProgress.done}/${uploadProgress.total}…`
-                  : uploadFiles.length > 1
-                    ? `Save ${uploadFiles.length} Templates`
-                    : "Save Template"}
+                  : uploadMode === "paste"
+                    ? "Save Template"
+                    : uploadFiles.length > 1
+                      ? `Save ${uploadFiles.length} Templates`
+                      : "Save Template"}
               </button>
 
             </div>
