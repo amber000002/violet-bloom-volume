@@ -727,6 +727,11 @@ function applyHtmlEditPatch(doc: Document, id: string, patch: HtmlEditPatch): vo
   if (typeof patch.marginTop === "number") el.style.marginTop = `${patch.marginTop}px`;
   if (typeof patch.marginBottom === "number") el.style.marginBottom = `${patch.marginBottom}px`;
   if (typeof patch.marginLeft === "number") el.style.marginLeft = `${patch.marginLeft}px`;
+  if (typeof patch.fontSize === "number" && patch.fontSize > 0) el.style.fontSize = `${patch.fontSize}px`;
+  if (patch.fontWeight) el.style.fontWeight = patch.fontWeight;
+  if (patch.fontStyle) el.style.fontStyle = patch.fontStyle;
+  if (patch.textDecoration) el.style.textDecoration = patch.textDecoration;
+
 
   if (typeof patch.text === "string") {
 
