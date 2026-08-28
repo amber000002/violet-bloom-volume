@@ -878,6 +878,10 @@ interface Selected {
   marginTop?: number;
   marginBottom?: number;
   marginLeft?: number;
+  fontSize?: number;
+  fontWeight?: string;
+  fontStyle?: string;
+  textDecoration?: string;
 
 }
 
