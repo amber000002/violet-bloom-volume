@@ -174,7 +174,44 @@ export const UseCaseTemplateEditor: React.FC<UseCaseTemplateEditorProps> = ({ on
     }
   };
 
+  const resetUploadForm = () => {
+    setUploadFiles([]);
+    setPasteHtml("");
+    setUploadLabel("");
+    setUploadCustomer("");
+    setUploadIndustry("");
+    setUploadType("amp");
+  };
+
+  const handlePasteSubmit = async () => {
+    const html = pasteHtml.trim();
+    const label = uploadLabel.trim();
+    if (!html || !label) return;
+    if (new TextEncoder().encode(html).length > TEMPLATE_MAX_BYTES) {
+      toast.error("Pasted code exceeds 500 KB");
+      return;
+    }
+    setUploading(true);
+    try {
+      const t = await uploadUseCaseTemplate({
+        label,
+        html,
+        customerName: uploadCustomer,
+        industry: uploadIndustry,
+        templateType: uploadType,
+      });
+      setTemplates((prev) => [t, ...prev]);
+      toast.success("Template saved");
+      setUploadOpen(false);
+      resetUploadForm();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save template");
+    }
+    setUploading(false);
+  };
+
   const handleUploadSubmit = async () => {
+    if (uploadMode === "paste") return handlePasteSubmit();
     if (uploadFiles.length === 0) return;
     setUploading(true);
     setUploadProgress({ done: 0, total: uploadFiles.length });
