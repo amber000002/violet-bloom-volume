@@ -1935,6 +1935,65 @@ export const InteractivePreviewMode: React.FC = () => {
                         — click them individually to edit.
                       </p>
                     )}
+                    {/* Typography */}
+                    <div className="mt-2 rounded-lg border border-border p-2.5 space-y-2.5">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>Font size</span>
+                        <span className="font-mono text-foreground">{Number(selected.fontSize ?? 0)}px</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            sendPatch({ fontSize: Math.max(8, Number(selected.fontSize ?? 14) - 1) })
+                          }
+                          className="w-7 h-7 rounded-md bg-muted/60 hover:bg-muted text-sm font-semibold"
+                          title="Decrease font size"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="range"
+                          min={8}
+                          max={72}
+                          step={1}
+                          value={Number(selected.fontSize ?? 14)}
+                          onChange={(e) => sendPatch({ fontSize: Number(e.target.value) })}
+                          className="flex-1 accent-primary"
+                        />
+                        <button
+                          onClick={() =>
+                            sendPatch({ fontSize: Math.min(120, Number(selected.fontSize ?? 14) + 1) })
+                          }
+                          className="w-7 h-7 rounded-md bg-muted/60 hover:bg-muted text-sm font-semibold"
+                          title="Increase font size"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([
+                          { key: "fontWeight", on: "bold", off: "normal", label: "B", cls: "font-bold", title: "Bold" },
+                          { key: "fontStyle", on: "italic", off: "normal", label: "I", cls: "italic", title: "Italic" },
+                          { key: "textDecoration", on: "underline", off: "none", label: "U", cls: "underline", title: "Underline" },
+                        ] as const).map(({ key, on, off, label, cls, title }) => {
+                          const active = (selected as any)[key] === on;
+                          return (
+                            <button
+                              key={key}
+                              title={title}
+                              onClick={() => sendPatch({ [key]: active ? off : on } as HtmlEditPatch)}
+                              className={`px-2 py-1.5 rounded-md text-xs ${cls} ${
+                                active
+                                  ? "bg-primary/15 text-primary border border-primary/40"
+                                  : "bg-muted/60 hover:bg-muted border border-transparent"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
 
