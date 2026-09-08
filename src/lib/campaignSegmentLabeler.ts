@@ -204,3 +204,136 @@ export function buildSegmentPerformance(
     }))
     .sort((a, b) => b.sent - a.sent);
 }
+
+// ============= SEGMENT TIMELINE (label × month) =============
+
+export interface SegmentMonthCell {
+  month: string;
+  monthSortKey: string;
+  campaigns: number;
+  sent: number;
+  viewed: number;
+  clicked: number;
+  unsubscribes: number;
+  openRate: number;
+  clickRate: number;
+  uniqueCTR: number;
+  unsubRate: number;
+}
+
+export interface SegmentTimelineRow {
+  label: string;
+  totalSent: number;
+  cells: SegmentMonthCell[];
+  /** Percentage-point delta of open rate between first and last month with data */
+  openRateDelta: number;
+}
+
+export interface SegmentTimeline {
+  /** Ordered month labels (e.g. "Jun 2025") present across the dataset */
+  months: string[];
+  rows: SegmentTimelineRow[];
+}
+
+interface DatedLabelableCampaign extends LabelableCampaign {
+  startDate: string;
+}
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Parse DD/MM/YY or DD/MM/YYYY (also tolerates ISO) into a month bucket. */
+function monthBucket(dateStr: string): { month: string; monthSortKey: string } | null {
+  if (!dateStr) return null;
+  const raw = dateStr.trim().split(" ")[0];
+  let y: number | null = null;
+  let m: number | null = null;
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const dmy = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+  if (iso) {
+    y = Number(iso[1]);
+    m = Number(iso[2]);
+  } else if (dmy) {
+    m = Number(dmy[2]);
+    const yr = Number(dmy[3]);
+    y = yr < 100 ? 2000 + yr : yr;
+  }
+  if (!y || !m || m < 1 || m > 12) return null;
+  return { month: `${MONTH_SHORT[m - 1]} ${y}`, monthSortKey: `${y}-${String(m).padStart(2, "0")}` };
+}
+
+/**
+ * Aggregate every derived label across months so the same region/segment can be
+ * compared over time rather than as a single snapshot.
+ */
+export function buildSegmentTimeline(
+  campaigns: DatedLabelableCampaign[],
+  labelFor: (name: string) => SegmentLabel,
+  minSent = 1000,
+): SegmentTimeline {
+  const monthKeys = new Map<string, string>(); // sortKey -> label
+  const byLabel = new Map<string, Map<string, SegmentMonthCell>>();
+
+  campaigns.forEach((c) => {
+    const bucket = monthBucket(c.startDate || "");
+    if (!bucket) return;
+    monthKeys.set(bucket.monthSortKey, bucket.month);
+
+    const { parts } = labelFor(c.campaignName || "");
+    const facets = parts.length ? parts : [];
+    facets.forEach((facet) => {
+      let months = byLabel.get(facet);
+      if (!months) {
+        months = new Map();
+        byLabel.set(facet, months);
+      }
+      const cell = months.get(bucket.monthSortKey) || {
+        month: bucket.month,
+        monthSortKey: bucket.monthSortKey,
+        campaigns: 0, sent: 0, viewed: 0, clicked: 0, unsubscribes: 0,
+        openRate: 0, clickRate: 0, uniqueCTR: 0, unsubRate: 0,
+      };
+      cell.campaigns += 1;
+      cell.sent += c.totalSentUsers || 0;
+      cell.viewed += c.uniqueViewed || 0;
+      cell.clicked += c.uniqueClicked || 0;
+      cell.unsubscribes += c.unsubscribes || 0;
+      months.set(bucket.monthSortKey, cell);
+    });
+  });
+
+  const orderedKeys = [...monthKeys.keys()].sort((a, b) => a.localeCompare(b));
+  const months = orderedKeys.map((k) => monthKeys.get(k)!);
+
+  const rows: SegmentTimelineRow[] = [];
+  byLabel.forEach((monthMap, label) => {
+    const cells = orderedKeys.map((key) => {
+      const cell = monthMap.get(key) || {
+        month: monthKeys.get(key)!,
+        monthSortKey: key,
+        campaigns: 0, sent: 0, viewed: 0, clicked: 0, unsubscribes: 0,
+        openRate: 0, clickRate: 0, uniqueCTR: 0, unsubRate: 0,
+      };
+      return {
+        ...cell,
+        openRate: cell.sent > 0 ? (cell.viewed / cell.sent) * 100 : 0,
+        clickRate: cell.sent > 0 ? (cell.clicked / cell.sent) * 100 : 0,
+        uniqueCTR: cell.viewed > 0 ? (cell.clicked / cell.viewed) * 100 : 0,
+        unsubRate: cell.sent > 0 ? (cell.unsubscribes / cell.sent) * 100 : 0,
+      };
+    });
+
+    const totalSent = cells.reduce((sum, c) => sum + c.sent, 0);
+    if (totalSent < minSent) return;
+
+    const active = cells.filter((c) => c.sent > 0);
+    const openRateDelta = active.length >= 2
+      ? active[active.length - 1].openRate - active[0].openRate
+      : 0;
+
+    rows.push({ label, totalSent, cells, openRateDelta });
+  });
+
+  rows.sort((a, b) => b.totalSent - a.totalSent);
+  return { months, rows };
+}
