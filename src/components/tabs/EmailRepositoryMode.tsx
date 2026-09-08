@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Search, X, Copy, Download, ArrowLeft, Mail, Sparkles, RefreshCw } from "lucide-react";
+import { Loader2, Search, X, Copy, Download, ArrowLeft, Mail, Sparkles, RefreshCw, Code2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   listUseCaseTemplates,
@@ -22,6 +22,7 @@ export const EmailRepositoryMode: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterIndustry, setFilterIndustry] = useState<string>("all");
   const [selected, setSelected] = useState<UseCaseTemplate | null>(null);
+  const [showCode, setShowCode] = useState(false);
   const [reclassifyingId, setReclassifyingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -158,6 +159,12 @@ export const EmailRepositoryMode: React.FC = () => {
             Back to repository
           </button>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCode((v) => !v)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted/50"
+            >
+              <Code2 className="w-4 h-4" /> {showCode ? "Hide code" : "Show code"}
+            </button>
             <button
               onClick={() => handleCopy(selected.htmlContent)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted/50"
