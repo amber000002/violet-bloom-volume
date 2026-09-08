@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Search, X, Copy, Download, ArrowLeft, Mail, Sparkles, RefreshCw } from "lucide-react";
+import { Loader2, Search, X, Copy, Download, ArrowLeft, Mail, Sparkles, RefreshCw, Code2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   listUseCaseTemplates,
@@ -22,6 +22,7 @@ export const EmailRepositoryMode: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterIndustry, setFilterIndustry] = useState<string>("all");
   const [selected, setSelected] = useState<UseCaseTemplate | null>(null);
+  const [showCode, setShowCode] = useState(false);
   const [reclassifyingId, setReclassifyingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -159,6 +160,12 @@ export const EmailRepositoryMode: React.FC = () => {
           </button>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowCode((v) => !v)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted/50"
+            >
+              <Code2 className="w-4 h-4" /> {showCode ? "Hide code" : "Show code"}
+            </button>
+            <button
               onClick={() => handleCopy(selected.htmlContent)}
               className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm hover:bg-muted/50"
             >
@@ -204,33 +211,36 @@ export const EmailRepositoryMode: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Code (left) */}
-          <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
-            <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">HTML Code</span>
-              <button
-                onClick={() => handleCopy(selected.htmlContent)}
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-              >
-                <Copy className="w-3 h-3" /> Copy
-              </button>
+        <div className={showCode ? "grid grid-cols-1 lg:grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
+          {showCode && (
+            <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
+              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">HTML Code</span>
+                <button
+                  onClick={() => handleCopy(selected.htmlContent)}
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" /> Copy
+                </button>
+              </div>
+              <pre className="p-3 text-[11px] leading-relaxed overflow-auto max-h-[85vh] font-mono text-foreground/80 bg-muted/20">
+                <code>{selected.htmlContent}</code>
+              </pre>
             </div>
-            <pre className="p-3 text-[11px] leading-relaxed overflow-auto max-h-[70vh] font-mono text-foreground/80 bg-muted/20">
-              <code>{selected.htmlContent}</code>
-            </pre>
-          </div>
+          )}
 
-          {/* Preview (right) */}
+          {/* Preview */}
           <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
             <div className="px-3 py-2 border-b border-border">
               <span className="text-xs font-medium text-muted-foreground">Preview</span>
             </div>
-            <AmpEmailPreviewFrame
-              title={selected.label}
-              html={selected.htmlContent}
-              className="w-full h-[70vh] bg-white"
-            />
+            <div className="bg-white flex justify-center">
+              <AmpEmailPreviewFrame
+                title={selected.label}
+                html={selected.htmlContent}
+                className={`${showCode ? "w-full" : "w-full max-w-[900px]"} h-[85vh] bg-white`}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -327,7 +337,7 @@ export const EmailRepositoryMode: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                onClick={() => setSelected(t)}
+                onClick={() => { setShowCode(false); setSelected(t); }}
                 className="text-left group rounded-xl border border-border bg-card/40 overflow-hidden hover:border-primary/50 transition-colors"
               >
                 <div className="relative aspect-[4/5] bg-white overflow-hidden">
