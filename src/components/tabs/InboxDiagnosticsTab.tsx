@@ -31,7 +31,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
-import { buildSegmentLabeler, buildSegmentTimeline } from "@/lib/campaignSegmentLabeler";
+import { buildSegmentLabeler, buildSegmentTimeline, buildSegmentPerformance } from "@/lib/campaignSegmentLabeler";
 import { exportElementAsPNG, exportCreativeAnalysisAsText, exportCreativeAnalysisAsCSV } from "@/lib/exportUtils";
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { 
@@ -2017,6 +2017,72 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
                 </p>
               </div>
             )}
+          </CollapsibleSection>
+
+          {/* ============= SEGMENT LABEL PERFORMANCE (snapshot) ============= */}
+          <CollapsibleSection
+            title="Segment Label Performance"
+            icon={<Activity className="w-5 h-5 text-primary" />}
+            isOpen={expandedSections.segmentLabels ?? true}
+            onToggle={() => toggleSection("segmentLabels")}
+          >
+            {(() => {
+              const labelFor = buildSegmentLabeler(diagnostics.rawData.map((c) => c.campaignName || ""));
+              const segRows = buildSegmentPerformance(
+                diagnostics.rawData.map((c) => ({
+                  campaignName: c.campaignName,
+                  totalSentUsers: c.totalSentUsers,
+                  uniqueViewed: c.uniqueViewedWithinConversion,
+                  uniqueClicked: c.uniqueClickedWithinConversion,
+                  unsubscribes: c.totalUnsubscribes,
+                })),
+                labelFor,
+              ).slice(0, 12);
+
+              if (segRows.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    No recurring region/segment labels with at least 1,000 sends were found in your campaign names.
+                  </p>
+                );
+              }
+
+              return (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Label</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Campaigns</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Sent</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">View %</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Click %</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Unique CTR %</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Unsub %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {segRows.map((r) => (
+                          <tr key={r.label} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="px-3 py-2 font-medium whitespace-nowrap">{r.label}</td>
+                            <td className="px-3 py-2 text-right text-muted-foreground">{r.campaigns}</td>
+                            <td className="px-3 py-2 text-right">{formatNumber(r.sent)}</td>
+                            <td className="px-3 py-2 text-right"><ColoredPercent value={r.openRate} metricType="openRate" /></td>
+                            <td className="px-3 py-2 text-right"><ColoredPercent value={r.clickRate} metricType="clickRate" /></td>
+                            <td className="px-3 py-2 text-right"><ColoredPercent value={r.uniqueCTR} metricType="clickRate" /></td>
+                            <td className="px-3 py-2 text-right"><ColoredPercent value={r.unsubRate} metricType="unsubscribeRate" /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    * Same labels and figures as the "Segment Label Performance" slide in the exported report. Labels below 1,000 total sends are excluded.
+                  </p>
+                </>
+              );
+            })()}
           </CollapsibleSection>
 
           {/* ============= SEGMENT PERFORMANCE TIMELINE ============= */}
