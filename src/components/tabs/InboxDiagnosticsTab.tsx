@@ -31,7 +31,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { exportDiagnosticsToPPT } from "@/lib/diagnosticsPptExport";
-import { buildSegmentLabeler, buildSegmentTimeline } from "@/lib/campaignSegmentLabeler";
+import { buildSegmentLabeler, buildSegmentTimeline, buildSegmentPerformance } from "@/lib/campaignSegmentLabeler";
 import { exportElementAsPNG, exportCreativeAnalysisAsText, exportCreativeAnalysisAsCSV } from "@/lib/exportUtils";
 import { ViewMode } from "@/hooks/usePresentationMode";
 import { 
