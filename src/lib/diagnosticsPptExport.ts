@@ -14,7 +14,7 @@ import {
 import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
 import { SectionInsights, TableInsight } from "./sectionInsightEngine";
 import { JourneyAnalysisReport } from "./journeyAnalyzer";
-import { buildSegmentLabeler, buildSegmentPerformance } from "./campaignSegmentLabeler";
+import { buildSegmentLabeler, buildSegmentPerformance, buildSegmentTimeline } from "./campaignSegmentLabeler";
 
 // ============= TYPES =============
 
@@ -1921,7 +1921,94 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
     }
   }
 
+  // ==========================================
+  // Segment Performance Timeline — same label compared month over month
+  // ==========================================
+  {
+    const timeline = buildSegmentTimeline(
+      diagnostics.rawData.map(c => ({
+        campaignName: c.campaignName,
+        startDate: c.startDate,
+        totalSentUsers: c.totalSentUsers,
+        uniqueViewed: c.uniqueViewedWithinConversion,
+        uniqueClicked: c.uniqueClickedWithinConversion,
+        unsubscribes: c.totalUnsubscribes,
+      })),
+      segmentLabelFor,
+    );
 
+    const timelineMonths = timeline.months.slice(-6);
+    const timelineRows = timeline.rows.slice(0, 10);
+
+    if (timelineRows.length > 0 && timelineMonths.length >= 2) {
+      slideNum++;
+      const s = pptx.addSlide();
+      addSlideBackground(s, theme);
+      addDecorativeMotif(s, theme, "corner");
+      addSlideHeader(s, "Segment Performance Timeline \u2013 View % by Month", theme, monthRange, slideNum);
+
+      const headers = ["Label", "Sent", ...timelineMonths, "Trend"];
+      const table: pptxgen.TableRow[] = [
+        headers.map((h, i) => ({ text: sanitizeText(h), options: headerCellOpts(theme, i === 0 ? "left" : "center") })),
+      ];
+
+      timelineRows.forEach((r, ri) => {
+        const cells = r.cells.filter(c => timelineMonths.includes(c.month));
+        const present = cells.filter(c => c.sent > 0);
+        const delta = present.length >= 2 ? present[present.length - 1].openRate - present[0].openRate : 0;
+        table.push([
+          { text: sanitizeText(r.label), options: bodyCellOpts(theme, ri, "left", undefined, true) },
+          { text: formatNumber(r.totalSent), options: bodyCellOpts(theme, ri, "center") },
+          ...cells.map(c => ({
+            text: c.sent > 0 ? formatPercent(c.openRate) : "\u2014",
+            options: bodyCellOpts(theme, ri, "center", c.sent > 0 ? getMetricColor(c.openRate, "openRate", theme) : theme.mutedColor),
+          })),
+          {
+            text: present.length >= 2 ? `${delta > 0 ? "+" : ""}${delta.toFixed(1)}pp` : "\u2014",
+            options: bodyCellOpts(theme, ri, "center", present.length < 2 ? theme.mutedColor : delta >= 0 ? theme.green : theme.red),
+          },
+        ]);
+      });
+
+      const monthColW = (10 - 1.0 - 3.0 - 0.9 - 0.9) / Math.max(timelineMonths.length, 1);
+      s.addTable(table, {
+        x: TABLE_X, y: ZONE.TABLE_Y, w: TABLE_W,
+        colW: [3.0, 0.9, ...timelineMonths.map(() => monthColW), 0.9],
+        border: TABLE_BORDER,
+        fontFace: FONTS.body,
+      });
+
+      s.addText(
+        "* Same label tracked across months (last 6 shown). Trend compares the first and last month with sends for that label.",
+        { x: 0.5, y: ZONE.INSIGHT_Y - 0.25, w: 9, h: 0.2, fontSize: 7, italic: true, color: theme.mutedColor, fontFace: FONTS.body },
+      );
+
+      const movers = timelineRows
+        .map(r => {
+          const cells = r.cells.filter(c => timelineMonths.includes(c.month) && c.sent > 0);
+          return { label: r.label, delta: cells.length >= 2 ? cells[cells.length - 1].openRate - cells[0].openRate : 0, active: cells.length >= 2 };
+        })
+        .filter(m => m.active);
+
+      if (movers.length > 0) {
+        const riser = movers.reduce((a, b) => (b.delta > a.delta ? b : a));
+        const faller = movers.reduce((a, b) => (b.delta < a.delta ? b : a));
+        addInsightBlock(s, [
+          {
+            severity: riser.delta > 0 ? "positive" : "info",
+            text: `"${riser.label}" moved ${riser.delta > 0 ? "up" : "down"} ${Math.abs(riser.delta).toFixed(1)}pp on open rate across the observed months.`,
+            source: "Segment timeline",
+          },
+          {
+            severity: faller.delta < -2 ? "warning" : "info",
+            text: `"${faller.label}" shifted ${faller.delta.toFixed(1)}pp over the same window — worth a content and frequency review for that cohort.`,
+            source: "Segment timeline",
+          },
+        ], 0, theme);
+      }
+      addSlideFooter(s, theme, slideNum);
+    }
+  }
 
   // ==========================================
   // SLIDES 10 & 11: Creative Analyzer (Conditional)
