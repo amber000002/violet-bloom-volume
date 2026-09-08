@@ -598,6 +598,8 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
   const [bestJourneySortBy, setBestJourneySortBy] = useState<"openRate" | "clickRate">("openRate");
   const [worstJourneySortBy, setWorstJourneySortBy] = useState<"openRate" | "clickRate">("openRate");
    const [monthlyProviderTab, setMonthlyProviderTab] = useState<string | null>(null);
+  const [segmentMetric, setSegmentMetric] = useState<"openRate" | "clickRate" | "uniqueCTR" | "unsubRate">("openRate");
+  const [segmentLabelFilter, setSegmentLabelFilter] = useState<string>("all");
 
   // UI states
   const [isDraggingCampaign, setIsDraggingCampaign] = useState(false);
