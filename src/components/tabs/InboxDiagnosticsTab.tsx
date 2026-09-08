@@ -2018,6 +2018,130 @@ export const InboxDiagnosticsTab: React.FC<InboxDiagnosticsTabProps> = ({
             )}
           </CollapsibleSection>
 
+          {/* ============= SEGMENT PERFORMANCE TIMELINE ============= */}
+          <CollapsibleSection
+            title="Segment Performance Timeline"
+            icon={<Activity className="w-5 h-5 text-primary" />}
+            isOpen={expandedSections.segmentTimeline ?? true}
+            onToggle={() => toggleSection("segmentTimeline")}
+          >
+            {(() => {
+              const labelFor = buildSegmentLabeler(diagnostics.rawData.map((c) => c.campaignName || ""));
+              const timeline = buildSegmentTimeline(
+                diagnostics.rawData.map((c) => ({
+                  campaignName: c.campaignName,
+                  startDate: c.startDate,
+                  totalSentUsers: c.totalSentUsers,
+                  uniqueViewed: c.uniqueViewedWithinConversion,
+                  uniqueClicked: c.uniqueClickedWithinConversion,
+                  unsubscribes: c.totalUnsubscribes,
+                })),
+                labelFor,
+              );
+
+              if (timeline.rows.length === 0 || timeline.months.length < 2) {
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    Not enough dated campaigns across multiple months to build a segment timeline.
+                  </p>
+                );
+              }
+
+              const metricLabels: Record<string, string> = {
+                openRate: "View %",
+                clickRate: "Click %",
+                uniqueCTR: "Unique CTR %",
+                unsubRate: "Unsub %",
+              };
+              const rows = (segmentLabelFilter === "all"
+                ? timeline.rows.slice(0, 12)
+                : timeline.rows.filter((r) => r.label === segmentLabelFilter));
+              const lowerIsBetter = segmentMetric === "unsubRate";
+
+              return (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <select
+                      value={segmentLabelFilter}
+                      onChange={(e) => setSegmentLabelFilter(e.target.value)}
+                      className="px-3 py-1.5 bg-input border border-border rounded-lg text-xs"
+                    >
+                      <option value="all">Top labels</option>
+                      {timeline.rows.map((r) => (
+                        <option key={r.label} value={r.label}>{r.label}</option>
+                      ))}
+                    </select>
+                    <div className="flex gap-1">
+                      {(["openRate", "clickRate", "uniqueCTR", "unsubRate"] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setSegmentMetric(m)}
+                          className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                            segmentMetric === m
+                              ? "bg-primary/15 border-primary/40 text-primary"
+                              : "border-border text-muted-foreground hover:bg-muted/40"
+                          }`}
+                        >
+                          {metricLabels[m]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Label</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Total Sent</th>
+                          {timeline.months.map((m) => (
+                            <th key={m} className="px-3 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">{m}</th>
+                          ))}
+                          <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Trend</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => {
+                          const values = r.cells.map((c) => (c.sent > 0 ? c[segmentMetric] : null));
+                          const present = values.filter((v): v is number => v !== null);
+                          const firstV = present[0];
+                          const lastV = present[present.length - 1];
+                          const delta = present.length >= 2 ? lastV - firstV : 0;
+                          const improving = lowerIsBetter ? delta < 0 : delta > 0;
+                          return (
+                            <tr key={r.label} className="border-b border-border/50 hover:bg-muted/20">
+                              <td className="px-3 py-2 text-foreground font-medium whitespace-nowrap">{r.label}</td>
+                              <td className="px-3 py-2 text-right text-muted-foreground">{r.totalSent.toLocaleString()}</td>
+                              {r.cells.map((c) => (
+                                <td key={c.monthSortKey} className="px-3 py-2 text-right tabular-nums">
+                                  {c.sent > 0 ? (
+                                    <span title={`${c.campaigns} campaigns · ${c.sent.toLocaleString()} sent`}>
+                                      {c[segmentMetric].toFixed(2)}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground/40">—</span>
+                                  )}
+                                </td>
+                              ))}
+                              <td className={`px-3 py-2 text-right font-medium ${
+                                present.length < 2 ? "text-muted-foreground" : improving ? "text-emerald-500" : "text-red-500"
+                              }`}>
+                                {present.length < 2 ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(2)}pp`}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    * Labels are derived from your own campaign naming (region / segment / recurring attribute). A campaign counts towards each of its labels. Trend compares the first and last month with sends. Labels below 1,000 total sends are excluded.
+                  </p>
+                </>
+              );
+            })()}
+          </CollapsibleSection>
+
           {/* ============= EMAIL METRICS TREND CHART ============= */}
           <CollapsibleSection
             title="Email Metrics Trend"
