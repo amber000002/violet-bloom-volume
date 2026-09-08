@@ -14,7 +14,7 @@ import {
 import { CoreBrandJSON, BrandVisualAssets } from "@/types/brandProfile";
 import { SectionInsights, TableInsight } from "./sectionInsightEngine";
 import { JourneyAnalysisReport } from "./journeyAnalyzer";
-import { buildSegmentLabeler, buildSegmentPerformance } from "./campaignSegmentLabeler";
+import { buildSegmentLabeler, buildSegmentPerformance, buildSegmentTimeline } from "./campaignSegmentLabeler";
 
 // ============= TYPES =============
 
@@ -1965,7 +1965,7 @@ export const exportDiagnosticsToPPT = async (opts: DiagnosticsDeckOptions) => {
           })),
           {
             text: present.length >= 2 ? `${delta > 0 ? "+" : ""}${delta.toFixed(1)}pp` : "\u2014",
-            options: bodyCellOpts(theme, ri, "center", present.length < 2 ? theme.mutedColor : delta >= 0 ? theme.positiveColor : theme.negativeColor),
+            options: bodyCellOpts(theme, ri, "center", present.length < 2 ? theme.mutedColor : delta >= 0 ? theme.green : theme.red),
           },
         ]);
       });
