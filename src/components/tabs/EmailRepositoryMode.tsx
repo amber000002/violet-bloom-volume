@@ -337,7 +337,7 @@ export const EmailRepositoryMode: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                onClick={() => setSelected(t)}
+                onClick={() => { setShowCode(false); setSelected(t); }}
                 className="text-left group rounded-xl border border-border bg-card/40 overflow-hidden hover:border-primary/50 transition-colors"
               >
                 <div className="relative aspect-[4/5] bg-white overflow-hidden">
