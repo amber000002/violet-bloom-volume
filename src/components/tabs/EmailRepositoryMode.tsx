@@ -211,33 +211,36 @@ export const EmailRepositoryMode: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Code (left) */}
-          <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
-            <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">HTML Code</span>
-              <button
-                onClick={() => handleCopy(selected.htmlContent)}
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-              >
-                <Copy className="w-3 h-3" /> Copy
-              </button>
+        <div className={showCode ? "grid grid-cols-1 lg:grid-cols-2 gap-4" : "grid grid-cols-1 gap-4"}>
+          {showCode && (
+            <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
+              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">HTML Code</span>
+                <button
+                  onClick={() => handleCopy(selected.htmlContent)}
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" /> Copy
+                </button>
+              </div>
+              <pre className="p-3 text-[11px] leading-relaxed overflow-auto max-h-[85vh] font-mono text-foreground/80 bg-muted/20">
+                <code>{selected.htmlContent}</code>
+              </pre>
             </div>
-            <pre className="p-3 text-[11px] leading-relaxed overflow-auto max-h-[70vh] font-mono text-foreground/80 bg-muted/20">
-              <code>{selected.htmlContent}</code>
-            </pre>
-          </div>
+          )}
 
-          {/* Preview (right) */}
+          {/* Preview */}
           <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
             <div className="px-3 py-2 border-b border-border">
               <span className="text-xs font-medium text-muted-foreground">Preview</span>
             </div>
-            <AmpEmailPreviewFrame
-              title={selected.label}
-              html={selected.htmlContent}
-              className="w-full h-[70vh] bg-white"
-            />
+            <div className="bg-white flex justify-center">
+              <AmpEmailPreviewFrame
+                title={selected.label}
+                html={selected.htmlContent}
+                className={`${showCode ? "w-full" : "w-full max-w-[900px]"} h-[85vh] bg-white`}
+              />
+            </div>
           </div>
         </div>
       </div>
